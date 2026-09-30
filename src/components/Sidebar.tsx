@@ -1,177 +1,133 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
+  LayoutGrid,
   Receipt,
-  Wallet,
   Users,
+  Shapes,
+  CreditCard,
+  GitFork,
+  ClipboardList,
   BarChart3,
-  Briefcase,
-  CheckCircle2,
-  Package,
   Settings,
+  HelpCircle,
 } from "lucide-react";
 
 interface NavItem {
   id: string;
   name: string;
+  href: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 }
 
-const primaryNavItems: NavItem[] = [
-  { id: "dashboard", name: "Dashboard", icon: LayoutDashboard },
-  { id: "invoices", name: "Invoices", icon: Receipt },
-  { id: "expenses", name: "Expenses", icon: Wallet },
-  { id: "clients", name: "Clients", icon: Users },
-  { id: "analytics", name: "Analytics", icon: BarChart3 },
+const mainNavItems: NavItem[] = [
+  { id: "dashboard", name: "Dashboard", href: "/", icon: LayoutGrid },
+  { id: "invoices", name: "Invoices", href: "/#invoices", icon: Receipt },
+  { id: "clients", name: "Clients", href: "/clients", icon: Users },
+  { id: "catalog", name: "Catalog", href: "/#catalog", icon: Shapes },
+  { id: "expenses", name: "Expenses", href: "/expenses", icon: CreditCard },
+  { id: "outsourcing", name: "Outsourcing", href: "/#outsourcing", icon: GitFork },
+  { id: "tasks", name: "Tasks", href: "/#tasks", icon: ClipboardList },
+  { id: "analytics", name: "Analytics", href: "/#analytics", icon: BarChart3 },
 ];
 
-const secondaryNavItems: NavItem[] = [
-  { id: "outsourcing", name: "Outsourcing", icon: Briefcase },
-  { id: "todo", name: "To-Do", icon: CheckCircle2 },
-  { id: "catalog", name: "Catalog", icon: Package },
+const footerNavItems: NavItem[] = [
+  { id: "settings", name: "Settings", href: "/#settings", icon: Settings },
+  { id: "support", name: "Support", href: "/#support", icon: HelpCircle },
 ];
-
-const settingsItem: NavItem = {
-  id: "settings",
-  name: "Settings",
-  icon: Settings,
-};
 
 export default function Sidebar() {
-  const [activeItem, setActiveItem] = useState<string>("dashboard");
-
-  const handleSelect = (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    setActiveItem(id);
-  };
+  const pathname = usePathname();
 
   return (
-    <aside className="w-64 min-w-[16rem] h-screen sticky top-0 flex flex-col justify-between bg-white border-r border-neutral-200/80 select-none">
+    <aside className="w-64 min-w-[16rem] h-screen sticky top-0 flex flex-col justify-between bg-white border-r border-neutral-200/70 select-none z-30">
       {/* Top Header: App Branding */}
       <div className="flex flex-col">
-        <div className="h-16 px-5 flex items-center gap-3 border-b border-neutral-100">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]">
-            <svg
-              className="w-4.5 h-4.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
+        <Link
+          href="/"
+          className="h-20 px-6 flex items-center gap-3.5 group transition-colors"
+        >
+          {/* Logo badge with animated hover pulse */}
+          <div className="w-10 h-10 rounded-full bg-[#7c3aed] flex items-center justify-center text-white shadow-sm transition-transform duration-300 group-hover:scale-105 group-hover:shadow-purple-200 group-hover:shadow-md">
+            <span className="font-bold text-lg leading-none tracking-tight">B</span>
           </div>
-          <span className="text-[17px] font-bold tracking-tight text-neutral-900 leading-none">
-            BillFlow
-          </span>
-        </div>
+
+          <div className="flex flex-col">
+            <span className="text-[19px] font-semibold tracking-tight text-neutral-900 leading-tight">
+              BillFlow
+            </span>
+            <span className="text-xs text-neutral-400 font-normal leading-tight">
+              Operations Hub
+            </span>
+          </div>
+        </Link>
 
         {/* Navigation Items */}
-        <nav aria-label="Main Navigation" className="p-3 space-y-1">
-          {/* Primary Nav Links */}
-          <div className="space-y-1">
-            {primaryNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeItem === item.id;
+        <nav aria-label="Main Navigation" className="px-3.5 py-2 space-y-1">
+          {mainNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname?.startsWith(item.href) || false;
 
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={(e) => handleSelect(item.id, e)}
-                  className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
-                    isActive
-                      ? "bg-neutral-100 text-neutral-950 font-semibold shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]"
-                      : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
-                  }`}
-                >
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left outline-none cursor-pointer ${
+                  isActive
+                    ? "bg-[#ede9fe]/60 text-neutral-950 font-semibold"
+                    : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/70"
+                }`}
+              >
+                {/* Lucide animated icon on hover */}
+                <div className="w-5 h-5 flex items-center justify-center shrink-0">
                   <Icon
                     strokeWidth={isActive ? 2.2 : 1.9}
-                    className={`w-[18px] h-[18px] transition-colors duration-150 shrink-0 ${
+                    className={`w-[19px] h-[19px] transition-all duration-200 ease-out group-hover:scale-115 group-hover:-translate-y-0.5 ${
                       isActive
-                        ? "text-emerald-600"
-                        : "text-neutral-400 group-hover:text-neutral-600"
+                        ? "text-[#7c3aed]"
+                        : "text-neutral-400 group-hover:text-[#7c3aed]"
                     }`}
                   />
-                  <span className="truncate">{item.name}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Section Divider */}
-          <div className="py-2.5">
-            <div className="h-px bg-neutral-200/70 mx-2" />
-          </div>
-
-          {/* Secondary Nav Links */}
-          <div className="space-y-1">
-            {secondaryNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeItem === item.id;
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={(e) => handleSelect(item.id, e)}
-                  className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
-                    isActive
-                      ? "bg-neutral-100 text-neutral-950 font-semibold shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]"
-                      : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
-                  }`}
-                >
-                  <Icon
-                    strokeWidth={isActive ? 2.2 : 1.9}
-                    className={`w-[18px] h-[18px] transition-colors duration-150 shrink-0 ${
-                      isActive
-                        ? "text-emerald-600"
-                        : "text-neutral-400 group-hover:text-neutral-600"
-                    }`}
-                  />
-                  <span className="truncate">{item.name}</span>
-                </button>
-              );
-            })}
-          </div>
+                </div>
+                <span className="truncate">{item.name}</span>
+              </Link>
+            );
+          })}
         </nav>
       </div>
 
-      {/* Bottom Pinned Area: Settings */}
-      <div className="p-3 border-t border-neutral-100">
-        {(() => {
-          const Icon = settingsItem.icon;
-          const isActive = activeItem === settingsItem.id;
+      {/* Bottom Pinned Area: Settings & Support */}
+      <div className="p-3.5 border-t border-neutral-100/80 space-y-1">
+        {footerNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
 
           return (
-            <button
-              type="button"
-              aria-current={isActive ? "page" : undefined}
-              onClick={(e) => handleSelect(settingsItem.id, e)}
-              className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+            <Link
+              key={item.id}
+              href={item.href}
+              className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left outline-none cursor-pointer ${
                 isActive
-                  ? "bg-neutral-100 text-neutral-950 font-semibold shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]"
-                  : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
+                  ? "bg-[#ede9fe]/60 text-neutral-950 font-semibold"
+                  : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/70"
               }`}
             >
-              <Icon
-                strokeWidth={isActive ? 2.2 : 1.9}
-                className={`w-[18px] h-[18px] transition-colors duration-150 shrink-0 ${
-                  isActive
-                    ? "text-emerald-600"
-                    : "text-neutral-400 group-hover:text-neutral-600"
-                }`}
-              />
-              <span className="truncate">{settingsItem.name}</span>
-            </button>
+              <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                <Icon
+                  strokeWidth={1.9}
+                  className="w-[19px] h-[19px] text-neutral-400 transition-all duration-200 ease-out group-hover:scale-115 group-hover:rotate-12 group-hover:text-[#7c3aed]"
+                />
+              </div>
+              <span className="truncate">{item.name}</span>
+            </Link>
           );
-        })()}
+        })}
       </div>
     </aside>
   );
