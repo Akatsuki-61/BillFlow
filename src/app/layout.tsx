@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
+import { NavProvider } from "@/context/NavContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,9 +14,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const playfair = Playfair_Display({
+  variable: "--font-serif",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "BillFlow",
-  description: "Modern financial management and cashflow tracking",
+  title: "BillFlow - Operations Hub",
+  description: "Modern financial management and billing operations tracking",
 };
 
 export default function RootLayout({
@@ -24,12 +30,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-screen bg-white text-neutral-900 flex antialiased selection:bg-emerald-100 selection:text-emerald-900">
-        <Sidebar />
-        <main className="flex-1 bg-white min-h-screen">
-          {children}
-        </main>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}>
+      <body className="min-h-screen bg-[#F8F9FA] text-neutral-900 flex antialiased selection:bg-purple-100 selection:text-purple-900 font-sans">
+        <NavProvider>
+          <Sidebar />
+          <main className="flex-1 min-h-screen bg-[#F8F9FA] overflow-y-auto">
+            {children}
+          </main>
+        </NavProvider>
       </body>
     </html>
   );

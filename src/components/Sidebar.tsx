@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   LayoutDashboard,
-  Receipt,
-  Wallet,
+  FileText,
   Users,
-  BarChart3,
+  Network,
+  Banknote,
   Briefcase,
-  CheckCircle2,
-  Package,
+  CheckSquare,
+  BarChart3,
   Settings,
+  CircleHelp,
 } from "lucide-react";
+import { useNav } from "@/context/NavContext";
 
 interface NavItem {
   id: string;
@@ -19,28 +21,24 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 }
 
-const primaryNavItems: NavItem[] = [
+const navItems: NavItem[] = [
   { id: "dashboard", name: "Dashboard", icon: LayoutDashboard },
-  { id: "invoices", name: "Invoices", icon: Receipt },
-  { id: "expenses", name: "Expenses", icon: Wallet },
+  { id: "invoices", name: "Invoices", icon: FileText },
   { id: "clients", name: "Clients", icon: Users },
+  { id: "catalog", name: "Catalog", icon: Network },
+  { id: "expenses", name: "Expenses", icon: Banknote },
+  { id: "outsourcing", name: "Outsourcing", icon: Briefcase },
+  { id: "tasks", name: "Tasks", icon: CheckSquare },
   { id: "analytics", name: "Analytics", icon: BarChart3 },
 ];
 
-const secondaryNavItems: NavItem[] = [
-  { id: "outsourcing", name: "Outsourcing", icon: Briefcase },
-  { id: "todo", name: "To-Do", icon: CheckCircle2 },
-  { id: "catalog", name: "Catalog", icon: Package },
+const bottomNavItems: NavItem[] = [
+  { id: "settings", name: "Settings", icon: Settings },
+  { id: "support", name: "Support", icon: CircleHelp },
 ];
 
-const settingsItem: NavItem = {
-  id: "settings",
-  name: "Settings",
-  icon: Settings,
-};
-
 export default function Sidebar() {
-  const [activeItem, setActiveItem] = useState<string>("dashboard");
+  const { activeNav: activeItem, setActiveNav: setActiveItem } = useNav();
 
   const handleSelect = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -48,130 +46,86 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 min-w-[16rem] h-screen sticky top-0 flex flex-col justify-between bg-white border-r border-neutral-200/80 select-none">
+    <aside className="w-64 min-w-[16rem] h-screen sticky top-0 flex flex-col justify-between bg-[#F8F9FA] border-r border-neutral-200/70 select-none px-4 py-5 font-sans">
       {/* Top Header: App Branding */}
-      <div className="flex flex-col">
-        <div className="h-16 px-5 flex items-center gap-3 border-b border-neutral-100">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]">
-            <svg
-              className="w-4.5 h-4.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-3 px-2">
+          <div className="w-9 h-9 rounded-full bg-[#7C3AED] flex items-center justify-center text-white font-bold text-base shadow-sm">
+            B
           </div>
-          <span className="text-[17px] font-bold tracking-tight text-neutral-900 leading-none">
-            BillFlow
-          </span>
+          <div className="flex flex-col">
+            <span className="text-[17px] font-bold text-neutral-900 leading-tight tracking-tight">
+              BillFlow
+            </span>
+            <span className="text-xs text-neutral-400 font-normal leading-tight">
+              Operations Hub
+            </span>
+          </div>
         </div>
 
-        {/* Navigation Items */}
-        <nav aria-label="Main Navigation" className="p-3 space-y-1">
-          {/* Primary Nav Links */}
-          <div className="space-y-1">
-            {primaryNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeItem === item.id;
+        {/* Main Navigation Items */}
+        <nav aria-label="Main Navigation" className="space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeItem === item.id;
 
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={(e) => handleSelect(item.id, e)}
-                  className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-current={isActive ? "page" : undefined}
+                onClick={(e) => handleSelect(item.id, e)}
+                className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left outline-none cursor-pointer ${
+                  isActive
+                    ? "bg-[#EAE6F5] text-neutral-900 font-semibold"
+                    : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/70"
+                }`}
+              >
+                <Icon
+                  strokeWidth={isActive ? 2.2 : 1.8}
+                  className={`w-[18px] h-[18px] transition-colors duration-150 shrink-0 ${
                     isActive
-                      ? "bg-neutral-100 text-neutral-950 font-semibold shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]"
-                      : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
+                      ? "text-neutral-900"
+                      : "text-neutral-500 group-hover:text-neutral-800"
                   }`}
-                >
-                  <Icon
-                    strokeWidth={isActive ? 2.2 : 1.9}
-                    className={`w-[18px] h-[18px] transition-colors duration-150 shrink-0 ${
-                      isActive
-                        ? "text-emerald-600"
-                        : "text-neutral-400 group-hover:text-neutral-600"
-                    }`}
-                  />
-                  <span className="truncate">{item.name}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Section Divider */}
-          <div className="py-2.5">
-            <div className="h-px bg-neutral-200/70 mx-2" />
-          </div>
-
-          {/* Secondary Nav Links */}
-          <div className="space-y-1">
-            {secondaryNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeItem === item.id;
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={(e) => handleSelect(item.id, e)}
-                  className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
-                    isActive
-                      ? "bg-neutral-100 text-neutral-950 font-semibold shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]"
-                      : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
-                  }`}
-                >
-                  <Icon
-                    strokeWidth={isActive ? 2.2 : 1.9}
-                    className={`w-[18px] h-[18px] transition-colors duration-150 shrink-0 ${
-                      isActive
-                        ? "text-emerald-600"
-                        : "text-neutral-400 group-hover:text-neutral-600"
-                    }`}
-                  />
-                  <span className="truncate">{item.name}</span>
-                </button>
-              );
-            })}
-          </div>
+                />
+                <span className="truncate">{item.name}</span>
+              </button>
+            );
+          })}
         </nav>
       </div>
 
-      {/* Bottom Pinned Area: Settings */}
-      <div className="p-3 border-t border-neutral-100">
-        {(() => {
-          const Icon = settingsItem.icon;
-          const isActive = activeItem === settingsItem.id;
+      {/* Bottom Pinned Area: Settings & Support */}
+      <div className="space-y-1 pt-4 border-t border-neutral-200/50">
+        {bottomNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeItem === item.id;
 
           return (
             <button
+              key={item.id}
               type="button"
               aria-current={isActive ? "page" : undefined}
-              onClick={(e) => handleSelect(settingsItem.id, e)}
-              className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
+              onClick={(e) => handleSelect(item.id, e)}
+              className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left outline-none cursor-pointer ${
                 isActive
-                  ? "bg-neutral-100 text-neutral-950 font-semibold shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)]"
-                  : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
+                  ? "bg-[#EAE6F5] text-neutral-900 font-semibold"
+                  : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/70"
               }`}
             >
               <Icon
-                strokeWidth={isActive ? 2.2 : 1.9}
+                strokeWidth={isActive ? 2.2 : 1.8}
                 className={`w-[18px] h-[18px] transition-colors duration-150 shrink-0 ${
                   isActive
-                    ? "text-emerald-600"
-                    : "text-neutral-400 group-hover:text-neutral-600"
+                    ? "text-neutral-900"
+                    : "text-neutral-500 group-hover:text-neutral-800"
                 }`}
               />
-              <span className="truncate">{settingsItem.name}</span>
+              <span className="truncate">{item.name}</span>
             </button>
           );
-        })()}
+        })}
       </div>
     </aside>
   );
