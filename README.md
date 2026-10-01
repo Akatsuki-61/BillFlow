@@ -10,38 +10,20 @@
 
 ## Overview
 
-**BillFlow** is an offline-first, local-first web application designed for independent technical freelancers and consultants. It eliminates fragmented chat notes, manual spreadsheets, and expensive recurring SaaS tools by unifying catalog rate cards, multi-currency invoicing, deliverable execution, and sub-contractor outsourcing with vendor payout tracking.
+**BillFlow** is a modern, local-first web application designed for independent technical freelancers and consultants. It unifies catalog rate cards, multi-currency invoicing, deliverable execution, subcontractor vendor payout tracking, and real-time financial analytics into a single fast workspace.
 
 ---
 
-## Module 6: Outsourcing & Vendor Directory UI
+## Languages Used
 
-This module implements the **Outsourcing Frontend UI** strictly aligned with the official [BillFlow - Design 2.0 Figma Wireframe](https://www.figma.com/design/GtcnOoTxEvm0dRJj5FXzwY/BillFlow---Design-2.0?node-id=0-1&t=s5FMp98PXvy2LO9v-1).
-
-### Key Highlights & Features:
-
-- **Figma Design 2.0 Color & Layout Fidelity:**
-  - **Main Canvas:** Warm cream/linen tone (`#faf9f5`) matching Figma artboard canvas.
-  - **Sidebar Navigation:** Soft neutral background (`#f4f4f0`) with border (`#e5e5e0`), vibrant brand purple circle (`#7133f5`), serif brand title, and active tab pill in soft warm gray (`#eae8ed`).
-  - **Two-Font System Architecture:**
-    - **1. Headings, Brand & Metric Figures:** **Newsreader** ("Newspaper" serif font style) exclusively applied to brand logo **"BillFlow"**, page title **"Outsourcing"**, and KPI financial figures (**`$42,850.00`**, **`14`**, **`Oct 15`**).
-    - **2. All Other Web System Typography:** **Inter** sans-serif font applied to all body text, subtitles, table rows, navigation items, buttons, status badges, and interactive forms. No other fonts are loaded or used in the application.
-  - **Metric Summary Cards (`#eaeae5`):**
-    - **Total Outstanding Payables**: `$42,850.00` (in authentic Newspaper font style)
-    - **Active Vendors**: `14` (in Newspaper font style with pastel mint green crescent `#d6eddb`)
-    - **Next Payout Run**: `Oct 15` (in Newspaper font style with pastel lavender crescent `#e2e0e4`)
-  - **Header Actions:** Clean bordered buttons for `+ Add Client` and `Log Expense`.
-- **Vendor Directory Table:**
-  - Integrated `#eaeae5` container header with `#faf9f5` row cards.
-  - Itemized rows for sub-contractor services (Studio ArchiType, DevOps Nexus, ClearCopy Legal).
-  - Accurate status badges: `PENDING` (`#eaeae5`) and `PAID` (`#d6eddb` mint badge with emerald text).
-  - Action buttons matching wireframe: purple solid download buttons (`#7133f5`) for pending vouchers, and clean outlined download button for settled vendors.
-- **Font Awesome Integration ([fontawesome.com](https://fontawesome.com/)):**
-  - All navigation and view icons powered by official Font Awesome vector icons (`faTableCellsLarge`, `faFileInvoice`, `faUserGroup`, `faShapes`, `faMoneyBillWave`, `faUserGear`, `faClipboardCheck`, `faSquarePollVertical`, `faGear`, `faCircleQuestion`, `faUserPlus`, `faReceipt`, `faDownload`, `faSliders`, `faCode`, `faFileLines`, etc.).
-- **Controlled Navigation Workflow:**
-  - In the navigation bar, **only the `Outsourcing` button is active and functional on click**, focusing the workflow strictly on the Outsourcing module while keeping other module tabs non-clickable.
-- **Codebase Documentation:**
-  - Every component and function includes concise, clear comments describing its UI purpose and layout structure.
+1. **TypeScript (`.ts`, `.tsx`)**
+   - Main programming language for all application logic, React components, state management, and strict data type definitions.
+2. **JavaScript (ES Modules / Node.js)**
+   - Used for Next.js build workflows, configuration files, and package scripts.
+3. **HTML5 / JSX**
+   - Provides semantic document structure, interactive modal dialogs, and embedded SVG graphics (charts and gauges).
+4. **CSS3**
+   - Applied via **Tailwind CSS v4** (`globals.css`) for theme variables, custom typography utilities, gradients, and layout design.
 
 ---
 
@@ -49,13 +31,59 @@ This module implements the **Outsourcing Frontend UI** strictly aligned with the
 
 | Layer | Technology |
 |---|---|
-| **Framework** | Next.js 16 (App Router) |
+| **Framework** | Next.js 16 (App Router with Turbopack) |
 | **Frontend Library** | React 19 |
-| **Language** | TypeScript 5 (Strict Mode) |
-| **Styling** | Tailwind CSS v4 |
-| **Color Tokens** | `#faf9f5` (Canvas), `#f4f4f0` (Sidebar), `#eaeae5` (Cards), `#7133f5` (Purple) |
-| **Typography** | Newsreader (Headings / Newspaper style), Inter (Body & UI) |
-| **Iconography** | Font Awesome ([fontawesome.com](https://fontawesome.com/)) |
+| **Primary Language** | TypeScript 5 (Strict Mode) |
+| **Styling Engine** | Tailwind CSS v4 |
+| **Typography** | Newsreader & Inter (via `next/font/google`) |
+| **Iconography** | Font Awesome & Lucide React |
+
+---
+
+## Two-Font Typography System
+
+BillFlow strictly adheres to a clean two-font typography architecture:
+
+1. **Newsreader** (*"Newspaper"* Editorial Serif):
+   - Applied to the brand logo (**"BillFlow"**), page titles, section titles, and key financial metrics (`$142,850`, `94.2%`, `86%`, `$42,850.00`).
+2. **Inter** (Modern Sans-Serif):
+   - Applied to all UI controls, body text, buttons, table entries, filter tabs, and status badges across the system.
+
+No other font families are loaded, maintaining lightweight performance and consistent editorial branding.
+
+---
+
+## Key Features & Modules
+
+### 1. Analytics Dashboard (`/analytics`)
+Rebuilt directly from the Figma Design 2.0 wireframe:
+- **Net Profit Card:** Highlights net profit with a growth trend indicator (`+12.4%`), detailed calculation modal, and subtle background watermark.
+- **Paid Ratio Card:** High-contrast dark gradient card (`#0c0d12` to `#1f1733`) showing payment collection efficiency (`94.2%`) with a purple progress bar and breakdown figures (`$482k` collected / `$512k` billed).
+- **Revenue vs Expenses Chart:** Multi-month bar chart (January – June) comparing gross revenue against operating expenses with hover states and a 0–2.0M scale.
+- **Billing Alerts:** Highlights overdue invoices with actionable alert badges, quick one-click payment reminder triggers, and an expandable alert viewer.
+- **Collection Rate Indicator:** Circular SVG donut progress gauge (`86%`) showing on-time client settlements.
+- **Timeframe Filters:** Segmented control (`Month`, `Quarter`, `Year`) and interactive quarter selector dropdown (`Q3 2023`).
+
+### 2. Client Directory & Ledger (`/clients`)
+- Comprehensive client profiles with contact details, default billing currency, and Google Drive deliverables links.
+- Instant Quick Bill modal and invoice transaction histories.
+
+### 3. Outsourcing & Vendor Directory (`/outsourcing`)
+- Subcontractor payout tracking with payment status indicators and payment run summaries.
+
+### 4. Expense Tracking & Task Management (`/expenses`, `/tasks`, `/todo`)
+- Categorized expense logging, delivery task boards, and daily freelancer todo workflows.
+
+---
+
+## Design System & Color Tokens
+
+- **Main Canvas:** `#faf9f5` (warm cream linen)
+- **Card Containers:** `#eaeae5` with subtle border `#deded8`
+- **Dark Accent Card:** Linear gradient from `#0c0d12` to `#1f1733`
+- **Brand Purple:** `#7133f5`
+- **Alert Highlights:** `#fee2e2` / `#ef4444`
+- **Success & Growth:** `#d6eddb` / `#15803d`
 
 ---
 
@@ -64,17 +92,31 @@ This module implements the **Outsourcing Frontend UI** strictly aligned with the
 ```text
 src/
 ├── app/
-│   ├── globals.css                    # Color variables, Google fonts & Tailwind CSS v4 root
-│   ├── layout.tsx                     # Root application layout with navigation sidebar
-│   ├── page.tsx                       # Root view displaying Outsourcing UI
-│   └── outsourcing/
-│       └── page.tsx                   # Dedicated /outsourcing route
+│   ├── analytics/
+│   │   └── page.tsx                   # Dedicated /analytics route
+│   ├── clients/
+│   │   └── page.tsx                   # Client directory & billing ledger
+│   ├── expenses/
+│   │   └── page.tsx                   # Expense management
+│   ├── outsourcing/
+│   │   └── page.tsx                   # Vendor payout directory
+│   ├── tasks/
+│   │   └── page.tsx                   # Task board
+│   ├── todo/
+│   │   └── page.tsx                   # Daily todo workflow
+│   ├── globals.css                    # Theme variables & typography definitions
+│   ├── layout.tsx                     # Main app layout with navigation sidebar
+│   └── page.tsx                       # Root redirect to primary view
 ├── components/
-│   ├── Sidebar.tsx                    # Font Awesome sidebar with selective click control & wireframe colors
-│   └── outsourcing/
-│       └── OutsourcingView.tsx        # Pure frontend Outsourcing & Vendor Directory UI with wireframe colors
+│   ├── analytics/
+│   │   └── AnalyticsView.tsx          # Analytics dashboard matching Figma wireframe
+│   ├── outsourcing/
+│   │   └── OutsourcingView.tsx        # Vendor directory and payout tracking UI
+│   └── Sidebar.tsx                    # Two-font navigation sidebar
 └── types/
-    └── outsourcing.ts                 # TypeScript interfaces and models
+    ├── analytics.ts                   # Financial and billing alert interfaces
+    ├── outsourcing.ts                 # Vendor payout and invoice models
+    └── tasks.ts                       # Task management types
 ```
 
 ---
@@ -89,18 +131,16 @@ npm install
 
 ### 2. Development Server
 
-Start the local Next.js development server:
-
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) or [http://localhost:3000/outsourcing](http://localhost:3000/outsourcing) in your browser.
+Open [http://localhost:3000/analytics](http://localhost:3000/analytics) in your browser.
 
 ### 3. Production Build & Linting
 
 ```bash
-# Verify ESLint rules
+# Check TypeScript and ESLint
 npm run lint
 
 # Build production bundle
@@ -108,13 +148,4 @@ npm run build
 
 # Start production server
 npm start
-```
-
----
-
-## Recommended Git Commit
-
-```bash
-git add .
-git commit -m "feat(outsourcing): implement two-font system with Newsreader headings and Inter body UI"
 ```

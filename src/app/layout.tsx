@@ -46,9 +46,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${inter.variable} ${newsreader.variable} h-full antialiased`}
     >
-      <body className="min-h-screen bg-[#f8f8fa] text-neutral-900 flex antialiased selection:bg-purple-100 selection:text-purple-900">
+      <body className="min-h-screen bg-[#faf9f5] text-neutral-900 flex antialiased selection:bg-purple-100 selection:text-purple-900">
         <Sidebar />
-        <main className="flex-1 bg-[#f8f8fa] min-h-screen overflow-y-auto">
+        <main className="flex-1 bg-[#faf9f5] min-h-screen overflow-y-auto">
           {children}
         </main>
       </body>

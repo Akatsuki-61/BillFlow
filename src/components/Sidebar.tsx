@@ -32,7 +32,7 @@ const mainNavItems: NavItem[] = [
   { id: "expenses", name: "Expenses", href: "/expenses", icon: CreditCard },
   { id: "outsourcing", name: "Outsourcing", href: "/outsourcing", icon: GitFork },
   { id: "tasks", name: "Tasks", href: "/tasks", icon: ClipboardList },
-  { id: "analytics", name: "Analytics", href: "/#analytics", icon: BarChart3 },
+  { id: "analytics", name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
 
 const footerNavItems: NavItem[] = [
@@ -57,7 +57,7 @@ export default function Sidebar() {
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[19px] font-semibold tracking-tight text-neutral-900 leading-tight">
+            <span className="font-newspaper text-[20px] font-normal tracking-tight text-neutral-900 leading-tight">
               BillFlow
             </span>
             <span className="text-xs text-neutral-400 font-normal leading-tight">
