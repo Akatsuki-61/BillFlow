@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display, Inter, Newsreader } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import "./globals.css";
 
@@ -19,9 +19,21 @@ const playfair = Playfair_Display({
   weight: ["400", "500", "600", "700"],
 });
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  variable: "--font-newsreader",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "BillFlow - Operations Hub",
-  description: "Modern financial management and cashflow tracking for freelancers",
+  description: "Modern financial management and task outsourcing workspace for freelancers",
 };
 
 export default function RootLayout({
@@ -30,7 +42,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${inter.variable} ${newsreader.variable} h-full antialiased`}
+    >
       <body className="min-h-screen bg-[#f8f8fa] text-neutral-900 flex antialiased selection:bg-purple-100 selection:text-purple-900">
         <Sidebar />
         <main className="flex-1 bg-[#f8f8fa] min-h-screen overflow-y-auto">

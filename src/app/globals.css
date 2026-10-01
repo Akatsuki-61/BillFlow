@@ -20,6 +20,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Editorial & Newspaper Serif Typography */
+.font-newspaper,
+.font-editorial-serif {
+  font-family: var(--font-newsreader), 'Newsreader', serif;
+  font-feature-settings: 'lnum' 1, 'tnum' 1;
+}
+
 /* Custom Serif heading helper */
 .font-serif-heading {
   font-family: var(--font-playfair), Georgia, Cambria, "Times New Roman", Times, serif;
