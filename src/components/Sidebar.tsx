@@ -31,7 +31,7 @@ const mainNavItems: NavItem[] = [
   { id: "catalog", name: "Catalog", href: "/#catalog", icon: Shapes },
   { id: "expenses", name: "Expenses", href: "/expenses", icon: CreditCard },
   { id: "outsourcing", name: "Outsourcing", href: "/outsourcing", icon: GitFork },
-  { id: "tasks", name: "Tasks", href: "/#tasks", icon: ClipboardList },
+  { id: "tasks", name: "Tasks", href: "/tasks", icon: ClipboardList },
   { id: "analytics", name: "Analytics", href: "/#analytics", icon: BarChart3 },
 ];
 
