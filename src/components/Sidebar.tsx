@@ -26,9 +26,9 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
   { id: "dashboard", name: "Dashboard", href: "/", icon: LayoutGrid },
-  { id: "invoices", name: "Invoices", href: "/#invoices", icon: Receipt },
+  { id: "invoices", name: "Invoices", href: "/invoices", icon: Receipt },
   { id: "clients", name: "Clients", href: "/clients", icon: Users },
-  { id: "catalog", name: "Catalog", href: "/#catalog", icon: Shapes },
+  { id: "catalog", name: "Catalog", href: "/catalog", icon: Shapes },
   { id: "expenses", name: "Expenses", href: "/expenses", icon: CreditCard },
   { id: "outsourcing", name: "Outsourcing", href: "/outsourcing", icon: GitFork },
   { id: "tasks", name: "Tasks", href: "/tasks", icon: ClipboardList },
