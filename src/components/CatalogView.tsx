@@ -214,14 +214,14 @@ export default function CatalogView() {
   };
 
   return (
-    <div className="motion-page w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
+    <div className="p-8 lg:p-10 max-w-7xl mx-auto motion-page font-sans">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="font-serif-heading text-4xl md:text-[46px] font-normal tracking-tight text-neutral-900 leading-tight">
+          <h1 className="text-4xl md:text-[42px] font-serif font-normal text-neutral-900 tracking-tight leading-none">
             Catalog
           </h1>
-          <p className="text-neutral-500 text-sm md:text-[15px] mt-1.5 font-normal">
+          <p className="text-sm text-neutral-500 mt-2 font-normal">
             Manage standardized products, services, and pricing units.
           </p>
         </div>

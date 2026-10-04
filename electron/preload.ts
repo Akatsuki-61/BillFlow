@@ -8,9 +8,15 @@ import type {
   InvoiceStatus,
   DashboardSummary,
 } from "../src/types/billing";
+import type {
+  AppSettings,
+  UpdateSettingsInput,
+  ExportDataPayload,
+} from "../src/types/settings";
 
 contextBridge.exposeInMainWorld("billflow", {
   isElectron: true,
+  platform: process.platform,
   clients: {
     list: (): Promise<ClientWithStats[]> => ipcRenderer.invoke("clients:list"),
     get: (id: string): Promise<ClientWithStats> => ipcRenderer.invoke("clients:get", id),
@@ -34,6 +40,18 @@ contextBridge.exposeInMainWorld("billflow", {
   },
   dashboard: {
     summary: (): Promise<DashboardSummary> => ipcRenderer.invoke("dashboard:summary"),
+  },
+  settings: {
+    get: (): Promise<AppSettings> => ipcRenderer.invoke("settings:get"),
+    update: (patch: UpdateSettingsInput): Promise<AppSettings> =>
+      ipcRenderer.invoke("settings:update", patch),
+    getDbPath: (): Promise<string> => ipcRenderer.invoke("settings:getDbPath"),
+    revealDbFile: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("settings:revealDbFile"),
+    export: (): Promise<ExportDataPayload> => ipcRenderer.invoke("settings:export"),
+    import: (payload: ExportDataPayload): Promise<{ success: boolean; importedClients: number; importedInvoices: number }> =>
+      ipcRenderer.invoke("settings:import", payload),
+    reset: (): Promise<{ success: boolean }> => ipcRenderer.invoke("settings:reset"),
   },
   onDataChanged: (callback: () => void) => {
     const handler = () => callback();

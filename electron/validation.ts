@@ -36,3 +36,28 @@ export const invoicePatchSchema = z.object({
   dueDate: z.string().nullable().optional(),
   status: z.enum(["DRAFT", "UNPAID", "PAID", "OVERDUE"]).optional(),
 });
+
+export const updateSettingsSchema = z.object({
+  businessName: z.string().trim().max(120).optional(),
+  professionalTitle: z.string().trim().max(120).nullable().optional(),
+  email: z
+    .string()
+    .trim()
+    .max(120)
+    .refine((val) => val === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), "Please provide a valid email address")
+    .optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  website: z.string().trim().max(120).nullable().optional(),
+  taxId: z.string().trim().max(60).nullable().optional(),
+  address: z.string().trim().max(300).nullable().optional(),
+  paymentDetails: z.string().trim().max(1000).nullable().optional(),
+  defaultCurrency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  invoicePrefix: z.string().trim().min(1).max(20).optional(),
+  nextInvoiceSeq: z.number().int().positive().optional(),
+  defaultDueDays: z.number().int().min(0).max(365).optional(),
+  defaultTaxRate: z.number().min(0).max(100).optional(),
+  defaultNotes: z.string().trim().max(1000).nullable().optional(),
+  dateFormat: z.enum(["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"]).optional(),
+  currencyDisplay: z.enum(["symbol", "code"]).optional(),
+});
+

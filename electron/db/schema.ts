@@ -43,7 +43,33 @@ export const invoices = sqliteTable(
   ]
 );
 
+export const settings = sqliteTable("settings", {
+  id: text("id").primaryKey().default("default"),
+  businessName: text("business_name").notNull().default(""),
+  professionalTitle: text("professional_title"),
+  email: text("email").notNull().default(""),
+  phone: text("phone"),
+  website: text("website"),
+  taxId: text("tax_id"),
+  address: text("address"),
+  paymentDetails: text("payment_details"),
+  defaultCurrency: text("default_currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
+    .notNull()
+    .default("USD"),
+  invoicePrefix: text("invoice_prefix").notNull().default("INV-"),
+  nextInvoiceSeq: integer("next_invoice_seq").notNull().default(1),
+  defaultDueDays: integer("default_due_days").notNull().default(14),
+  defaultTaxRate: integer("default_tax_rate").notNull().default(0),
+  defaultNotes: text("default_notes"),
+  dateFormat: text("date_format").notNull().default("YYYY-MM-DD"),
+  currencyDisplay: text("currency_display").notNull().default("symbol"),
+  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+});
+
 export type ClientRow = typeof clients.$inferSelect;
 export type InsertClientRow = typeof clients.$inferInsert;
 export type InvoiceRow = typeof invoices.$inferSelect;
 export type InsertInvoiceRow = typeof invoices.$inferInsert;
+export type SettingRow = typeof settings.$inferSelect;
+export type InsertSettingRow = typeof settings.$inferInsert;
+

@@ -7,9 +7,15 @@ import type {
   InvoiceStatus,
   DashboardSummary,
 } from "./billing";
+import type {
+  AppSettings,
+  UpdateSettingsInput,
+  ExportDataPayload,
+} from "./settings";
 
 export interface BillFlowAPI {
   isElectron: boolean;
+  platform?: string;
   clients: {
     list: () => Promise<ClientWithStats[]>;
     get: (id: string) => Promise<ClientWithStats>;
@@ -26,6 +32,15 @@ export interface BillFlowAPI {
   };
   dashboard: {
     summary: () => Promise<DashboardSummary>;
+  };
+  settings: {
+    get: () => Promise<AppSettings>;
+    update: (patch: UpdateSettingsInput) => Promise<AppSettings>;
+    getDbPath: () => Promise<string>;
+    revealDbFile: () => Promise<{ success: boolean }>;
+    export: () => Promise<ExportDataPayload>;
+    import: (payload: ExportDataPayload) => Promise<{ success: boolean; importedClients: number; importedInvoices: number }>;
+    reset: () => Promise<{ success: boolean }>;
   };
   onDataChanged: (callback: () => void) => () => void;
 }

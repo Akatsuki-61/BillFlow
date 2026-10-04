@@ -6,6 +6,7 @@ import { initDatabase } from "./db";
 import { registerClientHandlers } from "./ipc/clients";
 import { registerInvoiceHandlers } from "./ipc/invoices";
 import { registerDashboardHandlers } from "./ipc/dashboard";
+import { registerSettingsHandlers } from "./ipc/settings";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -30,6 +31,7 @@ function broadcastDataChanged() {
 
 function createWindow() {
   const isMac = process.platform === "darwin";
+  const isWindows = process.platform === "win32";
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -37,7 +39,15 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     title: "BillFlow",
-    titleBarStyle: isMac ? "hiddenInset" : "default",
+    titleBarStyle: isMac ? "hiddenInset" : isWindows ? "hidden" : "default",
+    trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
+    titleBarOverlay: isWindows
+      ? {
+          color: "#faf9f5",
+          symbolColor: "#111827",
+          height: 40,
+        }
+      : false,
     backgroundColor: "#faf9f5",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -90,6 +100,7 @@ app.whenReady().then(() => {
   registerClientHandlers(broadcastDataChanged);
   registerInvoiceHandlers(broadcastDataChanged);
   registerDashboardHandlers();
+  registerSettingsHandlers(broadcastDataChanged);
 
   // Register production static file protocol
   const outDir = app.isPackaged

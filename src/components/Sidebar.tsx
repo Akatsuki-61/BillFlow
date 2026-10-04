@@ -36,7 +36,7 @@ const mainNavItems: NavItem[] = [
 ];
 
 const footerNavItems: NavItem[] = [
-  { id: "settings", name: "Settings", href: "/#settings", icon: Settings },
+  { id: "settings", name: "Settings", href: "/settings", icon: Settings },
   { id: "support", name: "Support", href: "/#support", icon: HelpCircle },
 ];
 
@@ -44,7 +44,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 min-w-[16rem] h-screen sticky top-0 flex flex-col justify-between bg-white border-r border-neutral-200/70 select-none z-30">
+    <aside className="w-64 min-w-[16rem] h-full flex flex-col justify-between bg-white border-r border-neutral-200/70 select-none z-30 app-no-drag">
       {/* Top Header: App Branding */}
       <div className="flex flex-col">
         <Link
@@ -108,7 +108,10 @@ export default function Sidebar() {
       <div className="p-3.5 border-t border-neutral-100/80 space-y-1">
         {footerNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive =
+            item.href.startsWith("/#")
+              ? false
+              : pathname === item.href || Boolean(pathname?.startsWith(item.href));
 
           return (
             <Link
