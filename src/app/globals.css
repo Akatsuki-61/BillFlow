@@ -290,7 +290,8 @@ aside nav a[aria-current="page"] svg {
   flex-wrap: wrap;
 }
 .workspace-form {
-  max-width: 960px;
+  width: 100%;
+  max-width: none;
 }
 
 .ui-button {

@@ -6,7 +6,7 @@ Audited all nine routes in the running macOS Electron app on 4 October 2026, inc
 
 Retain BillFlow's warm canvas, white sidebar, purple accent, and Newsreader page titles. Make working controls and numerical summaries predictable rather than redesigning the app's identity.
 
-- Layout: shared page wrapper, 32 px desktop inset (24 px at smaller widths), 24 px section spacing, 1280 px maximum content width. Settings uses the same outer alignment with a narrower form body.
+- Layout: shared page wrapper, 32 px desktop inset (24 px at smaller widths), 24 px section spacing, 1280 px maximum content width. Settings form body and cards expand horizontally to fill available window width.
 - Type: 34 px page titles, 14 px descriptions, 13 px controls, 32 px sans-serif tabular metric values. Use one serif face for titles rather than mixing it with monospace money values.
 - Controls: 40 px standard buttons/fields, 32 px compact and icon buttons; 10 px corners. Purple primary actions; white secondary actions; quiet text actions; explicit danger treatment.
 - Segments: one 40 px group with 32 px options, white selected surface, consistent selected semantics and keyboard focus.
@@ -26,7 +26,7 @@ Retain BillFlow's warm canvas, white sidebar, purple accent, and Newsreader page
 | Outsourcing | Separate palette/insets, small controls, decorative circles and prototype metrics | Shared header, cards, button/form styles and blank-state summaries |
 | Tasks | Different metric proportions, tall empty board, controls crowded at smaller desktop widths | Shared summary cards, board/list segments, wrapping filters and shorter board columns |
 | Analytics | Separate palette, dark KPI, small controls and headings, prototype values beside empty chart | Shared header, metrics, segments and card surfaces; empty-data indicators |
-| Settings | Narrower outer alignment/title, separate segments, heavy card shadows | Shared outer header, narrower inner form, shared fields/buttons/segments/surfaces |
+| Settings | Narrower outer alignment/title, separate segments, heavy card shadows | Shared outer header, full-width responsive form tiles, shared fields/buttons/segments/surfaces |
 
 ## Verification
 

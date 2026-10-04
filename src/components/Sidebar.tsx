@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,7 +14,10 @@ import {
   BarChart3,
   Settings,
   HelpCircle,
+  Plus,
+  Check,
 } from "lucide-react";
+import { useWidgetContext } from "@/context/WidgetContext";
 
 // Interface for sidebar navigation items
 interface NavItem {
@@ -47,6 +50,9 @@ const footerNavItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { pinToDashboard, isDragging } = useWidgetContext();
+  const [isDragOverDashboard, setIsDragOverDashboard] = useState(false);
+  const [showSuccessPulse, setShowSuccessPulse] = useState(false);
 
   return (
     <aside className="workspace-sidebar h-full flex flex-col justify-between bg-white border-r border-neutral-200/70 select-none z-30 app-no-drag">
@@ -82,15 +88,53 @@ export default function Sidebar() {
                 ? pathname === "/"
                 : pathname?.startsWith(item.href) || false;
 
+            const isDashboard = item.id === "dashboard";
+
             return (
               <Link
                 key={item.id}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
+                onDragOver={
+                  isDashboard
+                    ? (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "copy";
+                        setIsDragOverDashboard(true);
+                      }
+                    : undefined
+                }
+                onDragLeave={
+                  isDashboard
+                    ? () => {
+                        setIsDragOverDashboard(false);
+                      }
+                    : undefined
+                }
+                onDrop={
+                  isDashboard
+                    ? (e) => {
+                        e.preventDefault();
+                        setIsDragOverDashboard(false);
+                        const widgetId = e.dataTransfer.getData("text/plain");
+                        if (widgetId) {
+                          pinToDashboard(widgetId);
+                          setShowSuccessPulse(true);
+                          setTimeout(() => setShowSuccessPulse(false), 1400);
+                        }
+                      }
+                    : undefined
+                }
                 className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left outline-none cursor-pointer ${
-                  isActive
-                    ? "bg-[#ede9fe]/60 text-neutral-950 font-semibold"
-                    : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/70"
+                  isDashboard && isDragOverDashboard
+                    ? "bg-[#ede9fe] text-[#7c3aed] ring-2 ring-[#7c3aed] scale-[1.03] shadow-md font-semibold"
+                    : isDashboard && showSuccessPulse
+                      ? "bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500 scale-[1.03] shadow-md font-semibold"
+                      : isDashboard && isDragging
+                        ? "bg-purple-50/70 text-purple-900 border border-dashed border-[#7c3aed]/50 animate-pulse"
+                        : isActive
+                          ? "bg-[#ede9fe]/60 text-neutral-950 font-semibold"
+                          : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/70"
                 }`}
               >
                 {/* Lucide animated icon on hover */}
@@ -98,13 +142,31 @@ export default function Sidebar() {
                   <Icon
                     strokeWidth={isActive ? 2.2 : 1.9}
                     className={`w-[19px] h-[19px] transition-all duration-200 ease-out group-hover:scale-105 group-hover:-translate-y-px ${
-                      isActive
-                        ? "text-[#7c3aed]"
-                        : "text-neutral-400 group-hover:text-[#7c3aed]"
+                      isDashboard && isDragOverDashboard
+                        ? "text-[#7c3aed] scale-110"
+                        : isDashboard && showSuccessPulse
+                          ? "text-emerald-600 scale-110"
+                          : isActive
+                            ? "text-[#7c3aed]"
+                            : "text-neutral-400 group-hover:text-[#7c3aed]"
                     }`}
                   />
                 </div>
                 <span className="truncate">{item.name}</span>
+
+                {/* Drop Indicator Badges for Dashboard */}
+                {isDashboard && isDragOverDashboard && (
+                  <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#7c3aed] text-white shadow-xs">
+                    <Plus className="w-2.5 h-2.5" />
+                    <span>Drop</span>
+                  </span>
+                )}
+                {isDashboard && showSuccessPulse && (
+                  <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-xs">
+                    <Check className="w-2.5 h-2.5" />
+                    <span>Pinned</span>
+                  </span>
+                )}
               </Link>
             );
           })}

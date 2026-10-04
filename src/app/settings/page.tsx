@@ -304,7 +304,7 @@ function SettingsContent() {
   ).toUpperCase();
 
   return (
-    <div className="workspace-page motion-page">
+    <div className="workspace-page motion-page max-w-none">
       {/* Toast Notification */}
       <MotionPresence>
         {notification && (
@@ -388,7 +388,7 @@ function SettingsContent() {
       />
 
       {/* Main Content Area */}
-      <div className="workspace-form">
+      <div className="workspace-form w-full max-w-none">
         {isLoading ? (
           <div className="bg-white rounded-2xl border border-neutral-200/80 p-8 space-y-6 animate-pulse">
             <div className="h-6 w-36 bg-neutral-200 rounded-md" />
@@ -1203,7 +1203,7 @@ export default function SettingsPage() {
   return (
     <Suspense
       fallback={
-        <div className="workspace-page motion-page">
+        <div className="workspace-page motion-page max-w-none">
           <div className="h-10 w-48 bg-neutral-200 rounded-xl" />
           <div className="h-10 w-72 bg-neutral-200 rounded-xl" />
           <div className="h-64 bg-neutral-200 rounded-2xl" />
