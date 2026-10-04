@@ -56,44 +56,7 @@ const formatPriceWithCurrency = (priceStr: string, currency: string) => {
   })}`;
 };
 
-const initialCatalogItems: CatalogItem[] = [
-  {
-    id: "1",
-    title: "Senior Full-Stack Development",
-    category: "Development",
-    sku: "DEV-001",
-    description:
-      "Architecture design, API implementation, and frontend React development.",
-    price: "Rs. 45,000.00",
-    currency: "LKR",
-    unit: "/ Hourly",
-    iconType: "code",
-  },
-  {
-    id: "2",
-    title: "UI/UX Design Sprint",
-    category: "Design",
-    sku: "DES-042",
-    description:
-      "Comprehensive wireframing, high-fidelity prototyping, and user testing sessions.",
-    price: "Rs. 360,000.00",
-    currency: "LKR",
-    unit: "/ Daily",
-    iconType: "design",
-  },
-  {
-    id: "3",
-    title: "Enterprise Server License",
-    category: "Licensing",
-    sku: "LIC-991",
-    description:
-      "Annual license for self-hosted enterprise infrastructure deployment.",
-    price: "Rs. 1,500,000.00",
-    currency: "LKR",
-    unit: "/ Unit",
-    iconType: "cloud",
-  },
-];
+const initialCatalogItems: CatalogItem[] = [];
 
 const categoryList = [
   "All Items",
@@ -343,11 +306,11 @@ export default function CatalogView() {
               Total Items
             </span>
             <div className="text-4xl md:text-[42px] font-bold text-neutral-900 tracking-tight leading-none">
-              {139 + catalogItems.length}
+              {catalogItems.length}
             </div>
             <div className="flex items-center gap-1.5 text-xs font-normal mt-4">
-              <TrendingUp className="w-4 h-4 text-emerald-600" strokeWidth={2.2} />
-              <span className="font-bold text-emerald-600">+12</span>
+              <TrendingUp className="w-4 h-4 text-neutral-400" strokeWidth={2.2} />
+              <span className="font-bold text-neutral-600">0</span>
               <span className="text-neutral-500">this month</span>
             </div>
           </div>
@@ -366,7 +329,9 @@ export default function CatalogView() {
             <div className="divide-y divide-neutral-300/60">
               {filteredItems.length === 0 ? (
                 <div className="py-16 text-center text-sm text-neutral-500">
-                  No catalog items found matching your criteria.
+                  {catalogItems.length === 0
+                    ? "Catalog is empty. Add service offerings and rates."
+                    : "No catalog items found matching your criteria."}
                 </div>
               ) : (
                 filteredItems.map((item) => (

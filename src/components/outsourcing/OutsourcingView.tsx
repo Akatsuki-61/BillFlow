@@ -25,33 +25,8 @@ interface VendorItem {
   iconType: "design" | "devops" | "legal";
 }
 
-// Initial vendor dataset matching Figma Design 2.0 wireframe
-const initialVendors: VendorItem[] = [
-  {
-    id: "v-1",
-    name: "Studio ArchiType",
-    service: "UI/UX Design Services",
-    currentBalance: 8500.0,
-    status: "PENDING",
-    iconType: "design",
-  },
-  {
-    id: "v-2",
-    name: "DevOps Nexus",
-    service: "Infrastructure Engineering",
-    currentBalance: 0.0,
-    status: "PAID",
-    iconType: "devops",
-  },
-  {
-    id: "v-3",
-    name: "ClearCopy Legal",
-    service: "Contract Review",
-    currentBalance: 3200.0,
-    status: "PENDING",
-    iconType: "legal",
-  },
-];
+// Initial vendor dataset starts blank
+const initialVendors: VendorItem[] = [];
 
 export default function OutsourcingView() {
   // Main vendor directory state
@@ -224,7 +199,12 @@ export default function OutsourcingView() {
 
         {/* Vendor list rows container */}
         <div className="bg-[#faf9f5] rounded-b-2xl divide-y divide-[#eaeae5]">
-          {vendors.map((vendor) => (
+          {vendors.length === 0 ? (
+            <div className="py-16 text-center text-xs text-neutral-400">
+              No vendors added. Add external vendors and subcontractors.
+            </div>
+          ) : (
+            vendors.map((vendor) => (
             <div
               key={vendor.id}
               className="px-6 py-4.5 flex items-center justify-between hover:bg-[#f4f4f0] transition-colors"
@@ -292,7 +272,7 @@ export default function OutsourcingView() {
                 )}
               </div>
             </div>
-          ))}
+          )))}
         </div>
       </div>
 

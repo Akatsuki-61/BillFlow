@@ -21,6 +21,7 @@ import {
   Sparkles,
   Server,
   FileSpreadsheet,
+  Receipt,
 } from "lucide-react";
 
 interface ExpenseItem {
@@ -37,86 +38,7 @@ interface ExpenseItem {
   receiptName?: string;
 }
 
-const initialExpenses: ExpenseItem[] = [
-  {
-    id: "exp-1",
-    iconType: "plane",
-    date: "Oct 24, 2023",
-    merchant: "Delta Airlines",
-    description: "Flight to San Francisco for Confe...",
-    category: "TRAVEL",
-    amount: 450.0,
-    currency: "USD",
-    deductible: true,
-    hasReceipt: true,
-    receiptName: "Delta_Boarding_Pass.pdf",
-  },
-  {
-    id: "exp-2",
-    iconType: "code",
-    date: "Oct 22, 2023",
-    merchant: "GitHub",
-    description: "Copilot Subscription - Annual",
-    category: "SOFTWARE",
-    amount: 100.0,
-    currency: "USD",
-    deductible: true,
-    hasReceipt: true,
-    receiptName: "GitHub_Invoice_Oct.pdf",
-  },
-  {
-    id: "exp-3",
-    iconType: "utensils",
-    date: "Oct 20, 2023",
-    merchant: "Sweetgreen",
-    description: "Client Lunch - ACME Corp",
-    category: "MEALS",
-    amount: 42.5,
-    currency: "USD",
-    deductible: false,
-    hasReceipt: true,
-    receiptName: "Sweetgreen_Receipt.jpg",
-  },
-  {
-    id: "exp-4",
-    iconType: "package",
-    date: "Oct 18, 2023",
-    merchant: "Amazon Business",
-    description: "Office Supplies - Monitor Stand &...",
-    category: "OFFICE",
-    amount: 128.75,
-    currency: "USD",
-    deductible: true,
-    hasReceipt: true,
-    receiptName: "Amazon_Tax_Invoice.pdf",
-  },
-  {
-    id: "exp-5",
-    iconType: "ai",
-    date: "Oct 15, 2023",
-    merchant: "Anthropic / Claude AI",
-    description: "Claude 3.5 Sonnet API Tokens",
-    category: "AI INFRASTRUCTURE",
-    amount: 42.5,
-    currency: "USD",
-    deductible: true,
-    hasReceipt: true,
-    receiptName: "Anthropic_Billing.pdf",
-  },
-  {
-    id: "exp-6",
-    iconType: "server",
-    date: "Oct 12, 2023",
-    merchant: "Vercel Inc.",
-    description: "Pro Team Cloud Hosting Subscription",
-    category: "HOSTING",
-    amount: 20.0,
-    currency: "USD",
-    deductible: true,
-    hasReceipt: true,
-    receiptName: "Vercel_Invoice.pdf",
-  },
-];
+const initialExpenses: ExpenseItem[] = [];
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<ExpenseItem[]>(initialExpenses);
@@ -369,7 +291,29 @@ export default function ExpensesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 text-xs">
-              {filteredExpenses.slice((currentPage - 1) * 4, currentPage * 4).map((item) => (
+              {filteredExpenses.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto text-center">
+                      <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center text-neutral-400 mb-3">
+                        <Receipt className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-base font-semibold text-neutral-900 tracking-tight">No expenses logged</h3>
+                      <p className="text-sm text-neutral-500 mt-1 font-normal">
+                        Track business, travel, software, and office expenses for tax deductions.
+                      </p>
+                      <button
+                        onClick={() => setIsLogModalOpen(true)}
+                        className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Log Expense</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredExpenses.slice((currentPage - 1) * 4, currentPage * 4).map((item) => (
                 <tr
                   key={item.id}
                   className="hover:bg-neutral-50/70 transition-colors group"
@@ -464,7 +408,7 @@ export default function ExpensesPage() {
                     )}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

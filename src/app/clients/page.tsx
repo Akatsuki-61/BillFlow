@@ -1,122 +1,45 @@
 "use client";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-
-import React, { useState } from "react";
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   UserPlus,
   MoreVertical,
   User,
   Mail,
   Phone,
-  Clock,
   Zap,
   FolderClosed,
   ExternalLink,
   X,
   CheckCircle2,
+  AlertCircle,
   Trash2,
   Building,
+  Plus,
+  ArrowRight,
+  Receipt,
 } from "lucide-react";
+import { useClients, useInvoices } from "@/lib/data/DataProvider";
+import { formatCents, formatDateDisplay, parseAmountToCents, getCurrencySymbol } from "@/lib/format";
+import type { ClientWithStats } from "@/types/billing";
 
-interface ClientRecord {
-  id: string;
-  name: string;
-  category: "Enterprise" | "Startup" | "Agency" | string;
-  contactPerson: string;
-  contactRole?: string;
-  email: string;
-  phone?: string;
-  currency: "USD" | "LKR" | "EUR";
-  driveUrl?: string;
-  avatarType: "apex" | "nexus" | "vanguard" | "custom";
-  customAvatarLetter?: string;
-  hasQuickBill: boolean;
-  totalBilled: number;
-  totalPaid: number;
-  outstandingBalance: number;
-  invoicesCount: number;
-  recentInvoices?: {
-    id: string;
-    date: string;
-    amount: number;
-    status: "Paid" | "Partial Paid" | "Sent" | "Draft";
-  }[];
-}
+function ClientsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { clients, isLoading, createClient, deleteClient } = useClients();
+  const { createInvoice, invoices: allInvoices } = useInvoices();
 
-const initialClients: ClientRecord[] = [
-  {
-    id: "cli-1",
-    name: "Apex Architecture",
-    category: "Enterprise",
-    contactPerson: "Sarah Jenkins",
-    contactRole: "Director",
-    email: "sarah.j@apexarch.com",
-    phone: "+1 (555) 284-9102",
-    currency: "USD",
-    driveUrl: "https://drive.google.com/drive/folders/apex-architecture",
-    avatarType: "apex",
-    hasQuickBill: true,
-    totalBilled: 14500,
-    totalPaid: 12000,
-    outstandingBalance: 2500,
-    invoicesCount: 6,
-    recentInvoices: [
-      { id: "INV-2023-089", date: "Oct 15, 2023", amount: 4500, status: "Paid" },
-      { id: "INV-2023-094", date: "Oct 28, 2023", amount: 2500, status: "Sent" },
-    ],
-  },
-  {
-    id: "cli-2",
-    name: "Nexus Tech",
-    category: "Startup",
-    contactPerson: "David Chen",
-    contactRole: "CEO",
-    email: "d.chen@nexus.io",
-    phone: "+1 (555) 892-3314",
-    currency: "USD",
-    driveUrl: "https://drive.google.com/drive/folders/nexus-tech",
-    avatarType: "nexus",
-    hasQuickBill: true,
-    totalBilled: 8900,
-    totalPaid: 8900,
-    outstandingBalance: 0,
-    invoicesCount: 4,
-    recentInvoices: [
-      { id: "INV-2023-078", date: "Sep 12, 2023", amount: 3200, status: "Paid" },
-      { id: "INV-2023-084", date: "Oct 02, 2023", amount: 5700, status: "Paid" },
-    ],
-  },
-  {
-    id: "cli-3",
-    name: "Vanguard Media",
-    category: "Agency",
-    contactPerson: "Elena Rostova",
-    email: "elena@vanguard.co",
-    currency: "EUR",
-    driveUrl: "https://drive.google.com/drive/folders/vanguard-media",
-    avatarType: "vanguard",
-    hasQuickBill: false,
-    totalBilled: 6200,
-    totalPaid: 4200,
-    outstandingBalance: 2000,
-    invoicesCount: 3,
-    recentInvoices: [
-      { id: "INV-2023-066", date: "Aug 19, 2023", amount: 2200, status: "Paid" },
-      { id: "INV-2023-075", date: "Oct 10, 2023", amount: 2000, status: "Partial Paid" },
-    ],
-  },
-];
-
-export default function ClientsPage() {
-  const [clients, setClients] = useState<ClientRecord[]>(initialClients);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedClientForHistory, setSelectedClientForHistory] = useState<ClientRecord | null>(null);
-  const [selectedClientForBill, setSelectedClientForBill] = useState<ClientRecord | null>(null);
+  const [selectedClientForHistory, setSelectedClientForHistory] = useState<ClientWithStats | null>(null);
+  const [selectedClientForBill, setSelectedClientForBill] = useState<ClientWithStats | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [notification, setNotification] = useState<string | null>(null);
 
-  // New Client Form State
+  // Notifications / Toasts
+  const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // Add Client Form State
   const [formData, setFormData] = useState({
     name: "",
     category: "Enterprise",
@@ -127,82 +50,177 @@ export default function ClientsPage() {
     currency: "USD" as "USD" | "LKR" | "EUR",
     driveUrl: "",
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmittingClient, setIsSubmittingClient] = useState(false);
 
-  const showToast = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3200);
+  // Quick Bill Form State
+  const [quickBillTitle, setQuickBillTitle] = useState("Professional Services & Development Sprint");
+  const [quickBillAmount, setQuickBillAmount] = useState("1500");
+  const [isSubmittingQuickBill, setIsSubmittingQuickBill] = useState(false);
+
+  // Handle URL param ?client=<id> to deep link to client ledger
+  useEffect(() => {
+    const targetClientId = searchParams.get("client");
+    if (targetClientId && clients.length > 0) {
+      const match = clients.find((c) => c.id === targetClientId);
+      if (match) {
+        setSelectedClientForHistory(match);
+      }
+    }
+  }, [searchParams, clients]);
+
+  // Keep selectedClientForHistory synced with live clients data
+  useEffect(() => {
+    if (selectedClientForHistory) {
+      const updated = clients.find((c) => c.id === selectedClientForHistory.id);
+      if (updated) setSelectedClientForHistory(updated);
+    }
+  }, [clients, selectedClientForHistory]);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3600);
   };
 
-  const handleAddClient = (e: React.FormEvent) => {
+  const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim()) return;
+    setFormErrors({});
 
-    const newClient: ClientRecord = {
-      id: `cli-${Date.now()}`,
-      name: formData.name,
-      category: formData.category,
-      contactPerson: formData.contactPerson || formData.name,
-      contactRole: formData.contactRole || undefined,
-      email: formData.email,
-      phone: formData.phone || undefined,
-      currency: formData.currency,
-      driveUrl: formData.driveUrl || undefined,
-      avatarType: "custom",
-      customAvatarLetter: formData.name.charAt(0).toUpperCase(),
-      hasQuickBill: true,
-      totalBilled: 0,
-      totalPaid: 0,
-      outstandingBalance: 0,
-      invoicesCount: 0,
-      recentInvoices: [],
-    };
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = "Client name is required";
+    if (!formData.email.trim()) {
+      errors.email = "Email is required";
+    } else if (!formData.email.includes("@")) {
+      errors.email = "Please enter a valid email address";
+    }
 
-    setClients([newClient, ...clients]);
-    setIsAddModalOpen(false);
-    setFormData({
-      name: "",
-      category: "Enterprise",
-      contactPerson: "",
-      contactRole: "",
-      email: "",
-      phone: "",
-      currency: "USD",
-      driveUrl: "",
-    });
-    showToast(`Client "${newClient.name}" added successfully!`);
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setIsSubmittingClient(true);
+    try {
+      const created = await createClient({
+        name: formData.name.trim(),
+        category: formData.category,
+        contactPerson: formData.contactPerson.trim() || formData.name.trim(),
+        contactRole: formData.contactRole.trim() || undefined,
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || undefined,
+        currency: formData.currency,
+        driveUrl: formData.driveUrl.trim() || undefined,
+      });
+
+      setIsAddModalOpen(false);
+      setFormData({
+        name: "",
+        category: "Enterprise",
+        contactPerson: "",
+        contactRole: "",
+        email: "",
+        phone: "",
+        currency: "USD",
+        driveUrl: "",
+      });
+      showToast(`Client "${created.name}" added successfully!`);
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to add client";
+      showToast(msg, "error");
+    } finally {
+      setIsSubmittingClient(false);
+    }
   };
 
-  const handleDeleteClient = (id: string, name: string) => {
-    setClients(clients.filter((c) => c.id !== id));
-    setActiveMenuId(null);
-    showToast(`Client "${name}" removed from directory.`);
+  const handleDeleteClient = async (id: string, name: string) => {
+    try {
+      await deleteClient(id);
+      setActiveMenuId(null);
+      if (selectedClientForHistory?.id === id) {
+        setSelectedClientForHistory(null);
+      }
+      showToast(`Client "${name}" removed from directory.`);
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to remove client";
+      showToast(msg, "error");
+    }
   };
+
+  const handleQuickBillSubmit = async () => {
+    if (!selectedClientForBill) return;
+    setIsSubmittingQuickBill(true);
+
+    try {
+      const amountCents = parseAmountToCents(quickBillAmount);
+      const today = new Date();
+      const issueDate = today.toISOString().split("T")[0];
+      const dueDateObj = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const dueDate = dueDateObj.toISOString().split("T")[0];
+
+      const created = await createInvoice({
+        clientId: selectedClientForBill.id,
+        title: quickBillTitle.trim() || "Quick Bill Deliverable",
+        amountCents,
+        currency: selectedClientForBill.currency,
+        issueDate,
+        dueDate,
+        status: "UNPAID",
+      });
+
+      setSelectedClientForBill(null);
+      showToast(`Quick Bill ${created.code} generated for ${selectedClientForBill.name}!`);
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to create invoice";
+      showToast(msg, "error");
+    } finally {
+      setIsSubmittingQuickBill(false);
+    }
+  };
+
+  // Find invoices specifically for selected client history
+  const clientLedgerInvoices = selectedClientForHistory
+    ? allInvoices.filter((i) => i.clientId === selectedClientForHistory.id)
+    : [];
 
   return (
     <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 motion-page">
       {/* Toast Notification */}
       <MotionPresence>
         {notification && (
-          <MotionSurface kind="toast" className="fixed top-6 right-6 z-50 bg-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-neutral-700">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span>{notification}</span>
+          <MotionSurface
+            kind="toast"
+            className={`fixed top-6 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+              notification.type === "error"
+                ? "bg-rose-950 border-rose-800 text-rose-100"
+                : "bg-neutral-900 border-neutral-700 text-white"
+            }`}
+          >
+            {notification.type === "error" ? (
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            )}
+            <span>{notification.message}</span>
           </MotionSurface>
         )}
       </MotionPresence>
 
-      {/* Header Section matching Figma reference */}
+      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl md:text-[42px] font-serif font-normal text-neutral-900 tracking-tight leading-none">
             Clients
           </h1>
           <p className="text-sm text-neutral-500 mt-2 font-normal">
-            Manage your client relationships and billing history.
+            Manage your client relationships, contracts, and ledger balance.
           </p>
         </div>
 
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            setFormErrors({});
+            setIsAddModalOpen(true);
+          }}
           className="group inline-flex items-center gap-2.5 px-4 py-2.5 bg-white border border-neutral-200/90 rounded-xl text-sm font-medium text-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-neutral-50 hover:border-neutral-300 hover:shadow-sm transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7c3aed]/40"
         >
           <div className="w-4 h-4 flex items-center justify-center">
@@ -215,225 +233,245 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      {/* Client Cards Grid matching 3-column reference */}
+      {/* Client Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {clients.map((client) => (
-          <div
-            key={client.id}
-            className="motion-card relative bg-[#ececf0] hover:bg-[#eaeaf0] transition-colors rounded-2xl p-5 border border-neutral-200/60 shadow-xs flex flex-col justify-between group"
-          >
-            {/* Top Bar: Avatar, Title, Category, Menu */}
-            <div>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3.5">
-                  {/* Distinct Client Logo Avatar */}
-                  {client.avatarType === "apex" && (
-                    <div className="w-12 h-12 rounded-full bg-white flex flex-col items-center justify-center shadow-xs border border-neutral-100 shrink-0 text-center leading-none p-1.5 transition-transform duration-300 group-hover:scale-105">
-                      <span className="text-[13px] font-extrabold tracking-tighter text-neutral-900">
-                        AA
-                      </span>
-                      <span className="text-[6px] tracking-tight text-neutral-400 font-semibold uppercase mt-0.5">
-                        Architects
-                      </span>
-                    </div>
-                  )}
-
-                  {client.avatarType === "nexus" && (
-                    <div className="w-12 h-12 rounded-full bg-[#f3efff] border border-[#e5dcfc] flex items-center justify-center shadow-xs shrink-0 transition-transform duration-300 group-hover:scale-105">
-                      <svg
-                        className="w-6 h-6 text-[#7c3aed] transition-transform duration-300 group-hover:rotate-6"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M4 4l16 8-16 8V4z" />
-                      </svg>
-                    </div>
-                  )}
-
-                  {client.avatarType === "vanguard" && (
-                    <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-xs border border-neutral-100 shrink-0 transition-transform duration-300 group-hover:scale-105">
-                      <span className="font-serif text-xl font-normal text-neutral-600">
-                        V
-                      </span>
-                    </div>
-                  )}
-
-                  {client.avatarType === "custom" && (
-                    <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-xs border border-neutral-100 shrink-0 transition-transform duration-300 group-hover:scale-105">
-                      <span className="text-lg font-bold text-[#7c3aed]">
-                        {client.customAvatarLetter || client.name.charAt(0)}
-                      </span>
-                    </div>
-                  )}
-
-                  <div>
-                    <h2 className="text-[17px] font-semibold text-neutral-900 tracking-tight leading-snug">
-                      {client.name}
-                    </h2>
-                    <div className="flex items-center gap-1.5 text-xs text-neutral-500 font-normal mt-0.5">
-                      <FolderClosed className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                      <span>{client.category}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3-dots Context Menu Button */}
-                <div className="relative">
-                  <button
-                    onClick={() =>
-                      setActiveMenuId(activeMenuId === client.id ? null : client.id)
-                    }
-                    className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-200/60 transition-colors cursor-pointer"
-                    aria-label="Client options"
-                    aria-expanded={activeMenuId === client.id}
-                  >
-                    <MoreVertical className="w-4 h-4 transition-transform duration-200 hover:rotate-6 hover:text-neutral-900" />
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  <MotionPresence>
-                    {activeMenuId === client.id && (
-                      <MotionSurface kind="menu" className="absolute right-0 top-7 w-44 bg-white rounded-xl shadow-lg border border-neutral-200/80 py-1.5 z-20 text-xs font-medium text-neutral-700">
-                        {client.driveUrl && (
-                          <a
-                            href={client.driveUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-2 px-3.5 py-2 hover:bg-neutral-50 text-neutral-700 hover:text-[#7c3aed] transition-colors"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
-                            Google Drive
-                          </a>
-                        )}
-                        <button
-                          onClick={() => {
-                            setSelectedClientForHistory(client);
-                            setActiveMenuId(null);
-                          }}
-                          className="w-full text-left flex items-center gap-2 px-3.5 py-2 hover:bg-neutral-50 transition-colors"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-neutral-400" />
-                          View Ledger
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClient(client.id, client.name)}
-                          className="w-full text-left flex items-center gap-2 px-3.5 py-2 text-rose-600 hover:bg-rose-50 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                          Remove Client
-                        </button>
-                      </MotionSurface>
-                    )}
-                  </MotionPresence>
-                </div>
-              </div>
-
-              {/* Inner White Box with Client Contact Info */}
-              <div className="bg-white rounded-xl p-4 my-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] border border-neutral-200/50 space-y-2 text-xs text-neutral-600">
-                {/* Contact Person */}
-                <div className="flex items-center gap-2.5 group/item">
-                  <User className="w-3.5 h-3.5 text-neutral-400 shrink-0 transition-transform duration-200 group-hover/item:scale-105 group-hover/item:text-[#7c3aed]" />
-                  <span className="truncate font-medium text-neutral-700">
-                    {client.contactPerson}
-                    {client.contactRole && (
-                      <span className="text-neutral-500 font-normal ml-1">
-                        ({client.contactRole})
-                      </span>
-                    )}
-                  </span>
-                </div>
-
-                {/* Email Address */}
-                <div className="flex items-center gap-2.5 group/item">
-                  <Mail className="w-3.5 h-3.5 text-neutral-400 shrink-0 transition-transform duration-200 group-hover/item:scale-105 group-hover/item:text-[#7c3aed]" />
-                  <a
-                    href={`mailto:${client.email}`}
-                    className={`truncate transition-colors ${
-                      client.id === "cli-1" || client.id === "cli-2"
-                        ? "text-[#7c3aed] font-medium hover:underline"
-                        : "text-neutral-600 hover:text-neutral-900"
-                    }`}
-                  >
-                    {client.email}
-                  </a>
-                </div>
-
-                {/* Phone Number */}
-                {client.phone && (
-                  <div className="flex items-center gap-2.5 group/item">
-                    <Phone className="w-3.5 h-3.5 text-neutral-400 shrink-0 transition-transform duration-200 group-hover/item:scale-105 group-hover/item:text-[#7c3aed]" />
-                    <span className="text-neutral-600 font-mono text-[11px]">
-                      {client.phone}
-                    </span>
-                  </div>
-                )}
-              </div>
+        {isLoading ? (
+          // Skeleton loading cards
+          Array.from({ length: 3 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="bg-[#ececf0] rounded-2xl p-5 border border-neutral-200/60 animate-pulse h-64"
+            />
+          ))
+        ) : clients.length === 0 ? (
+          // Clean Empty State
+          <div className="col-span-full bg-white rounded-2xl border border-neutral-200/80 p-12 text-center flex flex-col items-center justify-center shadow-xs">
+            <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center text-neutral-400 mb-3.5">
+              <User className="w-6 h-6" />
             </div>
-
-            {/* Bottom Card Actions */}
-            <div className="flex items-center justify-between pt-1">
-              <button
-                onClick={() => setSelectedClientForHistory(client)}
-                className="group/btn inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors py-1 px-1 cursor-pointer outline-none"
-              >
-                <Clock className="w-3.5 h-3.5 text-neutral-500 transition-transform duration-300 group-hover/btn:rotate-6 group-hover/btn:text-[#7c3aed]" />
-                <span>View History</span>
-              </button>
-
-              {client.hasQuickBill ? (
-                <button
-                  onClick={() => setSelectedClientForBill(client)}
-                  className="group/btn inline-flex items-center justify-center gap-1.5 bg-[#6941C6] hover:bg-[#5b32be] text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer leading-tight"
-                >
-                  <Zap className="w-3.5 h-3.5 fill-white text-white transition-transform duration-200 group-hover/btn:scale-105 group-hover/btn:rotate-6 shrink-0" />
-                  <div className="text-left leading-none">
-                    <span className="block text-[11px] leading-tight font-bold tracking-tight">
-                      Quick
-                    </span>
-                    <span className="block text-[11px] leading-tight font-bold tracking-tight">
-                      Bill
-                    </span>
-                  </div>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setSelectedClientForHistory(client)}
-                  className="px-3 py-1.5 text-xs font-medium text-neutral-600 bg-white border border-neutral-200 rounded-lg shadow-xs hover:bg-neutral-50 transition-colors cursor-pointer"
-                >
-                  info
-                </button>
-              )}
-            </div>
+            <h3 className="text-base font-semibold text-neutral-900 tracking-tight">No clients yet</h3>
+            <p className="text-sm text-neutral-500 mt-1 max-w-sm font-normal">
+              Add your first client to start organizing business relationships, tracking billings, and issuing invoices.
+            </p>
+            <button
+              onClick={() => {
+                setFormErrors({});
+                setIsAddModalOpen(true);
+              }}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Add Client</span>
+            </button>
           </div>
-        ))}
+        ) : (
+          clients.map((client) => {
+            const letter = client.name.trim().charAt(0).toUpperCase();
+
+            return (
+              <div
+                key={client.id}
+                className="motion-card relative bg-[#ececf0] hover:bg-[#eaeaf0] transition-colors rounded-2xl p-5 border border-neutral-200/60 shadow-xs flex flex-col justify-between group"
+              >
+                {/* Top Bar: Avatar, Title, Category, Menu */}
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3.5">
+                      {/* Initials Avatar */}
+                      <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-xs border border-neutral-100 shrink-0 transition-transform duration-300 group-hover:scale-105">
+                        <span className="text-base font-bold text-[#7c3aed]">
+                          {letter}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h2 className="text-[17px] font-semibold text-neutral-900 tracking-tight leading-snug">
+                          {client.name}
+                        </h2>
+                        <div className="flex items-center gap-1.5 text-xs text-neutral-500 font-normal mt-0.5">
+                          <FolderClosed className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                          <span>{client.category}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3-dots Context Menu Button */}
+                    <div className="relative">
+                      <button
+                        onClick={() =>
+                          setActiveMenuId(activeMenuId === client.id ? null : client.id)
+                        }
+                        className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-white/60 transition-colors cursor-pointer"
+                        aria-label="Options"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {activeMenuId === client.id && (
+                        <div className="absolute right-0 top-8 z-30 bg-white rounded-xl shadow-lg border border-neutral-200 py-1.5 w-44 text-xs font-medium text-neutral-700">
+                          <button
+                            onClick={() => {
+                              setSelectedClientForHistory(client);
+                              setActiveMenuId(null);
+                            }}
+                            className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-neutral-400" />
+                            <span>View Ledger</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              router.push(`/invoices?new=1&client=${client.id}`);
+                              setActiveMenuId(null);
+                            }}
+                            className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-neutral-400" />
+                            <span>New Invoice</span>
+                          </button>
+                          {client.driveUrl && (
+                            <a
+                              href={client.driveUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 text-neutral-700"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+                              <span>Open Drive Folder</span>
+                            </a>
+                          )}
+                          <div className="my-1 border-t border-neutral-100" />
+                          <button
+                            onClick={() => handleDeleteClient(client.id, client.name)}
+                            className="w-full px-3.5 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            <span>Delete Client</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Financial Metrics Strip */}
+                  <div className="mt-5 pt-4 border-t border-neutral-200/70 grid grid-cols-3 gap-2 text-left">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 block leading-tight">
+                        TOTAL BILLED
+                      </span>
+                      <span className="text-[15px] font-bold text-neutral-900 mt-1 block leading-tight">
+                        {formatCents(client.totalBilledCents, client.currency)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 block leading-tight">
+                        TOTAL PAID
+                      </span>
+                      <span className="text-[15px] font-bold text-emerald-700 mt-1 block leading-tight">
+                        {formatCents(client.totalPaidCents, client.currency)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 block leading-tight">
+                        OUTSTANDING
+                      </span>
+                      <span
+                        className={`text-[15px] font-bold mt-1 block leading-tight ${
+                          client.outstandingBalanceCents > 0
+                            ? "text-rose-600 font-mono"
+                            : "text-neutral-500"
+                        }`}
+                      >
+                        {formatCents(client.outstandingBalanceCents, client.currency)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Contact Info Row */}
+                  <div className="mt-4 pt-3.5 border-t border-neutral-200/50 space-y-1.5 text-xs text-neutral-600 font-normal">
+                    <div className="flex items-center gap-2 truncate">
+                      <User className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <span className="truncate">
+                        {client.contactPerson}
+                        {client.contactRole ? ` (${client.contactRole})` : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 truncate">
+                      <Mail className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <span className="truncate">{client.email}</span>
+                    </div>
+                    {client.phone && (
+                      <div className="flex items-center gap-2 truncate">
+                        <Phone className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                        <span className="truncate">{client.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom Action Footer */}
+                <div className="mt-5 pt-3.5 border-t border-neutral-200/70 flex items-center justify-between">
+                  <span className="text-xs text-neutral-500 font-medium">
+                    {client.invoicesCount} {client.invoicesCount === 1 ? "invoice" : "invoices"}
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedClientForHistory(client)}
+                      className="px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg shadow-xs hover:bg-neutral-50 transition-colors cursor-pointer"
+                    >
+                      Ledger
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSelectedClientForBill(client);
+                        setQuickBillAmount("1500");
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#7c3aed] text-white rounded-lg text-xs font-semibold hover:bg-[#6d28d9] transition-colors shadow-xs cursor-pointer"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-white" />
+                      <span>Quick Bill</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
-      {/* Add Client Modal (SRS REQ-CLI 01 / UC-02) */}
+      {/* Add Client Modal */}
       <MotionPresence>
         {isAddModalOpen && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden">
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <MotionSurface
+              kind="panel"
+              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
+            >
               <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-[#f3efff] text-[#7c3aed] flex items-center justify-center">
                     <Building className="w-4 h-4" />
                   </div>
                   <div>
                     <h3 className="text-base font-semibold text-neutral-900">
-                      Add New Client Profile
+                      Add New Client
                     </h3>
                     <p className="text-xs text-neutral-400">
-                      UC-02: Manage Client Directory
+                      Create a new client profile in your local directory.
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsAddModalOpen(false)}
-                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors"
+                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -442,16 +480,21 @@ export default function ClientsPage() {
               <form onSubmit={handleAddClient} className="p-6 space-y-4 text-xs font-medium text-neutral-700">
                 <div>
                   <label className="block mb-1.5 text-neutral-700 font-semibold">
-                    Client Business Name *
+                    Client / Company Name *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Fintech Labs Inc."
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 focus:border-[#7c3aed]"
+                    placeholder="e.g. Apex Architecture Ltd"
+                    className={`w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 ${
+                      formErrors.name ? "border-rose-400 bg-rose-50/20" : "border-neutral-200"
+                    }`}
                   />
+                  {formErrors.name && (
+                    <span className="text-rose-600 text-[11px] mt-1 block">{formErrors.name}</span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3.5">
@@ -467,14 +510,13 @@ export default function ClientsPage() {
                       <option value="Enterprise">Enterprise</option>
                       <option value="Startup">Startup</option>
                       <option value="Agency">Agency</option>
-                      <option value="SaaS">SaaS</option>
-                      <option value="E-Commerce">E-Commerce</option>
+                      <option value="Small Business">Small Business</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block mb-1.5 text-neutral-700 font-semibold">
-                      Default Currency
+                      Billing Currency *
                     </label>
                     <select
                       value={formData.currency}
@@ -496,30 +538,26 @@ export default function ClientsPage() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-neutral-700 font-semibold">
-                      Contact Person Name
+                      Contact Person
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Alex Rivera"
                       value={formData.contactPerson}
-                      onChange={(e) =>
-                        setFormData({ ...formData, contactPerson: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                      placeholder="e.g. Sarah Jenkins"
                       className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
 
                   <div>
                     <label className="block mb-1.5 text-neutral-700 font-semibold">
-                      Contact Role / Title
+                      Contact Role
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Product Lead"
                       value={formData.contactRole}
-                      onChange={(e) =>
-                        setFormData({ ...formData, contactRole: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, contactRole: e.target.value })}
+                      placeholder="e.g. Director / CEO"
                       className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
@@ -533,26 +571,27 @@ export default function ClientsPage() {
                     <input
                       type="email"
                       required
-                      placeholder="alex@fintechlabs.io"
                       value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="sarah@apexarch.com"
+                      className={`w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 ${
+                        formErrors.email ? "border-rose-400 bg-rose-50/20" : "border-neutral-200"
+                      }`}
                     />
+                    {formErrors.email && (
+                      <span className="text-rose-600 text-[11px] mt-1 block">{formErrors.email}</span>
+                    )}
                   </div>
 
                   <div>
                     <label className="block mb-1.5 text-neutral-700 font-semibold">
-                      WhatsApp / Phone (E.164)
+                      Phone Number
                     </label>
                     <input
                       type="text"
-                      placeholder="+1 415 555 2671"
                       value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="+1 (555) 284-9102"
                       className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
@@ -560,15 +599,13 @@ export default function ClientsPage() {
 
                 <div>
                   <label className="block mb-1.5 text-neutral-700 font-semibold">
-                    Google Drive Deliverables URL
+                    Google Drive Folder Link
                   </label>
                   <input
                     type="url"
-                    placeholder="https://drive.google.com/drive/folders/..."
                     value={formData.driveUrl}
-                    onChange={(e) =>
-                      setFormData({ ...formData, driveUrl: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, driveUrl: e.target.value })}
+                    placeholder="https://drive.google.com/drive/folders/..."
                     className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                   />
                 </div>
@@ -583,9 +620,10 @@ export default function ClientsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer"
+                    disabled={isSubmittingClient}
+                    className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
-                    Save Client Profile
+                    {isSubmittingClient ? "Saving..." : "Save Client"}
                   </button>
                 </div>
               </form>
@@ -594,115 +632,157 @@ export default function ClientsPage() {
         )}
       </MotionPresence>
 
-      {/* Client History & Details Modal (SRS REQ-CLI 02) */}
+      {/* Client Ledger / Invoices Modal */}
       <MotionPresence>
         {selectedClientForHistory && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-neutral-200 overflow-hidden">
-              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
-                <div>
-                  <span className="text-xs font-semibold text-[#7c3aed] uppercase tracking-wider">
-                    Client Ledger & History
-                  </span>
-                  <h3 className="text-xl font-serif font-bold text-neutral-900">
-                    {selectedClientForHistory.name}
-                  </h3>
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <MotionSurface
+              kind="panel"
+              className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-neutral-200 overflow-hidden"
+            >
+              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white border border-neutral-200 flex items-center justify-center font-bold text-[#7c3aed]">
+                    {selectedClientForHistory.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-neutral-900">
+                      {selectedClientForHistory.name}
+                    </h3>
+                    <p className="text-xs text-neutral-400">
+                      Client Ledger & Transaction History
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setSelectedClientForHistory(null)}
-                  className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-colors"
+                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="p-6 space-y-6">
-                {/* Financial Metrics Cards */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-[#f8f8fa] p-4 rounded-xl border border-neutral-200/60">
-                    <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider block">
-                      Total Billed
+              <div className="p-6 space-y-5">
+                {/* 3 Metric Cards */}
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
+                    <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block">
+                      TOTAL BILLED
                     </span>
-                    <span className="text-2xl font-serif font-semibold text-neutral-900 mt-1 block">
-                      ${selectedClientForHistory.totalBilled.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="bg-[#f8f8fa] p-4 rounded-xl border border-neutral-200/60">
-                    <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider block">
-                      Total Paid
-                    </span>
-                    <span className="text-2xl font-serif font-semibold text-emerald-600 mt-1 block">
-                      ${selectedClientForHistory.totalPaid.toLocaleString()}
+                    <span className="text-base font-bold text-neutral-900 mt-1 block">
+                      {formatCents(selectedClientForHistory.totalBilledCents, selectedClientForHistory.currency)}
                     </span>
                   </div>
-                  <div className="bg-[#f8f8fa] p-4 rounded-xl border border-neutral-200/60">
-                    <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider block">
-                      Outstanding Balance
+                  <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                    <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block">
+                      TOTAL PAID
                     </span>
-                    <span className="text-2xl font-serif font-semibold text-amber-600 mt-1 block">
-                      ${selectedClientForHistory.outstandingBalance.toLocaleString()}
+                    <span className="text-base font-bold text-emerald-700 mt-1 block">
+                      {formatCents(selectedClientForHistory.totalPaidCents, selectedClientForHistory.currency)}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100">
+                    <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider block">
+                      OUTSTANDING
+                    </span>
+                    <span className="text-base font-bold text-rose-700 mt-1 block font-mono">
+                      {formatCents(selectedClientForHistory.outstandingBalanceCents, selectedClientForHistory.currency)}
                     </span>
                   </div>
                 </div>
 
-                {/* Client Info & Drive Folder */}
-                <div className="flex flex-wrap items-center justify-between gap-4 p-3.5 bg-neutral-50 rounded-xl border border-neutral-100 text-xs text-neutral-600">
-                  <div className="flex items-center gap-4">
-                    <span>
+                {/* Contact Information & Drive */}
+                <div className="text-xs text-neutral-600 space-y-1 bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div>
                       <strong>Contact:</strong> {selectedClientForHistory.contactPerson}
-                    </span>
-                    <span>
+                      {selectedClientForHistory.contactRole ? ` · ${selectedClientForHistory.contactRole}` : ""}
+                    </div>
+                    <div>
                       <strong>Email:</strong> {selectedClientForHistory.email}
-                    </span>
+                    </div>
                   </div>
                   {selectedClientForHistory.driveUrl && (
                     <a
                       href={selectedClientForHistory.driveUrl}
                       target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-[#7c3aed] font-medium hover:underline"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-[#7c3aed] font-semibold hover:underline"
                     >
-                      <FolderClosed className="w-4 h-4" />
-                      <span>Open Deliverables Folder</span>
                       <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Drive Folder</span>
                     </a>
                   )}
                 </div>
 
-                {/* Invoices Table */}
+                {/* Invoices List Table */}
                 <div>
-                  <h4 className="text-sm font-semibold text-neutral-900 mb-3">
-                    Recent Invoices & Payment Status
-                  </h4>
-                  <div className="border border-neutral-200/70 rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h4 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider">
+                      Invoices & Payment Records
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          router.push(`/invoices?new=1&client=${selectedClientForHistory.id}`);
+                        }}
+                        className="text-xs text-[#7c3aed] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>New Invoice</span>
+                      </button>
+                      <span className="text-neutral-300">·</span>
+                      <button
+                        onClick={() => {
+                          router.push(`/invoices?client=${selectedClientForHistory.id}`);
+                        }}
+                        className="text-xs text-neutral-600 hover:underline font-medium flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>View all</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border border-neutral-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-neutral-50 text-neutral-500 uppercase tracking-wider border-b border-neutral-200/70">
+                      <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 sticky top-0">
                         <tr>
-                          <th className="py-2.5 px-4 font-semibold">Invoice ID</th>
+                          <th className="py-2.5 px-4 font-semibold">Invoice Code</th>
                           <th className="py-2.5 px-4 font-semibold">Issue Date</th>
                           <th className="py-2.5 px-4 font-semibold">Amount</th>
                           <th className="py-2.5 px-4 font-semibold">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
-                        {selectedClientForHistory.recentInvoices &&
-                        selectedClientForHistory.recentInvoices.length > 0 ? (
-                          selectedClientForHistory.recentInvoices.map((inv) => (
-                            <tr key={inv.id} className="hover:bg-neutral-50/50">
-                              <td className="py-3 px-4 font-mono font-medium text-neutral-800">
-                                {inv.id}
+                        {clientLedgerInvoices.length > 0 ? (
+                          clientLedgerInvoices.map((inv) => (
+                            <tr
+                              key={inv.id}
+                              onClick={() => router.push(`/invoices?invoice=${inv.id}`)}
+                              className="hover:bg-purple-50/40 transition-colors cursor-pointer"
+                            >
+                              <td className="py-3 px-4 font-mono font-medium text-neutral-900">
+                                {inv.code}
                               </td>
-                              <td className="py-3 px-4 text-neutral-500">{inv.date}</td>
+                              <td className="py-3 px-4 text-neutral-500">
+                                {formatDateDisplay(inv.issueDate)}
+                              </td>
                               <td className="py-3 px-4 font-semibold text-neutral-900">
-                                ${inv.amount.toLocaleString()}
+                                {formatCents(inv.amountCents, inv.currency)}
                               </td>
                               <td className="py-3 px-4">
                                 <span
                                   className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                                    inv.status === "Paid"
+                                    inv.status === "PAID"
                                       ? "bg-emerald-100 text-emerald-700"
-                                      : inv.status === "Partial Paid"
-                                      ? "bg-amber-100 text-amber-700"
+                                      : inv.status === "OVERDUE"
+                                      ? "bg-rose-100 text-rose-700"
+                                      : inv.status === "DRAFT"
+                                      ? "bg-neutral-100 text-neutral-600"
                                       : "bg-blue-100 text-blue-700"
                                   }`}
                                 >
@@ -727,7 +807,7 @@ export default function ClientsPage() {
               <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex justify-end">
                 <button
                   onClick={() => setSelectedClientForHistory(null)}
-                  className="px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors"
+                  className="px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
                   Close Ledger
                 </button>
@@ -737,11 +817,17 @@ export default function ClientsPage() {
         )}
       </MotionPresence>
 
-      {/* Quick Bill Modal (SRS UC-03) */}
+      {/* Instant Quick Bill Modal */}
       <MotionPresence>
         {selectedClientForBill && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden">
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <MotionSurface
+              kind="panel"
+              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
+            >
               <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center">
@@ -758,7 +844,7 @@ export default function ClientsPage() {
                 </div>
                 <button
                   onClick={() => setSelectedClientForBill(null)}
-                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors"
+                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -771,7 +857,8 @@ export default function ClientsPage() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="Full-Stack Development Sprint & AI Integration"
+                    value={quickBillTitle}
+                    onChange={(e) => setQuickBillTitle(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                   />
                 </div>
@@ -783,7 +870,10 @@ export default function ClientsPage() {
                     </label>
                     <input
                       type="number"
-                      defaultValue={1500}
+                      step="any"
+                      min="0"
+                      value={quickBillAmount}
+                      onChange={(e) => setQuickBillAmount(e.target.value)}
                       className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
@@ -814,7 +904,8 @@ export default function ClientsPage() {
                     </label>
                   </div>
                   <span className="text-xs font-semibold text-[#7c3aed]">
-                    Deposit: \$750.00
+                    Deposit: {getCurrencySymbol(selectedClientForBill.currency)}
+                    {((parseFloat(quickBillAmount) || 0) * 0.5).toFixed(2)}
                   </span>
                 </div>
 
@@ -822,19 +913,17 @@ export default function ClientsPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedClientForBill(null)}
-                    className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedClientForBill(null);
-                      showToast(`Quick Bill draft generated for ${selectedClientForBill.name}!`);
-                    }}
-                    className="px-5 py-2.5 bg-[#6941C6] hover:bg-[#5b32be] text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer"
+                    disabled={isSubmittingQuickBill}
+                    onClick={handleQuickBillSubmit}
+                    className="px-5 py-2.5 bg-[#6941C6] hover:bg-[#5b32be] disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer"
                   >
-                    Generate & Send Invoice
+                    {isSubmittingQuickBill ? "Creating..." : "Generate & Save Invoice"}
                   </button>
                 </div>
               </div>
@@ -843,5 +932,24 @@ export default function ClientsPage() {
         )}
       </MotionPresence>
     </div>
+  );
+}
+
+export default function ClientsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 animate-pulse">
+          <div className="h-10 w-48 bg-neutral-200 rounded-xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="h-64 bg-neutral-200 rounded-2xl" />
+            <div className="h-64 bg-neutral-200 rounded-2xl" />
+            <div className="h-64 bg-neutral-200 rounded-2xl" />
+          </div>
+        </div>
+      }
+    >
+      <ClientsContent />
+    </Suspense>
   );
 }

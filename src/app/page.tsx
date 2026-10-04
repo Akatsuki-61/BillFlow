@@ -21,21 +21,15 @@ import {
   DashboardPeriod,
   MetricTile,
   MonthlyGrowthPoint,
-  DashboardInvoiceSummary,
   DashboardTaskSummary,
 } from "@/types/dashboard";
+import { useDashboardSummary } from "@/lib/data/DataProvider";
+import { formatCents, formatDateDisplay } from "@/lib/format";
 
-// Sample monthly business growth dataset
-const growthDataset: MonthlyGrowthPoint[] = [
-  { month: "May", revenue: 28500, profit: 19800, expenses: 8700, margin: 69.5 },
-  { month: "Jun", revenue: 34200, profit: 24600, expenses: 9600, margin: 71.9 },
-  { month: "Jul", revenue: 31800, profit: 22100, expenses: 9700, margin: 69.5 },
-  { month: "Aug", revenue: 41500, profit: 30200, expenses: 11300, margin: 72.8 },
-  { month: "Sep", revenue: 46800, profit: 34900, expenses: 11900, margin: 74.6 },
-  { month: "Oct", revenue: 52400, profit: 39800, expenses: 12600, margin: 76.0 },
-];
+// Monthly business growth dataset
+const growthDataset: MonthlyGrowthPoint[] = [];
 
-// Initial customizable metric tiles definition
+// Initial customizable metric tiles definition (starts blank)
 const initialTiles: MetricTile[] = [
   {
     id: "total-revenue",
@@ -44,19 +38,19 @@ const initialTiles: MetricTile[] = [
     visible: true,
     category: "financial",
     values: {
-      month: "$52,400.00",
-      quarter: "$140,700.00",
-      year: "$385,200.00",
-      all: "$512,850.00",
+      month: "$0.00",
+      quarter: "$0.00",
+      year: "$0.00",
+      all: "$0.00",
     },
     growthRates: {
-      month: { rate: "+12.0%", isPositive: true, label: "vs last month" },
-      quarter: { rate: "+18.4%", isPositive: true, label: "vs prior quarter" },
-      year: { rate: "+34.2%", isPositive: true, label: "YoY growth" },
-      all: { rate: "+45.0%", isPositive: true, label: "lifetime" },
+      month: { rate: "0%", isPositive: true, label: "no data" },
+      quarter: { rate: "0%", isPositive: true, label: "no data" },
+      year: { rate: "0%", isPositive: true, label: "no data" },
+      all: { rate: "0%", isPositive: true, label: "no data" },
     },
     accentColor: "text-neutral-900",
-    pillBg: "bg-emerald-50 text-emerald-700 border-emerald-200/60",
+    pillBg: "bg-neutral-100 text-neutral-700 border-neutral-200/60",
   },
   {
     id: "net-profit",
@@ -65,16 +59,16 @@ const initialTiles: MetricTile[] = [
     visible: true,
     category: "financial",
     values: {
-      month: "$39,800.00",
-      quarter: "$105,400.00",
-      year: "$286,100.00",
-      all: "$378,500.00",
+      month: "$0.00",
+      quarter: "$0.00",
+      year: "$0.00",
+      all: "$0.00",
     },
     growthRates: {
-      month: { rate: "+14.1%", isPositive: true, label: "76.0% margin" },
-      quarter: { rate: "+22.1%", isPositive: true, label: "74.9% margin" },
-      year: { rate: "+28.6%", isPositive: true, label: "74.3% margin" },
-      all: { rate: "+31.2%", isPositive: true, label: "73.8% margin" },
+      month: { rate: "0%", isPositive: true, label: "no data" },
+      quarter: { rate: "0%", isPositive: true, label: "no data" },
+      year: { rate: "0%", isPositive: true, label: "no data" },
+      all: { rate: "0%", isPositive: true, label: "no data" },
     },
     accentColor: "text-[#7c3aed]",
     pillBg: "bg-purple-50 text-purple-700 border-purple-200/60",
@@ -86,16 +80,16 @@ const initialTiles: MetricTile[] = [
     visible: true,
     category: "financial",
     values: {
-      month: "$14,200.00",
-      quarter: "$42,850.00",
-      year: "$42,850.00",
-      all: "$42,850.00",
+      month: "$0.00",
+      quarter: "$0.00",
+      year: "$0.00",
+      all: "$0.00",
     },
     growthRates: {
-      month: { rate: "4 unpaid", isPositive: false, label: "invoices pending" },
-      quarter: { rate: "6 unpaid", isPositive: false, label: "invoices pending" },
-      year: { rate: "6 unpaid", isPositive: false, label: "invoices pending" },
-      all: { rate: "6 unpaid", isPositive: false, label: "invoices pending" },
+      month: { rate: "0 pending", isPositive: true, label: "no unpaid" },
+      quarter: { rate: "0 pending", isPositive: true, label: "no unpaid" },
+      year: { rate: "0 pending", isPositive: true, label: "no unpaid" },
+      all: { rate: "0 pending", isPositive: true, label: "no unpaid" },
     },
     accentColor: "text-amber-700",
     pillBg: "bg-amber-50 text-amber-800 border-amber-200/60",
@@ -107,16 +101,16 @@ const initialTiles: MetricTile[] = [
     visible: true,
     category: "clients",
     values: {
-      month: "14",
-      quarter: "14",
-      year: "22",
-      all: "31",
+      month: "0",
+      quarter: "0",
+      year: "0",
+      all: "0",
     },
     growthRates: {
-      month: { rate: "+2 new", isPositive: true, label: "onboarded this month" },
-      quarter: { rate: "+5 new", isPositive: true, label: "onboarded in Q3" },
-      year: { rate: "+12 new", isPositive: true, label: "this year" },
-      all: { rate: "100%", isPositive: true, label: "retention rate" },
+      month: { rate: "0", isPositive: true, label: "clients" },
+      quarter: { rate: "0", isPositive: true, label: "clients" },
+      year: { rate: "0", isPositive: true, label: "clients" },
+      all: { rate: "0", isPositive: true, label: "clients" },
     },
     accentColor: "text-neutral-900",
     pillBg: "bg-blue-50 text-blue-700 border-blue-200/60",
@@ -128,16 +122,16 @@ const initialTiles: MetricTile[] = [
     visible: true,
     category: "operations",
     values: {
-      month: "$4,500.00",
-      quarter: "$11,700.00",
-      year: "$32,800.00",
-      all: "$48,200.00",
+      month: "$0.00",
+      quarter: "$0.00",
+      year: "$0.00",
+      all: "$0.00",
     },
     growthRates: {
-      month: { rate: "3 vendors", isPositive: true, label: "active contractors" },
-      quarter: { rate: "3 vendors", isPositive: true, label: "active contractors" },
-      year: { rate: "+8.4%", isPositive: true, label: "budget efficiency" },
-      all: { rate: "12%", isPositive: true, label: "of total revenue" },
+      month: { rate: "0 vendors", isPositive: true, label: "active contractors" },
+      quarter: { rate: "0 vendors", isPositive: true, label: "active contractors" },
+      year: { rate: "0%", isPositive: true, label: "no data" },
+      all: { rate: "0%", isPositive: true, label: "no data" },
     },
     accentColor: "text-purple-700",
     pillBg: "bg-purple-50 text-purple-700 border-purple-200/60",
@@ -149,40 +143,28 @@ const initialTiles: MetricTile[] = [
     visible: true,
     category: "operations",
     values: {
-      month: "$3,650.00",
-      quarter: "$8,940.00",
-      year: "$24,500.00",
-      all: "$35,900.00",
+      month: "$0.00",
+      quarter: "$0.00",
+      year: "$0.00",
+      all: "$0.00",
     },
     growthRates: {
-      month: { rate: "-4.2%", isPositive: true, label: "spend reduction" },
-      quarter: { rate: "100%", isPositive: true, label: "tax deductible" },
-      year: { rate: "-6.1%", isPositive: true, label: "operational savings" },
-      all: { rate: "8.5%", isPositive: true, label: "overhead ratio" },
+      month: { rate: "0%", isPositive: true, label: "no data" },
+      quarter: { rate: "0%", isPositive: true, label: "no data" },
+      year: { rate: "0%", isPositive: true, label: "no data" },
+      all: { rate: "0%", isPositive: true, label: "no data" },
     },
     accentColor: "text-neutral-900",
     pillBg: "bg-neutral-100 text-neutral-700 border-neutral-200/60",
   },
 ];
 
-// Sample latest invoices for dashboard summary
-const recentInvoices: DashboardInvoiceSummary[] = [
-  { id: "inv-1", code: "INV-2023-089", client: "Globex Corporation", amount: "$12,450.00", status: "PENDING", dueDate: "Oct 15, 2026" },
-  { id: "inv-2", code: "INV-2023-084", client: "Nexus Tech", amount: "$5,700.00", status: "PAID", dueDate: "Oct 02, 2026" },
-  { id: "inv-3", code: "INV-2023-075", client: "Vanguard Media", amount: "$2,000.00", status: "PENDING", dueDate: "Oct 10, 2026" },
-  { id: "inv-4", code: "INV-2023-066", client: "Apex Architecture", amount: "$14,500.00", status: "PAID", dueDate: "Sep 28, 2026" },
-];
-
-// Sample active deliverables from Kanban
-const activeTasks: DashboardTaskSummary[] = [
-  { id: "task-101", title: "Configure AWS ECS Fargate Cluster & CI/CD Pipeline", priority: "high", assignee: "Nipun Y.", dueDate: "Oct 05", isOutsourced: true },
-  { id: "task-102", title: "Client Contract Terms & IP Assignment Review", priority: "urgent", assignee: "Lahiru K.", dueDate: "Oct 04", isOutsourced: true },
-  { id: "task-104", title: "Build Multi-Currency Invoice Generator & PDF Export", priority: "high", assignee: "Sandika M.", dueDate: "Oct 06", isOutsourced: false },
-  { id: "task-103", title: "Design System & Figma Component Audit", priority: "medium", assignee: "Binuka M.", dueDate: "Oct 03", isOutsourced: false },
-];
+// Active deliverables from Kanban
+const activeTasks: DashboardTaskSummary[] = [];
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { dashboard } = useDashboardSummary();
 
   // State
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
@@ -217,8 +199,89 @@ export default function DashboardPage() {
     showToast("Dashboard tiles reset to default");
   };
 
-  // Visible tiles list
-  const visibleTiles = useMemo(() => tiles.filter((t) => t.visible), [tiles]);
+  const formatCurrencyMap = (map?: Record<string, number>): string => {
+    if (!map || Object.keys(map).length === 0) return "$0.00";
+    const nonZero = Object.entries(map).filter(([, cents]) => cents > 0);
+    if (nonZero.length === 0) return "$0.00";
+    return nonZero.map(([curr, cents]) => formatCents(cents, curr)).join(" · ");
+  };
+
+  const totalRevenueStr = useMemo(() => formatCurrencyMap(dashboard?.totalBilledByCurrency), [dashboard]);
+  const pendingReceivablesStr = useMemo(() => formatCurrencyMap(dashboard?.outstandingByCurrency), [dashboard]);
+  const activeClientsCount = dashboard?.activeClients ?? 0;
+  const unpaidCount = dashboard?.unpaidCount ?? 0;
+  const recentInvoicesList = dashboard?.recentInvoices ?? [];
+
+  // Visible tiles list computed with live metrics
+  const computedTiles = useMemo(() => {
+    return tiles.map((tile) => {
+      if (tile.id === "total-revenue") {
+        return {
+          ...tile,
+          values: {
+            month: totalRevenueStr,
+            quarter: totalRevenueStr,
+            year: totalRevenueStr,
+            all: totalRevenueStr,
+          },
+          growthRates: {
+            month: { rate: totalRevenueStr !== "$0.00" ? "Active" : "0%", isPositive: true, label: "billed to date" },
+            quarter: { rate: totalRevenueStr !== "$0.00" ? "Active" : "0%", isPositive: true, label: "billed to date" },
+            year: { rate: totalRevenueStr !== "$0.00" ? "Active" : "0%", isPositive: true, label: "billed to date" },
+            all: { rate: totalRevenueStr !== "$0.00" ? "Active" : "0%", isPositive: true, label: "billed to date" },
+          },
+        };
+      }
+      if (tile.id === "net-profit") {
+        return {
+          ...tile,
+          values: {
+            month: totalRevenueStr,
+            quarter: totalRevenueStr,
+            year: totalRevenueStr,
+            all: totalRevenueStr,
+          },
+        };
+      }
+      if (tile.id === "pending-receivables") {
+        return {
+          ...tile,
+          values: {
+            month: pendingReceivablesStr,
+            quarter: pendingReceivablesStr,
+            year: pendingReceivablesStr,
+            all: pendingReceivablesStr,
+          },
+          growthRates: {
+            month: { rate: `${unpaidCount} pending`, isPositive: unpaidCount === 0, label: unpaidCount === 1 ? "invoice awaiting payment" : "invoices awaiting payment" },
+            quarter: { rate: `${unpaidCount} pending`, isPositive: unpaidCount === 0, label: unpaidCount === 1 ? "invoice awaiting payment" : "invoices awaiting payment" },
+            year: { rate: `${unpaidCount} pending`, isPositive: unpaidCount === 0, label: unpaidCount === 1 ? "invoice awaiting payment" : "invoices awaiting payment" },
+            all: { rate: `${unpaidCount} pending`, isPositive: unpaidCount === 0, label: unpaidCount === 1 ? "invoice awaiting payment" : "invoices awaiting payment" },
+          },
+        };
+      }
+      if (tile.id === "active-clients") {
+        return {
+          ...tile,
+          values: {
+            month: String(activeClientsCount),
+            quarter: String(activeClientsCount),
+            year: String(activeClientsCount),
+            all: String(activeClientsCount),
+          },
+          growthRates: {
+            month: { rate: String(activeClientsCount), isPositive: true, label: activeClientsCount === 1 ? "client account" : "client accounts" },
+            quarter: { rate: String(activeClientsCount), isPositive: true, label: activeClientsCount === 1 ? "client account" : "client accounts" },
+            year: { rate: String(activeClientsCount), isPositive: true, label: activeClientsCount === 1 ? "client account" : "client accounts" },
+            all: { rate: String(activeClientsCount), isPositive: true, label: activeClientsCount === 1 ? "client account" : "client accounts" },
+          },
+        };
+      }
+      return tile;
+    });
+  }, [tiles, totalRevenueStr, pendingReceivablesStr, activeClientsCount, unpaidCount]);
+
+  const visibleTiles = useMemo(() => computedTiles.filter((t) => t.visible), [computedTiles]);
 
   // Scaled max for growth bar chart
   const maxRevenue = Math.max(...growthDataset.map((d) => d.revenue));
@@ -425,7 +488,14 @@ export default function DashboardPage() {
 
         {/* Growth Bar Chart Visualization */}
         <div className="pt-2">
-          {chartMetric === "profit" ? (
+          {growthDataset.length === 0 ? (
+            <div className="h-56 flex flex-col items-center justify-center text-center p-6 border border-dashed border-neutral-200/80 rounded-xl bg-neutral-50/50">
+              <span className="text-xs font-semibold text-neutral-800">No revenue history yet</span>
+              <span className="text-xs text-neutral-400 mt-1 max-w-sm">
+                Monthly performance trends and profit margins will plot here as you bill clients.
+              </span>
+            </div>
+          ) : chartMetric === "profit" ? (
             <div className="grid grid-cols-6 gap-3 sm:gap-6 items-end h-56 pt-6 pb-2">
               {growthDataset.map((point) => {
                 const revenueHeight = Math.round((point.revenue / maxRevenue) * 100);
@@ -516,42 +586,50 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3">
-              {recentInvoices.map((inv) => (
-                <div
-                  key={inv.id}
-                  onClick={() => router.push("/invoices")}
-                  className="flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 hover:bg-neutral-100/70 transition-colors cursor-pointer border border-neutral-100"
-                >
-                  <div>
-                    <div className="text-xs font-semibold text-neutral-900">{inv.client}</div>
-                    <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                      {inv.code} · Due {inv.dueDate}
+              {recentInvoicesList.length === 0 ? (
+                <div className="py-10 text-center text-xs text-neutral-400">
+                  No invoices generated yet.
+                </div>
+              ) : (
+                recentInvoicesList.map((inv) => (
+                  <div
+                    key={inv.id}
+                    onClick={() => router.push(`/invoices?invoice=${encodeURIComponent(inv.id)}`)}
+                    className="flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 hover:bg-neutral-100/70 transition-colors cursor-pointer border border-neutral-100"
+                  >
+                    <div>
+                      <div className="text-xs font-semibold text-neutral-900">{inv.clientName}</div>
+                      <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
+                        {inv.code} · Due {formatDateDisplay(inv.dueDate)}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="font-serif text-sm font-semibold text-neutral-900">
+                        {formatCents(inv.amountCents, inv.currency)}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          inv.status === "PAID"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                            : inv.status === "UNPAID"
+                            ? "bg-amber-50 text-amber-800 border border-amber-200/60"
+                            : inv.status === "DRAFT"
+                            ? "bg-neutral-100 text-neutral-600 border border-neutral-200"
+                            : "bg-rose-50 text-rose-700 border border-rose-200/60"
+                        }`}
+                      >
+                        {inv.status}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="font-serif text-sm font-semibold text-neutral-900">
-                      {inv.amount}
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
-                        inv.status === "PAID"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                          : inv.status === "PENDING"
-                          ? "bg-amber-50 text-amber-800 border border-amber-200/60"
-                          : "bg-rose-50 text-rose-700 border border-rose-200/60"
-                      }`}
-                    >
-                      {inv.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
           <div className="mt-4 pt-3.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
-            <span>Outstanding Balance: $14,450.00</span>
+            <span>Outstanding Balance: {pendingReceivablesStr}</span>
             <Link href="/clients" className="text-neutral-700 hover:text-neutral-900 font-medium">
               Manage Clients →
             </Link>
@@ -578,7 +656,12 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3">
-              {activeTasks.map((t) => (
+              {activeTasks.length === 0 ? (
+                <div className="py-10 text-center text-xs text-neutral-400">
+                  No active sprint deliverables yet.
+                </div>
+              ) : (
+                activeTasks.map((t) => (
                 <div
                   key={t.id}
                   onClick={() => router.push("/tasks")}
@@ -615,12 +698,12 @@ export default function DashboardPage() {
                     </span>
                   </div>
                 </div>
-              ))}
+              )))}
             </div>
           </div>
 
           <div className="mt-4 pt-3.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
-            <span>4 items in current sprint</span>
+            <span>{activeTasks.length} items in current sprint</span>
             <Link href="/outsourcing" className="text-neutral-700 hover:text-neutral-900 font-medium">
               Vendor Payouts →
             </Link>

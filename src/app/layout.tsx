@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display, Inter, Newsreader } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import { NavProvider } from "@/context/NavContext";
+import { DataProvider } from "@/lib/data/DataProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,10 +50,12 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-[#faf9f5] text-neutral-900 flex antialiased selection:bg-purple-100 selection:text-purple-900">
         <NavProvider>
-          <Sidebar />
-          <main className="flex-1 bg-[#faf9f5] min-h-screen overflow-y-auto">
-            {children}
-          </main>
+          <DataProvider>
+            <Sidebar />
+            <main className="flex-1 bg-[#faf9f5] min-h-screen overflow-y-auto">
+              {children}
+            </main>
+          </DataProvider>
         </NavProvider>
       </body>
     </html>
