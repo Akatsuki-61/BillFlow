@@ -1,5 +1,7 @@
 "use client";
 
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -124,14 +126,16 @@ export default function OutsourcingView() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#faf9f5] text-[#111827] px-6 sm:px-10 lg:px-12 py-10">
+    <div className="motion-page w-full min-h-screen bg-[#faf9f5] text-[#111827] px-6 sm:px-10 lg:px-12 py-10">
       {/* Toast Feedback Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium animate-in fade-in duration-150">
-          <FontAwesomeIcon icon={faCircleCheck} className="text-[#34d399] text-[13px]" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <MotionPresence>
+        {toastMessage && (
+          <MotionSurface kind="toast" className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium">
+            <FontAwesomeIcon icon={faCircleCheck} className="text-[#34d399] text-[13px]" />
+            <span>{toastMessage}</span>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Top Header: Title, subtitle, and primary action buttons */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -293,195 +297,201 @@ export default function OutsourcingView() {
       </div>
 
       {/* Modal Dialog: View Statement Voucher */}
-      {selectedVendor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-              <h3 className="font-bold text-[13px] text-[#111827]">
-                Vendor Statement Voucher
-              </h3>
-              <button
-                type="button"
-                onClick={() => setSelectedVendor(null)}
-                className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
-              >
-                <FontAwesomeIcon icon={faXmark} className="text-sm" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 text-[12px] text-[#4b5563]">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-bold text-[14px] text-[#111827]">{selectedVendor.name}</div>
-                  <div className="text-[#8e8e93] text-[11px]">{selectedVendor.service}</div>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    selectedVendor.status === "PAID"
-                      ? "text-[#15803d] bg-[#d6eddb]"
-                      : "text-[#4b5563] bg-[#eaeae5]"
-                  }`}
+      <MotionPresence>
+        {selectedVendor && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+            <MotionSurface kind="panel" className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
+                <h3 className="font-bold text-[13px] text-[#111827]">
+                  Vendor Statement Voucher
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setSelectedVendor(null)}
+                  className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
                 >
-                  {selectedVendor.status}
-                </span>
+                  <FontAwesomeIcon icon={faXmark} className="text-sm" />
+                </button>
               </div>
-
-              <div className="p-3 bg-[#eaeae5] rounded-xl space-y-1.5 border border-[#dcdcd7]">
-                <div className="flex justify-between">
-                  <span className="text-[#6b7280]">Current Balance:</span>
-                  <span className="font-bold text-[#111827]">
-                    ${selectedVendor.currentBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              <div className="p-6 space-y-4 text-[12px] text-[#4b5563]">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-bold text-[14px] text-[#111827]">{selectedVendor.name}</div>
+                    <div className="text-[#8e8e93] text-[11px]">{selectedVendor.service}</div>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      selectedVendor.status === "PAID"
+                        ? "text-[#15803d] bg-[#d6eddb]"
+                        : "text-[#4b5563] bg-[#eaeae5]"
+                    }`}
+                  >
+                    {selectedVendor.status}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-[#6b7280]">Scheduled Payout:</span>
-                  <span className="font-medium text-[#111827]">Oct 15, 2026</span>
+
+                <div className="p-3 bg-[#eaeae5] rounded-xl space-y-1.5 border border-[#dcdcd7]">
+                  <div className="flex justify-between">
+                    <span className="text-[#6b7280]">Current Balance:</span>
+                    <span className="font-bold text-[#111827]">
+                      ${selectedVendor.currentBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#6b7280]">Scheduled Payout:</span>
+                    <span className="font-medium text-[#111827]">Oct 15, 2026</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedVendor(null)}
-                className="px-3.5 py-1.5 text-[11.5px] font-medium text-[#4b5563] hover:text-[#111827] cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  window.print();
-                  setSelectedVendor(null);
-                }}
-                className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
-              >
-                Download PDF
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedVendor(null)}
+                  className="px-3.5 py-1.5 text-[11.5px] font-medium text-[#4b5563] hover:text-[#111827] cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.print();
+                    setSelectedVendor(null);
+                  }}
+                  className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
+                >
+                  Download PDF
+                </button>
+              </div>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Modal Dialog: Add New Client */}
-      {isClientModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-              <h3 className="font-bold text-[13px] text-[#111827]">Add New Client</h3>
-              <button
-                type="button"
-                onClick={() => setIsClientModalOpen(false)}
-                className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
-              >
-                <FontAwesomeIcon icon={faXmark} className="text-sm" />
-              </button>
-            </div>
-            <form onSubmit={handleAddClient} className="p-6 space-y-3.5">
-              <div>
-                <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
-                  Client Business Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Fintech Labs Inc."
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  className="w-full text-[12px] px-3 py-2 bg-white border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
-                />
-              </div>
-              <div>
-                <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  placeholder="alex@fintechlabs.com"
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                  className="w-full text-[12px] px-3 py-2 bg-white border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
-                />
-              </div>
-              <div className="pt-2 flex justify-end gap-2">
+      <MotionPresence>
+        {isClientModalOpen && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+            <MotionSurface kind="panel" className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
+                <h3 className="font-bold text-[13px] text-[#111827]">Add New Client</h3>
                 <button
                   type="button"
                   onClick={() => setIsClientModalOpen(false)}
-                  className="px-3.5 py-1.5 text-[11.5px] text-[#4b5563] hover:text-[#111827] cursor-pointer"
+                  className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
-                >
-                  Save Client
+                  <FontAwesomeIcon icon={faXmark} className="text-sm" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+              <form onSubmit={handleAddClient} className="p-6 space-y-3.5">
+                <div>
+                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                    Client Business Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Fintech Labs Inc."
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="w-full text-[12px] px-3 py-2 bg-white border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="alex@fintechlabs.com"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                    className="w-full text-[12px] px-3 py-2 bg-white border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                  />
+                </div>
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsClientModalOpen(false)}
+                    className="px-3.5 py-1.5 text-[11.5px] text-[#4b5563] hover:text-[#111827] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
+                  >
+                    Save Client
+                  </button>
+                </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Modal Dialog: Log Business Expense */}
-      {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-              <h3 className="font-bold text-[13px] text-[#111827]">Log Business Expense</h3>
-              <button
-                type="button"
-                onClick={() => setIsExpenseModalOpen(false)}
-                className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
-              >
-                <FontAwesomeIcon icon={faXmark} className="text-sm" />
-              </button>
-            </div>
-            <form onSubmit={handleLogExpense} className="p-6 space-y-3.5">
-              <div>
-                <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
-                  Expense Description
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Adobe Creative Cloud, Cloud Server"
-                  value={expenseTitle}
-                  onChange={(e) => setExpenseTitle(e.target.value)}
-                  className="w-full text-[12px] px-3 py-2 bg-white border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
-                />
-              </div>
-              <div>
-                <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
-                  Amount ($ USD)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="54.99"
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                  className="w-full text-[12px] px-3 py-2 bg-white border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
-                />
-              </div>
-              <div className="pt-2 flex justify-end gap-2">
+      <MotionPresence>
+        {isExpenseModalOpen && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+            <MotionSurface kind="panel" className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
+                <h3 className="font-bold text-[13px] text-[#111827]">Log Business Expense</h3>
                 <button
                   type="button"
                   onClick={() => setIsExpenseModalOpen(false)}
-                  className="px-3.5 py-1.5 text-[11.5px] text-[#4b5563] hover:text-[#111827] cursor-pointer"
+                  className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
-                >
-                  Log Expense
+                  <FontAwesomeIcon icon={faXmark} className="text-sm" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+              <form onSubmit={handleLogExpense} className="p-6 space-y-3.5">
+                <div>
+                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                    Expense Description
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Adobe Creative Cloud, Cloud Server"
+                    value={expenseTitle}
+                    onChange={(e) => setExpenseTitle(e.target.value)}
+                    className="w-full text-[12px] px-3 py-2 bg-white border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                    Amount ($ USD)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="54.99"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    className="w-full text-[12px] px-3 py-2 bg-white border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                  />
+                </div>
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsExpenseModalOpen(false)}
+                    className="px-3.5 py-1.5 text-[11.5px] text-[#4b5563] hover:text-[#111827] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
+                  >
+                    Log Expense
+                  </button>
+                </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
     </div>
   );
 }

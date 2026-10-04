@@ -1,5 +1,7 @@
 "use client";
 
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+
 import React, { useState } from "react";
 import {
   Plus,
@@ -286,7 +288,7 @@ export default function InvoicesPage() {
   };
 
   return (
-    <div className="w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
+    <div className="motion-page w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
         <div>
@@ -566,113 +568,116 @@ export default function InvoicesPage() {
                               : "text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100/70"
                           }`}
                           aria-label={`Options for invoice ${inv.code}`}
+                          aria-expanded={isMenuOpen}
                         >
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
 
                         {/* Dropdown Menu */}
-                        {isMenuOpen && (
-                          <>
-                            {/* Backdrop to close on click outside */}
-                            <div
-                              className="fixed inset-0 z-30"
-                              onClick={() => setOpenMenuId(null)}
-                            />
+                        <MotionPresence>
+                          {isMenuOpen && (
+                            <MotionSurface kind="group">
+                              {/* Backdrop to close on click outside */}
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setOpenMenuId(null)}
+                              />
 
-                            <div
-                              className={`absolute right-6 w-52 bg-white rounded-2xl shadow-xl border border-neutral-200/80 py-2 z-40 text-left text-xs animate-in fade-in zoom-in-95 duration-100 ${
-                                isNearBottom ? "bottom-full mb-2" : "top-full mt-1"
-                              }`}
-                            >
-                              {/* Edit Action */}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEdit(inv)}
-                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 transition-colors font-medium cursor-pointer"
+                              <MotionSurface kind="menu"
+                                className={`absolute right-6 w-52 bg-white rounded-2xl shadow-xl border border-neutral-200/80 py-2 z-40 text-left text-xs ${
+                                  isNearBottom ? "bottom-full mb-2" : "top-full mt-1"
+                                }`}
                               >
-                                <Pencil className="w-3.5 h-3.5 text-neutral-500" />
-                                <span>Edit Invoice</span>
-                              </button>
+                                {/* Edit Action */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(inv)}
+                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 transition-colors font-medium cursor-pointer"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-neutral-500" />
+                                  <span>Edit Invoice</span>
+                                </button>
 
-                              {/* Status Subheading */}
-                              <div className="my-1 border-t border-neutral-100" />
-                              <div className="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                Change Status
-                              </div>
-
-                              {/* Status Options */}
-                              <button
-                                type="button"
-                                onClick={() => handleChangeStatus(inv.id, "PAID")}
-                                className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-emerald-50/60 hover:text-emerald-800 transition-colors cursor-pointer"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                  <span>Mark as Paid</span>
+                                {/* Status Subheading */}
+                                <div className="my-1 border-t border-neutral-100" />
+                                <div className="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                                  Change Status
                                 </div>
-                                {inv.status === "PAID" && (
-                                  <span className="text-[10px] text-emerald-600 font-semibold">Active</span>
-                                )}
-                              </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleChangeStatus(inv.id, "UNPAID")}
-                                className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-amber-50/60 hover:text-amber-800 transition-colors cursor-pointer"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                                  <span>Mark as Unpaid</span>
-                                </div>
-                                {inv.status === "UNPAID" && (
-                                  <span className="text-[10px] text-amber-600 font-semibold">Active</span>
-                                )}
-                              </button>
+                                {/* Status Options */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleChangeStatus(inv.id, "PAID")}
+                                  className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-emerald-50/60 hover:text-emerald-800 transition-colors cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    <span>Mark as Paid</span>
+                                  </div>
+                                  {inv.status === "PAID" && (
+                                    <span className="text-[10px] text-emerald-600 font-semibold">Active</span>
+                                  )}
+                                </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleChangeStatus(inv.id, "OVERDUE")}
-                                className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-red-50/60 hover:text-red-800 transition-colors cursor-pointer"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-red-500" />
-                                  <span>Mark as Overdue</span>
-                                </div>
-                                {inv.status === "OVERDUE" && (
-                                  <span className="text-[10px] text-red-600 font-semibold">Active</span>
-                                )}
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleChangeStatus(inv.id, "UNPAID")}
+                                  className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-amber-50/60 hover:text-amber-800 transition-colors cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                    <span>Mark as Unpaid</span>
+                                  </div>
+                                  {inv.status === "UNPAID" && (
+                                    <span className="text-[10px] text-amber-600 font-semibold">Active</span>
+                                  )}
+                                </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleChangeStatus(inv.id, "DRAFT")}
-                                className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-neutral-400" />
-                                  <span>Mark as Draft</span>
-                                </div>
-                                {inv.status === "DRAFT" && (
-                                  <span className="text-[10px] text-neutral-500 font-semibold">Active</span>
-                                )}
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleChangeStatus(inv.id, "OVERDUE")}
+                                  className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-red-50/60 hover:text-red-800 transition-colors cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                                    <span>Mark as Overdue</span>
+                                  </div>
+                                  {inv.status === "OVERDUE" && (
+                                    <span className="text-[10px] text-red-600 font-semibold">Active</span>
+                                  )}
+                                </button>
 
-                              {/* Delete Option */}
-                              <div className="my-1 border-t border-neutral-100" />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDeletingInvoice(inv);
-                                  setOpenMenuId(null);
-                                }}
-                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 hover:bg-red-50/80 font-medium transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                <span>Delete Invoice</span>
-                              </button>
-                            </div>
-                          </>
-                        )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleChangeStatus(inv.id, "DRAFT")}
+                                  className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-neutral-400" />
+                                    <span>Mark as Draft</span>
+                                  </div>
+                                  {inv.status === "DRAFT" && (
+                                    <span className="text-[10px] text-neutral-500 font-semibold">Active</span>
+                                  )}
+                                </button>
+
+                                {/* Delete Option */}
+                                <div className="my-1 border-t border-neutral-100" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeletingInvoice(inv);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 hover:bg-red-50/80 font-medium transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                  <span>Delete Invoice</span>
+                                </button>
+                              </MotionSurface>
+                            </MotionSurface>
+                          )}
+                        </MotionPresence>
                       </td>
                     </tr>
                   );
@@ -750,400 +755,408 @@ export default function InvoicesPage() {
       </div>
 
       {/* Edit Invoice Modal */}
-      {editingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-900">
-                  Edit Invoice {editingInvoice.code}
-                </h3>
-                <p className="text-xs text-neutral-400 mt-0.5">
-                  Update invoice specifications, currency, status, and client details.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingInvoice(null)}
-                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="mt-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <MotionPresence>
+        {editingInvoice && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <MotionSurface kind="panel" className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Invoice Number
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editCode}
-                    onChange={(e) => setEditCode(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
+                  <h3 className="text-lg font-semibold text-neutral-900">
+                    Edit Invoice {editingInvoice.code}
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Update invoice specifications, currency, status, and client details.
+                  </p>
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Client Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editClient}
-                    onChange={(e) => setEditClient(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Amount
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={editAmount}
-                    onChange={(e) => setEditAmount(e.target.value)}
-                    placeholder="12500.00"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    value={editCurrency}
-                    onChange={(e) => setEditCurrency(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
-                    <option value="USD">USD ($ US Dollar)</option>
-                    <option value="EUR">EUR (€ Euro)</option>
-                    <option value="GBP">GBP (£ British Pound)</option>
-                    <option value="CAD">CAD ($ Canadian Dollar)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Due Date
-                  </label>
-                  <input
-                    type="text"
-                    value={editDueDate}
-                    onChange={(e) => setEditDueDate(e.target.value)}
-                    placeholder="e.g. Oct 28, 2023"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Status
-                  </label>
-                  <select
-                    value={editStatus}
-                    onChange={(e) =>
-                      setEditStatus(e.target.value as "UNPAID" | "OVERDUE" | "PAID" | "DRAFT")
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="UNPAID">UNPAID</option>
-                    <option value="OVERDUE">OVERDUE</option>
-                    <option value="PAID">PAID</option>
-                    <option value="DRAFT">DRAFT</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
                 <button
                   type="button"
                   onClick={() => setEditingInvoice(null)}
+                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="mt-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Invoice Number
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editCode}
+                      onChange={(e) => setEditCode(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Client Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editClient}
+                      onChange={(e) => setEditClient(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Amount
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                      placeholder="12500.00"
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Currency
+                    </label>
+                    <select
+                      value={editCurrency}
+                      onChange={(e) => setEditCurrency(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                      <option value="USD">USD ($ US Dollar)</option>
+                      <option value="EUR">EUR (€ Euro)</option>
+                      <option value="GBP">GBP (£ British Pound)</option>
+                      <option value="CAD">CAD ($ Canadian Dollar)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Due Date
+                    </label>
+                    <input
+                      type="text"
+                      value={editDueDate}
+                      onChange={(e) => setEditDueDate(e.target.value)}
+                      placeholder="e.g. Oct 28, 2023"
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Status
+                    </label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) =>
+                        setEditStatus(e.target.value as "UNPAID" | "OVERDUE" | "PAID" | "DRAFT")
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="UNPAID">UNPAID</option>
+                      <option value="OVERDUE">OVERDUE</option>
+                      <option value="PAID">PAID</option>
+                      <option value="DRAFT">DRAFT</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                  <button
+                    type="button"
+                    onClick={() => setEditingInvoice(null)}
+                    className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
+
+      {/* Delete Confirmation Modal */}
+      <MotionPresence>
+        {deletingInvoice && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <MotionSurface kind="panel" className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+              <div className="flex items-center gap-3 text-red-600 mb-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-neutral-900">
+                    Delete Invoice {deletingInvoice.code}?
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-sm text-neutral-600 mt-2">
+                Are you sure you want to permanently delete the invoice for{" "}
+                <strong className="text-neutral-900">{deletingInvoice.client}</strong> valued at{" "}
+                <strong className="text-neutral-900">{deletingInvoice.amount}</strong>?
+              </p>
+
+              <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setDeletingInvoice(null)}
                   className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                  type="button"
+                  onClick={confirmDelete}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
-                  Save Changes
+                  Delete Invoice
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deletingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center gap-3 text-red-600 mb-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-neutral-900">
-                  Delete Invoice {deletingInvoice.code}?
-                </h3>
-                <p className="text-xs text-neutral-500">
-                  This action cannot be undone.
-                </p>
-              </div>
-            </div>
-
-            <p className="text-sm text-neutral-600 mt-2">
-              Are you sure you want to permanently delete the invoice for{" "}
-              <strong className="text-neutral-900">{deletingInvoice.client}</strong> valued at{" "}
-              <strong className="text-neutral-900">{deletingInvoice.amount}</strong>?
-            </p>
-
-            <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
-              <button
-                type="button"
-                onClick={() => setDeletingInvoice(null)}
-                className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmDelete}
-                className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                Delete Invoice
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Add New Invoice Modal */}
-      {showAddInvoiceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <div>
+      <MotionPresence>
+        {showAddInvoiceModal && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <MotionSurface kind="panel" className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-900">
+                    Add New Invoice
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Enter the invoice details to create a new billing record.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddInvoiceModal(false)}
+                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddInvoiceSubmit} className="mt-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Invoice Number
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newCode}
+                      onChange={(e) => setNewCode(e.target.value)}
+                      placeholder="INV-2023-091"
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Client Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newClient}
+                      onChange={(e) => setNewClient(e.target.value)}
+                      placeholder="e.g. Acme Corporation"
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Amount
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={newAmount}
+                      onChange={(e) => setNewAmount(e.target.value)}
+                      placeholder="12500.00"
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Currency
+                    </label>
+                    <select
+                      value={newCurrency}
+                      onChange={(e) => setNewCurrency(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                      <option value="USD">USD ($ US Dollar)</option>
+                      <option value="EUR">EUR (€ Euro)</option>
+                      <option value="GBP">GBP (£ British Pound)</option>
+                      <option value="CAD">CAD ($ Canadian Dollar)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Due Date
+                    </label>
+                    <input
+                      type="date"
+                      value={newDueDate}
+                      onChange={(e) => setNewDueDate(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Status
+                    </label>
+                    <select
+                      value={newStatus}
+                      onChange={(e) =>
+                        setNewStatus(e.target.value as "UNPAID" | "OVERDUE" | "PAID" | "DRAFT")
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="UNPAID">UNPAID (Pending)</option>
+                      <option value="OVERDUE">OVERDUE</option>
+                      <option value="PAID">PAID</option>
+                      <option value="DRAFT">DRAFT</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddInvoiceModal(false)}
+                    className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Create Invoice
+                  </button>
+                </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
+
+      {/* Log Expense Modal */}
+      <MotionPresence>
+        {showLogExpenseModal && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <MotionSurface kind="panel" className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
                 <h3 className="text-lg font-semibold text-neutral-900">
-                  Add New Invoice
+                  Log New Expense
                 </h3>
-                <p className="text-xs text-neutral-400 mt-0.5">
-                  Enter the invoice details to create a new billing record.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowLogExpenseModal(false)}
+                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAddInvoiceModal(false)}
-                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setShowLogExpenseModal(false);
+                  setExpenseTitle("");
+                  setExpenseAmount("");
+                }}
+                className="mt-4 space-y-4"
               >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddInvoiceSubmit} className="mt-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Invoice Number
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Expense Description
                   </label>
                   <input
                     type="text"
                     required
-                    value={newCode}
-                    onChange={(e) => setNewCode(e.target.value)}
-                    placeholder="INV-2023-091"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    value={expenseTitle}
+                    onChange={(e) => setExpenseTitle(e.target.value)}
+                    placeholder="e.g. AWS Cloud Hosting"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Client Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newClient}
-                    onChange={(e) => setNewClient(e.target.value)}
-                    placeholder="e.g. Acme Corporation"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Amount
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Amount (LKR / Rs.)
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     required
-                    value={newAmount}
-                    onChange={(e) => setNewAmount(e.target.value)}
-                    placeholder="12500.00"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    placeholder="45000.00"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    value={newCurrency}
-                    onChange={(e) => setNewCurrency(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowLogExpenseModal(false)}
+                    className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
-                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
-                    <option value="USD">USD ($ US Dollar)</option>
-                    <option value="EUR">EUR (€ Euro)</option>
-                    <option value="GBP">GBP (£ British Pound)</option>
-                    <option value="CAD">CAD ($ Canadian Dollar)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Status
-                  </label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) =>
-                      setNewStatus(e.target.value as "UNPAID" | "OVERDUE" | "PAID" | "DRAFT")
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
-                    <option value="UNPAID">UNPAID (Pending)</option>
-                    <option value="OVERDUE">OVERDUE</option>
-                    <option value="PAID">PAID</option>
-                    <option value="DRAFT">DRAFT</option>
-                  </select>
+                    Log Expense
+                  </button>
                 </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                <button
-                  type="button"
-                  onClick={() => setShowAddInvoiceModal(false)}
-                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  Create Invoice
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Log Expense Modal */}
-      {showLogExpenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <h3 className="text-lg font-semibold text-neutral-900">
-                Log New Expense
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowLogExpenseModal(false)}
-                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setShowLogExpenseModal(false);
-                setExpenseTitle("");
-                setExpenseAmount("");
-              }}
-              className="mt-4 space-y-4"
-            >
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
-                  Expense Description
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={expenseTitle}
-                  onChange={(e) => setExpenseTitle(e.target.value)}
-                  placeholder="e.g. AWS Cloud Hosting"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
-                  Amount (LKR / Rs.)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                  placeholder="45000.00"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                <button
-                  type="button"
-                  onClick={() => setShowLogExpenseModal(false)}
-                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  Log Expense
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
     </div>
   );
 }
