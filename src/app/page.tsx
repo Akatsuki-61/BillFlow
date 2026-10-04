@@ -1,5 +1,7 @@
 "use client";
 
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -230,20 +232,22 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 animate-fadeIn select-none">
+    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 motion-page select-none">
       {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-neutral-800 transition-all duration-300 animate-in fade-in slide-in-from-bottom-3">
-          <div className="w-2 h-2 rounded-full bg-[#7c3aed] animate-ping" />
-          <span>{toastMessage}</span>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="text-neutral-400 hover:text-white ml-2 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <MotionPresence>
+        {toastMessage && (
+          <MotionSurface kind="toast" className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-neutral-800 transition-all">
+            <div className="w-2 h-2 rounded-full bg-[#7c3aed] animate-ping" />
+            <span>{toastMessage}</span>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="text-neutral-400 hover:text-white ml-2 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Header Section matching Clients & Tasks page alignment */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -290,7 +294,7 @@ export default function DashboardPage() {
             onClick={() => router.push("/invoices")}
             className="group inline-flex items-center gap-1.5 px-4 py-2 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-xl text-xs font-medium shadow-[0px_2px_4px_rgba(124,58,237,0.25)] hover:shadow-[0px_4px_8px_rgba(124,58,237,0.35)] transition-all cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-90" />
+            <Plus className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-6" />
             <span>New Invoice</span>
           </button>
         </div>
@@ -326,7 +330,7 @@ export default function DashboardPage() {
               return (
                 <div
                   key={tile.id}
-                  className="group relative bg-[#ececf0] hover:bg-[#eaeaf0] transition-all duration-200 rounded-2xl p-5 border border-neutral-200/70 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.04)] flex flex-col justify-between min-h-[142px]"
+                  className="motion-card group relative bg-[#ececf0] hover:bg-[#eaeaf0] transition-all duration-200 rounded-2xl p-5 border border-neutral-200/70 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.04)] flex flex-col justify-between min-h-[142px]"
                 >
                   {/* Top Row: Label & Quick Hide Action */}
                   <div className="flex items-start justify-between gap-2">
@@ -625,99 +629,101 @@ export default function DashboardPage() {
       </div>
 
       {/* CUSTOMIZE METRICS MODAL */}
-      {isCustomizeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden">
-            {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-serif font-semibold text-neutral-900">
-                  Customize Dashboard Analytics
-                </h2>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Select which financial and operational metric tiles appear on your executive dashboard.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsCustomizeModalOpen(false)}
-                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Tile Toggle List */}
-            <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto divide-y divide-neutral-100">
-              {tiles.map((tile) => (
-                <div
-                  key={tile.id}
-                  onClick={() => handleToggleTile(tile.id)}
-                  className="pt-3 first:pt-0 flex items-center justify-between gap-4 cursor-pointer group"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-neutral-900 group-hover:text-[#7c3aed] transition-colors">
-                        {tile.label}
-                      </span>
-                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 bg-neutral-100 text-neutral-600 rounded">
-                        {tile.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      {tile.description}
-                    </p>
-                  </div>
-
-                  {/* Toggle Switch */}
-                  <div
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                      tile.visible ? "bg-[#7c3aed]" : "bg-neutral-200"
-                    }`}
-                  >
-                    <div
-                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                        tile.visible ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </div>
+      <MotionPresence>
+        {isCustomizeModalOpen && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs">
+            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-lg shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden">
+              {/* Modal Header */}
+              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-serif font-semibold text-neutral-900">
+                    Customize Dashboard Analytics
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Select which financial and operational metric tiles appear on your executive dashboard.
+                  </p>
                 </div>
-              ))}
-            </div>
-
-            {/* Modal Actions */}
-            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={handleResetTiles}
-                className="inline-flex items-center gap-1.5 text-xs text-neutral-600 hover:text-neutral-900 font-medium cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset to Default</span>
-              </button>
-
-              <div className="flex items-center gap-2">
                 <button
-                  type="button"
-                  onClick={handleShowAll}
-                  className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+                  onClick={() => setIsCustomizeModalOpen(false)}
+                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
-                  Show All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCustomizeModalOpen(false);
-                    showToast("Dashboard preferences updated");
-                  }}
-                  className="px-4 py-1.5 rounded-lg bg-[#7c3aed] text-white text-xs font-semibold hover:bg-[#6d28d9] transition-all cursor-pointer shadow-2xs"
-                >
-                  Done
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+
+              {/* Tile Toggle List */}
+              <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto divide-y divide-neutral-100">
+                {tiles.map((tile) => (
+                  <div
+                    key={tile.id}
+                    onClick={() => handleToggleTile(tile.id)}
+                    className="pt-3 first:pt-0 flex items-center justify-between gap-4 cursor-pointer group"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-neutral-900 group-hover:text-[#7c3aed] transition-colors">
+                          {tile.label}
+                        </span>
+                        <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 bg-neutral-100 text-neutral-600 rounded">
+                          {tile.category}
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-500 mt-0.5">
+                        {tile.description}
+                      </p>
+                    </div>
+
+                    {/* Toggle Switch */}
+                    <div
+                      className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+                        tile.visible ? "bg-[#7c3aed]" : "bg-neutral-200"
+                      }`}
+                    >
+                      <div
+                        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                          tile.visible ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Modal Actions */}
+              <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleResetTiles}
+                  className="inline-flex items-center gap-1.5 text-xs text-neutral-600 hover:text-neutral-900 font-medium cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset to Default</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShowAll}
+                    className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+                  >
+                    Show All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomizeModalOpen(false);
+                      showToast("Dashboard preferences updated");
+                    }}
+                    className="px-4 py-1.5 rounded-lg bg-[#7c3aed] text-white text-xs font-semibold hover:bg-[#6d28d9] transition-all cursor-pointer shadow-2xs"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
     </div>
   );
 }

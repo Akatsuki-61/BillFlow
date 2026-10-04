@@ -1,5 +1,7 @@
 "use client";
 
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -355,20 +357,22 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 animate-fadeIn select-none">
+    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 motion-page select-none">
       {/* Toast Alert */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-neutral-800 transition-all duration-300 animate-in fade-in slide-in-from-bottom-3">
-          <div className="w-2 h-2 rounded-full bg-[#7c3aed] animate-ping" />
-          <span>{toastMessage}</span>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="text-neutral-400 hover:text-white ml-2 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      <MotionPresence>
+        {toastMessage && (
+          <MotionSurface kind="toast" className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-neutral-800 transition-all">
+            <div className="w-2 h-2 rounded-full bg-[#7c3aed] animate-ping" />
+            <span>{toastMessage}</span>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="text-neutral-400 hover:text-white ml-2 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Header Section matching Clients & Expenses page alignment */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -417,7 +421,7 @@ export default function TasksPage() {
             }}
             className="group inline-flex items-center gap-2 px-4 py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-xl text-sm font-medium shadow-[0px_2px_4px_rgba(124,58,237,0.25)] hover:shadow-[0px_4px_8px_rgba(124,58,237,0.35)] transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7c3aed]/40"
           >
-            <Plus className="w-4 h-4 transition-transform duration-200 group-hover:scale-120 group-hover:rotate-90" />
+            <Plus className="w-4 h-4 transition-transform duration-200 group-hover:scale-105 group-hover:rotate-6" />
             <span>New Task</span>
           </button>
         </div>
@@ -587,7 +591,7 @@ export default function TasksPage() {
       {/* Main Content Area: Kanban View vs List View */}
       {viewMode === "kanban" ? (
         /* KANBAN BOARD */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
+        <div key="board" className="motion-page grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
           {columnDefinitions.map((col) => {
             const columnTasks = filteredTasks.filter((t) => t.status === col.id);
             const isDropTarget = dragOverColumn === col.id;
@@ -658,7 +662,7 @@ export default function TasksPage() {
                           draggable
                           onDragStart={(e) => handleDragStart(e, task.id)}
                           onClick={() => setSelectedTaskForDetail(task)}
-                          className={`group relative bg-white rounded-xl p-4 border border-neutral-200/80 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.06),0px_1px_0px_0px_rgba(25,28,33,0.02)] hover:border-neutral-300 hover:shadow-[0px_4px_8px_-2px_rgba(0,0,0,0.08)] transition-all cursor-grab active:cursor-grabbing ${
+                          className={`motion-card group relative bg-white rounded-xl p-4 border border-neutral-200/80 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.06),0px_1px_0px_0px_rgba(25,28,33,0.02)] hover:border-neutral-300 hover:shadow-[0px_4px_8px_-2px_rgba(0,0,0,0.08)] transition-all cursor-grab active:cursor-grabbing ${
                             isDragging ? "opacity-40 scale-98" : ""
                           }`}
                         >
@@ -765,7 +769,7 @@ export default function TasksPage() {
                               }
                             >
                               <GitFork
-                                className={`w-3 h-3 transition-transform duration-200 group-hover/outsource:rotate-12 ${
+                                className={`w-3 h-3 transition-transform duration-200 group-hover/outsource:rotate-6 ${
                                   task.isOutsourced ? "text-[#7c3aed]" : ""
                                 }`}
                               />
@@ -785,7 +789,7 @@ export default function TasksPage() {
         </div>
       ) : (
         /* LIST VIEW */
-        <div className="bg-white rounded-2xl border border-neutral-200/80 overflow-hidden shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.06)]">
+        <div key="list" className="motion-page bg-white rounded-2xl border border-neutral-200/80 overflow-hidden shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.06)]">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-[#f8f8fa] border-b border-neutral-200/80 text-xs text-neutral-500 uppercase font-semibold">
@@ -885,422 +889,426 @@ export default function TasksPage() {
       )}
 
       {/* CREATE NEW TASK MODAL */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden">
-            {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-newspaper font-semibold text-neutral-900">
-                  Create New Deliverable
-                </h2>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Add a task to the board with team assignments and optional subcontractor outsourcing.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleCreateTask} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              {/* Task Title */}
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                  Task Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Production Database Migration"
-                  className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all"
-                />
+      <MotionPresence>
+        {isAddModalOpen && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs">
+            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden">
+              {/* Modal Header */}
+              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-newspaper font-semibold text-neutral-900">
+                    Create New Deliverable
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Add a task to the board with team assignments and optional subcontractor outsourcing.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              {/* Description */}
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                  Description
-                </label>
-                <textarea
-                  rows={3}
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Detailed requirements, acceptance criteria, or external links..."
-                  className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all resize-none"
-                />
-              </div>
-
-              {/* Status & Priority Row */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Modal Form */}
+              <form onSubmit={handleCreateTask} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                {/* Task Title */}
                 <div>
                   <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                    Initial Column / Status
-                  </label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as TaskStatus)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
-                  >
-                    <option value="todo">To Do</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="review">Under Review</option>
-                    <option value="done">Done</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                    Priority
-                  </label>
-                  <select
-                    value={newPriority}
-                    onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Category & Assignee Row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                    Category
-                  </label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value as TaskCategory)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
-                  >
-                    <option value="Development">Development</option>
-                    <option value="Design">Design</option>
-                    <option value="Infrastructure">Infrastructure</option>
-                    <option value="Legal">Legal</option>
-                    <option value="Documentation">Documentation</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                    Team Assignee
-                  </label>
-                  <select
-                    value={newAssigneeName}
-                    onChange={(e) => setNewAssigneeName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
-                  >
-                    {teamMembers.map((m) => (
-                      <option key={m.name} value={m.name}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Client & Due Date Row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                    Client Association
-                  </label>
-                  <select
-                    value={newClientName}
-                    onChange={(e) => setNewClientName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
-                  >
-                    <option value="Nexus Tech">Nexus Tech</option>
-                    <option value="Apex Architecture">Apex Architecture</option>
-                    <option value="Vanguard Media">Vanguard Media</option>
-                    <option value="Internal">Internal</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                    Due Date
+                    Task Title *
                   </label>
                   <input
                     type="text"
-                    value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                    placeholder="e.g. Oct 12, 2026"
+                    required
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g. Production Database Migration"
                     className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all"
                   />
                 </div>
-              </div>
 
-              {/* Subcontractor Outsourcing Section */}
-              <div className="pt-3 border-t border-neutral-100">
-                <label className="flex items-center gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newIsOutsourced}
-                    onChange={(e) => setNewIsOutsourced(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#7c3aed] focus:ring-[#7c3aed] border-neutral-300"
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Detailed requirements, acceptance criteria, or external links..."
+                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all resize-none"
                   />
-                  <div className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
-                    <GitFork className="w-3.5 h-3.5 text-[#7c3aed]" />
-                    <span>Outsource this task to an external vendor</span>
+                </div>
+
+                {/* Status & Priority Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      Initial Column / Status
+                    </label>
+                    <select
+                      value={newStatus}
+                      onChange={(e) => setNewStatus(e.target.value as TaskStatus)}
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                    >
+                      <option value="todo">To Do</option>
+                      <option value="in-progress">In Progress</option>
+                      <option value="review">Under Review</option>
+                      <option value="done">Done</option>
+                    </select>
                   </div>
-                </label>
 
-                {newIsOutsourced && (
-                  <div className="mt-3.5 p-3.5 bg-[#f4f4f8] rounded-xl border border-purple-200/60 grid grid-cols-2 gap-3.5 animate-in fade-in duration-150">
-                    <div>
-                      <label className="block text-xs font-medium text-neutral-700 mb-1">
-                        Subcontractor Vendor
-                      </label>
-                      <select
-                        value={newOutsourcedVendor}
-                        onChange={(e) => setNewOutsourcedVendor(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#7c3aed]"
-                      >
-                        <option value="Studio ArchiType">Studio ArchiType (UI/UX)</option>
-                        <option value="DevOps Nexus">DevOps Nexus (Infra)</option>
-                        <option value="ClearCopy Legal">ClearCopy Legal (Contracts)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-neutral-700 mb-1">
-                        Estimated Budget ($ USD)
-                      </label>
-                      <input
-                        type="number"
-                        value={newOutsourceBudget}
-                        onChange={(e) => setNewOutsourceBudget(e.target.value)}
-                        placeholder="1500"
-                        className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#7c3aed]"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      Priority
+                    </label>
+                    <select
+                      value={newPriority}
+                      onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Action Buttons */}
-              <div className="pt-4 border-t border-neutral-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[#7c3aed] text-white text-sm font-medium hover:bg-[#6d28d9] shadow-sm transition-all cursor-pointer"
-                >
-                  Create Deliverable
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                {/* Category & Assignee Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      Category
+                    </label>
+                    <select
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value as TaskCategory)}
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                    >
+                      <option value="Development">Development</option>
+                      <option value="Design">Design</option>
+                      <option value="Infrastructure">Infrastructure</option>
+                      <option value="Legal">Legal</option>
+                      <option value="Documentation">Documentation</option>
+                    </select>
+                  </div>
 
-      {/* TASK DETAIL & SUBTASK CHECKLIST DRAWER/MODAL */}
-      {selectedTaskForDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden">
-            {/* Header */}
-            <div className="px-6 py-5 border-b border-neutral-100 flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-600">
-                    {selectedTaskForDetail.category}
-                  </span>
-                  <span
-                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                      selectedTaskForDetail.priority === "urgent"
-                        ? "bg-rose-100 text-rose-800"
-                        : selectedTaskForDetail.priority === "high"
-                        ? "bg-orange-100 text-orange-800"
-                        : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    {selectedTaskForDetail.priority}
-                  </span>
-                  {selectedTaskForDetail.clientName && (
-                    <span className="text-xs text-neutral-400">
-                      Client: {selectedTaskForDetail.clientName}
-                    </span>
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      Team Assignee
+                    </label>
+                    <select
+                      value={newAssigneeName}
+                      onChange={(e) => setNewAssigneeName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                    >
+                      {teamMembers.map((m) => (
+                        <option key={m.name} value={m.name}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Client & Due Date Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      Client Association
+                    </label>
+                    <select
+                      value={newClientName}
+                      onChange={(e) => setNewClientName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                    >
+                      <option value="Nexus Tech">Nexus Tech</option>
+                      <option value="Apex Architecture">Apex Architecture</option>
+                      <option value="Vanguard Media">Vanguard Media</option>
+                      <option value="Internal">Internal</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      Due Date
+                    </label>
+                    <input
+                      type="text"
+                      value={newDueDate}
+                      onChange={(e) => setNewDueDate(e.target.value)}
+                      placeholder="e.g. Oct 12, 2026"
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Subcontractor Outsourcing Section */}
+                <div className="pt-3 border-t border-neutral-100">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newIsOutsourced}
+                      onChange={(e) => setNewIsOutsourced(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#7c3aed] focus:ring-[#7c3aed] border-neutral-300"
+                    />
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
+                      <GitFork className="w-3.5 h-3.5 text-[#7c3aed]" />
+                      <span>Outsource this task to an external vendor</span>
+                    </div>
+                  </label>
+
+                  {newIsOutsourced && (
+                    <div className="motion-page mt-3.5 p-3.5 bg-[#f4f4f8] rounded-xl border border-purple-200/60 grid grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-700 mb-1">
+                          Subcontractor Vendor
+                        </label>
+                        <select
+                          value={newOutsourcedVendor}
+                          onChange={(e) => setNewOutsourcedVendor(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#7c3aed]"
+                        >
+                          <option value="Studio ArchiType">Studio ArchiType (UI/UX)</option>
+                          <option value="DevOps Nexus">DevOps Nexus (Infra)</option>
+                          <option value="ClearCopy Legal">ClearCopy Legal (Contracts)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-700 mb-1">
+                          Estimated Budget ($ USD)
+                        </label>
+                        <input
+                          type="number"
+                          value={newOutsourceBudget}
+                          onChange={(e) => setNewOutsourceBudget(e.target.value)}
+                          placeholder="1500"
+                          className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#7c3aed]"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
-                <h2 className="text-xl font-semibold text-neutral-900 leading-snug">
-                  {selectedTaskForDetail.title}
-                </h2>
-              </div>
 
-              <button
-                onClick={() => setSelectedTaskForDetail(null)}
-                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-              {/* Description */}
-              <div>
-                <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-                  Description
-                </h4>
-                <p className="text-sm text-neutral-700 leading-relaxed bg-[#f8f8fa] p-3.5 rounded-xl border border-neutral-200/60">
-                  {selectedTaskForDetail.description}
-                </p>
-              </div>
-
-              {/* Subtasks Checklist */}
-              <div>
-                <div className="flex items-center justify-between mb-2.5">
-                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-                    Checklist & Subtasks
-                  </h4>
-                  <span className="text-xs text-neutral-500 font-medium">
-                    {selectedTaskForDetail.subtasks.filter((s) => s.completed).length} of{" "}
-                    {selectedTaskForDetail.subtasks.length} done
-                  </span>
+                {/* Action Buttons */}
+                <div className="pt-4 border-t border-neutral-100 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-[#7c3aed] text-white text-sm font-medium hover:bg-[#6d28d9] shadow-sm transition-all cursor-pointer"
+                  >
+                    Create Deliverable
+                  </button>
                 </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
-                <div className="space-y-2">
-                  {selectedTaskForDetail.subtasks.map((st) => (
-                    <div
-                      key={st.id}
-                      onClick={() => handleToggleSubtask(selectedTaskForDetail.id, st.id)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
-                        st.completed
-                          ? "bg-emerald-50/50 border-emerald-200/60 text-neutral-500 line-through"
-                          : "bg-white border-neutral-200/90 text-neutral-900 hover:bg-neutral-50"
+      {/* TASK DETAIL & SUBTASK CHECKLIST DRAWER/MODAL */}
+      <MotionPresence>
+        {selectedTaskForDetail && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs">
+            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-2xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden">
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-neutral-100 flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-600">
+                      {selectedTaskForDetail.category}
+                    </span>
+                    <span
+                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                        selectedTaskForDetail.priority === "urgent"
+                          ? "bg-rose-100 text-rose-800"
+                          : selectedTaskForDetail.priority === "high"
+                          ? "bg-orange-100 text-orange-800"
+                          : "bg-amber-100 text-amber-800"
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={st.completed}
-                        onChange={() => {}}
-                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span className="text-sm font-normal">{st.title}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Subcontractor Outsourcing Box */}
-              <div className="p-4 rounded-xl bg-[#f5f3ff] border border-purple-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center shrink-0 text-[#7c3aed]">
-                    <GitFork className="w-5 h-5" />
+                      {selectedTaskForDetail.priority}
+                    </span>
+                    {selectedTaskForDetail.clientName && (
+                      <span className="text-xs text-neutral-400">
+                        Client: {selectedTaskForDetail.clientName}
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <h5 className="text-sm font-semibold text-neutral-900">
-                      {selectedTaskForDetail.isOutsourced
-                        ? `Outsourced to ${selectedTaskForDetail.outsourcedVendor}`
-                        : "Outsource this Task"}
-                    </h5>
-                    <p className="text-xs text-neutral-600 mt-0.5">
-                      {selectedTaskForDetail.isOutsourced
-                        ? `Budget allocated: $${selectedTaskForDetail.outsourceBudget?.toLocaleString() || "1,500"}. Open Outsourcing view to generate payout voucher.`
-                        : "Delegate this task to an external specialist or engineering agency."}
-                    </p>
-                  </div>
+                  <h2 className="text-xl font-semibold text-neutral-900 leading-snug">
+                    {selectedTaskForDetail.title}
+                  </h2>
                 </div>
 
                 <button
-                  onClick={() => handleOutsourceTask(selectedTaskForDetail)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer whitespace-nowrap"
+                  onClick={() => setSelectedTaskForDetail(null)}
+                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>
-                    {selectedTaskForDetail.isOutsourced
-                      ? "Open Outsourcing"
-                      : "Outsource Task"}
-                  </span>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Status and Details Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-neutral-100 text-xs">
+              {/* Body */}
+              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                {/* Description */}
                 <div>
-                  <span className="text-neutral-400 block mb-1">Status</span>
-                  <select
-                    value={selectedTaskForDetail.status}
-                    onChange={(e) => {
-                      const newStat = e.target.value as TaskStatus;
-                      setTasks((prev) =>
-                        prev.map((t) =>
-                          t.id === selectedTaskForDetail.id ? { ...t, status: newStat } : t
-                        )
-                      );
-                      setSelectedTaskForDetail({
-                        ...selectedTaskForDetail,
-                        status: newStat,
-                      });
-                    }}
-                    className="w-full px-2 py-1 bg-neutral-100 border border-neutral-200 rounded-lg font-medium text-neutral-800"
+                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                    Description
+                  </h4>
+                  <p className="text-sm text-neutral-700 leading-relaxed bg-[#f8f8fa] p-3.5 rounded-xl border border-neutral-200/60">
+                    {selectedTaskForDetail.description}
+                  </p>
+                </div>
+
+                {/* Subtasks Checklist */}
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                      Checklist & Subtasks
+                    </h4>
+                    <span className="text-xs text-neutral-500 font-medium">
+                      {selectedTaskForDetail.subtasks.filter((s) => s.completed).length} of{" "}
+                      {selectedTaskForDetail.subtasks.length} done
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {selectedTaskForDetail.subtasks.map((st) => (
+                      <div
+                        key={st.id}
+                        onClick={() => handleToggleSubtask(selectedTaskForDetail.id, st.id)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                          st.completed
+                            ? "bg-emerald-50/50 border-emerald-200/60 text-neutral-500 line-through"
+                            : "bg-white border-neutral-200/90 text-neutral-900 hover:bg-neutral-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={st.completed}
+                          onChange={() => {}}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="text-sm font-normal">{st.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Subcontractor Outsourcing Box */}
+                <div className="p-4 rounded-xl bg-[#f5f3ff] border border-purple-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center shrink-0 text-[#7c3aed]">
+                      <GitFork className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-semibold text-neutral-900">
+                        {selectedTaskForDetail.isOutsourced
+                          ? `Outsourced to ${selectedTaskForDetail.outsourcedVendor}`
+                          : "Outsource this Task"}
+                      </h5>
+                      <p className="text-xs text-neutral-600 mt-0.5">
+                        {selectedTaskForDetail.isOutsourced
+                          ? `Budget allocated: $${selectedTaskForDetail.outsourceBudget?.toLocaleString() || "1,500"}. Open Outsourcing view to generate payout voucher.`
+                          : "Delegate this task to an external specialist or engineering agency."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleOutsourceTask(selectedTaskForDetail)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer whitespace-nowrap"
                   >
-                    <option value="todo">To Do</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="review">Review</option>
-                    <option value="done">Done</option>
-                  </select>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>
+                      {selectedTaskForDetail.isOutsourced
+                        ? "Open Outsourcing"
+                        : "Outsource Task"}
+                    </span>
+                  </button>
                 </div>
 
-                <div>
-                  <span className="text-neutral-400 block mb-1">Assignee</span>
-                  <span className="font-semibold text-neutral-800">
-                    {selectedTaskForDetail.assignee.name}
-                  </span>
-                </div>
+                {/* Status and Details Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-neutral-100 text-xs">
+                  <div>
+                    <span className="text-neutral-400 block mb-1">Status</span>
+                    <select
+                      value={selectedTaskForDetail.status}
+                      onChange={(e) => {
+                        const newStat = e.target.value as TaskStatus;
+                        setTasks((prev) =>
+                          prev.map((t) =>
+                            t.id === selectedTaskForDetail.id ? { ...t, status: newStat } : t
+                          )
+                        );
+                        setSelectedTaskForDetail({
+                          ...selectedTaskForDetail,
+                          status: newStat,
+                        });
+                      }}
+                      className="w-full px-2 py-1 bg-neutral-100 border border-neutral-200 rounded-lg font-medium text-neutral-800"
+                    >
+                      <option value="todo">To Do</option>
+                      <option value="in-progress">In Progress</option>
+                      <option value="review">Review</option>
+                      <option value="done">Done</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <span className="text-neutral-400 block mb-1">Due Date</span>
-                  <span className="font-semibold text-neutral-800">
-                    {selectedTaskForDetail.dueDate}
-                  </span>
-                </div>
+                  <div>
+                    <span className="text-neutral-400 block mb-1">Assignee</span>
+                    <span className="font-semibold text-neutral-800">
+                      {selectedTaskForDetail.assignee.name}
+                    </span>
+                  </div>
 
-                <div>
-                  <span className="text-neutral-400 block mb-1">Created</span>
-                  <span className="font-semibold text-neutral-800">
-                    {selectedTaskForDetail.createdAt}
-                  </span>
+                  <div>
+                    <span className="text-neutral-400 block mb-1">Due Date</span>
+                    <span className="font-semibold text-neutral-800">
+                      {selectedTaskForDetail.dueDate}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-neutral-400 block mb-1">Created</span>
+                    <span className="font-semibold text-neutral-800">
+                      {selectedTaskForDetail.createdAt}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Footer with Delete Action */}
-            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
-              <button
-                onClick={() => handleDeleteTask(selectedTaskForDetail.id)}
-                className="inline-flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-800 font-medium cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Task</span>
-              </button>
+              {/* Footer with Delete Action */}
+              <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
+                <button
+                  onClick={() => handleDeleteTask(selectedTaskForDetail.id)}
+                  className="inline-flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-800 font-medium cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Task</span>
+                </button>
 
-              <button
-                onClick={() => setSelectedTaskForDetail(null)}
-                className="px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <button
+                  onClick={() => setSelectedTaskForDetail(null)}
+                  className="px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
     </div>
   );
 }

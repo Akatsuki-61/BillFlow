@@ -1,5 +1,7 @@
 "use client";
 
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+
 import React, { useState } from "react";
 import {
   Upload,
@@ -249,7 +251,7 @@ export default function CatalogView() {
   };
 
   return (
-    <div className="w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
+    <div className="motion-page w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
         <div>
@@ -420,45 +422,48 @@ export default function CatalogView() {
                               : "text-neutral-400 hover:text-neutral-700 hover:bg-neutral-300/50"
                           }`}
                           aria-label={`Options for ${item.title}`}
+                          aria-expanded={openMenuId === item.id}
                         >
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
 
                         {/* Dropdown Menu */}
-                        {openMenuId === item.id && (
-                          <>
-                            {/* Backdrop */}
-                            <div
-                              className="fixed inset-0 z-30"
-                              onClick={() => setOpenMenuId(null)}
-                            />
+                        <MotionPresence>
+                          {openMenuId === item.id && (
+                            <MotionSurface kind="group">
+                              {/* Backdrop */}
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setOpenMenuId(null)}
+                              />
 
-                            <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-2xl shadow-xl border border-neutral-200/90 py-1.5 z-40 text-left text-xs animate-in fade-in zoom-in-95 duration-100 font-medium">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEdit(item)}
-                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 transition-colors cursor-pointer"
-                              >
-                                <Pencil className="w-3.5 h-3.5 text-neutral-500" />
-                                <span>Edit Item</span>
-                              </button>
+                              <MotionSurface kind="menu" className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-2xl shadow-xl border border-neutral-200/90 py-1.5 z-40 text-left text-xs font-medium">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(item)}
+                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 transition-colors cursor-pointer"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-neutral-500" />
+                                  <span>Edit Item</span>
+                                </button>
 
-                              <div className="my-1 border-t border-neutral-100" />
+                                <div className="my-1 border-t border-neutral-100" />
 
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDeletingItem(item);
-                                  setOpenMenuId(null);
-                                }}
-                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 hover:bg-red-50/80 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                <span>Delete Item</span>
-                              </button>
-                            </div>
-                          </>
-                        )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeletingItem(item);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 hover:bg-red-50/80 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                  <span>Delete Item</span>
+                                </button>
+                              </MotionSurface>
+                            </MotionSurface>
+                          )}
+                        </MotionPresence>
                       </div>
                     </div>
                   </div>
@@ -495,405 +500,413 @@ export default function CatalogView() {
       </div>
 
       {/* Edit Item Modal */}
-      {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-900">
-                  Edit Catalog Item
-                </h3>
-                <p className="text-xs text-neutral-400 mt-0.5">
-                  Update item specifications, price, currency, or description.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingItem(null)}
-                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="mt-5 space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                  Item Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <MotionPresence>
+        {editingItem && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <MotionSurface kind="panel" className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Category
-                  </label>
-                  <select
-                    value={editCategory}
-                    onChange={(e) =>
-                      setEditCategory(
-                        e.target.value as "Development" | "Design" | "Consulting" | "Licensing"
-                      )
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="Development">Development</option>
-                    <option value="Design">Design</option>
-                    <option value="Consulting">Consulting</option>
-                    <option value="Licensing">Licensing</option>
-                  </select>
+                  <h3 className="text-lg font-semibold text-neutral-900">
+                    Edit Catalog Item
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Update item specifications, price, currency, or description.
+                  </p>
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    SKU Code <span className="normal-case font-normal text-neutral-400">(Stock Keeping Unit)</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editSku}
-                    onChange={(e) => setEditSku(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Price
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    value={editCurrency}
-                    onChange={(e) => setEditCurrency(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
-                    <option value="USD">USD ($ US Dollar)</option>
-                    <option value="EUR">EUR (€ Euro)</option>
-                    <option value="GBP">GBP (£ British Pound)</option>
-                    <option value="CAD">CAD ($ Canadian Dollar)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Pricing Unit
-                  </label>
-                  <select
-                    value={editUnit}
-                    onChange={(e) => setNewUnit(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="/ Hourly">/ Hourly</option>
-                    <option value="/ Daily">/ Daily</option>
-                    <option value="/ Unit">/ Unit</option>
-                    <option value="/ Monthly">/ Monthly</option>
-                    <option value="/ Project">/ Project</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                  Item Description
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
                 <button
                   type="button"
                   onClick={() => setEditingItem(null)}
-                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  Save Changes
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Delete Item Confirmation Modal */}
-      {deletingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center gap-3 text-red-600 mb-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-neutral-900">
-                  Delete Catalog Item?
-                </h3>
-                <p className="text-xs text-neutral-500">
-                  This action will permanently remove this item from your catalog.
-                </p>
-              </div>
-            </div>
-
-            <p className="text-sm text-neutral-600 mt-2">
-              Are you sure you want to delete <strong className="text-neutral-900">{deletingItem.title}</strong> ({deletingItem.sku}) valued at <strong className="text-neutral-900">{deletingItem.price} {deletingItem.unit}</strong>?
-            </p>
-
-            <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
-              <button
-                type="button"
-                onClick={() => setDeletingItem(null)}
-                className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                Delete Item
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* New Item Modal */}
-      {showNewItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-900">
-                  New Catalog Item
-                </h3>
-                <p className="text-xs text-neutral-400 mt-0.5">
-                  Define a standardized product, service, or pricing unit.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowNewItemModal(false)}
-                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateItem} className="mt-5 space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                  Item Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Senior Full-Stack Development"
-                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <form onSubmit={handleSaveEdit} className="mt-5 space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Category
-                  </label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) =>
-                      setNewCategory(
-                        e.target.value as "Development" | "Design" | "Consulting" | "Licensing"
-                      )
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="Development">Development</option>
-                    <option value="Design">Design</option>
-                    <option value="Consulting">Consulting</option>
-                    <option value="Licensing">Licensing</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    SKU Code <span className="normal-case font-normal text-neutral-400">(Stock Keeping Unit)</span>
+                    Item Title
                   </label>
                   <input
                     type="text"
                     required
-                    value={newSku}
-                    onChange={(e) => setNewSku(e.target.value)}
-                    placeholder="e.g. DEV-001"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Category
+                    </label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) =>
+                        setEditCategory(
+                          e.target.value as "Development" | "Design" | "Consulting" | "Licensing"
+                        )
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="Development">Development</option>
+                      <option value="Design">Design</option>
+                      <option value="Consulting">Consulting</option>
+                      <option value="Licensing">Licensing</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      SKU Code <span className="normal-case font-normal text-neutral-400">(Stock Keeping Unit)</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editSku}
+                      onChange={(e) => setEditSku(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Price
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Currency
+                    </label>
+                    <select
+                      value={editCurrency}
+                      onChange={(e) => setEditCurrency(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                      <option value="USD">USD ($ US Dollar)</option>
+                      <option value="EUR">EUR (€ Euro)</option>
+                      <option value="GBP">GBP (£ British Pound)</option>
+                      <option value="CAD">CAD ($ Canadian Dollar)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Pricing Unit
+                    </label>
+                    <select
+                      value={editUnit}
+                      onChange={(e) => setNewUnit(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="/ Hourly">/ Hourly</option>
+                      <option value="/ Daily">/ Daily</option>
+                      <option value="/ Unit">/ Unit</option>
+                      <option value="/ Monthly">/ Monthly</option>
+                      <option value="/ Project">/ Project</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Price
+                    Item Description
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <textarea
+                    rows={3}
                     required
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    placeholder="45000.00"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    value={newCurrency}
-                    onChange={(e) => setNewCurrency(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                  <button
+                    type="button"
+                    onClick={() => setEditingItem(null)}
+                    className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
-                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
-                    <option value="USD">USD ($ US Dollar)</option>
-                    <option value="EUR">EUR (€ Euro)</option>
-                    <option value="GBP">GBP (£ British Pound)</option>
-                    <option value="CAD">CAD ($ Canadian Dollar)</option>
-                  </select>
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Save Changes
+                  </button>
                 </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
+      {/* Delete Item Confirmation Modal */}
+      <MotionPresence>
+        {deletingItem && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <MotionSurface kind="panel" className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+              <div className="flex items-center gap-3 text-red-600 mb-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Pricing Unit
-                  </label>
-                  <select
-                    value={newUnit}
-                    onChange={(e) => setNewUnit(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="/ Hourly">/ Hourly</option>
-                    <option value="/ Daily">/ Daily</option>
-                    <option value="/ Unit">/ Unit</option>
-                    <option value="/ Monthly">/ Monthly</option>
-                    <option value="/ Project">/ Project</option>
-                  </select>
+                  <h3 className="text-base font-semibold text-neutral-900">
+                    Delete Catalog Item?
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    This action will permanently remove this item from your catalog.
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                  Item Description
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Describe the scope, deliverables, or specifications of this item..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                />
-              </div>
+              <p className="text-sm text-neutral-600 mt-2">
+                Are you sure you want to delete <strong className="text-neutral-900">{deletingItem.title}</strong> ({deletingItem.sku}) valued at <strong className="text-neutral-900">{deletingItem.price} {deletingItem.unit}</strong>?
+              </p>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+              <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
                 <button
                   type="button"
-                  onClick={() => setShowNewItemModal(false)}
+                  onClick={() => setDeletingItem(null)}
                   className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
-                  Create Item
+                  Delete Item
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
+
+      {/* New Item Modal */}
+      <MotionPresence>
+        {showNewItemModal && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <MotionSurface kind="panel" className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-900">
+                    New Catalog Item
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Define a standardized product, service, or pricing unit.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNewItemModal(false)}
+                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateItem} className="mt-5 space-y-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Item Title
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g. Senior Full-Stack Development"
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Category
+                    </label>
+                    <select
+                      value={newCategory}
+                      onChange={(e) =>
+                        setNewCategory(
+                          e.target.value as "Development" | "Design" | "Consulting" | "Licensing"
+                        )
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="Development">Development</option>
+                      <option value="Design">Design</option>
+                      <option value="Consulting">Consulting</option>
+                      <option value="Licensing">Licensing</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      SKU Code <span className="normal-case font-normal text-neutral-400">(Stock Keeping Unit)</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newSku}
+                      onChange={(e) => setNewSku(e.target.value)}
+                      placeholder="e.g. DEV-001"
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Price
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={newPrice}
+                      onChange={(e) => setNewPrice(e.target.value)}
+                      placeholder="45000.00"
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Currency
+                    </label>
+                    <select
+                      value={newCurrency}
+                      onChange={(e) => setNewCurrency(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                      <option value="USD">USD ($ US Dollar)</option>
+                      <option value="EUR">EUR (€ Euro)</option>
+                      <option value="GBP">GBP (£ British Pound)</option>
+                      <option value="CAD">CAD ($ Canadian Dollar)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                      Pricing Unit
+                    </label>
+                    <select
+                      value={newUnit}
+                      onChange={(e) => setNewUnit(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="/ Hourly">/ Hourly</option>
+                      <option value="/ Daily">/ Daily</option>
+                      <option value="/ Unit">/ Unit</option>
+                      <option value="/ Monthly">/ Monthly</option>
+                      <option value="/ Project">/ Project</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Item Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Describe the scope, deliverables, or specifications of this item..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewItemModal(false)}
+                    className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Create Item
+                  </button>
+                </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Bulk Import Modal */}
-      {showBulkImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <h3 className="text-lg font-semibold text-neutral-900">
-                Bulk Import Items
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowBulkImportModal(false)}
-                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <MotionPresence>
+        {showBulkImportModal && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <MotionSurface kind="panel" className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+                <h3 className="text-lg font-semibold text-neutral-900">
+                  Bulk Import Items
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkImportModal(false)}
+                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-            <div className="mt-4 p-8 border-2 border-dashed border-neutral-200 rounded-2xl text-center hover:border-purple-400 transition-colors cursor-pointer">
-              <FileSpreadsheet className="w-10 h-10 text-neutral-400 mx-auto mb-2" />
-              <p className="text-sm font-semibold text-neutral-800">
-                Upload CSV or Excel file
-              </p>
-              <p className="text-xs text-neutral-400 mt-1">
-                Drag and drop your catalog spreadsheet here or click to browse
-              </p>
-            </div>
+              <div className="mt-4 p-8 border-2 border-dashed border-neutral-200 rounded-2xl text-center hover:border-purple-400 transition-colors cursor-pointer">
+                <FileSpreadsheet className="w-10 h-10 text-neutral-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-neutral-800">
+                  Upload CSV or Excel file
+                </p>
+                <p className="text-xs text-neutral-400 mt-1">
+                  Drag and drop your catalog spreadsheet here or click to browse
+                </p>
+              </div>
 
-            <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
-              <button
-                type="button"
-                onClick={() => setShowBulkImportModal(false)}
-                className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowBulkImportModal(false)}
-                className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                Import
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkImportModal(false)}
+                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkImportModal(false)}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Import
+                </button>
+              </div>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
     </div>
   );
 }

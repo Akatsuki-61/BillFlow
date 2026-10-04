@@ -1,5 +1,7 @@
 "use client";
 
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+
 import React, { useState, useMemo } from "react";
 import {
   Download,
@@ -235,14 +237,16 @@ export default function ExpensesPage() {
   };
 
   return (
-    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 animate-fadeIn">
+    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 motion-page">
       {/* Toast Notification */}
-      {notification && (
-        <div className="fixed top-6 right-6 z-50 bg-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-neutral-700 animate-slideDown">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span>{notification}</span>
-        </div>
-      )}
+      <MotionPresence>
+        {notification && (
+          <MotionSurface kind="toast" className="fixed top-6 right-6 z-50 bg-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-neutral-700">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span>{notification}</span>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Header Section matching Figma reference */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -280,7 +284,7 @@ export default function ExpensesPage() {
           >
             <div className="w-4 h-4 flex items-center justify-center">
               <Download
-                className="w-4 h-4 text-white transition-transform duration-200 ease-out group-hover:scale-120 group-hover:translate-y-0.5"
+                className="w-4 h-4 text-white transition-transform duration-200 ease-out group-hover:scale-105 group-hover:translate-y-0.5"
                 strokeWidth={2.2}
               />
             </div>
@@ -302,7 +306,7 @@ export default function ExpensesPage() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 mt-4 text-xs font-medium">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-600 transition-transform duration-300 hover:scale-125" />
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-600 transition-transform duration-300 hover:scale-105" />
             <span className="text-emerald-600 font-semibold">+5.2%</span>
             <span className="text-neutral-400 font-normal">from last month</span>
           </div>
@@ -326,10 +330,10 @@ export default function ExpensesPage() {
         {/* Card 3: Action Card (LOG EXPENSE) */}
         <div
           onClick={() => setIsLogModalOpen(true)}
-          className="bg-[#ececf0] hover:bg-[#eaeaf0] transition-colors rounded-2xl p-6 border border-neutral-200/60 shadow-xs flex flex-col items-center justify-center cursor-pointer group select-none"
+          className="motion-card bg-[#ececf0] hover:bg-[#eaeaf0] transition-colors rounded-2xl p-6 border border-neutral-200/60 shadow-xs flex flex-col items-center justify-center cursor-pointer group select-none"
         >
           <div className="w-13 h-13 rounded-full bg-[#7c3aed] text-white flex items-center justify-center shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-purple-300 group-hover:shadow-lg">
-            <Plus className="w-6 h-6 stroke-[2.5] transition-transform duration-300 group-hover:rotate-90" />
+            <Plus className="w-6 h-6 stroke-[2.5] transition-transform duration-300 group-hover:rotate-6" />
           </div>
           <span className="text-xs font-bold tracking-widest text-[#7c3aed] uppercase mt-3 transition-colors group-hover:text-[#6d28d9]">
             LOG EXPENSE
@@ -374,25 +378,25 @@ export default function ExpensesPage() {
                   <td className="py-4 px-6">
                     <div className="w-10 h-10 rounded-xl bg-neutral-100/90 border border-neutral-200/60 flex items-center justify-center text-neutral-600 transition-all duration-300 group-hover:bg-[#f3efff] group-hover:border-[#e3d8fd] group-hover:text-[#7c3aed]">
                       {item.iconType === "plane" && (
-                        <Plane className="w-4.5 h-4.5 transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-115" />
+                        <Plane className="w-4.5 h-4.5 transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-105" />
                       )}
                       {item.iconType === "code" && (
-                        <Code2 className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-120" />
+                        <Code2 className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-105" />
                       )}
                       {item.iconType === "utensils" && (
-                        <Utensils className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-115" />
+                        <Utensils className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-105" />
                       )}
                       {item.iconType === "package" && (
-                        <Package className="w-4.5 h-4.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-115" />
+                        <Package className="w-4.5 h-4.5 transition-transform duration-300 group-hover:-translate-y-px group-hover:scale-105" />
                       )}
                       {item.iconType === "ai" && (
-                        <Sparkles className="w-4.5 h-4.5 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-115 text-[#7c3aed]" />
+                        <Sparkles className="w-4.5 h-4.5 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-105 text-[#7c3aed]" />
                       )}
                       {item.iconType === "server" && (
-                        <Server className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-115" />
+                        <Server className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-105" />
                       )}
                       {item.iconType === "other" && (
-                        <DollarSign className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-115" />
+                        <DollarSign className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-105" />
                       )}
                     </div>
                   </td>
@@ -453,7 +457,7 @@ export default function ExpensesPage() {
                         className="p-1.5 text-[#7c3aed] hover:text-[#6d28d9] rounded-lg hover:bg-purple-50 transition-all cursor-pointer group/rc"
                         title={item.receiptName || "View Receipt"}
                       >
-                        <Paperclip className="w-4.5 h-4.5 transition-transform duration-200 group-hover/rc:scale-125 group-hover/rc:rotate-12" />
+                        <Paperclip className="w-4.5 h-4.5 transition-transform duration-200 group-hover/rc:scale-105 group-hover/rc:rotate-6" />
                       </button>
                     ) : (
                       <Paperclip className="w-4.5 h-4.5 text-neutral-300 mx-auto" />
@@ -509,282 +513,286 @@ export default function ExpensesPage() {
       </div>
 
       {/* Log Expense Modal (SRS REQ-EXP 01 & 02 / UC-12) */}
-      {isLogModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center">
-                  <DollarSign className="w-4 h-4" />
+      <MotionPresence>
+        {isLogModalOpen && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden">
+              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center">
+                    <DollarSign className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-neutral-900">
+                      Log Business Expense
+                    </h3>
+                    <p className="text-xs text-neutral-400">
+                      UC-12: Operational Expense (OPEX) Tracker
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-semibold text-neutral-900">
-                    Log Business Expense
-                  </h3>
-                  <p className="text-xs text-neutral-400">
-                    UC-12: Operational Expense (OPEX) Tracker
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsLogModalOpen(false)}
-                className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* 1-Click Fast Presets per SRS REQ-EXP 02 */}
-            <div className="px-6 pt-4">
-              <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-                1-Click OPEX Presets (REQ-EXP 02)
-              </label>
-              <div className="grid grid-cols-2 gap-2 text-xs">
                 <button
-                  type="button"
-                  onClick={() =>
-                    applyPreset({
-                      merchant: "Adobe Creative Cloud",
-                      description: "Creative Cloud All Apps Subscription",
-                      category: "SOFTWARE",
-                      amount: "54.99",
-                    })
-                  }
-                  className="px-2.5 py-1.5 bg-neutral-100/80 hover:bg-purple-50 hover:text-[#7c3aed] border border-neutral-200/80 rounded-lg text-left transition-colors font-medium cursor-pointer"
+                  onClick={() => setIsLogModalOpen(false)}
+                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors"
                 >
-                  🎨 Adobe CC ($54.99)
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyPreset({
-                      merchant: "Anthropic",
-                      description: "Claude AI API Tokens",
-                      category: "AI INFRASTRUCTURE",
-                      amount: "42.50",
-                    })
-                  }
-                  className="px-2.5 py-1.5 bg-neutral-100/80 hover:bg-purple-50 hover:text-[#7c3aed] border border-neutral-200/80 rounded-lg text-left transition-colors font-medium cursor-pointer"
-                >
-                  ⚡ Claude AI API ($42.50)
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyPreset({
-                      merchant: "OpenAI",
-                      description: "GPT-4o API Tokens & Platform",
-                      category: "AI INFRASTRUCTURE",
-                      amount: "30.00",
-                    })
-                  }
-                  className="px-2.5 py-1.5 bg-neutral-100/80 hover:bg-purple-50 hover:text-[#7c3aed] border border-neutral-200/80 rounded-lg text-left transition-colors font-medium cursor-pointer"
-                >
-                  🤖 OpenAI API ($30.00)
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyPreset({
-                      merchant: "Vercel Inc.",
-                      description: "Vercel Pro Team Hosting",
-                      category: "HOSTING",
-                      amount: "20.00",
-                    })
-                  }
-                  className="px-2.5 py-1.5 bg-neutral-100/80 hover:bg-purple-50 hover:text-[#7c3aed] border border-neutral-200/80 rounded-lg text-left transition-colors font-medium cursor-pointer"
-                >
-                  ▲ Vercel Pro ($20.00)
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </div>
 
-            <form onSubmit={handleCreateExpense} className="p-6 space-y-4 text-xs font-medium text-neutral-700">
-              <div className="grid grid-cols-2 gap-3.5">
+              {/* 1-Click Fast Presets per SRS REQ-EXP 02 */}
+              <div className="px-6 pt-4">
+                <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                  1-Click OPEX Presets (REQ-EXP 02)
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      applyPreset({
+                        merchant: "Adobe Creative Cloud",
+                        description: "Creative Cloud All Apps Subscription",
+                        category: "SOFTWARE",
+                        amount: "54.99",
+                      })
+                    }
+                    className="px-2.5 py-1.5 bg-neutral-100/80 hover:bg-purple-50 hover:text-[#7c3aed] border border-neutral-200/80 rounded-lg text-left transition-colors font-medium cursor-pointer"
+                  >
+                    🎨 Adobe CC ($54.99)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      applyPreset({
+                        merchant: "Anthropic",
+                        description: "Claude AI API Tokens",
+                        category: "AI INFRASTRUCTURE",
+                        amount: "42.50",
+                      })
+                    }
+                    className="px-2.5 py-1.5 bg-neutral-100/80 hover:bg-purple-50 hover:text-[#7c3aed] border border-neutral-200/80 rounded-lg text-left transition-colors font-medium cursor-pointer"
+                  >
+                    ⚡ Claude AI API ($42.50)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      applyPreset({
+                        merchant: "OpenAI",
+                        description: "GPT-4o API Tokens & Platform",
+                        category: "AI INFRASTRUCTURE",
+                        amount: "30.00",
+                      })
+                    }
+                    className="px-2.5 py-1.5 bg-neutral-100/80 hover:bg-purple-50 hover:text-[#7c3aed] border border-neutral-200/80 rounded-lg text-left transition-colors font-medium cursor-pointer"
+                  >
+                    🤖 OpenAI API ($30.00)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      applyPreset({
+                        merchant: "Vercel Inc.",
+                        description: "Vercel Pro Team Hosting",
+                        category: "HOSTING",
+                        amount: "20.00",
+                      })
+                    }
+                    className="px-2.5 py-1.5 bg-neutral-100/80 hover:bg-purple-50 hover:text-[#7c3aed] border border-neutral-200/80 rounded-lg text-left transition-colors font-medium cursor-pointer"
+                  >
+                    ▲ Vercel Pro ($20.00)
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateExpense} className="p-6 space-y-4 text-xs font-medium text-neutral-700">
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                      Payee / Merchant *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. GitHub"
+                      value={formData.merchant}
+                      onChange={(e) => setFormData({ ...formData, merchant: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                      Amount (USD $) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="0.00"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block mb-1.5 text-neutral-700 font-semibold">
-                    Payee / Merchant *
+                    Expense Description
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. GitHub"
-                    value={formData.merchant}
-                    onChange={(e) => setFormData({ ...formData, merchant: e.target.value })}
+                    placeholder="e.g. Monthly developer tools subscription"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                   />
                 </div>
 
-                <div>
-                  <label className="block mb-1.5 text-neutral-700 font-semibold">
-                    Amount (USD $) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="0.00"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
-                  />
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                      Category
+                    </label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          category: e.target.value as ExpenseItem["category"],
+                        })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 bg-white"
+                    >
+                      <option value="SOFTWARE">SOFTWARE</option>
+                      <option value="AI INFRASTRUCTURE">AI INFRASTRUCTURE</option>
+                      <option value="HOSTING">HOSTING</option>
+                      <option value="TRAVEL">TRAVEL</option>
+                      <option value="MEALS">MEALS</option>
+                      <option value="OFFICE">OFFICE</option>
+                      <option value="HARDWARE">HARDWARE</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                      Expense Date
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 bg-white"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block mb-1.5 text-neutral-700 font-semibold">
-                  Expense Description
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Monthly developer tools subscription"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
-                />
-              </div>
+                {/* Deductible & Receipt switches */}
+                <div className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold text-neutral-800 block text-xs">
+                        Tax Deductible
+                      </span>
+                      <span className="text-neutral-400 text-[11px] font-normal">
+                        Include in business tax write-offs
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.deductible}
+                      onChange={(e) =>
+                        setFormData({ ...formData, deductible: e.target.checked })
+                      }
+                      className="w-4 h-4 text-[#7c3aed] rounded-sm focus:ring-[#7c3aed]"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block mb-1.5 text-neutral-700 font-semibold">
-                    Category
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        category: e.target.value as ExpenseItem["category"],
-                      })
-                    }
-                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 bg-white"
+                  <div className="flex items-center justify-between pt-2 border-t border-neutral-200/60">
+                    <div>
+                      <span className="font-semibold text-neutral-800 block text-xs">
+                        Attach Receipt
+                      </span>
+                      <span className="text-neutral-400 text-[11px] font-normal">
+                        Store local proof of payment
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.receiptAttached}
+                      onChange={(e) =>
+                        setFormData({ ...formData, receiptAttached: e.target.checked })
+                      }
+                      className="w-4 h-4 text-[#7c3aed] rounded-sm focus:ring-[#7c3aed]"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-neutral-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsLogModalOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
-                    <option value="SOFTWARE">SOFTWARE</option>
-                    <option value="AI INFRASTRUCTURE">AI INFRASTRUCTURE</option>
-                    <option value="HOSTING">HOSTING</option>
-                    <option value="TRAVEL">TRAVEL</option>
-                    <option value="MEALS">MEALS</option>
-                    <option value="OFFICE">OFFICE</option>
-                    <option value="HARDWARE">HARDWARE</option>
-                  </select>
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer"
+                  >
+                    Save Expense
+                  </button>
                 </div>
-
-                <div>
-                  <label className="block mb-1.5 text-neutral-700 font-semibold">
-                    Expense Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 bg-white"
-                  />
-                </div>
-              </div>
-
-              {/* Deductible & Receipt switches */}
-              <div className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-neutral-800 block text-xs">
-                      Tax Deductible
-                    </span>
-                    <span className="text-neutral-400 text-[11px] font-normal">
-                      Include in business tax write-offs
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={formData.deductible}
-                    onChange={(e) =>
-                      setFormData({ ...formData, deductible: e.target.checked })
-                    }
-                    className="w-4 h-4 text-[#7c3aed] rounded-sm focus:ring-[#7c3aed]"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-neutral-200/60">
-                  <div>
-                    <span className="font-semibold text-neutral-800 block text-xs">
-                      Attach Receipt
-                    </span>
-                    <span className="text-neutral-400 text-[11px] font-normal">
-                      Store local proof of payment
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={formData.receiptAttached}
-                    onChange={(e) =>
-                      setFormData({ ...formData, receiptAttached: e.target.checked })
-                    }
-                    className="w-4 h-4 text-[#7c3aed] rounded-sm focus:ring-[#7c3aed]"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-neutral-100">
-                <button
-                  type="button"
-                  onClick={() => setIsLogModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer"
-                >
-                  Save Expense
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Receipt Preview Modal */}
-      {selectedReceipt && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
-              <div className="flex items-center gap-2">
-                <Paperclip className="w-4 h-4 text-[#7c3aed]" />
-                <h4 className="text-sm font-semibold text-neutral-900">
-                  Receipt Document
-                </h4>
+      <MotionPresence>
+        {selectedReceipt && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-neutral-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="w-4 h-4 text-[#7c3aed]" />
+                  <h4 className="text-sm font-semibold text-neutral-900">
+                    Receipt Document
+                  </h4>
+                </div>
+                <button
+                  onClick={() => setSelectedReceipt(null)}
+                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedReceipt(null)}
-                className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6 text-center space-y-3">
-              <div className="w-16 h-16 rounded-2xl bg-purple-50 text-[#7c3aed] flex items-center justify-center mx-auto border border-purple-100">
-                <FileSpreadsheet className="w-8 h-8" />
+              <div className="p-6 text-center space-y-3">
+                <div className="w-16 h-16 rounded-2xl bg-purple-50 text-[#7c3aed] flex items-center justify-center mx-auto border border-purple-100">
+                  <FileSpreadsheet className="w-8 h-8" />
+                </div>
+                <div>
+                  <span className="font-semibold text-neutral-800 text-sm block">
+                    {selectedReceipt}
+                  </span>
+                  <span className="text-neutral-400 text-xs">
+                    Verified Local Receipt Attachment (Stored offline)
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="font-semibold text-neutral-800 text-sm block">
-                  {selectedReceipt}
-                </span>
-                <span className="text-neutral-400 text-xs">
-                  Verified Local Receipt Attachment (Stored offline)
-                </span>
+              <div className="px-6 py-3 bg-neutral-50 border-t border-neutral-100 flex justify-end">
+                <button
+                  onClick={() => setSelectedReceipt(null)}
+                  className="px-4 py-1.5 bg-neutral-900 text-white rounded-xl text-xs font-medium hover:bg-neutral-800"
+                >
+                  Done
+                </button>
               </div>
-            </div>
-            <div className="px-6 py-3 bg-neutral-50 border-t border-neutral-100 flex justify-end">
-              <button
-                onClick={() => setSelectedReceipt(null)}
-                className="px-4 py-1.5 bg-neutral-900 text-white rounded-xl text-xs font-medium hover:bg-neutral-800"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
     </div>
   );
 }

@@ -8,6 +8,9 @@
 :root {
   --background: #faf9f5;
   --foreground: #111827;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-fast: 180ms;
+  --motion-normal: 260ms;
 }
 
 body {
@@ -32,27 +35,146 @@ body {
   font-family: var(--font-playfair), Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
-/* Lucide Icon Animated Hover Helpers */
+/* Shared interaction rhythm: small movements, soft landings, no layout shifts. */
+:where(button, a, input, select, textarea, [role="button"]) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, translate, scale;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--motion-ease);
+}
+
+:where(button, [role="button"]):not(:disabled):not([aria-disabled="true"]):active {
+  scale: 0.98;
+  translate: 0 0;
+  transition-duration: 100ms;
+}
+
+:where(button, a, input, select, textarea, [role="button"]):focus-visible {
+  outline: 2px solid #7c3aed;
+  outline-offset: 3px;
+}
+
+:where(button, input, select, textarea):disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+:where(button > svg, a > svg, a > div > svg) {
+  transform-origin: center;
+  transition: transform var(--motion-normal) var(--motion-ease),
+    scale var(--motion-normal) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+button[aria-expanded] > :is(.lucide-chevron-down, .motion-chevron) {
+  transform: rotate(0deg);
+}
+
+button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
+  transform: rotate(180deg);
+}
+
+.motion-card {
+  transition: border-color var(--motion-normal) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    background-color var(--motion-normal) var(--motion-ease),
+    translate var(--motion-normal) var(--motion-ease);
+}
+
+aside nav a[aria-current="page"] svg {
+  animation: nav-arrive 260ms var(--motion-ease);
+}
+
+@keyframes nav-arrive {
+  from { opacity: 0.6; scale: 0.94; }
+  to { opacity: 1; scale: 1; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(button, [role="button"]):not(:disabled):not([aria-disabled="true"]):hover {
+    translate: 0 -1px;
+  }
+
+  :where(button, a):not(:disabled):not([aria-disabled="true"]):hover > svg:not([class*="hover:scale"]) {
+    scale: 1.06;
+  }
+
+  .motion-card:hover {
+    translate: 0 -2px;
+  }
+}
+
+/* Opacity only on page containers keeps fixed dialogs anchored to the viewport. */
+.motion-page {
+  animation: page-arrive 320ms var(--motion-ease);
+}
+
+[data-motion-surface="panel"] {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Motion owns these properties; CSS transitions would trail its animation frames. */
+[data-motion-surface] {
+  transition: none;
+}
+
+[data-motion-surface="menu"] {
+  transform-origin: top right;
+}
+
+@keyframes page-arrive {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* A gentle single cue replaces the repeated urgent pulse on notifications. */
+.animate-ping {
+  animation: status-pulse 1.8s var(--motion-ease) 1;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; scale: 1; }
+  50% { opacity: 0.55; scale: 1.15; }
+}
+
+/* Lucide helpers follow the same restrained motion as the rest of the interface. */
 .icon-hover-scale {
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+  transition: transform var(--motion-normal) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .icon-hover-scale:hover,
 .group:hover .icon-hover-scale {
-  transform: scale(1.15);
+  transform: scale(1.06);
 }
 
 .icon-hover-rotate {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+  transition: transform var(--motion-normal) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .icon-hover-rotate:hover,
 .group:hover .icon-hover-rotate {
-  transform: rotate(12deg) scale(1.12);
+  transform: rotate(6deg) scale(1.06);
 }
 
 .icon-hover-bounce {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+  transition: transform var(--motion-normal) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .icon-hover-bounce:hover,
 .group:hover .icon-hover-bounce {
-  transform: translateY(-2px) scale(1.08);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  :where(button, a, [role="button"], .motion-card),
+  :where(button, a) svg,
+  .icon-hover-scale, .icon-hover-rotate, .icon-hover-bounce {
+    transform: none !important;
+    translate: none !important;
+    scale: none !important;
+  }
 }

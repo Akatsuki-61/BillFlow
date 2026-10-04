@@ -1,5 +1,7 @@
 "use client";
 
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -75,14 +77,16 @@ export default function AnalyticsView() {
   const maxScale = 2.0;
 
   return (
-    <div className="w-full min-h-screen bg-[#faf9f5] text-[#111827] px-6 sm:px-10 lg:px-12 py-10 font-sans">
+    <div className="motion-page w-full min-h-screen bg-[#faf9f5] text-[#111827] px-6 sm:px-10 lg:px-12 py-10 font-sans">
       {/* Toast Feedback Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium animate-in fade-in duration-150">
-          <FontAwesomeIcon icon={faCircleCheck} className="text-[#34d399] text-[13px]" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <MotionPresence>
+        {toastMessage && (
+          <MotionSurface kind="toast" className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium">
+            <FontAwesomeIcon icon={faCircleCheck} className="text-[#34d399] text-[13px]" />
+            <span>{toastMessage}</span>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Top Header: Title, subtitle, timeframe toggle and date range picker */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -124,36 +128,39 @@ export default function AnalyticsView() {
             <button
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              aria-expanded={isDropdownOpen}
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#faf9f5] hover:bg-[#eaeae5] border border-[#dcdcd7] rounded-lg text-[11.5px] font-medium text-[#374151] transition-all cursor-pointer shadow-2xs"
             >
               <FontAwesomeIcon icon={faCalendarDays} className="text-[11px] text-[#6b7280]" />
               <span>{selectedQuarter}</span>
-              <FontAwesomeIcon icon={faChevronDown} className="text-[9px] text-[#9ca3af] ml-0.5" />
+              <FontAwesomeIcon icon={faChevronDown} className="motion-chevron text-[9px] text-[#9ca3af] ml-0.5" />
             </button>
 
             {/* Dropdown menu */}
-            {isDropdownOpen && (
-              <div className="absolute right-0 mt-1.5 w-36 bg-[#faf9f5] border border-[#dcdcd7] rounded-xl shadow-lg z-20 py-1 overflow-hidden">
-                {["Q3 2023", "Q2 2023", "Q1 2023", "Q4 2022"].map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => {
-                      setSelectedQuarter(q);
-                      setIsDropdownOpen(false);
-                      showToast(`Filtered to ${q}`);
-                    }}
-                    className={`w-full text-left px-3 py-1.5 text-[11.5px] transition-colors cursor-pointer ${
-                      selectedQuarter === q
-                        ? "bg-[#eaeae5] text-[#7133f5] font-semibold"
-                        : "text-[#374151] hover:bg-[#f4f4f0]"
-                    }`}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
+            <MotionPresence>
+              {isDropdownOpen && (
+                <MotionSurface kind="menu" className="absolute right-0 mt-1.5 w-36 bg-[#faf9f5] border border-[#dcdcd7] rounded-xl shadow-lg z-20 py-1 overflow-hidden">
+                  {["Q3 2023", "Q2 2023", "Q1 2023", "Q4 2022"].map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => {
+                        setSelectedQuarter(q);
+                        setIsDropdownOpen(false);
+                        showToast(`Filtered to ${q}`);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-[11.5px] transition-colors cursor-pointer ${
+                        selectedQuarter === q
+                          ? "bg-[#eaeae5] text-[#7133f5] font-semibold"
+                          : "text-[#374151] hover:bg-[#f4f4f0]"
+                      }`}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </MotionSurface>
+              )}
+            </MotionPresence>
           </div>
         </div>
       </div>
@@ -433,125 +440,129 @@ export default function AnalyticsView() {
       </div>
 
       {/* Modal Dialog: All Billing Alerts */}
-      {isAlertsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-              <h3 className="font-bold text-[13px] text-[#111827]">
-                Active Billing Alerts (Overdue Invoices)
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsAlertsModalOpen(false)}
-                className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
-              >
-                <FontAwesomeIcon icon={faXmark} className="text-sm" />
-              </button>
-            </div>
-            <div className="p-6 space-y-3">
-              {[
-                ...alerts,
-                {
-                  id: "alert-3",
-                  clientName: "CyberDyne Labs",
-                  retainerTitle: "Security Audit Q2",
-                  daysOverdue: 21,
-                  amount: 5400,
-                },
-              ].map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 bg-[#eaeae5] rounded-xl flex items-center justify-between border border-[#deded8]"
+      <MotionPresence>
+        {isAlertsModalOpen && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+            <MotionSurface kind="panel" className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
+                <h3 className="font-bold text-[13px] text-[#111827]">
+                  Active Billing Alerts (Overdue Invoices)
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAlertsModalOpen(false)}
+                  className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#fef2f2] text-[#ef4444] flex items-center justify-center shrink-0">
-                      <FontAwesomeIcon icon={faTriangleExclamation} className="text-[12px]" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-[13px] text-[#111827]">{item.clientName}</div>
-                      <div className="text-[#ef4444] text-[11px] font-medium">
-                        {item.daysOverdue} days overdue &bull; {item.retainerTitle}
+                  <FontAwesomeIcon icon={faXmark} className="text-sm" />
+                </button>
+              </div>
+              <div className="p-6 space-y-3">
+                {[
+                  ...alerts,
+                  {
+                    id: "alert-3",
+                    clientName: "CyberDyne Labs",
+                    retainerTitle: "Security Audit Q2",
+                    daysOverdue: 21,
+                    amount: 5400,
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3 bg-[#eaeae5] rounded-xl flex items-center justify-between border border-[#deded8]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-[#fef2f2] text-[#ef4444] flex items-center justify-center shrink-0">
+                        <FontAwesomeIcon icon={faTriangleExclamation} className="text-[12px]" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-[13px] text-[#111827]">{item.clientName}</div>
+                        <div className="text-[#ef4444] text-[11px] font-medium">
+                          {item.daysOverdue} days overdue &bull; {item.retainerTitle}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-[13px] text-[#111827]">
-                      ${item.amount.toLocaleString("en-US")}
+                    <div className="text-right">
+                      <div className="font-bold text-[13px] text-[#111827]">
+                        ${item.amount.toLocaleString("en-US")}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSendReminder(item.clientName)}
+                        className="text-[11px] text-[#7133f5] hover:underline font-semibold cursor-pointer"
+                      >
+                        Send Notice
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSendReminder(item.clientName)}
-                      className="text-[11px] text-[#7133f5] hover:underline font-semibold cursor-pointer"
-                    >
-                      Send Notice
-                    </button>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsAlertsModalOpen(false)}
-                className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                ))}
+              </div>
+              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsAlertsModalOpen(false)}
+                  className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
+                >
+                  Done
+                </button>
+              </div>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Modal Dialog: Net Profit Details */}
-      {isDetailsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-              <h3 className="font-bold text-[13px] text-[#111827]">
-                Net Profit Breakdown ({selectedQuarter})
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsDetailsModalOpen(false)}
-                className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
-              >
-                <FontAwesomeIcon icon={faXmark} className="text-sm" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 text-[12px] text-[#4b5563]">
-              <div className="p-3 bg-[#eaeae5] rounded-xl space-y-2 border border-[#deded8]">
-                <div className="flex justify-between">
-                  <span>Gross Billed Revenue:</span>
-                  <span className="font-bold text-[#111827]">$512,000.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Operating & Server OPEX:</span>
-                  <span className="font-bold text-[#ef4444]">-$285,150.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Subcontractor Outsourcing:</span>
-                  <span className="font-bold text-[#ef4444]">-$84,000.00</span>
-                </div>
-                <div className="pt-2 border-t border-[#deded8] flex justify-between text-[13px]">
-                  <span className="font-semibold text-[#111827]">Net Retained Profit:</span>
-                  <span className="font-newspaper font-bold text-[#15803d] text-[15px]">
-                    $142,850.00
-                  </span>
+      <MotionPresence>
+        {isDetailsModalOpen && (
+          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+            <MotionSurface kind="panel" className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
+                <h3 className="font-bold text-[13px] text-[#111827]">
+                  Net Profit Breakdown ({selectedQuarter})
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsDetailsModalOpen(false)}
+                  className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
+                >
+                  <FontAwesomeIcon icon={faXmark} className="text-sm" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4 text-[12px] text-[#4b5563]">
+                <div className="p-3 bg-[#eaeae5] rounded-xl space-y-2 border border-[#deded8]">
+                  <div className="flex justify-between">
+                    <span>Gross Billed Revenue:</span>
+                    <span className="font-bold text-[#111827]">$512,000.00</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Operating & Server OPEX:</span>
+                    <span className="font-bold text-[#ef4444]">-$285,150.00</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Subcontractor Outsourcing:</span>
+                    <span className="font-bold text-[#ef4444]">-$84,000.00</span>
+                  </div>
+                  <div className="pt-2 border-t border-[#deded8] flex justify-between text-[13px]">
+                    <span className="font-semibold text-[#111827]">Net Retained Profit:</span>
+                    <span className="font-newspaper font-bold text-[#15803d] text-[15px]">
+                      $142,850.00
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsDetailsModalOpen(false)}
-                className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsDetailsModalOpen(false)}
+                  className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
+                >
+                  Close
+                </button>
+              </div>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
     </div>
   );
 }
