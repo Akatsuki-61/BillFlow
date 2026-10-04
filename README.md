@@ -1,6 +1,6 @@
 # BillFlow
 
-> Freelance invoicing, rate cards, and execution workspace for technical consultants.  
+> Invoicing, rate cards, and financial execution workspace for solo freelancers, software consultants, and small business owners.  
 > Academic Coursework: **EER4189 Software Design in Group** — The Open University of Sri Lanka (Group 61).
 
 ---
