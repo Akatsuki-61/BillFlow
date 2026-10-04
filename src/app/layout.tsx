@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display, Inter, Newsreader } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
+import TitleBar from "@/components/TitleBar";
 import { NavProvider } from "@/context/NavContext";
 import { DataProvider } from "@/lib/data/DataProvider";
 import "./globals.css";
@@ -48,13 +49,16 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${inter.variable} ${newsreader.variable} h-full antialiased`}
     >
-      <body className="min-h-screen bg-[#faf9f5] text-neutral-900 flex antialiased selection:bg-purple-100 selection:text-purple-900">
+      <body className="h-screen bg-[#faf9f5] text-neutral-900 flex flex-col antialiased selection:bg-purple-100 selection:text-purple-900 overflow-hidden">
         <NavProvider>
           <DataProvider>
-            <Sidebar />
-            <main className="flex-1 bg-[#faf9f5] min-h-screen overflow-y-auto">
-              {children}
-            </main>
+            <TitleBar />
+            <div className="flex flex-1 min-h-0 overflow-hidden">
+              <Sidebar />
+              <main className="flex-1 bg-[#faf9f5] min-h-0 overflow-y-auto">
+                {children}
+              </main>
+            </div>
           </DataProvider>
         </NavProvider>
       </body>

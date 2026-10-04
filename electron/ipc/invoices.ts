@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import crypto from "crypto";
 import { eq, desc } from "drizzle-orm";
 import { getDb } from "../db";
-import { clients, invoices } from "../db/schema";
+import { clients, invoices, settings } from "../db/schema";
 import { newInvoiceSchema, invoicePatchSchema } from "../validation";
 import { AppError, formatError } from "./errors";
 import {
@@ -15,15 +15,34 @@ import {
 
 export function getNextInvoiceCode(): string {
   const db = getDb();
+  let prefixSetting = "INV-";
+  let minSeq = 1;
+
+  try {
+    const s = db.select().from(settings).where(eq(settings.id, "default")).get();
+    if (s) {
+      if (s.invoicePrefix) prefixSetting = s.invoicePrefix;
+      if (typeof s.nextInvoiceSeq === "number" && s.nextInvoiceSeq > 0) {
+        minSeq = s.nextInvoiceSeq;
+      }
+    }
+  } catch {
+    // fallback if table query fails
+  }
+
   const currentYear = new Date().getFullYear();
-  const prefix = `INV-${currentYear}-`;
+  const activePrefix = prefixSetting.includes("{YYYY}")
+    ? prefixSetting.replace("{YYYY}", String(currentYear))
+    : prefixSetting.endsWith("-")
+    ? `${prefixSetting}${currentYear}-`
+    : `${prefixSetting}-${currentYear}-`;
 
   const allRows = db.select({ code: invoices.code }).from(invoices).all();
-  let maxSeq = 0;
+  let maxSeq = minSeq - 1;
 
   for (const row of allRows) {
-    if (row.code && row.code.startsWith(prefix)) {
-      const rest = row.code.slice(prefix.length);
+    if (row.code && row.code.startsWith(activePrefix)) {
+      const rest = row.code.slice(activePrefix.length);
       const parsed = parseInt(rest, 10);
       if (!isNaN(parsed) && parsed > maxSeq) {
         maxSeq = parsed;
@@ -31,9 +50,9 @@ export function getNextInvoiceCode(): string {
     }
   }
 
-  const nextSeq = maxSeq + 1;
+  const nextSeq = Math.max(minSeq, maxSeq + 1);
   const padded = String(nextSeq).padStart(3, "0");
-  return `${prefix}${padded}`;
+  return `${activePrefix}${padded}`;
 }
 
 export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {

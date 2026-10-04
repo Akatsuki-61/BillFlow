@@ -163,7 +163,7 @@ export default function ExpensesPage() {
       {/* Toast Notification */}
       <MotionPresence>
         {notification && (
-          <MotionSurface kind="toast" className="fixed top-6 right-6 z-50 bg-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-neutral-700">
+          <MotionSurface kind="toast" className="fixed top-14 right-6 z-50 bg-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-neutral-700">
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>{notification}</span>
           </MotionSurface>

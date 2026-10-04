@@ -189,7 +189,7 @@ function ClientsContent() {
         {notification && (
           <MotionSurface
             kind="toast"
-            className={`fixed top-6 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+            className={`fixed top-14 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
               notification.type === "error"
                 ? "bg-rose-950 border-rose-800 text-rose-100"
                 : "bg-neutral-900 border-neutral-700 text-white"

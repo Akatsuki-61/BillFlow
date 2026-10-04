@@ -1,0 +1,20 @@
+CREATE TABLE `settings` (
+	`id` text PRIMARY KEY DEFAULT 'default' NOT NULL,
+	`business_name` text DEFAULT '' NOT NULL,
+	`professional_title` text,
+	`email` text DEFAULT '' NOT NULL,
+	`phone` text,
+	`website` text,
+	`tax_id` text,
+	`address` text,
+	`payment_details` text,
+	`default_currency` text DEFAULT 'USD' NOT NULL,
+	`invoice_prefix` text DEFAULT 'INV-' NOT NULL,
+	`next_invoice_seq` integer DEFAULT 1 NOT NULL,
+	`default_due_days` integer DEFAULT 14 NOT NULL,
+	`default_tax_rate` integer DEFAULT 0 NOT NULL,
+	`default_notes` text,
+	`date_format` text DEFAULT 'YYYY-MM-DD' NOT NULL,
+	`currency_display` text DEFAULT 'symbol' NOT NULL,
+	`updated_at` text DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+);

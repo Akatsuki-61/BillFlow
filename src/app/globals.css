@@ -23,6 +23,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Electron Window Drag Regions */
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
 /* Editorial & Newspaper Serif Typography */
 .font-newspaper,
 .font-editorial-serif {

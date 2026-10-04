@@ -185,4 +185,102 @@ describe("Database & Interconnection Tests", () => {
       expect(remainingClients[0].id).toBe(clientAId);
     });
   });
+
+  describe("Settings & Workspace Preferences", () => {
+    it("validates settings schema and email formatting", async () => {
+      const { updateSettingsSchema } = await import("../validation");
+      const valid = updateSettingsSchema.safeParse({
+        businessName: "Apex Engineering",
+        email: "alex@apex.dev",
+        defaultCurrency: "EUR",
+        invoicePrefix: "APEX-",
+        nextInvoiceSeq: 42,
+        defaultDueDays: 30,
+      });
+      expect(valid.success).toBe(true);
+
+      const invalidEmail = updateSettingsSchema.safeParse({
+        email: "invalid-email-address",
+      });
+      expect(invalidEmail.success).toBe(false);
+    });
+
+    it("seeds default settings and persists updates", async () => {
+      const { getOrCreateSettings, updateSettings } = await import("../ipc/settings");
+
+      // Initial query creates default settings row
+      const initial = getOrCreateSettings();
+      expect(initial.defaultCurrency).toBe("USD");
+      expect(initial.invoicePrefix).toBe("INV-");
+      expect(initial.nextInvoiceSeq).toBe(1);
+
+      // Update settings
+      const updated = updateSettings({
+        businessName: "Consultant Lab",
+        email: "contact@consultant.io",
+        invoicePrefix: "CL-",
+        nextInvoiceSeq: 10,
+        defaultCurrency: "GBP",
+      });
+
+      expect(updated.businessName).toBe("Consultant Lab");
+      expect(updated.invoicePrefix).toBe("CL-");
+      expect(updated.nextInvoiceSeq).toBe(10);
+      expect(updated.defaultCurrency).toBe("GBP");
+
+      // Invoice generator now uses updated prefix and sequence
+      const nextCode = getNextInvoiceCode();
+      const currentYear = new Date().getFullYear();
+      expect(nextCode).toBe(`CL-${currentYear}-010`);
+    });
+
+    it("exports and imports full workspace backup", async () => {
+      const db = getDb();
+      const { updateSettings, exportWorkspace, importWorkspace, resetWorkspace } = await import("../ipc/settings");
+
+      // Setup data
+      updateSettings({ businessName: "Backup Test Studio", invoicePrefix: "BK-" });
+      db.insert(clients).values({
+        id: "cli-backup-1",
+        name: "Test Client",
+        contactPerson: "Alice",
+        email: "alice@test.com",
+        currency: "USD",
+        hasQuickBill: true,
+      }).run();
+
+      db.insert(invoices).values({
+        id: "inv-backup-1",
+        code: "BK-2026-001",
+        clientId: "cli-backup-1",
+        amountCents: 50000,
+        currency: "USD",
+        issueDate: "2026-10-04",
+        status: "UNPAID",
+      }).run();
+
+      // Export
+      const backup = exportWorkspace();
+      expect(backup.clients.length).toBe(1);
+      expect(backup.invoices.length).toBe(1);
+      expect(backup.settings.businessName).toBe("Backup Test Studio");
+
+      // Reset workspace
+      resetWorkspace();
+      expect(db.select().from(clients).all().length).toBe(0);
+      expect(db.select().from(invoices).all().length).toBe(0);
+
+      // Restore from backup
+      const result = importWorkspace(backup);
+      expect(result.success).toBe(true);
+      expect(result.importedClients).toBe(1);
+      expect(result.importedInvoices).toBe(1);
+
+      const restoredClients = db.select().from(clients).all();
+      const restoredInvoices = db.select().from(invoices).all();
+      expect(restoredClients.length).toBe(1);
+      expect(restoredInvoices.length).toBe(1);
+      expect(restoredInvoices[0].code).toBe("BK-2026-001");
+    });
+  });
 });
