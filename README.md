@@ -10,114 +10,64 @@
 
 ## Overview
 
-**BillFlow** is a modern, local-first web application designed for independent technical freelancers and consultants. It unifies catalog rate cards, multi-currency invoicing, deliverable execution, subcontractor vendor payout tracking, and real-time financial analytics into a single fast workspace.
+**BillFlow** is a modern, local-first desktop application designed for independent technical freelancers and consultants. It unifies client accounts, catalog rate cards, multi-currency invoicing, deliverable execution, subcontractor vendor payout tracking, and real-time financial analytics into a single fast workspace.
+
+The application runs as a native desktop application powered by **Electron** with a persistent local **SQLite database**, while supporting dual platforms (**Windows** and **macOS**).
 
 ---
 
-## Languages Used
+## Architecture & Tech Stack
 
-1. **TypeScript (`.ts`, `.tsx`)**
-   - Main programming language for all application logic, React components, state management, and strict data type definitions.
-2. **JavaScript (ES Modules / Node.js)**
-   - Used for Next.js build workflows, configuration files, and package scripts.
-3. **HTML5 / JSX**
-   - Provides semantic document structure, interactive modal dialogs, and embedded SVG graphics (charts and gauges).
-4. **CSS3**
-   - Applied via **Tailwind CSS v4** (`globals.css`) for theme variables, custom typography utilities, gradients, and layout design.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Framework** | Next.js 16 (App Router with Turbopack) |
-| **Frontend Library** | React 19 |
-| **Primary Language** | TypeScript 5 (Strict Mode) |
-| **Styling Engine** | Tailwind CSS v4 |
-| **Typography** | Newsreader & Inter (via `next/font/google`) |
-| **Iconography** | Font Awesome & Lucide React |
+| Layer | Technology | Details |
+|---|---|---|
+| **Desktop Shell** | Electron 44 | Secure context isolation, sandbox enabled, typed IPC bridge (`window.billflow`) |
+| **Local Database** | SQLite (`better-sqlite3`) + Drizzle ORM | High-performance WAL mode, foreign key constraints, migration runner |
+| **Frontend Framework** | Next.js 16 (Turbopack) | Statically exported (`output: 'export'`) with zero server dependency in production |
+| **UI Library** | React 19 | Client-rendered with responsive hooks and instant state feedback |
+| **Language** | TypeScript 5 (Strict Mode) | Full type safety across main process, IPC, schema, and React renderer |
+| **Styling Engine** | Tailwind CSS v4 | Editorial typography pairing, multi-layered neutral depth shadows |
+| **Validation** | Zod 4 | Strict input sanitization for client and invoice creation |
+| **Testing** | Vitest 5 | Unit tests verifying SQLite persistence, stats computation, and IPC logic |
 
 ---
 
-## Two-Font Typography System
+## Key Modules & Interconnections
 
-BillFlow strictly adheres to a clean two-font typography architecture:
+### 1. Clients Ledger (`/clients`)
+- **Add Client Modal:** Clean modal dialog with email validation, category tags, contact role, and default billing currency.
+- **Client Ledger & Quick Bill:** Create invoices directly from the client's card with automatic currency matching.
+- **Computed Financial Totals:** Real-time calculation of total billed, total paid, outstanding balance, and invoice count.
+- **Invoice Protection:** Client records cannot be deleted if linked invoices exist (`CLIENT_HAS_INVOICES`).
 
-1. **Newsreader** (*"Newspaper"* Editorial Serif):
-   - Applied to the brand logo (**"BillFlow"**), page titles, section titles, and key financial metrics (`$142,850`, `94.2%`, `86%`, `$42,850.00`).
-2. **Inter** (Modern Sans-Serif):
-   - Applied to all UI controls, body text, buttons, table entries, filter tabs, and status badges across the system.
+### 2. Multi-Currency Invoices (`/invoices`)
+- **Client Association:** Invoices link directly to registered clients via dropdown selection (no free-text entry).
+- **Automated Sequence Generation:** Invoices receive sequentially incremented identifiers (`INV-YYYY-001`, `INV-YYYY-002`, etc.).
+- **Live Status Management:** Mark invoices as `DRAFT`, `UNPAID`, `PAID`, or `OVERDUE`. Marking an invoice as paid updates client balance and executive dashboard immediately.
+- **Direct Ledger Navigation:** Clicking a client in the invoice list immediately opens their filtered ledger.
 
-No other font families are loaded, maintaining lightweight performance and consistent editorial branding.
-
----
-
-## Key Features & Modules
-
-### 1. Analytics Dashboard (`/analytics`)
-Rebuilt directly from the Figma Design 2.0 wireframe:
-- **Net Profit Card:** Highlights net profit with a growth trend indicator (`+12.4%`), detailed calculation modal, and subtle background watermark.
-- **Paid Ratio Card:** High-contrast dark gradient card (`#0c0d12` to `#1f1733`) showing payment collection efficiency (`94.2%`) with a purple progress bar and breakdown figures (`$482k` collected / `$512k` billed).
-- **Revenue vs Expenses Chart:** Multi-month bar chart (January – June) comparing gross revenue against operating expenses with hover states and a 0–2.0M scale.
-- **Billing Alerts:** Highlights overdue invoices with actionable alert badges, quick one-click payment reminder triggers, and an expandable alert viewer.
-- **Collection Rate Indicator:** Circular SVG donut progress gauge (`86%`) showing on-time client settlements.
-- **Timeframe Filters:** Segmented control (`Month`, `Quarter`, `Year`) and interactive quarter selector dropdown (`Q3 2023`).
-
-### 2. Client Directory & Ledger (`/clients`)
-- Comprehensive client profiles with contact details, default billing currency, and Google Drive deliverables links.
-- Instant Quick Bill modal and invoice transaction histories.
-
-### 3. Outsourcing & Vendor Directory (`/outsourcing`)
-- Subcontractor payout tracking with payment status indicators and payment run summaries.
-
-### 4. Expense Tracking & Task Management (`/expenses`, `/tasks`, `/todo`)
-- Categorized expense logging, delivery task boards, and daily freelancer todo workflows.
+### 3. Executive Dashboard (`/`)
+- **Live Business KPIs:** Real-time computation of gross revenue, pending receivables, and active client count across all currencies.
+- **Recent Invoices Stream:** Displays latest issued invoices with instant navigation to invoice details.
 
 ---
 
-## Design System & Color Tokens
+## Local Database Storage
 
-- **Main Canvas:** `#faf9f5` (warm cream linen)
-- **Card Containers:** `#eaeae5` with subtle border `#deded8`
-- **Dark Accent Card:** Linear gradient from `#0c0d12` to `#1f1733`
-- **Brand Purple:** `#7133f5`
-- **Alert Highlights:** `#fee2e2` / `#ef4444`
-- **Success & Growth:** `#d6eddb` / `#15803d`
+BillFlow saves all records locally on the user's machine without requiring an external cloud server:
+
+- **Windows:** `%APPDATA%\BillFlow\billflow.db` (e.g. `C:\Users\<User>\AppData\Roaming\BillFlow\billflow.db`)
+- **macOS:** `~/Library/Application Support/BillFlow/billflow.db`
+- **Development Fallback:** `./.billflow-dev/billflow.db`
+
+The application launches with a **clean blank slate** (no hardcoded mock data). You can add test clients and invoices directly through the UI.
 
 ---
 
-## Project Structure
+## Prerequisites
 
-```text
-src/
-├── app/
-│   ├── analytics/
-│   │   └── page.tsx                   # Dedicated /analytics route
-│   ├── clients/
-│   │   └── page.tsx                   # Client directory & billing ledger
-│   ├── expenses/
-│   │   └── page.tsx                   # Expense management
-│   ├── outsourcing/
-│   │   └── page.tsx                   # Vendor payout directory
-│   ├── tasks/
-│   │   └── page.tsx                   # Task board
-│   ├── todo/
-│   │   └── page.tsx                   # Daily todo workflow
-│   ├── globals.css                    # Theme variables & typography definitions
-│   ├── layout.tsx                     # Main app layout with navigation sidebar
-│   └── page.tsx                       # Root redirect to primary view
-├── components/
-│   ├── analytics/
-│   │   └── AnalyticsView.tsx          # Analytics dashboard matching Figma wireframe
-│   ├── outsourcing/
-│   │   └── OutsourcingView.tsx        # Vendor directory and payout tracking UI
-│   └── Sidebar.tsx                    # Two-font navigation sidebar
-└── types/
-    ├── analytics.ts                   # Financial and billing alert interfaces
-    ├── outsourcing.ts                 # Vendor payout and invoice models
-    └── tasks.ts                       # Task management types
-```
+- **Node.js:** v22.x LTS (pinned in `.nvmrc`)
+- **npm:** v10.x or higher
+- **Operating System:** Windows 10/11 (x64) or macOS 12+ (Apple Silicon or Intel)
 
 ---
 
@@ -126,26 +76,126 @@ src/
 ### 1. Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/Akatsuki-61/BillFlow.git
+cd BillFlow
+
+# Install dependencies and build native SQLite binaries for Electron
 npm install
 ```
 
-### 2. Development Server
+### 2. Run Desktop App (Development Mode)
+
+Starts the Next.js development server and Electron with hot-reloading:
+
+```bash
+npm run dev:electron
+```
+
+### 3. Run Web Preview (Browser Only)
+
+Runs the application inside the browser with an in-memory repository fallback:
 
 ```bash
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-Open [http://localhost:3000/analytics](http://localhost:3000/analytics) in your browser.
+---
 
-### 3. Production Build & Linting
+## Verification & Testing
+
+Run unit tests for database schema, validation, and IPC logic:
 
 ```bash
-# Check TypeScript and ESLint
-npm run lint
+npm test
+```
 
-# Build production bundle
+Run TypeScript compilation check:
+
+```bash
+npx tsc --noEmit
+```
+
+Build production static assets and Electron main process:
+
+```bash
 npm run build
+```
 
-# Start production server
-npm start
+---
+
+## Building Desktop Installers
+
+### For Windows (`.exe` NSIS Installer)
+From a Windows machine (or via GitHub Actions):
+```bash
+npm run dist:win
+```
+The installer will be generated in `release/BillFlow Setup 0.1.0.exe`.
+
+### For macOS (`.dmg` Installer)
+From a macOS machine:
+```bash
+npm run dist:mac
+```
+The DMG image will be generated in `release/BillFlow-0.1.0.dmg`.
+
+---
+
+## Evaluation Guide (For Lecturer & Reviewers on Windows)
+
+1. **Option A: Running Pre-Built Installer (`.exe`)**
+   - Download the generated `BillFlow Setup 0.1.0.exe` from GitHub Releases / the release folder.
+   - Run the installer. If Windows SmartScreen appears (common for unsigned student projects), click **More info** -> **Run anyway**.
+   - Launch BillFlow from the desktop shortcut or Start Menu.
+   - The application opens cleanly to an empty workspace.
+   - Go to **Clients** -> click **Add Client** -> enter client details (e.g. *Stark Enterprises*, `billing@stark.com`, USD).
+   - Click **Quick Bill** on the client card or navigate to **Invoices** -> click **New Invoice** -> create an invoice for `$1,500.00`.
+   - Observe the live metrics update on the client card, invoice table, and main dashboard.
+
+2. **Option B: Running from Source on Windows**
+   ```powershell
+   git clone https://github.com/Akatsuki-61/BillFlow.git
+   cd BillFlow
+   npm install
+   npm run dev:electron
+   ```
+
+---
+
+## Project Structure
+
+```text
+├── electron/
+│   ├── db/
+│   │   ├── index.ts                   # SQLite connection, WAL mode, migration runner
+│   │   └── schema.ts                  # Drizzle ORM schema (clients, invoices)
+│   ├── ipc/
+│   │   ├── clients.ts                 # Client CRUD and financial stats handlers
+│   │   ├── invoices.ts                # Invoice CRUD and code generation handlers
+│   │   ├── dashboard.ts               # Executive metrics aggregation handlers
+│   │   └── errors.ts                  # Structured IPC error formatting
+│   ├── main.ts                        # Electron window lifecycle & app:// protocol
+│   ├── preload.ts                     # Context bridge exposing window.billflow
+│   ├── validation.ts                  # Zod validation schemas
+│   └── test/
+│       └── db.test.ts                 # Vitest database & IPC tests
+├── drizzle/                           # SQL migration files
+├── src/
+│   ├── app/
+│   │   ├── clients/page.tsx           # Client ledger & Quick Bill
+│   │   ├── invoices/page.tsx          # Multi-currency invoice management
+│   │   ├── page.tsx                   # Main executive dashboard
+│   │   └── layout.tsx                 # Root layout with DataProvider
+│   ├── lib/
+│   │   ├── data/
+│   │   │   └── DataProvider.tsx       # React Context bridging IPC & in-memory fallback
+│   │   └── format.ts                  # Currency & date formatters
+│   └── types/
+│       ├── billing.ts                 # Unified client & invoice interfaces
+│       └── billflow-api.d.ts          # Window.billflow TypeScript declarations
+├── build/                             # App icons (.ico, .icns, .png, .svg)
+├── electron-builder.yml               # Packaging configuration for Windows & macOS
+└── .github/workflows/release.yml      # CI/CD workflow building Windows & Mac binaries
 ```

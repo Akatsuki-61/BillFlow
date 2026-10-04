@@ -1,31 +1,57 @@
 {
   "name": "billflow",
   "version": "0.1.0",
+  "description": "Local-first freelance invoicing and task execution workspace",
+  "author": "Group 61",
   "private": true,
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "dev:electron": "concurrently -k \"next dev\" \"npm:electron:watch\"",
+    "electron:watch": "wait-on tcp:3000 && tsup --watch --onSuccess \"electron .\"",
+    "build:renderer": "next build",
+    "build:electron": "tsup",
+    "build": "next build && tsup",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.3.1",
     "@fortawesome/free-solid-svg-icons": "^7.3.1",
     "@fortawesome/react-fontawesome": "^3.5.0",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.3",
     "lucide-react": "^1.48.0",
     "motion": "^14.0.0",
     "next": "16.3.6",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "drizzle-kit": "^0.31.11",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "rimraf": "^6.1.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsup": "^8.5.1",
+    "typescript": "^5",
+    "vitest": "^5.0.3",
+    "wait-on": "^9.5.1"
   }
 }

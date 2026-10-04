@@ -1,0 +1,33 @@
+appId: com.billflow.desktop
+productName: BillFlow
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist-electron/**/*
+  - out/**/*
+  - package.json
+asar: true
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+extraResources:
+  - from: drizzle
+    to: drizzle
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: BillFlow
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.finance

@@ -16,33 +16,11 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Timeframe, BillingAlertItem, MonthlyFinancial } from "@/types/analytics";
 
-// Sample monthly financial dataset matching Figma Design 2.0 wireframe
-const monthlyData: MonthlyFinancial[] = [
-  { month: "JAN", revenue: 0.85, expenses: 0.5 },
-  { month: "FEB", revenue: 1.2, expenses: 0.75 },
-  { month: "MAR", revenue: 1.1, expenses: 0.65 },
-  { month: "APR", revenue: 1.55, expenses: 0.95 },
-  { month: "MAY", revenue: 1.45, expenses: 0.85 },
-  { month: "JUN", revenue: 1.85, expenses: 1.04 },
-];
+// Monthly financial dataset starts blank
+const monthlyData: MonthlyFinancial[] = [];
 
-// Initial billing alerts data
-const initialAlerts: BillingAlertItem[] = [
-  {
-    id: "alert-1",
-    clientName: "Acme Corp - Q2 Retainer",
-    retainerTitle: "Q2 Marketing Retainer",
-    daysOverdue: 14,
-    amount: 12400,
-  },
-  {
-    id: "alert-2",
-    clientName: "Stark Industries",
-    retainerTitle: "Cloud Architecture Consulting",
-    daysOverdue: 5,
-    amount: 8250,
-  },
-];
+// Billing alerts data starts blank
+const initialAlerts: BillingAlertItem[] = [];
 
 export default function AnalyticsView() {
   // Selected timeframe filter state: Month, Quarter, or Year
@@ -256,25 +234,34 @@ export default function AnalyticsView() {
 
             {/* Grouped Paired Bar Chart Visualization */}
             <div className="relative pt-2 pb-2">
-              {/* Y-Axis Horizontal Gridlines & Labels */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
-                <div className="flex items-center gap-2 w-full">
-                  <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$2M</span>
-                  <div className="flex-1 border-b border-[#deded8] border-dashed" />
+              {monthlyData.length === 0 ? (
+                <div className="h-48 flex flex-col items-center justify-center text-center p-6 border border-dashed border-[#deded8] rounded-xl bg-white/40">
+                  <span className="text-xs font-semibold text-neutral-800">No financial data yet</span>
+                  <span className="text-xs text-neutral-400 mt-1 max-w-sm">
+                    Monthly cashflow and expense analytics will plot here as transactions are recorded.
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 w-full">
-                  <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$1M</span>
-                  <div className="flex-1 border-b border-[#deded8] border-dashed" />
-                </div>
-                <div className="flex items-center gap-2 w-full">
-                  <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$0</span>
-                  <div className="flex-1 border-b border-[#deded8]" />
-                </div>
-              </div>
+              ) : (
+                <>
+                  {/* Y-Axis Horizontal Gridlines & Labels */}
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$2M</span>
+                      <div className="flex-1 border-b border-[#deded8] border-dashed" />
+                    </div>
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$1M</span>
+                      <div className="flex-1 border-b border-[#deded8] border-dashed" />
+                    </div>
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$0</span>
+                      <div className="flex-1 border-b border-[#deded8]" />
+                    </div>
+                  </div>
 
-              {/* Chart Bars Grid */}
-              <div className="h-44 pl-10 flex items-end justify-between gap-3 sm:gap-6 z-10 relative">
-                {monthlyData.map((d) => {
+                  {/* Chart Bars Grid */}
+                  <div className="h-44 pl-10 flex items-end justify-between gap-3 sm:gap-6 z-10 relative">
+                    {monthlyData.map((d) => {
                   const revHeight = (d.revenue / maxScale) * 100;
                   const expHeight = (d.expenses / maxScale) * 100;
 
@@ -306,7 +293,9 @@ export default function AnalyticsView() {
                   );
                 })}
               </div>
-            </div>
+            </>
+          )}
+        </div>
 
             {/* Centered Chart Legend */}
             <div className="flex items-center justify-center gap-6 mt-4 pt-2 border-t border-[#deded8]/60 text-[10.5px] text-[#6b7280] font-medium">
@@ -331,14 +320,23 @@ export default function AnalyticsView() {
               <h2 className="font-bold text-[14px] text-[#111827] tracking-tight">
                 Billing Alerts
               </h2>
-              <span className="px-2 py-0.5 bg-[#fee2e2] text-[#ef4444] text-[9px] font-bold tracking-wider rounded-full uppercase">
-                3 ACTION REQ
+              <span className={`px-2 py-0.5 text-[9px] font-bold tracking-wider rounded-full uppercase ${
+                alerts.length > 0
+                  ? "bg-[#fee2e2] text-[#ef4444]"
+                  : "bg-neutral-200/80 text-neutral-600"
+              }`}>
+                {alerts.length} ACTION REQ
               </span>
             </div>
 
             {/* Overdue Invoices List */}
             <div className="space-y-3 divide-y divide-[#deded8]">
-              {alerts.map((alert, idx) => (
+              {alerts.length === 0 ? (
+                <div className="py-8 text-center text-xs text-neutral-400">
+                  No overdue invoices or billing alerts.
+                </div>
+              ) : (
+                alerts.map((alert, idx) => (
                 <div
                   key={alert.id}
                   className={`flex items-center justify-between ${idx > 0 ? "pt-3" : ""}`}
@@ -372,7 +370,7 @@ export default function AnalyticsView() {
                     </button>
                   </div>
                 </div>
-              ))}
+              )))}
             </div>
 
             {/* View All Alerts Action Button */}
