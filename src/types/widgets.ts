@@ -6,6 +6,7 @@ export type WidgetCategory =
   | "activity";
 
 export type WidgetSize = "metric" | "medium" | "wide" | "full";
+export type WidgetDisplaySize = "compact" | "normal";
 
 export interface WidgetMeta {
   id: string;

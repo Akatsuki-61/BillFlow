@@ -223,21 +223,6 @@ export default function AnalyticsView() {
         </div>
       </PageHeader>
 
-      {/* Drag & Pin Tip Banner */}
-      <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-purple-50/70 border border-purple-200/60 text-xs text-purple-950">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-[#7c3aed] shrink-0" />
-          <span>
-            <strong>Central Widget Storage:</strong> Drag any card to the{" "}
-            <strong>Dashboard</strong> in the left sidebar, or right-click to pin
-            instantly.
-          </span>
-        </div>
-        <span className="text-[11px] text-purple-800 font-medium">
-          Showing {visibleWidgets.length} of {WIDGET_CATALOG.length} widgets
-        </span>
-      </div>
-
       {/* Empty State when all widgets are hidden */}
       {visibleWidgets.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-neutral-300">
@@ -355,6 +340,20 @@ export default function AnalyticsView() {
                 >
                   <X className="w-5 h-5" />
                 </Button>
+              </div>
+
+              {/* Central Widget Storage Banner shown inside Customize modal */}
+              <div className="mx-6 mt-4 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-purple-50/80 border border-purple-200/70 text-xs text-purple-950">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#7c3aed] shrink-0" />
+                  <span>
+                    <strong>Central Widget Storage:</strong> Drag any card to the{" "}
+                    <strong>Dashboard</strong> in the left sidebar, or right-click to pin instantly.
+                  </span>
+                </div>
+                <span className="text-[11px] text-purple-800 font-medium whitespace-nowrap ml-2">
+                  {visibleWidgets.length} active
+                </span>
               </div>
 
               {/* Widget List */}

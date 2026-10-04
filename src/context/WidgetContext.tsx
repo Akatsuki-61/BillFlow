@@ -12,13 +12,17 @@ import {
   DEFAULT_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_WIDGET_IDS,
 } from "@/lib/widgets/widgetDefinitions";
+import { WidgetDisplaySize } from "@/types/widgets";
 
 interface WidgetContextType {
   dashboardWidgets: string[];
   analyticsWidgets: string[];
+  widgetSizes: Record<string, WidgetDisplaySize>;
+  isDashboardEditing: boolean;
   isDragging: boolean;
   draggedWidgetId: string | null;
   toastMessage: string | null;
+  setIsDashboardEditing: (editing: boolean) => void;
   setDraggedWidgetId: (id: string | null) => void;
   setIsDragging: (dragging: boolean) => void;
   pinToDashboard: (id: string) => void;
@@ -29,13 +33,19 @@ interface WidgetContextType {
   isAnalyticsVisible: (id: string) => boolean;
   showAllAnalytics: () => void;
   resetToDefaults: () => void;
+  getWidgetSize: (id: string) => WidgetDisplaySize;
+  setWidgetSize: (id: string, size: WidgetDisplaySize) => void;
+  toggleWidgetSize: (id: string) => void;
+  reorderDashboardWidgets: (newOrder: string[]) => void;
+  moveDashboardWidget: (fromIndex: number, toIndex: number) => void;
   showToast: (msg: string) => void;
 }
 
 const WidgetContext = createContext<WidgetContextType | null>(null);
 
-const STORAGE_KEY_DASHBOARD = "billflow_dashboard_widgets_v1";
-const STORAGE_KEY_ANALYTICS = "billflow_analytics_widgets_v1";
+const STORAGE_KEY_DASHBOARD = "billflow_dashboard_widgets_v2";
+const STORAGE_KEY_ANALYTICS = "billflow_analytics_widgets_v2";
+const STORAGE_KEY_SIZES = "billflow_widget_sizes_v2";
 
 export function WidgetProvider({ children }: { children: React.ReactNode }) {
   const [dashboardWidgets, setDashboardWidgets] = useState<string[]>(
@@ -44,6 +54,10 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   const [analyticsWidgets, setAnalyticsWidgets] = useState<string[]>(
     DEFAULT_ANALYTICS_WIDGET_IDS,
   );
+  const [widgetSizes, setWidgetSizes] = useState<
+    Record<string, WidgetDisplaySize>
+  >({});
+  const [isDashboardEditing, setIsDashboardEditing] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -71,6 +85,13 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
         const parsed = JSON.parse(storedAnalytics);
         if (Array.isArray(parsed)) {
           setAnalyticsWidgets(parsed);
+        }
+      }
+      const storedSizes = localStorage.getItem(STORAGE_KEY_SIZES);
+      if (storedSizes) {
+        const parsed = JSON.parse(storedSizes);
+        if (parsed && typeof parsed === "object") {
+          setWidgetSizes(parsed);
         }
       }
     } catch {
@@ -105,6 +126,16 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
       // Ignore write errors
     }
   }, [analyticsWidgets, isInitialized]);
+
+  // Persist widget sizes
+  useEffect(() => {
+    if (!isInitialized) return;
+    try {
+      localStorage.setItem(STORAGE_KEY_SIZES, JSON.stringify(widgetSizes));
+    } catch {
+      // Ignore write errors
+    }
+  }, [widgetSizes, isInitialized]);
 
   const pinToDashboard = useCallback(
     (id: string) => {
@@ -187,17 +218,75 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   const resetToDefaults = useCallback(() => {
     setDashboardWidgets(DEFAULT_DASHBOARD_WIDGET_IDS);
     setAnalyticsWidgets(DEFAULT_ANALYTICS_WIDGET_IDS);
+    setWidgetSizes({});
     showToast("Widgets reset to default arrangement");
   }, [showToast]);
+
+  const getWidgetSize = useCallback(
+    (id: string): WidgetDisplaySize => {
+      return widgetSizes[id] || "normal";
+    },
+    [widgetSizes],
+  );
+
+  const setWidgetSize = useCallback(
+    (id: string, size: WidgetDisplaySize) => {
+      setWidgetSizes((prev) => ({ ...prev, [id]: size }));
+      const meta = WIDGET_CATALOG.find((w) => w.id === id);
+      const title = meta ? meta.title : "Widget";
+      showToast(
+        size === "compact"
+          ? `Resized "${title}" to Compact (Half)`
+          : `Resized "${title}" to Standard`,
+      );
+    },
+    [showToast],
+  );
+
+  const toggleWidgetSize = useCallback(
+    (id: string) => {
+      const current = getWidgetSize(id);
+      const next: WidgetDisplaySize = current === "compact" ? "normal" : "compact";
+      setWidgetSize(id, next);
+    },
+    [getWidgetSize, setWidgetSize],
+  );
+
+  const reorderDashboardWidgets = useCallback((newOrder: string[]) => {
+    setDashboardWidgets(newOrder);
+  }, []);
+
+  const moveDashboardWidget = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setDashboardWidgets((prev) => {
+        if (
+          fromIndex < 0 ||
+          fromIndex >= prev.length ||
+          toIndex < 0 ||
+          toIndex >= prev.length
+        ) {
+          return prev;
+        }
+        const updated = [...prev];
+        const [moved] = updated.splice(fromIndex, 1);
+        updated.splice(toIndex, 0, moved);
+        return updated;
+      });
+    },
+    [],
+  );
 
   return (
     <WidgetContext.Provider
       value={{
         dashboardWidgets,
         analyticsWidgets,
+        widgetSizes,
+        isDashboardEditing,
         isDragging,
         draggedWidgetId,
         toastMessage,
+        setIsDashboardEditing,
         setDraggedWidgetId,
         setIsDragging,
         pinToDashboard,
@@ -208,6 +297,11 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
         isAnalyticsVisible,
         showAllAnalytics,
         resetToDefaults,
+        getWidgetSize,
+        setWidgetSize,
+        toggleWidgetSize,
+        reorderDashboardWidgets,
+        moveDashboardWidget,
         showToast,
       }}
     >

@@ -17,10 +17,13 @@ import {
   Briefcase,
   PieChart,
   ShieldCheck,
-  TrendingDown,
-  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  X,
 } from "lucide-react";
-import { MetricCard, Button } from "@/components/ui/Workspace";
+import { MetricCard } from "@/components/ui/Workspace";
 import {
   useDashboardSummary,
   useInvoices,
@@ -28,6 +31,7 @@ import {
 } from "@/lib/data/DataProvider";
 import { formatCents, formatDateDisplay } from "@/lib/format";
 import { DashboardPeriod, MonthlyGrowthPoint } from "@/types/dashboard";
+import { WidgetDisplaySize } from "@/types/widgets";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 
 // Synthetic monthly growth trend dataset
@@ -65,7 +69,13 @@ interface WidgetRendererProps {
   widgetId: string;
   source: "dashboard" | "analytics";
   period?: DashboardPeriod;
+  displaySize?: WidgetDisplaySize;
   isDraggable?: boolean;
+  isEditing?: boolean;
+  onToggleSize?: () => void;
+  onMoveLeft?: () => void;
+  onMoveRight?: () => void;
+  onRemove?: () => void;
   onContextMenu?: (e: React.MouseEvent, widgetId: string) => void;
   onNavigateToInvoice?: (id: string) => void;
 }
@@ -74,7 +84,13 @@ export function WidgetRenderer({
   widgetId,
   source,
   period = "quarter",
+  displaySize = "normal",
   isDraggable = false,
+  isEditing = false,
+  onToggleSize,
+  onMoveLeft,
+  onMoveRight,
+  onRemove,
   onContextMenu,
   onNavigateToInvoice,
 }: WidgetRendererProps) {
@@ -155,273 +171,302 @@ export function WidgetRenderer({
     return formatCents(cents, "USD");
   }, [overdueInvoices]);
 
-  // Max for growth chart
-  const maxRevenue = Math.max(1, ...growthDataset.map((d) => d.revenue));
+  const isCompact = displaySize === "compact";
+
+  // Reusable metric card helper for both standard (rectangle) and compact (square)
+  const renderMetric = (
+    label: string,
+    value: React.ReactNode,
+    footer: React.ReactNode,
+    tone: "default" | "accent" | "warning" = "default",
+    compactTag?: string,
+  ) => {
+    if (isCompact) {
+      return (
+        <div
+          className={`ui-card p-4 min-h-[140px] h-full flex flex-col justify-between rounded-2xl transition-all ${
+            tone === "accent"
+              ? "border-purple-200/80 bg-purple-50/20"
+              : tone === "warning"
+                ? "border-amber-200/80 bg-amber-50/20"
+                : ""
+          }`}
+        >
+          <div>
+            <span className="text-[11px] font-medium text-neutral-500 block truncate">
+              {label}
+            </span>
+            <div className="font-serif text-xl sm:text-2xl font-semibold text-neutral-900 mt-1.5 tracking-tight truncate">
+              {value}
+            </div>
+          </div>
+          <div className="text-[11px] font-semibold text-neutral-600 pt-2 border-t border-neutral-100 flex items-center justify-between">
+            <span className="truncate">{compactTag || "Active"}</span>
+            {tone === "accent" && (
+              <span className="w-2 h-2 rounded-full bg-[#7c3aed]" />
+            )}
+            {tone === "warning" && (
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <MetricCard
+        label={label}
+        value={value}
+        tone={tone}
+        footer={footer}
+      />
+    );
+  };
 
   // Render individual widget based on ID
   const renderContent = () => {
     switch (widgetId) {
       // 1. Total Revenue
       case "total-revenue":
-        return (
-          <MetricCard
-            label="Total Revenue"
-            value={totalRevenueStr}
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
-                  <TrendingUp className="w-3 h-3 text-[#7c3aed]" />
-                  {totalRevenueStr !== "$0.00" ? "Active" : "0%"}
-                </span>
-                <span>billed to date</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Total Revenue",
+          totalRevenueStr,
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
+              <TrendingUp className="w-3 h-3 text-[#7c3aed]" />
+              {totalRevenueStr !== "$0.00" ? "Active" : "0%"}
+            </span>
+            <span>billed to date</span>
+          </>,
+          "default",
+          "Billed to date",
         );
 
       // 2. Net Profit
       case "net-profit":
-        return (
-          <MetricCard
-            label="Net Profit & Margin"
-            value={totalRevenueStr}
-            tone="accent"
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
-                  <TrendingUp className="w-3 h-3" />
-                  Healthy
-                </span>
-                <span>net retained earnings</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Net Profit & Margin",
+          totalRevenueStr,
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
+              <TrendingUp className="w-3 h-3" />
+              Healthy
+            </span>
+            <span>net retained earnings</span>
+          </>,
+          "accent",
+          "Retained earnings",
         );
 
       // 3. Pending Receivables
       case "pending-receivables":
-        return (
-          <MetricCard
-            label="Pending Receivables"
-            value={pendingReceivablesStr}
-            tone="warning"
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-amber-50 text-amber-800 border-amber-200/60">
-                  {unpaidCount} pending
-                </span>
-                <span>
-                  {unpaidCount === 1
-                    ? "invoice awaiting payment"
-                    : "invoices awaiting payment"}
-                </span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Pending Receivables",
+          pendingReceivablesStr,
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-amber-50 text-amber-800 border-amber-200/60">
+              {unpaidCount} pending
+            </span>
+            <span>
+              {unpaidCount === 1
+                ? "invoice awaiting payment"
+                : "invoices awaiting payment"}
+            </span>
+          </>,
+          "warning",
+          `${unpaidCount} pending`,
         );
 
       // 4. Active Clients
       case "active-clients":
-        return (
-          <MetricCard
-            label="Active Client Accounts"
-            value={String(activeClientsCount)}
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200/60">
-                  <Briefcase className="w-3 h-3" />
-                  {activeClientsCount} active
-                </span>
-                <span>client accounts & retainers</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Active Client Accounts",
+          String(activeClientsCount),
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200/60">
+              <Briefcase className="w-3 h-3" />
+              {activeClientsCount} active
+            </span>
+            <span>client accounts & retainers</span>
+          </>,
+          "default",
+          `${activeClientsCount} accounts`,
         );
 
       // 5. Outsourced Costs
       case "outsourced-costs":
-        return (
-          <MetricCard
-            label="Subcontractor Outsource Costs"
-            value="$0.00"
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
-                  <GitFork className="w-3 h-3" />
-                  0 vendors
-                </span>
-                <span>active external contractors</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Subcontractor Costs",
+          "$0.00",
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
+              <GitFork className="w-3 h-3" />
+              0 vendors
+            </span>
+            <span>active external contractors</span>
+          </>,
+          "default",
+          "0 contractors",
         );
 
       // 6. Operating Expenses
       case "operating-expenses":
-        return (
-          <MetricCard
-            label="Operating Expenses"
-            value="$0.00"
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
-                  0%
-                </span>
-                <span>software & cloud overhead</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Operating Expenses",
+          "$0.00",
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
+              0%
+            </span>
+            <span>software & cloud overhead</span>
+          </>,
+          "default",
+          "Software & cloud",
         );
 
       // 7. Paid Ratio
       case "paid-ratio":
-        return (
-          <MetricCard
-            label="Invoice Paid Ratio"
-            value={`${paidRatioPct}%`}
-            tone="accent"
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200/60">
-                  <ShieldCheck className="w-3 h-3" />
-                  {paidCount} of {invoices.length} paid
-                </span>
-                <span>on-time collection rate</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Invoice Paid Ratio",
+          `${paidRatioPct}%`,
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200/60">
+              <ShieldCheck className="w-3 h-3" />
+              {paidCount} of {invoices.length} paid
+            </span>
+            <span>on-time collection rate</span>
+          </>,
+          "accent",
+          `${paidRatioPct}% on-time`,
         );
 
       // 8. Average Invoice Value
       case "average-invoice-value":
-        return (
-          <MetricCard
-            label="Average Invoice Size"
-            value={avgInvoiceStr}
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
-                  <DollarSign className="w-3 h-3" />
-                  Average
-                </span>
-                <span>ticket size per contract</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Average Invoice Size",
+          avgInvoiceStr,
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
+              <DollarSign className="w-3 h-3" />
+              Average
+            </span>
+            <span>ticket size per contract</span>
+          </>,
+          "default",
+          "Average contract",
         );
 
       // 9. Overdue Receivables
       case "overdue-receivables":
-        return (
-          <MetricCard
-            label="Overdue Invoices"
-            value={overdueTotalStr}
-            tone={overdueInvoices.length > 0 ? "warning" : "default"}
-            footer={
-              <>
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
-                    overdueInvoices.length > 0
-                      ? "bg-rose-50 text-rose-700 border-rose-200/60"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                  }`}
-                >
-                  <Clock className="w-3 h-3" />
-                  {overdueInvoices.length} overdue
-                </span>
-                <span>past payment due date</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Overdue Invoices",
+          overdueTotalStr,
+          <>
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                overdueInvoices.length > 0
+                  ? "bg-rose-50 text-rose-700 border-rose-200/60"
+                  : "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              {overdueInvoices.length} overdue
+            </span>
+            <span>past payment due date</span>
+          </>,
+          overdueInvoices.length > 0 ? "warning" : "default",
+          `${overdueInvoices.length} overdue`,
         );
 
       // 10. Cashflow Runway
       case "cashflow-runway":
-        return (
-          <MetricCard
-            label="Cashflow Runway Cushion"
-            value="12+ mo"
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200/60">
-                  Stable
-                </span>
-                <span>operating cushion</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Cashflow Runway",
+          "12+ mo",
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200/60">
+              Stable
+            </span>
+            <span>operating cushion</span>
+          </>,
+          "default",
+          "Stable cushion",
         );
 
       // 11. Top Client Concentration
       case "client-concentration":
-        return (
-          <MetricCard
-            label="Top Client Concentration"
-            value="28%"
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200/60">
-                  <PieChart className="w-3 h-3" />
-                  Balanced
-                </span>
-                <span>diversified revenue base</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Client Concentration",
+          "28%",
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200/60">
+              <PieChart className="w-3 h-3" />
+              Balanced
+            </span>
+            <span>diversified revenue base</span>
+          </>,
+          "default",
+          "Top client 28%",
         );
 
       // 12. Realized Hourly Yield
       case "effective-hourly-rate":
-        return (
-          <MetricCard
-            label="Realized Hourly Yield"
-            value="$145/hr"
-            tone="accent"
-            footer={
-              <>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
-                  <TrendingUp className="w-3 h-3" />
-                  Target Met
-                </span>
-                <span>effective sprint return</span>
-              </>
-            }
-          />
+        return renderMetric(
+          "Realized Hourly Yield",
+          "$145/hr",
+          <>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
+              <TrendingUp className="w-3 h-3" />
+              Target Met
+            </span>
+            <span>effective sprint return</span>
+          </>,
+          "accent",
+          "Sprint return",
         );
 
       // 13. Revenue vs Expenses Paired Bar Chart
       case "revenue-expenses-chart":
         return (
-          <div className="ui-card p-6 flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+          <div
+            className={`ui-card flex flex-col justify-between ${
+              isCompact ? "p-4 space-y-3" : "p-6"
+            }`}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
               <div>
                 <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
                   Revenue vs Expenses
                 </h3>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Monthly cashflow and expense analytics comparison.
-                </p>
+                {!isCompact && (
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Monthly cashflow and expense comparison.
+                  </p>
+                )}
               </div>
-              <div className="flex items-center gap-3 text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-neutral-700">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#7c3aed]" />
-                  <span>Revenue</span>
+              <div className="flex items-center gap-2.5 text-xs font-medium">
+                <span className="flex items-center gap-1 text-neutral-700">
+                  <span className="w-2 h-2 rounded-full bg-[#7c3aed]" />
+                  <span>Rev</span>
                 </span>
-                <span className="flex items-center gap-1.5 text-neutral-700">
-                  <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
-                  <span>Expenses</span>
+                <span className="flex items-center gap-1 text-neutral-700">
+                  <span className="w-2 h-2 rounded-full bg-neutral-300" />
+                  <span>Exp</span>
                 </span>
               </div>
             </div>
 
-            <div className="py-8 text-center text-xs text-neutral-400 border border-dashed border-neutral-200/80 rounded-xl my-4 bg-neutral-50/50">
-              Monthly cashflow and cost distributions will plot here as you
-              record transactions.
+            <div
+              className={`text-center text-xs text-neutral-400 border border-dashed border-neutral-200/80 rounded-xl bg-neutral-50/50 flex items-center justify-center ${
+                isCompact ? "h-32 px-3" : "py-8 my-4"
+              }`}
+            >
+              Cashflow analytics plot here as you bill clients.
             </div>
 
-            <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
-              <span>Gross Intake: {totalRevenueStr}</span>
-              <span className="text-[#7c3aed] font-medium">Balanced Cashflow</span>
+            <div className="pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+              <span>Gross: {totalRevenueStr}</span>
+              <span className="text-[#7c3aed] font-medium">Cashflow</span>
             </div>
           </div>
         );
@@ -429,63 +474,61 @@ export function WidgetRenderer({
       // 14. Profit & Growth Trajectory Chart
       case "profit-trajectory-chart":
         return (
-          <div className="ui-card p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100">
+          <div
+            className={`ui-card space-y-4 ${
+              isCompact ? "p-4" : "p-6 space-y-6"
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100">
               <div>
                 <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
-                  Business & Profit Growth Trajectory
+                  Profit & Growth Trajectory
                 </h3>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Month-over-month revenue intake and net retained profits.
-                </p>
+                {!isCompact && (
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Month-over-month revenue intake and net retained profits.
+                  </p>
+                )}
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-4 text-xs font-medium">
-                  <span className="flex items-center gap-1.5 text-neutral-700">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#7c3aed]" />
-                    <span>Gross Revenue</span>
-                  </span>
-                  <span className="flex items-center gap-1.5 text-neutral-700">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
-                    <span>Net Profit</span>
-                  </span>
-                </div>
-
-                <div className="flex rounded-lg border border-neutral-200 p-0.5 bg-neutral-50 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="flex rounded-lg border border-neutral-200 p-0.5 bg-neutral-50 text-[11px]">
                   <button
                     type="button"
                     onClick={() => setChartMetric("profit")}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                    className={`px-2 py-0.5 rounded-md font-medium transition-all ${
                       chartMetric === "profit"
                         ? "bg-white text-neutral-900 shadow-xs"
                         : "text-neutral-500 hover:text-neutral-900"
                     }`}
                   >
-                    Volume ($)
+                    Volume
                   </button>
                   <button
                     type="button"
                     onClick={() => setChartMetric("margin")}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                    className={`px-2 py-0.5 rounded-md font-medium transition-all ${
                       chartMetric === "margin"
                         ? "bg-white text-neutral-900 shadow-xs"
                         : "text-neutral-500 hover:text-neutral-900"
                     }`}
                   >
-                    Margin (%)
+                    Margin
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="h-44 flex flex-col items-center justify-center text-center p-6 border border-dashed border-neutral-200/80 rounded-xl bg-neutral-50/50">
+            <div
+              className={`flex flex-col items-center justify-center text-center p-4 border border-dashed border-neutral-200/80 rounded-xl bg-neutral-50/50 ${
+                isCompact ? "h-32" : "h-44"
+              }`}
+            >
               <span className="text-xs font-semibold text-neutral-800">
                 No revenue history yet
               </span>
-              <span className="text-xs text-neutral-400 mt-1 max-w-sm">
-                Monthly performance trends and profit margins will plot here as
-                you bill clients.
+              <span className="text-[11px] text-neutral-400 mt-0.5 max-w-sm">
+                Monthly trends plot here as you bill clients.
               </span>
             </div>
           </div>
@@ -494,18 +537,26 @@ export function WidgetRenderer({
       // 15. On-Time Collection Rate Gauge
       case "collection-rate-gauge":
         return (
-          <div className="ui-card p-6 flex flex-col justify-between">
-            <div className="flex justify-between items-center pb-3 mb-2 border-b border-neutral-100">
+          <div
+            className={`ui-card flex flex-col justify-between ${
+              isCompact ? "p-4 space-y-2" : "p-6"
+            }`}
+          >
+            <div className="flex justify-between items-center pb-2 mb-1 border-b border-neutral-100">
               <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
-                Collection Rate Gauge
+                Collection Gauge
               </h3>
-              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                {paidRatioPct}% On-Time
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                {paidRatioPct}%
               </span>
             </div>
 
-            <div className="flex flex-col items-center justify-center py-4">
-              <div className="relative w-28 h-28 flex items-center justify-center">
+            <div className="flex flex-col items-center justify-center py-2">
+              <div
+                className={`relative flex items-center justify-center ${
+                  isCompact ? "w-20 h-20" : "w-28 h-28"
+                }`}
+              >
                 <svg
                   className="w-full h-full transform -rotate-90"
                   viewBox="0 0 100 100"
@@ -534,18 +585,19 @@ export function WidgetRenderer({
                 </svg>
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="font-serif text-2xl font-semibold text-neutral-900 leading-none">
+                  <span
+                    className={`font-serif font-semibold text-neutral-900 leading-none ${
+                      isCompact ? "text-lg" : "text-2xl"
+                    }`}
+                  >
                     {paidRatioPct}%
-                  </span>
-                  <span className="text-[9px] uppercase tracking-wider text-neutral-400 font-semibold mt-1">
-                    Efficiency
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="text-center text-xs text-neutral-500 pt-2 border-t border-neutral-100">
-              {paidCount} invoices collected successfully
+            <div className="text-center text-[11px] text-neutral-500 pt-1.5 border-t border-neutral-100">
+              {paidCount} invoices collected
             </div>
           </div>
         );
@@ -553,33 +605,31 @@ export function WidgetRenderer({
       // 16. Billing Alerts List
       case "billing-alerts":
         return (
-          <div className="ui-card p-6 flex flex-col justify-between">
+          <div
+            className={`ui-card flex flex-col justify-between ${
+              isCompact ? "p-4" : "p-6"
+            }`}
+          >
             <div>
-              <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-neutral-100">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
+                <div className="flex items-center gap-1.5">
                   <TriangleAlert className="w-4 h-4 text-amber-600" />
                   <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
                     Billing Alerts
                   </h3>
                 </div>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                    overdueInvoices.length > 0
-                      ? "bg-rose-50 text-rose-700 border border-rose-200"
-                      : "bg-neutral-100 text-neutral-600 border border-neutral-200"
-                  }`}
-                >
-                  {overdueInvoices.length} Action Req
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-neutral-100 text-neutral-600">
+                  {overdueInvoices.length}
                 </span>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {overdueInvoices.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-neutral-400">
-                    No overdue client accounts or pending billing alerts.
+                  <div className="py-6 text-center text-xs text-neutral-400">
+                    No overdue accounts.
                   </div>
                 ) : (
-                  overdueInvoices.slice(0, 3).map((inv) => (
+                  overdueInvoices.slice(0, isCompact ? 2 : 3).map((inv) => (
                     <div
                       key={inv.id}
                       onClick={() =>
@@ -589,13 +639,13 @@ export function WidgetRenderer({
                               `/invoices?invoice=${encodeURIComponent(inv.id)}`,
                             )
                       }
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-50 hover:bg-neutral-100/80 transition-colors cursor-pointer border border-neutral-100"
+                      className="flex items-center justify-between p-2 rounded-xl bg-neutral-50 hover:bg-neutral-100/80 transition-colors cursor-pointer border border-neutral-100"
                     >
                       <div>
                         <div className="text-xs font-semibold text-neutral-900">
                           {inv.clientName || "Client Account"}
                         </div>
-                        <div className="text-[11px] text-rose-600 font-medium mt-0.5">
+                        <div className="text-[10px] text-rose-600 font-medium">
                           Due {formatDateDisplay(inv.dueDate)}
                         </div>
                       </div>
@@ -608,13 +658,13 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
               <span>Overdue: {overdueTotalStr}</span>
               <Link
                 href="/invoices"
-                className="text-[#7c3aed] font-medium hover:underline"
+                className="text-[#7c3aed] font-medium hover:underline text-[11px]"
               >
-                View Invoices →
+                Invoices →
               </Link>
             </div>
           </div>
@@ -623,31 +673,35 @@ export function WidgetRenderer({
       // 17. Recent Invoices
       case "recent-invoices":
         return (
-          <div className="ui-card p-6 flex flex-col justify-between">
+          <div
+            className={`ui-card flex flex-col justify-between ${
+              isCompact ? "p-4" : "p-6"
+            }`}
+          >
             <div>
-              <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-neutral-100">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
+                <div className="flex items-center gap-1.5">
                   <Receipt className="w-4 h-4 text-[#7c3aed]" />
                   <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
-                    Recent Invoices & Cashflow
+                    Recent Invoices
                   </h3>
                 </div>
                 <Link
                   href="/invoices"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#7c3aed] hover:underline"
+                  className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#7c3aed] hover:underline"
                 >
-                  <span>View all</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>All</span>
+                  <ArrowUpRight className="w-3 h-3" />
                 </Link>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {recentInvoicesList.length === 0 ? (
-                  <div className="py-10 text-center text-xs text-neutral-400">
+                  <div className="py-6 text-center text-xs text-neutral-400">
                     No invoices generated yet.
                   </div>
                 ) : (
-                  recentInvoicesList.map((inv) => (
+                  recentInvoicesList.slice(0, isCompact ? 2 : 3).map((inv) => (
                     <div
                       key={inv.id}
                       onClick={() =>
@@ -657,30 +711,26 @@ export function WidgetRenderer({
                               `/invoices?invoice=${encodeURIComponent(inv.id)}`,
                             )
                       }
-                      className="flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 hover:bg-neutral-100/70 transition-colors cursor-pointer border border-neutral-100"
+                      className="flex items-center justify-between p-2 rounded-xl bg-neutral-50 hover:bg-neutral-100/70 transition-colors cursor-pointer border border-neutral-100"
                     >
-                      <div>
-                        <div className="text-xs font-semibold text-neutral-900">
+                      <div className="min-w-0 pr-2">
+                        <div className="text-xs font-semibold text-neutral-900 truncate">
                           {inv.clientName}
                         </div>
-                        <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                          {inv.code} · Due {formatDateDisplay(inv.dueDate)}
+                        <div className="text-[10px] text-neutral-500 font-mono">
+                          {inv.code}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <span className="font-serif text-sm font-semibold text-neutral-900">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-serif text-xs font-semibold text-neutral-900">
                           {formatCents(inv.amountCents, inv.currency)}
                         </span>
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                             inv.status === "PAID"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                              : inv.status === "UNPAID"
-                                ? "bg-amber-50 text-amber-800 border border-amber-200/60"
-                                : inv.status === "DRAFT"
-                                  ? "bg-neutral-100 text-neutral-600 border border-neutral-200"
-                                  : "bg-rose-50 text-rose-700 border border-rose-200/60"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-800"
                           }`}
                         >
                           {inv.status}
@@ -692,13 +742,13 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <div className="mt-4 pt-3.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
-              <span>Outstanding Balance: {pendingReceivablesStr}</span>
+            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+              <span className="truncate">Balance: {pendingReceivablesStr}</span>
               <Link
                 href="/clients"
-                className="text-neutral-700 hover:text-neutral-900 font-medium"
+                className="text-neutral-700 hover:text-neutral-900 font-medium text-[11px] shrink-0"
               >
-                Manage Clients →
+                Clients →
               </Link>
             </div>
           </div>
@@ -707,79 +757,71 @@ export function WidgetRenderer({
       // 18. Active Sprint Tasks
       case "sprint-tasks":
         return (
-          <div className="ui-card p-6 flex flex-col justify-between">
+          <div
+            className={`ui-card flex flex-col justify-between ${
+              isCompact ? "p-4" : "p-6"
+            }`}
+          >
             <div>
-              <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-neutral-100">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
+                <div className="flex items-center gap-1.5">
                   <Kanban className="w-4 h-4 text-[#7c3aed]" />
                   <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
-                    Active Sprint Deliverables
+                    Sprint Tasks
                   </h3>
                 </div>
                 <Link
                   href="/tasks"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#7c3aed] hover:underline"
+                  className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#7c3aed] hover:underline"
                 >
-                  <span>Kanban Board</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>Board</span>
+                  <ArrowUpRight className="w-3 h-3" />
                 </Link>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {activeTasks.length === 0 ? (
-                  <div className="py-10 text-center text-xs text-neutral-400">
-                    No active sprint deliverables yet.
+                  <div className="py-6 text-center text-xs text-neutral-400">
+                    No active deliverables.
                   </div>
                 ) : (
-                  activeTasks.map((t) => (
+                  activeTasks.slice(0, isCompact ? 2 : 3).map((t) => (
                     <div
                       key={t.id}
                       onClick={() => router.push("/tasks")}
-                      className="flex items-center justify-between p-3 rounded-xl bg-neutral-50/70 hover:bg-neutral-100/70 transition-colors cursor-pointer border border-neutral-100"
+                      className="flex items-center justify-between p-2 rounded-xl bg-neutral-50 hover:bg-neutral-100/70 transition-colors cursor-pointer border border-neutral-100"
                     >
-                      <div className="max-w-[240px] sm:max-w-xs">
+                      <div className="min-w-0 pr-2">
                         <div className="text-xs font-semibold text-neutral-900 truncate">
                           {t.title}
                         </div>
-                        <div className="text-[11px] text-neutral-500 mt-0.5 flex items-center gap-2">
-                          <span>Owner: {t.assignee}</span>
-                          <span>·</span>
-                          <span>Due {t.dueDate}</span>
+                        <div className="text-[10px] text-neutral-500">
+                          {t.assignee} · {t.dueDate}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {t.isOutsourced && (
-                          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#ede9fe] text-[#7c3aed]">
-                            <GitFork className="w-2.5 h-2.5" />
-                            <span>Outsourced</span>
-                          </span>
-                        )}
-                        <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider ${
-                            t.priority === "urgent"
-                              ? "bg-rose-100 text-rose-800"
-                              : t.priority === "high"
-                                ? "bg-orange-100 text-orange-800"
-                                : "bg-amber-100 text-amber-800"
-                          }`}
-                        >
-                          {t.priority}
-                        </span>
-                      </div>
+                      <span
+                        className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
+                          t.priority === "urgent"
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {t.priority}
+                      </span>
                     </div>
                   ))
                 )}
               </div>
             </div>
 
-            <div className="mt-4 pt-3.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
-              <span>{activeTasks.length} items in current sprint</span>
+            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+              <span>{activeTasks.length} in sprint</span>
               <Link
                 href="/outsourcing"
-                className="text-neutral-700 hover:text-neutral-900 font-medium"
+                className="text-neutral-700 hover:text-neutral-900 font-medium text-[11px]"
               >
-                Vendor Payouts →
+                Payouts →
               </Link>
             </div>
           </div>
@@ -789,8 +831,6 @@ export function WidgetRenderer({
         return null;
     }
   };
-
-  const meta = WIDGET_CATALOG.find((w) => w.id === widgetId);
 
   return (
     <div
@@ -806,12 +846,87 @@ export function WidgetRenderer({
           onContextMenu(e, widgetId);
         }
       }}
-      className={`group relative transition-all duration-200 ${
-        isDraggable ? "cursor-grab active:cursor-grabbing hover:-translate-y-0.5" : ""
+      className={`group relative h-full transition-all duration-200 ${
+        isDraggable
+          ? "cursor-grab active:cursor-grabbing hover:-translate-y-0.5"
+          : ""
+      } ${
+        isEditing
+          ? "ring-2 ring-dashed ring-purple-300 rounded-2xl bg-purple-50/10 p-0.5"
+          : ""
       }`}
     >
+      {/* Edit Mode Quick Actions Toolbar */}
+      {isEditing && (
+        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 p-1 bg-white/95 rounded-xl border border-neutral-200/90 shadow-md backdrop-blur-xs select-none">
+          {onMoveLeft && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveLeft();
+              }}
+              title="Move Left / Earlier"
+              className="p-1 text-neutral-500 hover:text-neutral-900 rounded hover:bg-neutral-100 transition-colors"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onMoveRight && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveRight();
+              }}
+              title="Move Right / Later"
+              className="p-1 text-neutral-500 hover:text-neutral-900 rounded hover:bg-neutral-100 transition-colors"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onToggleSize && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSize();
+              }}
+              title={
+                isCompact
+                  ? "Expand to Standard (Rectangle / Full)"
+                  : "Shrink to Square / Half"
+              }
+              className="p-1 text-[#7c3aed] hover:bg-purple-50 rounded transition-colors"
+            >
+              {isCompact ? (
+                <Maximize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Minimize2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
+
+          {onRemove && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              title="Remove from Dashboard"
+              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Subtle Drag Handle Indicator on Hover in Analytics */}
-      {isDraggable && source === "analytics" && (
+      {isDraggable && source === "analytics" && !isEditing && (
         <div className="absolute top-2.5 right-2.5 z-20 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 rounded-md bg-white/80 shadow-xs border border-neutral-200/60 pointer-events-none">
           <GripVertical className="w-3.5 h-3.5 text-neutral-500" />
         </div>

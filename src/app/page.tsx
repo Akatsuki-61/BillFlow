@@ -6,9 +6,15 @@ import {
   SlidersHorizontal,
   Minus,
   ArrowUpRight,
-  X,
   Layers,
   CheckCircle2,
+  Check,
+  RotateCcw,
+  Sparkles,
+  Maximize2,
+  Minimize2,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 import {
   Button,
@@ -24,10 +30,21 @@ import { DashboardPeriod } from "@/types/dashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { dashboardWidgets, removeFromDashboard, toastMessage } =
-    useWidgetContext();
+  const {
+    dashboardWidgets,
+    widgetSizes,
+    isDashboardEditing,
+    setIsDashboardEditing,
+    removeFromDashboard,
+    toggleWidgetSize,
+    moveDashboardWidget,
+    resetToDefaults,
+    toastMessage,
+  } = useWidgetContext();
 
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Context menu state for right-click on tiles
   const [contextMenu, setContextMenu] = useState<{
@@ -56,8 +73,62 @@ export default function DashboardPage() {
     setContextMenu({ isOpen: false, x: 0, y: 0, widgetId: null });
   };
 
+  const targetWidgetIndex = contextMenu.widgetId
+    ? dashboardWidgets.indexOf(contextMenu.widgetId)
+    : -1;
+
+  const targetWidgetMeta = contextMenu.widgetId
+    ? WIDGET_CATALOG.find((w) => w.id === contextMenu.widgetId)
+    : null;
+
+  const isTargetCompact = contextMenu.widgetId
+    ? widgetSizes[contextMenu.widgetId] === "compact"
+    : false;
+
   const contextMenuItems: ContextMenuItem[] = contextMenu.widgetId
     ? [
+        {
+          label: isTargetCompact
+            ? targetWidgetMeta?.size === "metric"
+              ? "Expand to Rectangle"
+              : "Expand to Full Width"
+            : targetWidgetMeta?.size === "metric"
+              ? "Shrink to Square"
+              : "Shrink to Half Width",
+          icon: isTargetCompact ? (
+            <Maximize2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+          ) : (
+            <Minimize2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+          ),
+          onClick: () => {
+            if (contextMenu.widgetId) {
+              toggleWidgetSize(contextMenu.widgetId);
+            }
+          },
+        },
+        ...(targetWidgetIndex > 0
+          ? [
+              {
+                label: "Move Left / Earlier",
+                icon: <ArrowLeft className="w-3.5 h-3.5" />,
+                onClick: () => {
+                  moveDashboardWidget(targetWidgetIndex, targetWidgetIndex - 1);
+                },
+              },
+            ]
+          : []),
+        ...(targetWidgetIndex >= 0 &&
+        targetWidgetIndex < dashboardWidgets.length - 1
+          ? [
+              {
+                label: "Move Right / Later",
+                icon: <ArrowRight className="w-3.5 h-3.5" />,
+                onClick: () => {
+                  moveDashboardWidget(targetWidgetIndex, targetWidgetIndex + 1);
+                },
+              },
+            ]
+          : []),
         {
           label: "Remove from Dashboard",
           icon: <Minus className="w-3.5 h-3.5" />,
@@ -78,24 +149,43 @@ export default function DashboardPage() {
       ]
     : [];
 
-  // Categorize pinned dashboard widgets
+  // Pinned dashboard widgets resolved in current order
   const pinnedWidgets = dashboardWidgets
     .map((id) => WIDGET_CATALOG.find((w) => w.id === id))
     .filter((w): w is NonNullable<typeof w> => Boolean(w));
-
-  const metricWidgets = pinnedWidgets.filter((w) => w.size === "metric");
-  const chartWidgets = pinnedWidgets.filter(
-    (w) => w.id === "profit-trajectory-chart" || w.id === "revenue-expenses-chart",
-  );
-  const otherWidgets = pinnedWidgets.filter(
-    (w) => !metricWidgets.includes(w) && !chartWidgets.includes(w),
-  );
 
   const periodLabelMap: Record<DashboardPeriod, string> = {
     month: "This Month",
     quarter: "This Quarter",
     year: "Year to Date",
     all: "All Time",
+  };
+
+  // Compute responsive column span classes for each widget based on display size
+  const getColSpanClass = (widgetId: string, baseSize: string) => {
+    const size = widgetSizes[widgetId] || "normal";
+    const isCompact = size === "compact";
+
+    if (baseSize === "metric") {
+      // Standard Metric: 4 cols out of 12 (1/3 row, rectangle).
+      // Compact Metric: 2 cols out of 12 (1/6 row, square-like shape!).
+      return isCompact
+        ? "col-span-6 sm:col-span-3 md:col-span-3 lg:col-span-2"
+        : "col-span-12 sm:col-span-6 md:col-span-3 lg:col-span-4";
+    }
+
+    if (baseSize === "full" || baseSize === "wide") {
+      // Standard Chart: full 12 cols (100% width).
+      // Compact Chart: 6 cols out of 12 (half of full size, side-by-side!).
+      return isCompact
+        ? "col-span-12 md:col-span-6 lg:col-span-6"
+        : "col-span-12";
+    }
+
+    // Medium widgets (recent invoices, sprint tasks, gauges, alerts)
+    return isCompact
+      ? "col-span-12 md:col-span-6 lg:col-span-6"
+      : "col-span-12 lg:col-span-6";
   };
 
   return (
@@ -128,7 +218,7 @@ export default function DashboardPage() {
         description="Welcome back. Here is your business health, profit growth, and operations summary."
       >
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Period Selector */}
+          {/* Period Selector kept on the left */}
           <SegmentedControl
             value={period}
             onChange={setPeriod}
@@ -144,18 +234,71 @@ export default function DashboardPage() {
             }))}
           />
 
-          {/* Discreet icon-only customize button: no text, compact, non-intrusive */}
+          {/* Discreet icon-only customize button: toggles dashboard rearrangement mode */}
           <Button
-            variant="ghost"
+            variant={isDashboardEditing ? "primary" : "ghost"}
             size="icon"
-            onClick={() => router.push("/analytics")}
-            title="Manage and configure widgets in Analytics"
-            className="w-8 h-8 text-neutral-400 hover:text-neutral-700 opacity-60 hover:opacity-100 transition-opacity"
+            onClick={() => setIsDashboardEditing(!isDashboardEditing)}
+            title={
+              isDashboardEditing
+                ? "Done customizing"
+                : "Rearrange and resize widgets"
+            }
+            className={`w-8 h-8 transition-all ${
+              isDashboardEditing
+                ? "bg-[#7c3aed] text-white shadow-xs"
+                : "text-neutral-400 hover:text-neutral-700 opacity-60 hover:opacity-100"
+            }`}
           >
-            <SlidersHorizontal className="w-3 h-3" />
+            <SlidersHorizontal className="w-3.5 h-3.5" />
           </Button>
         </div>
       </PageHeader>
+
+      {/* Customization Toolbar when customize mode is active */}
+      <MotionPresence>
+        {isDashboardEditing && (
+          <MotionSurface
+            kind="panel"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200/90 shadow-xs"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-[#7c3aed] text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-neutral-900 leading-tight">
+                  Dashboard Rearrange & Resize Mode
+                </h3>
+                <p className="text-[11px] text-neutral-500 mt-0.5">
+                  Drag tiles to reorder. Click the resize icon on any card to
+                  toggle between square/half-size and standard.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={resetToDefaults}
+                title="Reset to default arrangement"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
+              </Button>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={() => setIsDashboardEditing(false)}
+              >
+                <Check className="w-3 h-3" />
+                <span>Done</span>
+              </Button>
+            </div>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Main Dashboard Widget Feed */}
       {pinnedWidgets.length === 0 ? (
@@ -177,60 +320,77 @@ export default function DashboardPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-6">
-          {/* Section 1: KPI Metric Cards */}
-          {metricWidgets.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3 text-xs text-neutral-500 font-medium">
-                <span>Key Business Metrics ({periodLabelMap[period]})</span>
-                <span className="text-[11px] text-neutral-400">
-                  {metricWidgets.length} metrics pinned · Right-click any tile to
-                  remove
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {metricWidgets.map((w) => (
+        <div>
+          <div className="flex items-center justify-between mb-3 text-xs text-neutral-500 font-medium">
+            <span>Key Business Metrics ({periodLabelMap[period]})</span>
+            <span className="text-[11px] text-neutral-400">
+              {pinnedWidgets.length} widgets active · Right-click any tile to
+              resize or remove
+            </span>
+          </div>
+
+          {/* Unified 12-Column Responsive Dashboard Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4">
+            {pinnedWidgets.map((w, index) => {
+              const colSpan = getColSpanClass(w.id, w.size);
+              const isCompact = (widgetSizes[w.id] || "normal") === "compact";
+              const isOver = dragOverIndex === index;
+
+              return (
+                <div
+                  key={w.id}
+                  className={`${colSpan} transition-all duration-200 ${
+                    isOver
+                      ? "ring-2 ring-[#7c3aed] ring-offset-2 rounded-2xl scale-[1.02]"
+                      : ""
+                  }`}
+                  onDragOver={(e) => {
+                    if (isDashboardEditing) {
+                      e.preventDefault();
+                      setDragOverIndex(index);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (isDashboardEditing) {
+                      setDragOverIndex((curr) =>
+                        curr === index ? null : curr,
+                      );
+                    }
+                  }}
+                  onDrop={(e) => {
+                    if (isDashboardEditing && draggedIndex !== null) {
+                      e.preventDefault();
+                      moveDashboardWidget(draggedIndex, index);
+                      setDraggedIndex(null);
+                      setDragOverIndex(null);
+                    }
+                  }}
+                >
                   <WidgetRenderer
-                    key={w.id}
                     widgetId={w.id}
                     source="dashboard"
                     period={period}
+                    displaySize={isCompact ? "compact" : "normal"}
+                    isDraggable={isDashboardEditing}
+                    isEditing={isDashboardEditing}
+                    onToggleSize={() => toggleWidgetSize(w.id)}
+                    onMoveLeft={
+                      index > 0
+                        ? () => moveDashboardWidget(index, index - 1)
+                        : undefined
+                    }
+                    onMoveRight={
+                      index < pinnedWidgets.length - 1
+                        ? () => moveDashboardWidget(index, index + 1)
+                        : undefined
+                    }
+                    onRemove={() => removeFromDashboard(w.id)}
                     onContextMenu={handleContextMenu}
                   />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Section 2: Charts */}
-          {chartWidgets.length > 0 && (
-            <div className="space-y-6">
-              {chartWidgets.map((w) => (
-                <WidgetRenderer
-                  key={w.id}
-                  widgetId={w.id}
-                  source="dashboard"
-                  period={period}
-                  onContextMenu={handleContextMenu}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Section 3: Operational Feeds & Activity */}
-          {otherWidgets.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {otherWidgets.map((w) => (
-                <WidgetRenderer
-                  key={w.id}
-                  widgetId={w.id}
-                  source="dashboard"
-                  period={period}
-                  onContextMenu={handleContextMenu}
-                />
-              ))}
-            </div>
-          )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
