@@ -1,125 +1,200 @@
 "use client";
 
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-
 import React, { useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faBuildingColumns,
-  faArrowTrendUp,
-  faTriangleExclamation,
-  faEllipsisVertical,
-  faCalendarDays,
-  faChevronDown,
-  faCircleCheck,
-  faXmark,
-} from "@fortawesome/free-solid-svg-icons";
-import { Timeframe, BillingAlertItem, MonthlyFinancial } from "@/types/analytics";
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  SlidersHorizontal,
+  Plus,
+  Minus,
+  EyeOff,
+  RotateCcw,
+  X,
+  Layers,
+  Sparkles,
+} from "lucide-react";
+import {
+  Button,
+  PageHeader,
+  SegmentedControl,
+  Switch,
+} from "@/components/ui/Workspace";
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
+import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
+import { useWidgetContext } from "@/context/WidgetContext";
+import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
+import { Timeframe } from "@/types/analytics";
 
-// Monthly financial dataset starts blank
-const monthlyData: MonthlyFinancial[] = [];
-
-// Billing alerts data starts blank
-const initialAlerts: BillingAlertItem[] = [];
+const quarterOptions = Array.from({ length: 4 }, (_, offset) => {
+  const date = new Date();
+  const quarterIndex =
+    date.getFullYear() * 4 + Math.floor(date.getMonth() / 3) - offset;
+  return `Q${(quarterIndex % 4) + 1} ${Math.floor(quarterIndex / 4)}`;
+});
 
 export default function AnalyticsView() {
+  const {
+    analyticsWidgets,
+    dashboardWidgets,
+    pinToDashboard,
+    removeFromDashboard,
+    isPinnedToDashboard,
+    toggleAnalytics,
+    showAllAnalytics,
+    resetToDefaults,
+    toastMessage,
+    showToast,
+  } = useWidgetContext();
+
   // Selected timeframe filter state: Month, Quarter, or Year
   const [timeframe, setTimeframe] = useState<Timeframe>("Quarter");
-
-  // Selected date quarter state
-  const [selectedQuarter, setSelectedQuarter] = useState("Q3 2023");
+  const [selectedQuarter, setSelectedQuarter] = useState(quarterOptions[0]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
 
-  // Billing alerts state
-  const [alerts] = useState<BillingAlertItem[]>(initialAlerts);
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    widgetId: string | null;
+  }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    widgetId: null,
+  });
 
-  // Modals state
-  const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-
-  // Toast notification feedback state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Show auto-dismissing toast feedback
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const handleContextMenu = (e: React.MouseEvent, widgetId: string) => {
+    e.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      widgetId,
+    });
   };
 
-  // Dispatch payment reminder to client
-  const handleSendReminder = (clientName: string) => {
-    showToast(`Payment reminder dispatched to ${clientName}`);
+  const closeContextMenu = () => {
+    setContextMenu({ isOpen: false, x: 0, y: 0, widgetId: null });
   };
 
-  // Max revenue reference for bar height scaling (2.0M corresponds to 100%)
-  const maxScale = 2.0;
+  // Build context menu options for targeted widget
+  const targetWidgetMeta = WIDGET_CATALOG.find(
+    (w) => w.id === contextMenu.widgetId,
+  );
+  const isTargetPinned = contextMenu.widgetId
+    ? isPinnedToDashboard(contextMenu.widgetId)
+    : false;
+
+  const contextMenuItems: ContextMenuItem[] = contextMenu.widgetId
+    ? [
+        isTargetPinned
+          ? {
+              label: "Remove from Dashboard",
+              icon: <Minus className="w-3.5 h-3.5" />,
+              onClick: () => {
+                if (contextMenu.widgetId) {
+                  removeFromDashboard(contextMenu.widgetId);
+                }
+              },
+            }
+          : {
+              label: "Send to Dashboard",
+              icon: <Plus className="w-3.5 h-3.5 text-[#7c3aed]" />,
+              onClick: () => {
+                if (contextMenu.widgetId) {
+                  pinToDashboard(contextMenu.widgetId);
+                }
+              },
+            },
+        {
+          label: "Hide from Analytics",
+          icon: <EyeOff className="w-3.5 h-3.5" />,
+          onClick: () => {
+            if (contextMenu.widgetId) {
+              toggleAnalytics(contextMenu.widgetId);
+            }
+          },
+          tone: "danger",
+        },
+      ]
+    : [];
+
+  // Categorize visible widgets
+  const visibleWidgets = WIDGET_CATALOG.filter((w) =>
+    analyticsWidgets.includes(w.id),
+  );
+  const metricWidgets = visibleWidgets.filter((w) => w.size === "metric");
+  const chartWidgets = visibleWidgets.filter((w) => w.size === "full" || w.size === "wide");
+  const otherWidgets = visibleWidgets.filter(
+    (w) => w.size === "medium" || (!metricWidgets.includes(w) && !chartWidgets.includes(w)),
+  );
 
   return (
-    <div className="motion-page w-full min-h-screen bg-[#faf9f5] text-[#111827] px-6 sm:px-10 lg:px-12 py-10 font-sans">
+    <div className="workspace-page motion-page">
       {/* Toast Feedback Notification */}
       <MotionPresence>
         {toastMessage && (
-          <MotionSurface kind="toast" className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium">
-            <FontAwesomeIcon icon={faCircleCheck} className="text-[#34d399] text-[13px]" />
+          <MotionSurface
+            kind="toast"
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium"
+          >
+            <CheckCircle2 className="text-[#34d399] text-[13px]" />
             <span>{toastMessage}</span>
           </MotionSurface>
         )}
       </MotionPresence>
 
-      {/* Top Header: Title, subtitle, timeframe toggle and date range picker */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-          {/* Newspaper serif heading matching wireframe */}
-          <h1 className="font-newspaper text-[38px] sm:text-[42px] font-normal tracking-[-0.02em] text-[#111827] leading-none">
-            Analytics
-          </h1>
-          <p className="text-[13px] text-[#6b7280] mt-2 font-normal">
-            Here&apos;s your overall Analytics .
-          </p>
-        </div>
+      {/* Right Click Context Menu */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={closeContextMenu}
+        items={contextMenuItems}
+      />
 
-        {/* Header Controls: Timeframe segmented toggle and quarter dropdown */}
-        <div className="flex items-center gap-3">
-          {/* Timeframe pill selector (Month / Quarter / Year) */}
-          <div className="bg-[#eaeae5] p-1 rounded-xl flex items-center gap-1 border border-[#deded8]">
-            {(["Month", "Quarter", "Year"] as Timeframe[]).map((tab) => {
-              const isActive = timeframe === tab;
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setTimeframe(tab)}
-                  className={`px-3 py-1 rounded-lg text-[11.5px] transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-[#faf9f5] text-[#111827] font-semibold shadow-xs"
-                      : "text-[#6b7280] hover:text-[#111827] font-medium"
-                  }`}
-                >
-                  {tab}
-                </button>
-              );
-            })}
-          </div>
+      {/* Top Header */}
+      <PageHeader
+        title="Analytics & Widget Storage"
+        description="Central widget storage. Drag cards to the Dashboard in the sidebar, or right-click to pin."
+      >
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <SegmentedControl
+            value={timeframe}
+            onChange={setTimeframe}
+            label="Analytics period"
+            options={(["Month", "Quarter", "Year"] as Timeframe[]).map(
+              (value) => ({ value, label: value }),
+            )}
+          />
 
-          {/* Date range dropdown button */}
+          {/* Quarter Dropdown */}
           <div className="relative">
-            <button
+            <Button
+              variant="secondary"
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               aria-expanded={isDropdownOpen}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#faf9f5] hover:bg-[#eaeae5] border border-[#dcdcd7] rounded-lg text-[11.5px] font-medium text-[#374151] transition-all cursor-pointer shadow-2xs"
             >
-              <FontAwesomeIcon icon={faCalendarDays} className="text-[11px] text-[#6b7280]" />
+              <CalendarDays className="text-[11px] text-[#6b7280]" />
               <span>{selectedQuarter}</span>
-              <FontAwesomeIcon icon={faChevronDown} className="motion-chevron text-[9px] text-[#9ca3af] ml-0.5" />
-            </button>
+              <ChevronDown className="motion-chevron text-[9px] text-[#9ca3af] ml-0.5" />
+            </Button>
 
-            {/* Dropdown menu */}
             <MotionPresence>
               {isDropdownOpen && (
-                <MotionSurface kind="menu" className="absolute right-0 mt-1.5 w-36 bg-[#faf9f5] border border-[#dcdcd7] rounded-xl shadow-lg z-20 py-1 overflow-hidden">
-                  {["Q3 2023", "Q2 2023", "Q1 2023", "Q4 2022"].map((q) => (
-                    <button
+                <MotionSurface
+                  kind="menu"
+                  className="absolute right-0 mt-1.5 w-36 bg-[#faf9f5] border border-[#dcdcd7] rounded-xl shadow-lg z-20 py-1 overflow-hidden"
+                >
+                  {quarterOptions.map((q) => (
+                    <Button
+                      variant="menu"
+                      aria-pressed={selectedQuarter === q}
                       key={q}
                       type="button"
                       onClick={() => {
@@ -127,435 +202,246 @@ export default function AnalyticsView() {
                         setIsDropdownOpen(false);
                         showToast(`Filtered to ${q}`);
                       }}
-                      className={`w-full text-left px-3 py-1.5 text-[11.5px] transition-colors cursor-pointer ${
-                        selectedQuarter === q
-                          ? "bg-[#eaeae5] text-[#7133f5] font-semibold"
-                          : "text-[#374151] hover:bg-[#f4f4f0]"
-                      }`}
                     >
                       {q}
-                    </button>
+                    </Button>
                   ))}
                 </MotionSurface>
               )}
             </MotionPresence>
           </div>
+
+          {/* Customize Analytics Button */}
+          <Button
+            variant="secondary"
+            onClick={() => setIsCustomizeModalOpen(true)}
+            title="Configure widgets visible in Analytics"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-[#7c3aed]" />
+            <span>Customize</span>
+          </Button>
         </div>
-      </div>
+      </PageHeader>
 
-      {/* Main Analytics Grid matching Figma Design 2.0 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-7">
-        {/* Left Section (2 Columns): Net Profit, Paid Ratio & Revenue vs Expenses Chart */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Row 1: KPI Cards (Net Profit + Paid Ratio) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {/* Widget 1: Net Profit Card */}
-            <div className="bg-[#eaeae5] rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between h-[152px] shadow-xs border border-[#deded8]">
-              {/* Card Header & Watermark Icon */}
-              <div className="flex justify-between items-start">
-                <span className="text-[10px] font-semibold text-[#6b7280] tracking-[0.06em] uppercase block">
-                  NET PROFIT
+      {/* Empty State when all widgets are hidden */}
+      {visibleWidgets.length === 0 ? (
+        <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-neutral-300">
+          <EyeOff className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-neutral-900">
+            All analytics widgets are currently hidden
+          </h3>
+          <p className="text-xs text-neutral-500 mt-1 max-w-md mx-auto">
+            You can re-enable any of the 18 business metrics, charts, and feeds
+            from the widget customizer.
+          </p>
+          <Button
+            variant="primary"
+            onClick={showAllAnalytics}
+            className="mt-4"
+          >
+            Show All 18 Widgets
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Section 1: KPI Metrics Grid */}
+          {metricWidgets.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3 text-xs text-neutral-500 font-medium">
+                <span>Key Business Indicators ({selectedQuarter})</span>
+                <span className="text-[11px] text-neutral-400">
+                  {metricWidgets.length} KPI cards active
                 </span>
-                <FontAwesomeIcon
-                  icon={faBuildingColumns}
-                  className="text-[#c5c5be] text-[26px] pointer-events-none"
-                />
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {metricWidgets.map((w) => (
+                  <WidgetRenderer
+                    key={w.id}
+                    widgetId={w.id}
+                    source="analytics"
+                    isDraggable={true}
+                    onContextMenu={handleContextMenu}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-              {/* Numerical Value in Newsreader & Growth Indicator */}
-              <div className="flex items-center gap-2.5 mt-1">
-                <div className="font-newspaper text-[32px] sm:text-[36px] font-normal text-[#111827] tracking-tight leading-none">
-                  $142,850
+          {/* Section 2: Charts & Visualizations */}
+          {chartWidgets.length > 0 && (
+            <div className="space-y-4">
+              <div className="text-xs text-neutral-500 font-medium">
+                Financial Trends & Profit Trajectory
+              </div>
+              <div className="grid grid-cols-1 gap-6">
+                {chartWidgets.map((w) => (
+                  <WidgetRenderer
+                    key={w.id}
+                    widgetId={w.id}
+                    source="analytics"
+                    isDraggable={true}
+                    onContextMenu={handleContextMenu}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 3: Operational Feeds, Alerts & Gauges */}
+          {otherWidgets.length > 0 && (
+            <div className="space-y-3">
+              <div className="text-xs text-neutral-500 font-medium">
+                Operational Feeds & Account Health
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {otherWidgets.map((w) => (
+                  <WidgetRenderer
+                    key={w.id}
+                    widgetId={w.id}
+                    source="analytics"
+                    isDraggable={true}
+                    onContextMenu={handleContextMenu}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CUSTOMIZE ANALYTICS WIDGETS MODAL */}
+      <MotionPresence>
+        {isCustomizeModalOpen && (
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs"
+          >
+            <MotionSurface
+              onDismiss={() => setIsCustomizeModalOpen(false)}
+              kind="panel"
+              className="bg-white rounded-2xl w-full max-w-xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-serif font-semibold text-neutral-900">
+                    Customize Analytics Widgets
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Toggle which metrics appear in your Analytics storage and
+                    see which are on your Dashboard.
+                  </p>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#d6eddb] text-[#15803d] text-[10px] font-bold rounded-full">
-                  <FontAwesomeIcon icon={faArrowTrendUp} className="text-[9px]" />
-                  <span>12.4%</span>
-                </span>
-              </div>
-
-              {/* Bottom Context & Details Action */}
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-[11px] text-[#8e8e93] font-normal">
-                  vs previous quarter
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsDetailsModalOpen(true)}
-                  className="text-[11px] text-[#7133f5] font-semibold hover:underline cursor-pointer flex items-center gap-1"
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsCustomizeModalOpen(false)}
                 >
-                  <span>Details</span>
-                  <span>&rarr;</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Widget 2: Paid Ratio Card (Dark Gradient Theme) */}
-            <div className="bg-gradient-to-br from-[#0c0d12] via-[#12111d] to-[#1f1733] rounded-2xl p-6 flex flex-col justify-between h-[152px] shadow-xs text-white border border-[#27272a]">
-              {/* Card Label */}
-              <div>
-                <span className="text-[10px] font-semibold text-[#a1a1aa] tracking-[0.06em] uppercase block">
-                  PAID RATIO
-                </span>
-                {/* Ratio Value in Newsreader */}
-                <div className="font-newspaper text-[32px] sm:text-[36px] font-normal text-white tracking-tight mt-1 leading-none">
-                  94.2%
-                </div>
+                  <X className="w-5 h-5" />
+                </Button>
               </div>
 
-              {/* Visual Linear Progress Bar */}
-              <div>
-                <div className="w-full bg-[#27272a] h-1.5 rounded-full overflow-hidden">
-                  <div className="w-[94.2%] h-full bg-gradient-to-r from-[#7133f5] via-[#a855f7] to-[#e2e0e4] rounded-full" />
-                </div>
-                {/* Metric Summary Footers */}
-                <div className="flex justify-between items-center text-[10px] text-[#a1a1aa] font-medium mt-2">
-                  <span>$482k Collected</span>
-                  <span>$512k Billed</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Row 2: Revenue vs Expenses Chart Card */}
-          <div className="bg-[#eaeae5] rounded-2xl p-6 shadow-xs border border-[#deded8]">
-            {/* Chart Title and Header Actions */}
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="font-newspaper text-[17px] font-normal text-[#111827] tracking-tight">
-                Revenue vs Expenses
-              </h2>
-              <button
-                type="button"
-                className="text-[#9ca3af] hover:text-[#111827] p-1 rounded-md transition-colors cursor-pointer"
-                title="Chart options"
-              >
-                <FontAwesomeIcon icon={faEllipsisVertical} className="text-[13px]" />
-              </button>
-            </div>
-
-            {/* Grouped Paired Bar Chart Visualization */}
-            <div className="relative pt-2 pb-2">
-              {monthlyData.length === 0 ? (
-                <div className="h-48 flex flex-col items-center justify-center text-center p-6 border border-dashed border-[#deded8] rounded-xl bg-white/40">
-                  <span className="text-xs font-semibold text-neutral-800">No financial data yet</span>
-                  <span className="text-xs text-neutral-400 mt-1 max-w-sm">
-                    Monthly cashflow and expense analytics will plot here as transactions are recorded.
+              {/* Central Widget Storage Banner shown inside Customize modal */}
+              <div className="mx-6 mt-4 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-purple-50/80 border border-purple-200/70 text-xs text-purple-950">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#7c3aed] shrink-0" />
+                  <span>
+                    <strong>Central Widget Storage:</strong> Drag any card to the{" "}
+                    <strong>Dashboard</strong> in the left sidebar, or right-click to pin instantly.
                   </span>
                 </div>
-              ) : (
-                <>
-                  {/* Y-Axis Horizontal Gridlines & Labels */}
-                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pr-2">
-                    <div className="flex items-center gap-2 w-full">
-                      <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$2M</span>
-                      <div className="flex-1 border-b border-[#deded8] border-dashed" />
-                    </div>
-                    <div className="flex items-center gap-2 w-full">
-                      <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$1M</span>
-                      <div className="flex-1 border-b border-[#deded8] border-dashed" />
-                    </div>
-                    <div className="flex items-center gap-2 w-full">
-                      <span className="text-[9.5px] text-[#9ca3af] font-medium w-8">$0</span>
-                      <div className="flex-1 border-b border-[#deded8]" />
-                    </div>
-                  </div>
+                <span className="text-[11px] text-purple-800 font-medium whitespace-nowrap ml-2">
+                  {visibleWidgets.length} active
+                </span>
+              </div>
 
-                  {/* Chart Bars Grid */}
-                  <div className="h-44 pl-10 flex items-end justify-between gap-3 sm:gap-6 z-10 relative">
-                    {monthlyData.map((d) => {
-                  const revHeight = (d.revenue / maxScale) * 100;
-                  const expHeight = (d.expenses / maxScale) * 100;
+              {/* Widget List */}
+              <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto divide-y divide-neutral-100">
+                {WIDGET_CATALOG.map((widget) => {
+                  const isVisible = analyticsWidgets.includes(widget.id);
+                  const isPinned = dashboardWidgets.includes(widget.id);
 
                   return (
                     <div
-                      key={d.month}
-                      className="flex-1 flex flex-col items-center h-full justify-end group"
+                      key={widget.id}
+                      className="pt-3 first:pt-0 flex items-center justify-between gap-4 group"
                     >
-                      {/* Paired Bars (Purple for Revenue, Gray for Expenses) */}
-                      <div className="flex items-end gap-1.5 w-full justify-center h-full pb-1">
-                        {/* Revenue Bar */}
-                        <div
-                          style={{ height: `${revHeight}%` }}
-                          className="w-3.5 sm:w-4 bg-[#7133f5] rounded-t-md hover:brightness-110 transition-all cursor-pointer relative"
-                          title={`${d.month} Revenue: $${d.revenue}M`}
-                        />
-                        {/* Expenses Bar */}
-                        <div
-                          style={{ height: `${expHeight}%` }}
-                          className="w-3.5 sm:w-4 bg-[#c7c7cf] rounded-t-md hover:brightness-95 transition-all cursor-pointer relative"
-                          title={`${d.month} Expenses: $${d.expenses}M`}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-neutral-900 group-hover:text-[#7c3aed] transition-colors">
+                            {widget.title}
+                          </span>
+                          <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 bg-neutral-100 text-neutral-600 rounded">
+                            {widget.category}
+                          </span>
+                          {isPinned && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-md">
+                              On Dashboard
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          {widget.description}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Button
+                          size="small"
+                          variant={isPinned ? "secondary" : "ghost"}
+                          onClick={() => {
+                            if (isPinned) {
+                              removeFromDashboard(widget.id);
+                            } else {
+                              pinToDashboard(widget.id);
+                            }
+                          }}
+                          title={isPinned ? "Remove from Dashboard" : "Add to Dashboard"}
+                        >
+                          {isPinned ? "Unpin" : "+ Pin"}
+                        </Button>
+                        <Switch
+                          checked={isVisible}
+                          onChange={() => toggleAnalytics(widget.id)}
+                          label={`Show ${widget.title} in Analytics`}
                         />
                       </div>
-                      {/* X-Axis Month Label */}
-                      <span className="text-[9px] font-medium uppercase text-[#9ca3af] mt-2 block">
-                        {d.month}
-                      </span>
                     </div>
                   );
                 })}
               </div>
-            </>
-          )}
-        </div>
 
-            {/* Centered Chart Legend */}
-            <div className="flex items-center justify-center gap-6 mt-4 pt-2 border-t border-[#deded8]/60 text-[10.5px] text-[#6b7280] font-medium">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#7133f5]" />
-                <span>Revenue</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#c7c7cf]" />
-                <span>Expenses</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Section (1 Column): Billing Alerts & Collection Rate */}
-        <div className="lg:col-span-1 space-y-5">
-          {/* Card 1: Billing Alerts */}
-          <div className="bg-[#eaeae5] rounded-2xl p-5 shadow-xs flex flex-col justify-between border border-[#deded8]">
-            {/* Header: Title and Action Count Pill */}
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-bold text-[14px] text-[#111827] tracking-tight">
-                Billing Alerts
-              </h2>
-              <span className={`px-2 py-0.5 text-[9px] font-bold tracking-wider rounded-full uppercase ${
-                alerts.length > 0
-                  ? "bg-[#fee2e2] text-[#ef4444]"
-                  : "bg-neutral-200/80 text-neutral-600"
-              }`}>
-                {alerts.length} ACTION REQ
-              </span>
-            </div>
-
-            {/* Overdue Invoices List */}
-            <div className="space-y-3 divide-y divide-[#deded8]">
-              {alerts.length === 0 ? (
-                <div className="py-8 text-center text-xs text-neutral-400">
-                  No overdue invoices or billing alerts.
-                </div>
-              ) : (
-                alerts.map((alert, idx) => (
-                <div
-                  key={alert.id}
-                  className={`flex items-center justify-between ${idx > 0 ? "pt-3" : ""}`}
-                >
-                  {/* Left: Warning icon and invoice details */}
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-[#fef2f2] text-[#ef4444] flex items-center justify-center shrink-0">
-                      <FontAwesomeIcon icon={faTriangleExclamation} className="text-[11px]" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-[11.5px] text-[#111827] leading-tight">
-                        {alert.clientName}
-                      </h3>
-                      <p className="text-[10px] text-[#ef4444] font-medium mt-0.5">
-                        {alert.daysOverdue} days overdue
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Right: Amount & Quick Remind Action */}
-                  <div className="text-right">
-                    <span className="font-bold text-[12px] text-[#111827] block leading-tight">
-                      ${alert.amount.toLocaleString("en-US")}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleSendReminder(alert.clientName)}
-                      className="text-[10.5px] text-[#7133f5] hover:underline font-semibold cursor-pointer block mt-0.5"
-                    >
-                      Remind
-                    </button>
-                  </div>
-                </div>
-              )))}
-            </div>
-
-            {/* View All Alerts Action Button */}
-            <div className="mt-5 pt-3 border-t border-[#deded8]/80">
-              <button
-                type="button"
-                onClick={() => setIsAlertsModalOpen(true)}
-                className="w-full py-2 bg-[#faf9f5] hover:bg-[#deded8] border border-[#dcdcd7] text-[#374151] rounded-xl text-[11.5px] font-medium transition-colors cursor-pointer text-center shadow-2xs"
-              >
-                View All Alerts
-              </button>
-            </div>
-          </div>
-
-          {/* Card 2: Collection Rate (Circular Donut Indicator) */}
-          <div className="bg-[#eaeae5] rounded-2xl p-5 shadow-xs flex flex-col justify-between border border-[#deded8]">
-            {/* Header */}
-            <div className="w-full text-left mb-3">
-              <h2 className="font-bold text-[14px] text-[#111827] tracking-tight">
-                Collection Rate
-              </h2>
-            </div>
-
-            {/* Donut Gauge Visualization */}
-            <div className="flex flex-col items-center justify-center py-4">
-              <div className="relative w-28 h-28 flex items-center justify-center">
-                {/* SVG Circular Donut Ring */}
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  {/* Track circle */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke="#dcdcd7"
-                    strokeWidth="11"
-                    fill="transparent"
-                  />
-                  {/* Progress stroke (86%) */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke="#7133f5"
-                    strokeWidth="11"
-                    strokeDasharray={2 * Math.PI * 40}
-                    strokeDashoffset={2 * Math.PI * 40 * (1 - 0.86)}
-                    strokeLinecap="round"
-                    fill="transparent"
-                  />
-                </svg>
-
-                {/* Center Percentage in Newsreader */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="font-newspaper text-[26px] font-normal text-[#111827] leading-none">
-                    86%
-                  </span>
-                  <span className="text-[8px] uppercase tracking-wider text-[#6b7280] font-semibold mt-1">
-                    PAID ON TIME
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal Dialog: All Billing Alerts */}
-      <MotionPresence>
-        {isAlertsModalOpen && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <MotionSurface kind="panel" className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-lg overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-                <h3 className="font-bold text-[13px] text-[#111827]">
-                  Active Billing Alerts (Overdue Invoices)
-                </h3>
-                <button
+              {/* Modal Actions */}
+              <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
+                <Button
+                  variant="ghost"
                   type="button"
-                  onClick={() => setIsAlertsModalOpen(false)}
-                  className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
+                  onClick={resetToDefaults}
                 >
-                  <FontAwesomeIcon icon={faXmark} className="text-sm" />
-                </button>
-              </div>
-              <div className="p-6 space-y-3">
-                {[
-                  ...alerts,
-                  {
-                    id: "alert-3",
-                    clientName: "CyberDyne Labs",
-                    retainerTitle: "Security Audit Q2",
-                    daysOverdue: 21,
-                    amount: 5400,
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 bg-[#eaeae5] rounded-xl flex items-center justify-between border border-[#deded8]"
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Defaults</span>
+                </Button>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={showAllAnalytics}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#fef2f2] text-[#ef4444] flex items-center justify-center shrink-0">
-                        <FontAwesomeIcon icon={faTriangleExclamation} className="text-[12px]" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-[13px] text-[#111827]">{item.clientName}</div>
-                        <div className="text-[#ef4444] text-[11px] font-medium">
-                          {item.daysOverdue} days overdue &bull; {item.retainerTitle}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-[13px] text-[#111827]">
-                        ${item.amount.toLocaleString("en-US")}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleSendReminder(item.clientName)}
-                        className="text-[11px] text-[#7133f5] hover:underline font-semibold cursor-pointer"
-                      >
-                        Send Notice
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsAlertsModalOpen(false)}
-                  className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
-                >
-                  Done
-                </button>
-              </div>
-            </MotionSurface>
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
-      {/* Modal Dialog: Net Profit Details */}
-      <MotionPresence>
-        {isDetailsModalOpen && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <MotionSurface kind="panel" className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-                <h3 className="font-bold text-[13px] text-[#111827]">
-                  Net Profit Breakdown ({selectedQuarter})
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setIsDetailsModalOpen(false)}
-                  className="text-[#8e8e93] hover:text-[#111827] p-1 rounded-lg transition-colors cursor-pointer"
-                >
-                  <FontAwesomeIcon icon={faXmark} className="text-sm" />
-                </button>
-              </div>
-              <div className="p-6 space-y-4 text-[12px] text-[#4b5563]">
-                <div className="p-3 bg-[#eaeae5] rounded-xl space-y-2 border border-[#deded8]">
-                  <div className="flex justify-between">
-                    <span>Gross Billed Revenue:</span>
-                    <span className="font-bold text-[#111827]">$512,000.00</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Operating & Server OPEX:</span>
-                    <span className="font-bold text-[#ef4444]">-$285,150.00</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Subcontractor Outsourcing:</span>
-                    <span className="font-bold text-[#ef4444]">-$84,000.00</span>
-                  </div>
-                  <div className="pt-2 border-t border-[#deded8] flex justify-between text-[13px]">
-                    <span className="font-semibold text-[#111827]">Net Retained Profit:</span>
-                    <span className="font-newspaper font-bold text-[#15803d] text-[15px]">
-                      $142,850.00
-                    </span>
-                  </div>
+                    Show All (18)
+                  </Button>
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={() => {
+                      setIsCustomizeModalOpen(false);
+                      showToast("Analytics preferences updated");
+                    }}
+                  >
+                    Done
+                  </Button>
                 </div>
-              </div>
-              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsDetailsModalOpen(false)}
-                  className="px-4 py-1.5 bg-[#7133f5] hover:bg-[#5e1eed] text-white rounded-lg text-[11.5px] font-semibold cursor-pointer shadow-2xs"
-                >
-                  Close
-                </button>
               </div>
             </MotionSurface>
           </MotionSurface>

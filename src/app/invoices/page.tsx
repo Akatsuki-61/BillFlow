@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  Button,
+  PageHeader,
+  SegmentedControl,
+  MetricCard,
+  EmptyState,
+} from "@/components/ui/Workspace";
+
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -7,11 +15,8 @@ import Link from "next/link";
 import {
   Plus,
   Receipt,
-  ArrowDown,
   MoreHorizontal,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Pencil,
   Trash2,
   X,
@@ -19,8 +24,16 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useInvoices, useClients } from "@/lib/data/DataProvider";
-import { formatCents, formatDateDisplay, parseAmountToCents, getCurrencySymbol } from "@/lib/format";
-import type { InvoiceWithClient, InvoiceStatus, Currency } from "@/types/billing";
+import {
+  formatCents,
+  formatDateDisplay,
+  parseAmountToCents,
+} from "@/lib/format";
+import type {
+  InvoiceWithClient,
+  InvoiceStatus,
+  Currency,
+} from "@/types/billing";
 
 type FilterTab = "All Invoices" | "Drafts" | "Overdue" | "Paid";
 
@@ -44,10 +57,13 @@ function InvoicesContent() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [highlightedInvoiceId, setHighlightedInvoiceId] = useState<string | null>(null);
+  const [highlightedInvoiceId, setHighlightedInvoiceId] = useState<
+    string | null
+  >(null);
 
   // Add Invoice Modal state
-  const [showAddInvoiceModal, setShowAddInvoiceModal] = useState<boolean>(false);
+  const [showAddInvoiceModal, setShowAddInvoiceModal] =
+    useState<boolean>(false);
   const [newCode, setNewCode] = useState("");
   const [newClientId, setNewClientId] = useState("");
   const [newTitle, setNewTitle] = useState("");
@@ -58,7 +74,8 @@ function InvoicesContent() {
   const [isSubmittingNew, setIsSubmittingNew] = useState(false);
 
   // Edit Invoice Modal state
-  const [editingInvoice, setEditingInvoice] = useState<InvoiceWithClient | null>(null);
+  const [editingInvoice, setEditingInvoice] =
+    useState<InvoiceWithClient | null>(null);
   const [editCode, setEditCode] = useState("");
   const [editClientId, setEditClientId] = useState("");
   const [editTitle, setEditTitle] = useState("");
@@ -69,12 +86,19 @@ function InvoicesContent() {
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Delete Confirm Modal state
-  const [deletingInvoice, setDeletingInvoice] = useState<InvoiceWithClient | null>(null);
+  const [deletingInvoice, setDeletingInvoice] =
+    useState<InvoiceWithClient | null>(null);
 
   // Toast feedback state
-  const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
-  const showToast = (message: string, type: "success" | "error" = "success") => {
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3600);
   };
@@ -168,7 +192,7 @@ function InvoicesContent() {
 
   const handleToggleSelect = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
@@ -183,7 +207,10 @@ function InvoicesContent() {
       setOpenMenuId(null);
       showToast(`Invoice status updated to ${nextStatus}.`);
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to update status";
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to update status";
       showToast(msg, "error");
     }
   };
@@ -222,7 +249,10 @@ function InvoicesContent() {
       setEditingInvoice(null);
       showToast("Invoice updated successfully!");
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to save invoice";
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to save invoice";
       showToast(msg, "error");
     } finally {
       setIsSubmittingEdit(false);
@@ -239,7 +269,10 @@ function InvoicesContent() {
       setDeletingInvoice(null);
       setOpenMenuId(null);
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to delete invoice";
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to delete invoice";
       showToast(msg, "error");
     }
   };
@@ -275,7 +308,10 @@ function InvoicesContent() {
       setNewStatus("UNPAID");
       showToast(`Invoice ${created.code} created!`);
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to create invoice";
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to create invoice";
       showToast(msg, "error");
     } finally {
       setIsSubmittingNew(false);
@@ -283,7 +319,7 @@ function InvoicesContent() {
   };
 
   return (
-    <div className="p-8 lg:p-10 max-w-7xl mx-auto motion-page">
+    <div className="workspace-page motion-page">
       {/* Toast Notification */}
       <MotionPresence>
         {notification && (
@@ -306,114 +342,66 @@ function InvoicesContent() {
       </MotionPresence>
 
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-4xl md:text-[42px] font-serif font-normal text-neutral-900 tracking-tight leading-none">
-            Invoices
-          </h1>
-          <p className="text-sm text-neutral-500 mt-2 font-normal">
-            Manage, issue, and track your client billing operations.
-          </p>
-        </div>
-
+      <PageHeader
+        title="Invoices"
+        description="Manage, issue, and track your client billing operations."
+      >
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-xl text-neutral-800 text-[13px] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-neutral-50 transition-all cursor-pointer"
-          >
+          <Button variant="primary" type="button" onClick={handleOpenAddModal}>
             <Plus className="w-4 h-4 text-neutral-700" strokeWidth={2.2} />
             <span>New Invoice</span>
-          </button>
+          </Button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Metrics Cards & Filters Row */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 mb-8">
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-4 flex-1">
-          {/* Total Outstanding Card */}
-          <div className="relative overflow-hidden w-full sm:w-[260px] bg-white rounded-2xl border border-neutral-200/80 px-5 py-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div
-              className="absolute -top-6 -right-6 w-32 h-32 rounded-full pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.02) 60%, transparent 75%)",
-              }}
-            />
-            <span className="block text-[11px] font-bold tracking-wider text-neutral-500 uppercase mb-2">
-              Total Outstanding
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl md:text-[28px] font-bold text-neutral-900 tracking-tight leading-none">
-                {formatCents(totalOutstandingCents, primaryCurrency)}
-              </span>
-            </div>
-          </div>
-
-          {/* Overdue Card */}
-          <div className="relative overflow-hidden w-full sm:w-[260px] bg-white rounded-2xl border border-neutral-200/80 px-5 py-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div
-              className="absolute -top-6 -right-6 w-32 h-32 rounded-full pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(circle, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.02) 60%, transparent 75%)",
-              }}
-            />
-            <span className="block text-[11px] font-bold tracking-wider text-neutral-500 uppercase mb-2">
-              Overdue
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl md:text-[28px] font-bold text-[#DC2626] tracking-tight leading-none font-mono">
-                {formatCents(totalOverdueCents, primaryCurrency)}
-              </span>
-            </div>
-          </div>
+      <div className="flex flex-col gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+          <MetricCard
+            label="Total Outstanding"
+            value={formatCents(totalOutstandingCents, primaryCurrency)}
+            footer="awaiting payment"
+          />
+          <MetricCard
+            label="Overdue"
+            value={formatCents(totalOverdueCents, primaryCurrency)}
+            tone="warning"
+            footer="past the due date"
+          />
         </div>
 
         {/* Filters and Active Client Chip */}
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
+        <div className="flex flex-wrap items-center gap-2 self-start">
           {activeClientFilterObj && (
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#f3efff] border border-[#e5dcfc] text-[#7c3aed] text-xs font-semibold rounded-xl">
               <span>Client: {activeClientFilterObj.name}</span>
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 type="button"
                 onClick={() => router.push("/invoices")}
-                className="p-0.5 hover:bg-[#e5dcfc] rounded-full transition-colors cursor-pointer"
+
                 title="Clear filter"
               >
                 <X className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             </div>
           )}
 
-          {/* Tab Filters */}
-          <div className="bg-[#EDEDF0]/70 p-1 rounded-2xl flex items-center gap-1 border border-neutral-200/50">
-            {(["All Invoices", "Drafts", "Overdue", "Paid"] as FilterTab[]).map(
-              (tab) => {
-                const isActive = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-all duration-150 cursor-pointer ${
-                      isActive
-                        ? "bg-white text-neutral-900 font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.08)] border border-neutral-200/60"
-                        : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-200/40"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                );
-              }
-            )}
-          </div>
+          <SegmentedControl
+            value={activeTab}
+            onChange={setActiveTab}
+            label="Invoice status"
+            options={(
+              ["All Invoices", "Drafts", "Overdue", "Paid"] as FilterTab[]
+            ).map((value) => ({ value, label: value }))}
+          />
         </div>
       </div>
 
       {/* Invoices Table Container */}
-      <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.02)] overflow-visible min-h-[360px]">
+      <div className="ui-card overflow-visible">
         <div className="overflow-x-auto overflow-y-visible">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -439,29 +427,31 @@ function InvoicesContent() {
             <tbody className="divide-y divide-neutral-100/80">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center">
-                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto text-center">
-                      <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center text-neutral-400 mb-3">
-                        <Receipt className="w-6 h-6" />
-                      </div>
-                      <h3 className="text-base font-semibold text-neutral-900 tracking-tight">
-                        {allInvoices.length === 0 ? "No invoices yet" : "No invoices found"}
-                      </h3>
-                      <p className="text-sm text-neutral-500 mt-1 font-normal">
-                        {allInvoices.length === 0
+                  <td colSpan={6} className="p-0 text-center">
+                    <EmptyState
+                      title={
+                        allInvoices.length === 0
+                          ? "No invoices yet"
+                          : "No invoices found"
+                      }
+                      description={
+                        allInvoices.length === 0
                           ? "Create your first invoice to track client billings, payments, and cashflow."
-                          : "No invoices matched the selected filter."}
-                      </p>
+                          : "No invoices matched the selected filter."
+                      }
+                      icon={<Receipt />}
+                    >
                       {allInvoices.length === 0 && (
-                        <button
+                        <Button
+                          variant="primary"
                           onClick={handleOpenAddModal}
-                          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
+                          className="mt-4"
                         >
                           <Plus className="w-4 h-4" />
                           <span>New Invoice</span>
-                        </button>
+                        </Button>
                       )}
-                    </div>
+                    </EmptyState>
                   </td>
                 </tr>
               ) : (
@@ -502,13 +492,15 @@ function InvoicesContent() {
                           )}
                         </div>
                         <div className="mt-0.5">
-                          <button
+                          <Button
+                            variant="ghost"
                             type="button"
-                            onClick={() => router.push(`/clients?client=${inv.clientId}`)}
-                            className="text-xs text-neutral-500 hover:text-[#7c3aed] hover:underline font-normal text-left cursor-pointer"
+                            onClick={() =>
+                              router.push(`/clients?client=${inv.clientId}`)
+                            }
                           >
                             {inv.clientName}
-                          </button>
+                          </Button>
                           {inv.title && (
                             <span className="text-[11px] text-neutral-400 block truncate max-w-xs">
                               {inv.title}
@@ -534,8 +526,8 @@ function InvoicesContent() {
                             inv.status === "OVERDUE"
                               ? "font-semibold text-[#DC2626]"
                               : inv.status === "DRAFT"
-                              ? "text-neutral-500 italic font-normal"
-                              : "text-neutral-800 font-medium"
+                                ? "text-neutral-500 italic font-normal"
+                                : "text-neutral-800 font-medium"
                           }`}
                         >
                           {formatDateDisplay(inv.dueDate)}
@@ -549,10 +541,10 @@ function InvoicesContent() {
                             inv.status === "PAID"
                               ? "bg-emerald-100 text-emerald-800"
                               : inv.status === "OVERDUE"
-                              ? "bg-rose-100 text-rose-800 font-bold"
-                              : inv.status === "DRAFT"
-                              ? "bg-neutral-100 text-neutral-600"
-                              : "bg-blue-100 text-blue-800"
+                                ? "bg-rose-100 text-rose-800 font-bold"
+                                : inv.status === "DRAFT"
+                                  ? "bg-neutral-100 text-neutral-600"
+                                  : "bg-blue-100 text-blue-800"
                           }`}
                         >
                           {inv.status}
@@ -561,53 +553,70 @@ function InvoicesContent() {
 
                       {/* Actions Menu */}
                       <td className="py-4.5 pr-6 pl-4 text-right relative">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           type="button"
-                          onClick={() => setOpenMenuId(isMenuOpen ? null : inv.id)}
-                          className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+                          onClick={() =>
+                            setOpenMenuId(isMenuOpen ? null : inv.id)
+                          }
+
                           aria-label="Actions"
                         >
                           <MoreHorizontal className="w-4 h-4" />
-                        </button>
+                        </Button>
 
                         {isMenuOpen && (
                           <div className="absolute right-6 top-10 z-40 bg-white rounded-xl shadow-xl border border-neutral-200 py-1.5 w-44 text-xs font-medium text-neutral-700 text-left">
-                            <button
+                            <Button
+                              variant="menu"
                               onClick={() => handleOpenEdit(inv)}
-                              className="w-full px-3.5 py-2 hover:bg-neutral-50 flex items-center gap-2 cursor-pointer"
+                              className="w-full"
                             >
                               <Pencil className="w-3.5 h-3.5 text-neutral-400" />
                               <span>Edit Invoice</span>
-                            </button>
+                            </Button>
 
                             <div className="my-1 border-t border-neutral-100" />
                             <div className="px-3 py-1 text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
                               Change Status
                             </div>
-                            {(["UNPAID", "PAID", "OVERDUE", "DRAFT"] as InvoiceStatus[]).map((s) => (
+                            {(
+                              [
+                                "UNPAID",
+                                "PAID",
+                                "OVERDUE",
+                                "DRAFT",
+                              ] as InvoiceStatus[]
+                            ).map((s) => (
                               <button
                                 key={s}
                                 onClick={() => handleChangeStatus(inv.id, s)}
                                 className={`w-full px-3.5 py-1.5 hover:bg-neutral-50 flex items-center justify-between cursor-pointer ${
-                                  inv.status === s ? "font-bold text-[#7c3aed]" : ""
+                                  inv.status === s
+                                    ? "font-bold text-[#7c3aed]"
+                                    : ""
                                 }`}
                               >
                                 <span>{s}</span>
-                                {inv.status === s && <CheckCircle2 className="w-3 h-3 text-[#7c3aed]" />}
+                                {inv.status === s && (
+                                  <CheckCircle2 className="w-3 h-3 text-[#7c3aed]" />
+                                )}
                               </button>
                             ))}
 
                             <div className="my-1 border-t border-neutral-100" />
-                            <button
+                            <Button
+                              variant="danger"
                               onClick={() => {
                                 setDeletingInvoice(inv);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-3.5 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                              className="w-full"
                             >
                               <Trash2 className="w-3.5 h-3.5 text-red-400" />
                               <span>Delete Invoice</span>
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </td>
@@ -628,6 +637,7 @@ function InvoicesContent() {
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
             <MotionSurface
+              onDismiss={() => setShowAddInvoiceModal(false)}
               kind="panel"
               className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
             >
@@ -645,12 +655,14 @@ function InvoicesContent() {
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowAddInvoiceModal(false)}
-                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
               {clients.length === 0 ? (
@@ -662,13 +674,14 @@ function InvoicesContent() {
                     No Clients Found
                   </h4>
                   <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                    Invoices must be associated with an existing client. Please add a client before creating an invoice.
+                    Invoices must be associated with an existing client. Please
+                    add a client before creating an invoice.
                   </p>
                   <div className="pt-2">
                     <Link
                       href="/clients"
                       onClick={() => setShowAddInvoiceModal(false)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors"
+                      className="ui-button ui-button--primary"
                     >
                       <span>Go to Clients</span>
                       <span>→</span>
@@ -676,7 +689,10 @@ function InvoicesContent() {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleAddInvoiceSubmit} className="p-6 space-y-4 text-xs font-medium text-neutral-700">
+                <form
+                  onSubmit={handleAddInvoiceSubmit}
+                  className="p-6 space-y-4 text-xs font-medium text-neutral-700"
+                >
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
@@ -688,7 +704,7 @@ function InvoicesContent() {
                         value={newCode}
                         onChange={(e) => setNewCode(e.target.value)}
                         placeholder="INV-2026-001"
-                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 font-mono"
+                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 font-mono"
                       />
                     </div>
 
@@ -705,7 +721,7 @@ function InvoicesContent() {
                           const chosen = clients.find((c) => c.id === cid);
                           if (chosen) setNewCurrency(chosen.currency);
                         }}
-                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
+                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
                       >
                         <option value="">Select a client...</option>
                         {clients.map((c) => (
@@ -726,7 +742,7 @@ function InvoicesContent() {
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
                       placeholder="e.g. Phase 1 Architecture & Implementation"
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
 
@@ -743,7 +759,7 @@ function InvoicesContent() {
                         value={newAmount}
                         onChange={(e) => setNewAmount(e.target.value)}
                         placeholder="12500.00"
-                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                       />
                     </div>
 
@@ -753,8 +769,10 @@ function InvoicesContent() {
                       </label>
                       <select
                         value={newCurrency}
-                        onChange={(e) => setNewCurrency(e.target.value as Currency)}
-                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
+                        onChange={(e) =>
+                          setNewCurrency(e.target.value as Currency)
+                        }
+                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
                       >
                         <option value="LKR">LKR (Rs.)</option>
                         <option value="USD">USD ($)</option>
@@ -774,7 +792,7 @@ function InvoicesContent() {
                         type="date"
                         value={newDueDate}
                         onChange={(e) => setNewDueDate(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
+                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
                       />
                     </div>
 
@@ -784,8 +802,10 @@ function InvoicesContent() {
                       </label>
                       <select
                         value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value as InvoiceStatus)}
-                        className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
+                        onChange={(e) =>
+                          setNewStatus(e.target.value as InvoiceStatus)
+                        }
+                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
                       >
                         <option value="UNPAID">UNPAID (Pending)</option>
                         <option value="PAID">PAID</option>
@@ -796,20 +816,20 @@ function InvoicesContent() {
                   </div>
 
                   <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                    <button
+                    <Button
+                      variant="ghost"
                       type="button"
                       onClick={() => setShowAddInvoiceModal(false)}
-                      className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="primary"
                       type="submit"
                       disabled={isSubmittingNew}
-                      className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
                     >
                       {isSubmittingNew ? "Saving..." : "Create Invoice"}
-                    </button>
+                    </Button>
                   </div>
                 </form>
               )}
@@ -826,6 +846,7 @@ function InvoicesContent() {
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
             <MotionSurface
+              onDismiss={() => setEditingInvoice(null)}
               kind="panel"
               className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
             >
@@ -843,15 +864,20 @@ function InvoicesContent() {
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setEditingInvoice(null)}
-                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
-              <form onSubmit={handleEditSubmit} className="p-6 space-y-4 text-xs font-medium text-neutral-700">
+              <form
+                onSubmit={handleEditSubmit}
+                className="p-6 space-y-4 text-xs font-medium text-neutral-700"
+              >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
@@ -862,7 +888,7 @@ function InvoicesContent() {
                       required
                       value={editCode}
                       onChange={(e) => setEditCode(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 font-mono"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 font-mono"
                     />
                   </div>
 
@@ -874,7 +900,7 @@ function InvoicesContent() {
                       required
                       value={editClientId}
                       onChange={(e) => setEditClientId(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
                     >
                       {clients.map((c) => (
                         <option key={c.id} value={c.id}>
@@ -893,7 +919,7 @@ function InvoicesContent() {
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                   />
                 </div>
 
@@ -909,7 +935,7 @@ function InvoicesContent() {
                       required
                       value={editAmount}
                       onChange={(e) => setEditAmount(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
 
@@ -919,8 +945,10 @@ function InvoicesContent() {
                     </label>
                     <select
                       value={editCurrency}
-                      onChange={(e) => setEditCurrency(e.target.value as Currency)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
+                      onChange={(e) =>
+                        setEditCurrency(e.target.value as Currency)
+                      }
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
                     >
                       <option value="LKR">LKR (Rs.)</option>
                       <option value="USD">USD ($)</option>
@@ -940,7 +968,7 @@ function InvoicesContent() {
                       type="date"
                       value={editDueDate}
                       onChange={(e) => setEditDueDate(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
                     />
                   </div>
 
@@ -950,8 +978,10 @@ function InvoicesContent() {
                     </label>
                     <select
                       value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value as InvoiceStatus)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
+                      onChange={(e) =>
+                        setEditStatus(e.target.value as InvoiceStatus)
+                      }
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
                     >
                       <option value="UNPAID">UNPAID</option>
                       <option value="OVERDUE">OVERDUE</option>
@@ -962,20 +992,20 @@ function InvoicesContent() {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => setEditingInvoice(null)}
-                    className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="primary"
                     type="submit"
                     disabled={isSubmittingEdit}
-                    className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
                     {isSubmittingEdit ? "Updating..." : "Save Changes"}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </MotionSurface>
@@ -991,6 +1021,7 @@ function InvoicesContent() {
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
             <MotionSurface
+              onDismiss={() => setDeletingInvoice(null)}
               kind="panel"
               className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-neutral-200 p-6 text-center"
             >
@@ -1001,23 +1032,23 @@ function InvoicesContent() {
                 Delete Invoice?
               </h3>
               <p className="text-xs text-neutral-500 mt-1">
-                Are you sure you want to delete invoice <strong className="text-neutral-900">{deletingInvoice.code}</strong> for {deletingInvoice.clientName}? This action cannot be undone.
+                Are you sure you want to delete invoice{" "}
+                <strong className="text-neutral-900">
+                  {deletingInvoice.code}
+                </strong>{" "}
+                for {deletingInvoice.clientName}? This action cannot be undone.
               </p>
               <div className="flex justify-center gap-3 mt-6">
-                <button
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => setDeletingInvoice(null)}
-                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDelete}
-                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
+                </Button>
+                <Button variant="danger" type="button" onClick={confirmDelete}>
                   Delete
-                </button>
+                </Button>
               </div>
             </MotionSurface>
           </MotionSurface>

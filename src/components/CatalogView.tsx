@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  Button,
+  PageHeader,
+  MetricCard,
+  EmptyState,
+} from "@/components/ui/Workspace";
+
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 
 import React, { useState } from "react";
@@ -7,7 +14,6 @@ import {
   Upload,
   Plus,
   Search,
-  TrendingUp,
   Code2,
   Pencil,
   Cloud,
@@ -70,8 +76,10 @@ type Category = (typeof categoryList)[number];
 
 export default function CatalogView() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<Category>("All Items");
-  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>(initialCatalogItems);
+  const [selectedCategory, setSelectedCategory] =
+    useState<Category>("All Items");
+  const [catalogItems, setCatalogItems] =
+    useState<CatalogItem[]>(initialCatalogItems);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Modals state
@@ -82,7 +90,9 @@ export default function CatalogView() {
 
   // New Item Form state
   const [newTitle, setNewTitle] = useState("");
-  const [newCategory, setNewCategory] = useState<"Development" | "Design" | "Consulting" | "Licensing">("Development");
+  const [newCategory, setNewCategory] = useState<
+    "Development" | "Design" | "Consulting" | "Licensing"
+  >("Development");
   const [newSku, setNewSku] = useState("DEV-002");
   const [newPrice, setNewPrice] = useState("");
   const [newCurrency, setNewCurrency] = useState("LKR");
@@ -91,7 +101,9 @@ export default function CatalogView() {
 
   // Edit Item Form state
   const [editTitle, setEditTitle] = useState("");
-  const [editCategory, setEditCategory] = useState<"Development" | "Design" | "Consulting" | "Licensing">("Development");
+  const [editCategory, setEditCategory] = useState<
+    "Development" | "Design" | "Consulting" | "Licensing"
+  >("Development");
   const [editSku, setEditSku] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editCurrency, setEditCurrency] = useState("LKR");
@@ -114,7 +126,10 @@ export default function CatalogView() {
 
     const formattedPrice = formatPriceWithCurrency(newPrice, newCurrency);
 
-    const iconTypeMap: Record<string, "code" | "design" | "cloud" | "consulting"> = {
+    const iconTypeMap: Record<
+      string,
+      "code" | "design" | "cloud" | "consulting"
+    > = {
       Development: "code",
       Design: "design",
       Licensing: "cloud",
@@ -126,7 +141,8 @@ export default function CatalogView() {
       title: newTitle.trim() || "New Catalog Item",
       category: newCategory,
       sku: newSku.trim() || `SKU-${Date.now().toString().slice(-4)}`,
-      description: newDescription.trim() || "Standard product/service unit description.",
+      description:
+        newDescription.trim() || "Standard product/service unit description.",
       price: formattedPrice,
       currency: newCurrency,
       unit: newUnit,
@@ -162,7 +178,10 @@ export default function CatalogView() {
 
     const formattedPrice = formatPriceWithCurrency(editPrice, editCurrency);
 
-    const iconTypeMap: Record<string, "code" | "design" | "cloud" | "consulting"> = {
+    const iconTypeMap: Record<
+      string,
+      "code" | "design" | "cloud" | "consulting"
+    > = {
       Development: "code",
       Design: "design",
       Licensing: "cloud",
@@ -185,7 +204,7 @@ export default function CatalogView() {
           };
         }
         return item;
-      })
+      }),
     );
 
     setEditingItem(null);
@@ -193,7 +212,9 @@ export default function CatalogView() {
 
   const handleConfirmDelete = () => {
     if (deletingItem) {
-      setCatalogItems((prev) => prev.filter((item) => item.id !== deletingItem.id));
+      setCatalogItems((prev) =>
+        prev.filter((item) => item.id !== deletingItem.id),
+      );
       setDeletingItem(null);
       setOpenMenuId(null);
     }
@@ -204,56 +225,54 @@ export default function CatalogView() {
       case "code":
         return <Code2 className="w-5 h-5 text-neutral-700" strokeWidth={1.8} />;
       case "design":
-        return <Pencil className="w-4.5 h-4.5 text-neutral-700" strokeWidth={1.8} />;
+        return (
+          <Pencil className="w-4.5 h-4.5 text-neutral-700" strokeWidth={1.8} />
+        );
       case "cloud":
         return <Cloud className="w-5 h-5 text-neutral-700" strokeWidth={1.8} />;
       case "consulting":
       default:
-        return <Briefcase className="w-5 h-5 text-neutral-700" strokeWidth={1.8} />;
+        return (
+          <Briefcase className="w-5 h-5 text-neutral-700" strokeWidth={1.8} />
+        );
     }
   };
 
   return (
-    <div className="p-8 lg:p-10 max-w-7xl mx-auto motion-page font-sans">
+    <div className="workspace-page motion-page">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-4xl md:text-[42px] font-serif font-normal text-neutral-900 tracking-tight leading-none">
-            Catalog
-          </h1>
-          <p className="text-sm text-neutral-500 mt-2 font-normal">
-            Manage standardized products, services, and pricing units.
-          </p>
-        </div>
-
+      <PageHeader
+        title="Catalog"
+        description="Manage standardized products, services, and pricing units."
+      >
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            variant="secondary"
             type="button"
             onClick={() => setShowBulkImportModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-xl text-neutral-800 text-[13px] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-neutral-50 transition-all cursor-pointer"
           >
             <Upload className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
             <span>Bulk Import</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="primary"
             type="button"
             onClick={() => setShowNewItemModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl text-[13px] font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 text-white" strokeWidth={2.4} />
             <span>New Item</span>
-          </button>
+          </Button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Main Split Layout: Left Controls + Right Catalog Box */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column (Search, Categories, Total Items Card) */}
         <div className="lg:col-span-4 flex flex-col gap-6">
           {/* Search & Categories Box */}
-          <div className="bg-white rounded-2xl border border-neutral-200/80 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+          <div className="ui-card p-5">
             {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -262,7 +281,7 @@ export default function CatalogView() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search catalog..."
-                className="w-full pl-9 pr-3.5 py-2.5 bg-[#F8F9FA] rounded-xl border border-neutral-200/70 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-all"
+                className="ui-field w-full pl-9 pr-3.5 border border-neutral-200/70 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-all"
               />
             </div>
 
@@ -275,18 +294,16 @@ export default function CatalogView() {
                 {categoryList.map((category) => {
                   const isActive = selectedCategory === category;
                   return (
-                    <button
+                    <Button
+                      variant={isActive ? "primary" : "secondary"}
+                      size="small"
+                      aria-pressed={isActive}
                       key={category}
                       type="button"
                       onClick={() => setSelectedCategory(category)}
-                      className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-                        isActive
-                          ? "bg-neutral-950 text-white font-semibold shadow-xs"
-                          : "bg-white border border-neutral-200/80 text-neutral-700 font-medium hover:bg-neutral-50 hover:text-neutral-900"
-                      }`}
                     >
                       {category}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -294,30 +311,15 @@ export default function CatalogView() {
           </div>
 
           {/* Total Items Metric Card */}
-          <div className="relative overflow-hidden bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div
-              className="absolute -top-8 -right-8 w-36 h-36 rounded-full pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(circle, rgba(124, 58, 237, 0.12) 0%, rgba(124, 58, 237, 0.02) 60%, transparent 75%)",
-              }}
-            />
-            <span className="block text-[11px] font-bold tracking-wider text-neutral-400 uppercase mb-2">
-              Total Items
-            </span>
-            <div className="text-4xl md:text-[42px] font-bold text-neutral-900 tracking-tight leading-none">
-              {catalogItems.length}
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-normal mt-4">
-              <TrendingUp className="w-4 h-4 text-neutral-400" strokeWidth={2.2} />
-              <span className="font-bold text-neutral-600">0</span>
-              <span className="text-neutral-500">this month</span>
-            </div>
-          </div>
+          <MetricCard
+            label="Total Items"
+            value={catalogItems.length}
+            footer="services and products"
+          />
         </div>
 
         {/* Right Column (Catalog List Container) */}
-        <div className="lg:col-span-8 bg-[#EAE8E3]/85 rounded-3xl border border-neutral-300/60 p-6 md:p-8 shadow-[0_1px_4px_rgba(0,0,0,0.02)] flex flex-col justify-between min-h-[540px]">
+        <div className="ui-card lg:col-span-8 p-6 md:p-8 flex flex-col justify-between min-h-[360px]">
           <div>
             {/* Header Labels */}
             <div className="flex items-center justify-between pb-3.5 border-b border-neutral-300/60 text-[11px] font-bold tracking-wider text-neutral-500 uppercase">
@@ -328,11 +330,28 @@ export default function CatalogView() {
             {/* Catalog Items Rows */}
             <div className="divide-y divide-neutral-300/60">
               {filteredItems.length === 0 ? (
-                <div className="py-16 text-center text-sm text-neutral-500">
-                  {catalogItems.length === 0
-                    ? "Catalog is empty. Add service offerings and rates."
-                    : "No catalog items found matching your criteria."}
-                </div>
+                <EmptyState
+                  title={
+                    catalogItems.length === 0
+                      ? "No catalog items yet"
+                      : "No matching items"
+                  }
+                  description={
+                    catalogItems.length === 0
+                      ? "Add your services and products to keep pricing consistent across invoices."
+                      : "Try another category or search term."
+                  }
+                >
+                  {catalogItems.length === 0 && (
+                    <Button
+                      variant="primary"
+                      onClick={() => setShowNewItemModal(true)}
+                    >
+                      <Plus />
+                      New Item
+                    </Button>
+                  )}
+                </EmptyState>
               ) : (
                 filteredItems.map((item) => (
                   <div key={item.id} className="py-5 flex items-start gap-4">
@@ -379,7 +398,9 @@ export default function CatalogView() {
                         <button
                           type="button"
                           onClick={() =>
-                            setOpenMenuId(openMenuId === item.id ? null : item.id)
+                            setOpenMenuId(
+                              openMenuId === item.id ? null : item.id,
+                            )
                           }
                           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                             openMenuId === item.id
@@ -402,29 +423,34 @@ export default function CatalogView() {
                                 onClick={() => setOpenMenuId(null)}
                               />
 
-                              <MotionSurface kind="menu" className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-2xl shadow-xl border border-neutral-200/90 py-1.5 z-40 text-left text-xs font-medium">
-                                <button
+                              <MotionSurface
+                                kind="menu"
+                                className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-2xl shadow-xl border border-neutral-200/90 py-1.5 z-40 text-left text-xs font-medium"
+                              >
+                                <Button
+                                  variant="ghost"
                                   type="button"
                                   onClick={() => handleOpenEdit(item)}
-                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 transition-colors cursor-pointer"
+                                  className="w-full"
                                 >
                                   <Pencil className="w-3.5 h-3.5 text-neutral-500" />
                                   <span>Edit Item</span>
-                                </button>
+                                </Button>
 
                                 <div className="my-1 border-t border-neutral-100" />
 
-                                <button
+                                <Button
+                                  variant="danger"
                                   type="button"
                                   onClick={() => {
                                     setDeletingItem(item);
                                     setOpenMenuId(null);
                                   }}
-                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 hover:bg-red-50/80 transition-colors cursor-pointer"
+                                  className="w-full"
                                 >
                                   <Trash2 className="w-3.5 h-3.5 text-red-500" />
                                   <span>Delete Item</span>
-                                </button>
+                                </Button>
                               </MotionSurface>
                             </MotionSurface>
                           )}
@@ -440,25 +466,31 @@ export default function CatalogView() {
           {/* Footer & Pagination */}
           <div className="pt-6 mt-4 border-t border-neutral-300/60 flex items-center justify-between text-xs text-neutral-500">
             <div>
-              Showing 1-{filteredItems.length} of {139 + catalogItems.length} items
+              Showing {filteredItems.length} of {catalogItems.length} items
             </div>
 
             <div className="flex items-center gap-1.5">
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 type="button"
-                className="w-7 h-7 rounded-lg bg-neutral-200/80 hover:bg-neutral-300 text-neutral-700 flex items-center justify-center transition-colors cursor-pointer"
+
+                disabled
                 aria-label="Previous page"
               >
                 <ChevronLeft className="w-4 h-4" />
-              </button>
+              </Button>
 
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 type="button"
-                className="w-7 h-7 rounded-lg bg-neutral-200/80 hover:bg-neutral-300 text-neutral-700 flex items-center justify-center transition-colors cursor-pointer"
+
+                disabled
                 aria-label="Next page"
               >
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -467,8 +499,14 @@ export default function CatalogView() {
       {/* Edit Item Modal */}
       <MotionPresence>
         {editingItem && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <MotionSurface kind="panel" className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+          >
+            <MotionSurface onDismiss={() => setEditingItem(null)}
+              kind="panel"
+              className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
+            >
               <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
                 <div>
                   <h3 className="text-lg font-semibold text-neutral-900">
@@ -478,13 +516,15 @@ export default function CatalogView() {
                     Update item specifications, price, currency, or description.
                   </p>
                 </div>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   type="button"
                   onClick={() => setEditingItem(null)}
-                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
               <form onSubmit={handleSaveEdit} className="mt-5 space-y-4">
@@ -497,7 +537,7 @@ export default function CatalogView() {
                     required
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
 
@@ -510,10 +550,14 @@ export default function CatalogView() {
                       value={editCategory}
                       onChange={(e) =>
                         setEditCategory(
-                          e.target.value as "Development" | "Design" | "Consulting" | "Licensing"
+                          e.target.value as
+                            | "Development"
+                            | "Design"
+                            | "Consulting"
+                            | "Licensing",
                         )
                       }
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
                     >
                       <option value="Development">Development</option>
                       <option value="Design">Design</option>
@@ -524,14 +568,17 @@ export default function CatalogView() {
 
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      SKU Code <span className="normal-case font-normal text-neutral-400">(Stock Keeping Unit)</span>
+                      SKU Code{" "}
+                      <span className="normal-case font-normal text-neutral-400">
+                        (Stock Keeping Unit)
+                      </span>
                     </label>
                     <input
                       type="text"
                       required
                       value={editSku}
                       onChange={(e) => setEditSku(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                     />
                   </div>
                 </div>
@@ -547,7 +594,7 @@ export default function CatalogView() {
                       required
                       value={editPrice}
                       onChange={(e) => setEditPrice(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                     />
                   </div>
 
@@ -558,7 +605,7 @@ export default function CatalogView() {
                     <select
                       value={editCurrency}
                       onChange={(e) => setEditCurrency(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
                     >
                       <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
                       <option value="USD">USD ($ US Dollar)</option>
@@ -575,7 +622,7 @@ export default function CatalogView() {
                     <select
                       value={editUnit}
                       onChange={(e) => setNewUnit(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
                     >
                       <option value="/ Hourly">/ Hourly</option>
                       <option value="/ Daily">/ Daily</option>
@@ -595,24 +642,21 @@ export default function CatalogView() {
                     required
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    className="ui-field ui-textarea w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => setEditingItem(null)}
-                    className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-                  >
+                  </Button>
+                  <Button variant="primary" type="submit">
                     Save Changes
-                  </button>
+                  </Button>
                 </div>
               </form>
             </MotionSurface>
@@ -623,8 +667,14 @@ export default function CatalogView() {
       {/* Delete Item Confirmation Modal */}
       <MotionPresence>
         {deletingItem && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <MotionSurface kind="panel" className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+          >
+            <MotionSurface onDismiss={() => setDeletingItem(null)}
+              kind="panel"
+              className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
+            >
               <div className="flex items-center gap-3 text-red-600 mb-3">
                 <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                   <Trash2 className="w-5 h-5 text-red-600" />
@@ -634,30 +684,39 @@ export default function CatalogView() {
                     Delete Catalog Item?
                   </h3>
                   <p className="text-xs text-neutral-500">
-                    This action will permanently remove this item from your catalog.
+                    This action will permanently remove this item from your
+                    catalog.
                   </p>
                 </div>
               </div>
 
               <p className="text-sm text-neutral-600 mt-2">
-                Are you sure you want to delete <strong className="text-neutral-900">{deletingItem.title}</strong> ({deletingItem.sku}) valued at <strong className="text-neutral-900">{deletingItem.price} {deletingItem.unit}</strong>?
+                Are you sure you want to delete{" "}
+                <strong className="text-neutral-900">
+                  {deletingItem.title}
+                </strong>{" "}
+                ({deletingItem.sku}) valued at{" "}
+                <strong className="text-neutral-900">
+                  {deletingItem.price} {deletingItem.unit}
+                </strong>
+                ?
               </p>
 
               <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
-                <button
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => setDeletingItem(null)}
-                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
                   type="button"
                   onClick={handleConfirmDelete}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                   Delete Item
-                </button>
+                </Button>
               </div>
             </MotionSurface>
           </MotionSurface>
@@ -667,8 +726,14 @@ export default function CatalogView() {
       {/* New Item Modal */}
       <MotionPresence>
         {showNewItemModal && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <MotionSurface kind="panel" className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+          >
+            <MotionSurface onDismiss={() => setShowNewItemModal(false)}
+              kind="panel"
+              className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
+            >
               <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
                 <div>
                   <h3 className="text-lg font-semibold text-neutral-900">
@@ -678,13 +743,15 @@ export default function CatalogView() {
                     Define a standardized product, service, or pricing unit.
                   </p>
                 </div>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   type="button"
                   onClick={() => setShowNewItemModal(false)}
-                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
               <form onSubmit={handleCreateItem} className="mt-5 space-y-4">
@@ -698,7 +765,7 @@ export default function CatalogView() {
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder="e.g. Senior Full-Stack Development"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
 
@@ -711,10 +778,14 @@ export default function CatalogView() {
                       value={newCategory}
                       onChange={(e) =>
                         setNewCategory(
-                          e.target.value as "Development" | "Design" | "Consulting" | "Licensing"
+                          e.target.value as
+                            | "Development"
+                            | "Design"
+                            | "Consulting"
+                            | "Licensing",
                         )
                       }
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
                     >
                       <option value="Development">Development</option>
                       <option value="Design">Design</option>
@@ -725,7 +796,10 @@ export default function CatalogView() {
 
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      SKU Code <span className="normal-case font-normal text-neutral-400">(Stock Keeping Unit)</span>
+                      SKU Code{" "}
+                      <span className="normal-case font-normal text-neutral-400">
+                        (Stock Keeping Unit)
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -733,7 +807,7 @@ export default function CatalogView() {
                       value={newSku}
                       onChange={(e) => setNewSku(e.target.value)}
                       placeholder="e.g. DEV-001"
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                     />
                   </div>
                 </div>
@@ -750,7 +824,7 @@ export default function CatalogView() {
                       value={newPrice}
                       onChange={(e) => setNewPrice(e.target.value)}
                       placeholder="45000.00"
-                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                     />
                   </div>
 
@@ -761,7 +835,7 @@ export default function CatalogView() {
                     <select
                       value={newCurrency}
                       onChange={(e) => setNewCurrency(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
                     >
                       <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
                       <option value="USD">USD ($ US Dollar)</option>
@@ -778,7 +852,7 @@ export default function CatalogView() {
                     <select
                       value={newUnit}
                       onChange={(e) => setNewUnit(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
                     >
                       <option value="/ Hourly">/ Hourly</option>
                       <option value="/ Daily">/ Daily</option>
@@ -799,24 +873,21 @@ export default function CatalogView() {
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                     placeholder="Describe the scope, deliverables, or specifications of this item..."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    className="ui-field ui-textarea w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => setShowNewItemModal(false)}
-                    className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-                  >
+                  </Button>
+                  <Button variant="primary" type="submit">
                     Create Item
-                  </button>
+                  </Button>
                 </div>
               </form>
             </MotionSurface>
@@ -827,19 +898,27 @@ export default function CatalogView() {
       {/* Bulk Import Modal */}
       <MotionPresence>
         {showBulkImportModal && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <MotionSurface kind="panel" className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans">
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+          >
+            <MotionSurface onDismiss={() => setShowBulkImportModal(false)}
+              kind="panel"
+              className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
+            >
               <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
                 <h3 className="text-lg font-semibold text-neutral-900">
                   Bulk Import Items
                 </h3>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   type="button"
                   onClick={() => setShowBulkImportModal(false)}
-                  className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
               <div className="mt-4 p-8 border-2 border-dashed border-neutral-200 rounded-2xl text-center hover:border-purple-400 transition-colors cursor-pointer">
@@ -853,20 +932,20 @@ export default function CatalogView() {
               </div>
 
               <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
-                <button
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => setShowBulkImportModal(false)}
-                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
                   type="button"
                   onClick={() => setShowBulkImportModal(false)}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                   Import
-                </button>
+                </Button>
               </div>
             </MotionSurface>
           </MotionSurface>
