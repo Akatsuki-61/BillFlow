@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  Button,
+  PageHeader,
+  SegmentedControl,
+  MetricCard,
+  EmptyState,
+} from "@/components/ui/Workspace";
+
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 
 import React, { useState, useMemo } from "react";
@@ -11,8 +19,6 @@ import {
   List,
   GitFork,
   Calendar,
-  CheckCircle2,
-  Clock,
   ChevronDown,
   X,
   ExternalLink,
@@ -28,20 +34,65 @@ import {
 
 // Team member profiles for assignees
 const teamMembers = [
-  { name: "Nipun Yatawara", avatarLetter: "N", bgColor: "bg-purple-100", textColor: "text-purple-700" },
-  { name: "Lahiru Kavinda", avatarLetter: "L", bgColor: "bg-blue-100", textColor: "text-blue-700" },
-  { name: "Binuka Madusanka", avatarLetter: "B", bgColor: "bg-emerald-100", textColor: "text-emerald-700" },
-  { name: "Sandika Madushan", avatarLetter: "S", bgColor: "bg-amber-100", textColor: "text-amber-700" },
+  {
+    name: "Nipun Yatawara",
+    avatarLetter: "N",
+    bgColor: "bg-purple-100",
+    textColor: "text-purple-700",
+  },
+  {
+    name: "Lahiru Kavinda",
+    avatarLetter: "L",
+    bgColor: "bg-blue-100",
+    textColor: "text-blue-700",
+  },
+  {
+    name: "Binuka Madusanka",
+    avatarLetter: "B",
+    bgColor: "bg-emerald-100",
+    textColor: "text-emerald-700",
+  },
+  {
+    name: "Sandika Madushan",
+    avatarLetter: "S",
+    bgColor: "bg-amber-100",
+    textColor: "text-amber-700",
+  },
 ];
 
 // Initial dataset starts blank
 const initialTasks: TaskItem[] = [];
 
-const columnDefinitions: { id: TaskStatus; title: string; color: string; badgeBg: string }[] = [
-  { id: "todo", title: "To Do", color: "border-neutral-300", badgeBg: "bg-neutral-100 text-neutral-700" },
-  { id: "in-progress", title: "In Progress", color: "border-blue-400", badgeBg: "bg-blue-50 text-blue-700 border border-blue-200/60" },
-  { id: "review", title: "Under Review", color: "border-amber-400", badgeBg: "bg-amber-50 text-amber-700 border border-amber-200/60" },
-  { id: "done", title: "Done", color: "border-emerald-400", badgeBg: "bg-emerald-50 text-emerald-700 border border-emerald-200/60" },
+const columnDefinitions: {
+  id: TaskStatus;
+  title: string;
+  color: string;
+  badgeBg: string;
+}[] = [
+  {
+    id: "todo",
+    title: "To Do",
+    color: "border-neutral-300",
+    badgeBg: "bg-neutral-100 text-neutral-700",
+  },
+  {
+    id: "in-progress",
+    title: "In Progress",
+    color: "border-blue-400",
+    badgeBg: "bg-blue-50 text-blue-700 border border-blue-200/60",
+  },
+  {
+    id: "review",
+    title: "Under Review",
+    color: "border-amber-400",
+    badgeBg: "bg-amber-50 text-amber-700 border border-amber-200/60",
+  },
+  {
+    id: "done",
+    title: "Done",
+    color: "border-emerald-400",
+    badgeBg: "bg-emerald-50 text-emerald-700 border border-emerald-200/60",
+  },
 ];
 
 export default function TasksPage() {
@@ -59,7 +110,8 @@ export default function TasksPage() {
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<TaskItem | null>(null);
+  const [selectedTaskForDetail, setSelectedTaskForDetail] =
+    useState<TaskItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Form State for New Task
@@ -72,7 +124,8 @@ export default function TasksPage() {
   const [newDueDate, setNewDueDate] = useState("");
   const [newClientName, setNewClientName] = useState("Nexus Tech");
   const [newIsOutsourced, setNewIsOutsourced] = useState(false);
-  const [newOutsourcedVendor, setNewOutsourcedVendor] = useState("DevOps Nexus");
+  const [newOutsourcedVendor, setNewOutsourcedVendor] =
+    useState("DevOps Nexus");
   const [newOutsourceBudget, setNewOutsourceBudget] = useState("1500");
 
   const showToast = (message: string) => {
@@ -89,8 +142,10 @@ export default function TasksPage() {
         searchQuery === "" ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.clientName && t.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (t.outsourcedVendor && t.outsourcedVendor.toLowerCase().includes(searchQuery.toLowerCase()));
+        (t.clientName &&
+          t.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (t.outsourcedVendor &&
+          t.outsourcedVendor.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchesPriority =
         selectedPriority === "all" || t.priority === selectedPriority;
@@ -101,9 +156,17 @@ export default function TasksPage() {
       const matchesAssignee =
         selectedAssignee === "all" || t.assignee.name === selectedAssignee;
 
-      return matchesSearch && matchesPriority && matchesCategory && matchesAssignee;
+      return (
+        matchesSearch && matchesPriority && matchesCategory && matchesAssignee
+      );
     });
-  }, [tasks, searchQuery, selectedPriority, selectedCategory, selectedAssignee]);
+  }, [
+    tasks,
+    searchQuery,
+    selectedPriority,
+    selectedCategory,
+    selectedAssignee,
+  ]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -111,7 +174,8 @@ export default function TasksPage() {
     const inProgress = tasks.filter((t) => t.status === "in-progress").length;
     const outsourced = tasks.filter((t) => t.isOutsourced).length;
     const completed = tasks.filter((t) => t.status === "done").length;
-    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const completionRate =
+      total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return { total, inProgress, outsourced, completed, completionRate };
   }, [tasks]);
@@ -142,11 +206,13 @@ export default function TasksPage() {
     if (!taskId) return;
 
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: targetStatus } : t))
+      prev.map((t) => (t.id === taskId ? { ...t, status: targetStatus } : t)),
     );
 
     const task = tasks.find((t) => t.id === taskId);
-    showToast(`Moved "${task?.title.slice(0, 28)}..." to ${targetStatus.replace("-", " ")}`);
+    showToast(
+      `Moved "${task?.title.slice(0, 28)}..." to ${targetStatus.replace("-", " ")}`,
+    );
     setDraggedTaskId(null);
   };
 
@@ -156,8 +222,8 @@ export default function TasksPage() {
     // Passes task context in query parameters for the Outsourcing page to prepopulate voucher modal
     router.push(
       `/outsourcing?action=create-voucher&taskId=${task.id}&taskTitle=${encodeURIComponent(
-        task.title
-      )}&vendor=${encodeURIComponent(task.outsourcedVendor || "DevOps Nexus")}&budget=${task.outsourceBudget || 1500}`
+        task.title,
+      )}&vendor=${encodeURIComponent(task.outsourcedVendor || "DevOps Nexus")}&budget=${task.outsourceBudget || 1500}`,
     );
   };
 
@@ -181,10 +247,20 @@ export default function TasksPage() {
       clientName: newClientName,
       isOutsourced: newIsOutsourced,
       outsourcedVendor: newIsOutsourced ? newOutsourcedVendor : undefined,
-      outsourceBudget: newIsOutsourced ? parseFloat(newOutsourceBudget) || 1000 : undefined,
+      outsourceBudget: newIsOutsourced
+        ? parseFloat(newOutsourceBudget) || 1000
+        : undefined,
       subtasks: [
-        { id: `st-${Date.now()}-1`, title: "Initial scope alignment", completed: false },
-        { id: `st-${Date.now()}-2`, title: "Review deliverable checkpoint", completed: false },
+        {
+          id: `st-${Date.now()}-1`,
+          title: "Initial scope alignment",
+          completed: false,
+        },
+        {
+          id: `st-${Date.now()}-2`,
+          title: "Review deliverable checkpoint",
+          completed: false,
+        },
       ],
       createdAt: new Date().toISOString().split("T")[0],
     };
@@ -205,7 +281,7 @@ export default function TasksPage() {
       prev.map((t) => {
         if (t.id === taskId) {
           const updatedSubtasks = t.subtasks.map((st) =>
-            st.id === subtaskId ? { ...st, completed: !st.completed } : st
+            st.id === subtaskId ? { ...st, completed: !st.completed } : st,
           );
           const updated = { ...t, subtasks: updatedSubtasks };
           if (selectedTaskForDetail?.id === taskId) {
@@ -214,7 +290,7 @@ export default function TasksPage() {
           return updated;
         }
         return t;
-      })
+      }),
     );
   };
 
@@ -228,137 +304,103 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 motion-page select-none">
+    <div className="workspace-page motion-page">
       {/* Toast Alert */}
       <MotionPresence>
         {toastMessage && (
-          <MotionSurface kind="toast" className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-neutral-800 transition-all">
+          <MotionSurface
+            kind="toast"
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-neutral-800 transition-all"
+          >
             <div className="w-2 h-2 rounded-full bg-[#7c3aed] animate-ping" />
             <span>{toastMessage}</span>
-            <button
+            <Button
+              aria-label="Close"
+              variant="ghost"
+              size="icon"
               onClick={() => setToastMessage(null)}
-              className="text-neutral-400 hover:text-white ml-2 cursor-pointer"
+              className="ml-2"
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           </MotionSurface>
         )}
       </MotionPresence>
 
       {/* Header Section matching Clients & Expenses page alignment */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-4xl md:text-[42px] font-serif font-normal text-neutral-900 tracking-tight leading-none">
-            To-Do & Deliverables
-          </h1>
-          <p className="text-sm text-neutral-500 mt-2 font-normal">
-            Manage your sprint deliverables, task execution, and vendor outsourcing.
-          </p>
-        </div>
-
+      <PageHeader
+        title="Tasks"
+        description="Manage your sprint deliverables, task execution, and vendor outsourcing."
+      >
         {/* View Switcher & Primary Action in the right corner */}
         <div className="flex items-center gap-3">
-          {/* Board / List Toggle */}
-          <div className="flex items-center p-1 bg-neutral-200/70 rounded-xl text-neutral-600 text-xs font-medium">
-            <button
-              onClick={() => setViewMode("kanban")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === "kanban"
-                  ? "bg-white text-neutral-900 shadow-xs font-semibold"
-                  : "hover:text-neutral-900"
-              }`}
-            >
-              <Kanban className="w-3.5 h-3.5" />
-              <span>Board</span>
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === "list"
-                  ? "bg-white text-neutral-900 shadow-xs font-semibold"
-                  : "hover:text-neutral-900"
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>List</span>
-            </button>
-          </div>
+          <SegmentedControl
+            value={viewMode}
+            onChange={setViewMode}
+            label="Task view"
+            options={[
+              {
+                value: "kanban",
+                label: (
+                  <>
+                    <Kanban />
+                    Board
+                  </>
+                ),
+              },
+              {
+                value: "list",
+                label: (
+                  <>
+                    <List />
+                    List
+                  </>
+                ),
+              },
+            ]}
+          />
 
           {/* Create Task Button */}
-          <button
+          <Button
+            variant="primary"
             onClick={() => {
               setNewStatus("todo");
               setIsAddModalOpen(true);
             }}
-            className="group inline-flex items-center gap-2 px-4 py-2.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-xl text-sm font-medium shadow-[0px_2px_4px_rgba(124,58,237,0.25)] hover:shadow-[0px_4px_8px_rgba(124,58,237,0.35)] transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7c3aed]/40"
           >
             <Plus className="w-4 h-4 transition-transform duration-200 group-hover:scale-105 group-hover:rotate-6" />
             <span>New Task</span>
-          </button>
+          </Button>
         </div>
-      </div>
+      </PageHeader>
 
-      {/* Compact Metric Summary Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-        {/* Total Tasks */}
-        <div className="bg-[#ececf0] rounded-xl p-3.5 border border-neutral-200/70 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.04)] flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-            <span>Total Tasks</span>
-            <CheckSquare className="w-3.5 h-3.5 text-neutral-400" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-serif text-2xl md:text-[26px] font-normal text-neutral-900 leading-none">
-              {stats.total}
-            </span>
-            <span className="text-[11px] text-neutral-500 font-medium">active items</span>
-          </div>
-        </div>
-
-        {/* In Progress */}
-        <div className="bg-[#ececf0] rounded-xl p-3.5 border border-neutral-200/70 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.04)] flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-blue-600 uppercase tracking-wider">
-            <span>In Progress</span>
-            <Clock className="w-3.5 h-3.5 text-blue-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-serif text-2xl md:text-[26px] font-normal text-neutral-900 leading-none">
-              {stats.inProgress}
-            </span>
-            <span className="text-[11px] text-blue-600 font-medium">in current sprint</span>
-          </div>
-        </div>
-
-        {/* Outsourced Tasks */}
-        <div className="bg-[#f2edfc] rounded-xl p-3.5 border border-purple-200/80 shadow-[0px_2px_3px_-1px_rgba(124,58,237,0.06)] flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-purple-700 uppercase tracking-wider">
-            <span>Outsourced</span>
-            <GitFork className="w-3.5 h-3.5 text-[#7c3aed]" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-serif text-2xl md:text-[26px] font-normal text-[#7c3aed] leading-none">
-              {stats.outsourced}
-            </span>
-            <span className="text-[11px] text-purple-700/80 font-medium">subcontracted</span>
-          </div>
-        </div>
-
-        {/* Completed */}
-        <div className="bg-[#ececf0] rounded-xl p-3.5 border border-neutral-200/70 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.04)] flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">
-            <span>Completed</span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-serif text-2xl md:text-[26px] font-normal text-neutral-900 leading-none">
-              {stats.completed}
-            </span>
-            <span className="text-[11px] text-emerald-600 font-medium">{stats.completionRate}% finished</span>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard
+          label="Total Tasks"
+          value={stats.total}
+          footer="active items"
+        />
+        <MetricCard
+          label="In Progress"
+          value={stats.inProgress}
+          footer="in current sprint"
+        />
+        <MetricCard
+          label="Outsourced"
+          value={stats.outsourced}
+          tone="accent"
+          footer="subcontracted"
+        />
+        <MetricCard
+          label="Completed"
+          value={stats.completed}
+          tone="success"
+          footer={`${stats.completionRate}% finished`}
+        />
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-neutral-200/80 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.04),0px_1px_0px_0px_rgba(25,28,33,0.02)] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
+      <div className="ui-card p-4 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3.5">
         {/* Search Input */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -367,15 +409,18 @@ export default function TasksPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search deliverables, clients, vendors..."
-            className="w-full pl-10 pr-4 py-2 bg-neutral-50/70 border border-neutral-200/90 rounded-xl text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all"
+            className="ui-field w-full pl-10 pr-4 border border-neutral-200/90 text-neutral-800 placeholder-neutral-400 focus:outline-none focus:border-[#7c3aed] transition-all"
           />
           {searchQuery && (
-            <button
+            <Button
+              aria-label="Close"
+              variant="ghost"
+              size="icon"
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 cursor-pointer"
+              className="absolute right-3 top-1/2"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -386,7 +431,7 @@ export default function TasksPage() {
             <select
               value={selectedPriority}
               onChange={(e) => setSelectedPriority(e.target.value)}
-              className="w-full appearance-none pl-3.5 pr-8 py-2 bg-neutral-50/70 hover:bg-neutral-100/70 border border-neutral-200/90 rounded-xl text-xs font-medium text-neutral-700 focus:outline-none focus:border-[#7c3aed] cursor-pointer transition-colors truncate"
+              className="ui-field w-full appearance-none pl-3.5 pr-8 border border-neutral-200/90 font-medium text-neutral-700 focus:outline-none focus:border-[#7c3aed] cursor-pointer transition-colors truncate"
             >
               <option value="all">Priority: All</option>
               <option value="urgent">Urgent</option>
@@ -405,7 +450,7 @@ export default function TasksPage() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full appearance-none pl-3.5 pr-8 py-2 bg-neutral-50/70 hover:bg-neutral-100/70 border border-neutral-200/90 rounded-xl text-xs font-medium text-neutral-700 focus:outline-none focus:border-[#7c3aed] cursor-pointer transition-colors truncate"
+              className="ui-field w-full appearance-none pl-3.5 pr-8 border border-neutral-200/90 font-medium text-neutral-700 focus:outline-none focus:border-[#7c3aed] cursor-pointer transition-colors truncate"
             >
               <option value="all">Category: All</option>
               <option value="Development">Development</option>
@@ -425,7 +470,7 @@ export default function TasksPage() {
             <select
               value={selectedAssignee}
               onChange={(e) => setSelectedAssignee(e.target.value)}
-              className="w-full appearance-none pl-3.5 pr-8 py-2 bg-neutral-50/70 hover:bg-neutral-100/70 border border-neutral-200/90 rounded-xl text-xs font-medium text-neutral-700 focus:outline-none focus:border-[#7c3aed] cursor-pointer transition-colors truncate"
+              className="ui-field w-full appearance-none pl-3.5 pr-8 border border-neutral-200/90 font-medium text-neutral-700 focus:outline-none focus:border-[#7c3aed] cursor-pointer transition-colors truncate"
             >
               <option value="all">Assignee: All</option>
               {teamMembers.map((m) => (
@@ -444,17 +489,17 @@ export default function TasksPage() {
             selectedCategory !== "all" ||
             selectedAssignee !== "all" ||
             searchQuery !== "") && (
-            <button
+            <Button
+              variant="ghost"
               onClick={() => {
                 setSelectedPriority("all");
                 setSelectedCategory("all");
                 setSelectedAssignee("all");
                 setSearchQuery("");
               }}
-              className="text-xs text-neutral-500 hover:text-neutral-900 underline px-2 cursor-pointer"
             >
               Reset
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -462,9 +507,14 @@ export default function TasksPage() {
       {/* Main Content Area: Kanban View vs List View */}
       {viewMode === "kanban" ? (
         /* KANBAN BOARD */
-        <div key="board" className="motion-page grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
+        <div
+          key="board"
+          className="motion-page grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-6 items-start"
+        >
           {columnDefinitions.map((col) => {
-            const columnTasks = filteredTasks.filter((t) => t.status === col.id);
+            const columnTasks = filteredTasks.filter(
+              (t) => t.status === col.id,
+            );
             const isDropTarget = dragOverColumn === col.id;
 
             return (
@@ -473,7 +523,7 @@ export default function TasksPage() {
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, col.id)}
-                className={`bg-[#f4f4f6]/80 rounded-2xl p-4 border transition-all duration-200 min-h-[580px] flex flex-col ${
+                className={`bg-[#f4f4f6]/80 rounded-2xl p-4 border transition-all duration-200 min-h-[360px] flex flex-col ${
                   isDropTarget
                     ? "border-[#7c3aed] bg-[#ede9fe]/30 ring-2 ring-[#7c3aed]/20"
                     : "border-neutral-200/70"
@@ -493,37 +543,40 @@ export default function TasksPage() {
                   </div>
 
                   {/* Column Quick Add */}
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => {
                       setNewStatus(col.id);
                       setIsAddModalOpen(true);
                     }}
-                    className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-200/60 transition-colors cursor-pointer"
+
                     title={`Add task to ${col.title}`}
                   >
                     <Plus className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Column Card Container */}
                 <div className="space-y-3.5 flex-1 overflow-y-auto">
                   {columnTasks.length === 0 ? (
-                    <div className="h-36 flex flex-col items-center justify-center text-center p-4 border border-dashed border-neutral-300 rounded-xl">
-                      <p className="text-xs text-neutral-400">No tasks in {col.title}</p>
-                      <button
+                    <EmptyState compact title={`No tasks in ${col.title}`}>
+                      <Button
+                        variant="ghost"
+                        size="small"
                         onClick={() => {
                           setNewStatus(col.id);
                           setIsAddModalOpen(true);
                         }}
-                        className="mt-2 text-xs font-medium text-[#7c3aed] hover:underline cursor-pointer"
                       >
-                        + Add a task
-                      </button>
-                    </div>
+                        <Plus />
+                        Add a task
+                      </Button>
+                    </EmptyState>
                   ) : (
                     columnTasks.map((task) => {
                       const completedSubtasks = task.subtasks.filter(
-                        (st) => st.completed
+                        (st) => st.completed,
                       ).length;
                       const isDragging = draggedTaskId === task.id;
 
@@ -551,10 +604,10 @@ export default function TasksPage() {
                                   task.priority === "urgent"
                                     ? "bg-rose-100 text-rose-800"
                                     : task.priority === "high"
-                                    ? "bg-orange-100 text-orange-800"
-                                    : task.priority === "medium"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-blue-100 text-blue-800"
+                                      ? "bg-orange-100 text-orange-800"
+                                      : task.priority === "medium"
+                                        ? "bg-amber-100 text-amber-800"
+                                        : "bg-blue-100 text-blue-800"
                                 }`}
                               >
                                 {task.priority}
@@ -596,7 +649,9 @@ export default function TasksPage() {
                                   className="h-full bg-[#7c3aed] rounded-full transition-all duration-300"
                                   style={{
                                     width: `${
-                                      (completedSubtasks / task.subtasks.length) * 100
+                                      (completedSubtasks /
+                                        task.subtasks.length) *
+                                      100
                                     }%`,
                                   }}
                                 />
@@ -618,21 +673,21 @@ export default function TasksPage() {
 
                               <span className="text-[11px] text-neutral-500 flex items-center gap-1">
                                 <Calendar className="w-3 h-3 text-neutral-400" />
-                                <span>{task.dueDate.replace(", 2026", "")}</span>
+                                <span>
+                                  {task.dueDate.replace(", 2026", "")}
+                                </span>
                               </span>
                             </div>
 
                             {/* Direct Outsource Task Button (User Requirement) */}
-                            <button
+                            <Button
+                              variant="secondary"
+                              size="small"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOutsourceTask(task);
                               }}
-                              className={`group/outsource inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer ${
-                                task.isOutsourced
-                                  ? "bg-[#ede9fe] text-[#7c3aed] border border-purple-200/80 hover:bg-[#ddd6fe]"
-                                  : "bg-neutral-100 text-neutral-700 hover:bg-[#7c3aed] hover:text-white"
-                              }`}
+
                               title={
                                 task.isOutsourced
                                   ? `Outsourced to ${task.outsourcedVendor || "Vendor"}. Click to view or create voucher.`
@@ -647,7 +702,7 @@ export default function TasksPage() {
                               <span className="text-[11px]">
                                 {task.isOutsourced ? "Outsourced" : "Outsource"}
                               </span>
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       );
@@ -660,7 +715,7 @@ export default function TasksPage() {
         </div>
       ) : (
         /* LIST VIEW */
-        <div key="list" className="motion-page bg-white rounded-2xl border border-neutral-200/80 overflow-hidden shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.06)]">
+        <div key="list" className="ui-card motion-page overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-[#f8f8fa] border-b border-neutral-200/80 text-xs text-neutral-500 uppercase font-semibold">
@@ -675,6 +730,27 @@ export default function TasksPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
+                {filteredTasks.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-0">
+                      <EmptyState
+                        title="No tasks found"
+                        description="Add a deliverable or adjust your filters to find a task."
+                      >
+                        <Button
+                          variant="primary"
+                          onClick={() => {
+                            setNewStatus("todo");
+                            setIsAddModalOpen(true);
+                          }}
+                        >
+                          <Plus />
+                          New Task
+                        </Button>
+                      </EmptyState>
+                    </td>
+                  </tr>
+                )}
                 {filteredTasks.map((task) => (
                   <tr
                     key={task.id}
@@ -686,7 +762,9 @@ export default function TasksPage() {
                         {task.title}
                       </div>
                       <div className="text-xs text-neutral-400 truncate">
-                        {task.clientName ? `Client: ${task.clientName}` : task.description}
+                        {task.clientName
+                          ? `Client: ${task.clientName}`
+                          : task.description}
                       </div>
                     </td>
                     <td className="py-3.5 px-4">
@@ -700,10 +778,10 @@ export default function TasksPage() {
                           task.status === "done"
                             ? "bg-emerald-50 text-emerald-700"
                             : task.status === "in-progress"
-                            ? "bg-blue-50 text-blue-700"
-                            : task.status === "review"
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-neutral-100 text-neutral-700"
+                              ? "bg-blue-50 text-blue-700"
+                              : task.status === "review"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-neutral-100 text-neutral-700"
                         }`}
                       >
                         {task.status.replace("-", " ")}
@@ -715,10 +793,10 @@ export default function TasksPage() {
                           task.priority === "urgent"
                             ? "bg-rose-100 text-rose-800"
                             : task.priority === "high"
-                            ? "bg-orange-100 text-orange-800"
-                            : task.priority === "medium"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-blue-100 text-blue-800"
+                              ? "bg-orange-100 text-orange-800"
+                              : task.priority === "medium"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-blue-100 text-blue-800"
                         }`}
                       >
                         {task.priority}
@@ -731,25 +809,28 @@ export default function TasksPage() {
                         >
                           {task.assignee.avatarLetter}
                         </div>
-                        <span className="text-xs text-neutral-700">{task.assignee.name}</span>
+                        <span className="text-xs text-neutral-700">
+                          {task.assignee.name}
+                        </span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-xs text-neutral-500">{task.dueDate}</td>
+                    <td className="py-3.5 px-4 text-xs text-neutral-500">
+                      {task.dueDate}
+                    </td>
                     <td className="py-3.5 px-4 text-right">
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="small"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOutsourceTask(task);
                         }}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                          task.isOutsourced
-                            ? "bg-[#ede9fe] text-[#7c3aed] border border-purple-200"
-                            : "bg-neutral-100 text-neutral-700 hover:bg-[#7c3aed] hover:text-white"
-                        }`}
                       >
                         <GitFork className="w-3.5 h-3.5" />
-                        <span>{task.isOutsourced ? "Outsourced" : "Outsource"}</span>
-                      </button>
+                        <span>
+                          {task.isOutsourced ? "Outsourced" : "Outsource"}
+                        </span>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -762,8 +843,15 @@ export default function TasksPage() {
       {/* CREATE NEW TASK MODAL */}
       <MotionPresence>
         {isAddModalOpen && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs">
-            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden">
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs"
+          >
+            <MotionSurface
+              onDismiss={() => setIsAddModalOpen(false)}
+              kind="panel"
+              className="bg-white rounded-2xl w-full max-w-xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden"
+            >
               {/* Modal Header */}
               <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between">
                 <div>
@@ -771,19 +859,25 @@ export default function TasksPage() {
                     Create New Deliverable
                   </h2>
                   <p className="text-xs text-neutral-500 mt-0.5">
-                    Add a task to the board with team assignments and optional subcontractor outsourcing.
+                    Add a task to the board with team assignments and optional
+                    subcontractor outsourcing.
                   </p>
                 </div>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
               {/* Modal Form */}
-              <form onSubmit={handleCreateTask} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <form
+                onSubmit={handleCreateTask}
+                className="p-6 space-y-4 max-h-[80vh] overflow-y-auto"
+              >
                 {/* Task Title */}
                 <div>
                   <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
@@ -795,7 +889,7 @@ export default function TasksPage() {
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder="e.g. Production Database Migration"
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all"
+                    className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:border-[#7c3aed] transition-all"
                   />
                 </div>
 
@@ -809,7 +903,7 @@ export default function TasksPage() {
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                     placeholder="Detailed requirements, acceptance criteria, or external links..."
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all resize-none"
+                    className="ui-field ui-textarea w-full px-3.5 border border-neutral-200 focus:outline-none focus:border-[#7c3aed] transition-all resize-none"
                   />
                 </div>
 
@@ -821,8 +915,10 @@ export default function TasksPage() {
                     </label>
                     <select
                       value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value as TaskStatus)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                      onChange={(e) =>
+                        setNewStatus(e.target.value as TaskStatus)
+                      }
+                      className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:border-[#7c3aed] cursor-pointer"
                     >
                       <option value="todo">To Do</option>
                       <option value="in-progress">In Progress</option>
@@ -837,8 +933,10 @@ export default function TasksPage() {
                     </label>
                     <select
                       value={newPriority}
-                      onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                      onChange={(e) =>
+                        setNewPriority(e.target.value as TaskPriority)
+                      }
+                      className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:border-[#7c3aed] cursor-pointer"
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
@@ -856,8 +954,10 @@ export default function TasksPage() {
                     </label>
                     <select
                       value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value as TaskCategory)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                      onChange={(e) =>
+                        setNewCategory(e.target.value as TaskCategory)
+                      }
+                      className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:border-[#7c3aed] cursor-pointer"
                     >
                       <option value="Development">Development</option>
                       <option value="Design">Design</option>
@@ -874,7 +974,7 @@ export default function TasksPage() {
                     <select
                       value={newAssigneeName}
                       onChange={(e) => setNewAssigneeName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                      className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:border-[#7c3aed] cursor-pointer"
                     >
                       {teamMembers.map((m) => (
                         <option key={m.name} value={m.name}>
@@ -894,10 +994,12 @@ export default function TasksPage() {
                     <select
                       value={newClientName}
                       onChange={(e) => setNewClientName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] cursor-pointer"
+                      className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:border-[#7c3aed] cursor-pointer"
                     >
                       <option value="Nexus Tech">Nexus Tech</option>
-                      <option value="Apex Architecture">Apex Architecture</option>
+                      <option value="Apex Architecture">
+                        Apex Architecture
+                      </option>
                       <option value="Vanguard Media">Vanguard Media</option>
                       <option value="Internal">Internal</option>
                     </select>
@@ -912,7 +1014,7 @@ export default function TasksPage() {
                       value={newDueDate}
                       onChange={(e) => setNewDueDate(e.target.value)}
                       placeholder="e.g. Oct 12, 2026"
-                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-[#7c3aed] focus:bg-white transition-all"
+                      className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:border-[#7c3aed] transition-all"
                     />
                   </div>
                 </div>
@@ -940,12 +1042,20 @@ export default function TasksPage() {
                         </label>
                         <select
                           value={newOutsourcedVendor}
-                          onChange={(e) => setNewOutsourcedVendor(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#7c3aed]"
+                          onChange={(e) =>
+                            setNewOutsourcedVendor(e.target.value)
+                          }
+                          className="ui-field w-full px-3 border border-neutral-200 font-medium focus:outline-none focus:border-[#7c3aed]"
                         >
-                          <option value="Studio ArchiType">Studio ArchiType (UI/UX)</option>
-                          <option value="DevOps Nexus">DevOps Nexus (Infra)</option>
-                          <option value="ClearCopy Legal">ClearCopy Legal (Contracts)</option>
+                          <option value="Studio ArchiType">
+                            Studio ArchiType (UI/UX)
+                          </option>
+                          <option value="DevOps Nexus">
+                            DevOps Nexus (Infra)
+                          </option>
+                          <option value="ClearCopy Legal">
+                            ClearCopy Legal (Contracts)
+                          </option>
                         </select>
                       </div>
 
@@ -956,9 +1066,11 @@ export default function TasksPage() {
                         <input
                           type="number"
                           value={newOutsourceBudget}
-                          onChange={(e) => setNewOutsourceBudget(e.target.value)}
+                          onChange={(e) =>
+                            setNewOutsourceBudget(e.target.value)
+                          }
                           placeholder="1500"
-                          className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#7c3aed]"
+                          className="ui-field w-full px-3 border border-neutral-200 font-medium focus:outline-none focus:border-[#7c3aed]"
                         />
                       </div>
                     </div>
@@ -967,19 +1079,16 @@ export default function TasksPage() {
 
                 {/* Action Buttons */}
                 <div className="pt-4 border-t border-neutral-100 flex items-center justify-end gap-3">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-[#7c3aed] text-white text-sm font-medium hover:bg-[#6d28d9] shadow-sm transition-all cursor-pointer"
-                  >
+                  </Button>
+                  <Button variant="primary" type="submit">
                     Create Deliverable
-                  </button>
+                  </Button>
                 </div>
               </form>
             </MotionSurface>
@@ -990,8 +1099,15 @@ export default function TasksPage() {
       {/* TASK DETAIL & SUBTASK CHECKLIST DRAWER/MODAL */}
       <MotionPresence>
         {selectedTaskForDetail && (
-          <MotionSurface kind="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs">
-            <MotionSurface kind="panel" className="bg-white rounded-2xl w-full max-w-2xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden">
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs"
+          >
+            <MotionSurface
+              onDismiss={() => setSelectedTaskForDetail(null)}
+              kind="panel"
+              className="bg-white rounded-2xl w-full max-w-2xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden"
+            >
               {/* Header */}
               <div className="px-6 py-5 border-b border-neutral-100 flex items-start justify-between gap-4">
                 <div>
@@ -1004,8 +1120,8 @@ export default function TasksPage() {
                         selectedTaskForDetail.priority === "urgent"
                           ? "bg-rose-100 text-rose-800"
                           : selectedTaskForDetail.priority === "high"
-                          ? "bg-orange-100 text-orange-800"
-                          : "bg-amber-100 text-amber-800"
+                            ? "bg-orange-100 text-orange-800"
+                            : "bg-amber-100 text-amber-800"
                       }`}
                     >
                       {selectedTaskForDetail.priority}
@@ -1021,12 +1137,14 @@ export default function TasksPage() {
                   </h2>
                 </div>
 
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setSelectedTaskForDetail(null)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
               {/* Body */}
@@ -1048,8 +1166,12 @@ export default function TasksPage() {
                       Checklist & Subtasks
                     </h4>
                     <span className="text-xs text-neutral-500 font-medium">
-                      {selectedTaskForDetail.subtasks.filter((s) => s.completed).length} of{" "}
-                      {selectedTaskForDetail.subtasks.length} done
+                      {
+                        selectedTaskForDetail.subtasks.filter(
+                          (s) => s.completed,
+                        ).length
+                      }{" "}
+                      of {selectedTaskForDetail.subtasks.length} done
                     </span>
                   </div>
 
@@ -1057,7 +1179,9 @@ export default function TasksPage() {
                     {selectedTaskForDetail.subtasks.map((st) => (
                       <div
                         key={st.id}
-                        onClick={() => handleToggleSubtask(selectedTaskForDetail.id, st.id)}
+                        onClick={() =>
+                          handleToggleSubtask(selectedTaskForDetail.id, st.id)
+                        }
                         className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
                           st.completed
                             ? "bg-emerald-50/50 border-emerald-200/60 text-neutral-500 line-through"
@@ -1096,9 +1220,9 @@ export default function TasksPage() {
                     </div>
                   </div>
 
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={() => handleOutsourceTask(selectedTaskForDetail)}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#7c3aed] hover:bg-[#6d28d9] text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer whitespace-nowrap"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span>
@@ -1106,7 +1230,7 @@ export default function TasksPage() {
                         ? "Open Outsourcing"
                         : "Outsource Task"}
                     </span>
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Status and Details Grid */}
@@ -1119,15 +1243,17 @@ export default function TasksPage() {
                         const newStat = e.target.value as TaskStatus;
                         setTasks((prev) =>
                           prev.map((t) =>
-                            t.id === selectedTaskForDetail.id ? { ...t, status: newStat } : t
-                          )
+                            t.id === selectedTaskForDetail.id
+                              ? { ...t, status: newStat }
+                              : t,
+                          ),
                         );
                         setSelectedTaskForDetail({
                           ...selectedTaskForDetail,
                           status: newStat,
                         });
                       }}
-                      className="w-full px-2 py-1 bg-neutral-100 border border-neutral-200 rounded-lg font-medium text-neutral-800"
+                      className="ui-field w-full px-2 border border-neutral-200 font-medium text-neutral-800"
                     >
                       <option value="todo">To Do</option>
                       <option value="in-progress">In Progress</option>
@@ -1137,14 +1263,18 @@ export default function TasksPage() {
                   </div>
 
                   <div>
-                    <span className="text-neutral-400 block mb-1">Assignee</span>
+                    <span className="text-neutral-400 block mb-1">
+                      Assignee
+                    </span>
                     <span className="font-semibold text-neutral-800">
                       {selectedTaskForDetail.assignee.name}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-neutral-400 block mb-1">Due Date</span>
+                    <span className="text-neutral-400 block mb-1">
+                      Due Date
+                    </span>
                     <span className="font-semibold text-neutral-800">
                       {selectedTaskForDetail.dueDate}
                     </span>
@@ -1161,20 +1291,20 @@ export default function TasksPage() {
 
               {/* Footer with Delete Action */}
               <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
-                <button
+                <Button
+                  variant="danger"
                   onClick={() => handleDeleteTask(selectedTaskForDetail.id)}
-                  className="inline-flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-800 font-medium cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete Task</span>
-                </button>
+                </Button>
 
-                <button
+                <Button
+                  variant="primary"
                   onClick={() => setSelectedTaskForDetail(null)}
-                  className="px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
                   Close
-                </button>
+                </Button>
               </div>
             </MotionSurface>
           </MotionSurface>

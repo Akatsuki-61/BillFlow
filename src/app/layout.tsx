@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Playfair_Display, Inter, Newsreader } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Playfair_Display,
+  Inter,
+  Newsreader,
+} from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import TitleBar from "@/components/TitleBar";
 import { NavProvider } from "@/context/NavContext";
@@ -36,7 +42,8 @@ const newsreader = Newsreader({
 
 export const metadata: Metadata = {
   title: "BillFlow - Operations Hub",
-  description: "Modern financial management and task outsourcing workspace for freelancers",
+  description:
+    "Modern financial management and task outsourcing workspace for freelancers",
 };
 
 export default function RootLayout({
@@ -55,7 +62,7 @@ export default function RootLayout({
             <TitleBar />
             <div className="flex flex-1 min-h-0 overflow-hidden">
               <Sidebar />
-              <main className="flex-1 bg-[#faf9f5] min-h-0 overflow-y-auto">
+              <main className="workspace-scroll min-w-0 flex-1 bg-[#faf9f5] min-h-0 overflow-y-auto">
                 {children}
               </main>
             </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
+
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -22,7 +24,12 @@ import {
   Receipt,
 } from "lucide-react";
 import { useClients, useInvoices } from "@/lib/data/DataProvider";
-import { formatCents, formatDateDisplay, parseAmountToCents, getCurrencySymbol } from "@/lib/format";
+import {
+  formatCents,
+  formatDateDisplay,
+  parseAmountToCents,
+  getCurrencySymbol,
+} from "@/lib/format";
 import type { ClientWithStats } from "@/types/billing";
 
 function ClientsContent() {
@@ -32,12 +39,17 @@ function ClientsContent() {
   const { createInvoice, invoices: allInvoices } = useInvoices();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedClientForHistory, setSelectedClientForHistory] = useState<ClientWithStats | null>(null);
-  const [selectedClientForBill, setSelectedClientForBill] = useState<ClientWithStats | null>(null);
+  const [selectedClientForHistory, setSelectedClientForHistory] =
+    useState<ClientWithStats | null>(null);
+  const [selectedClientForBill, setSelectedClientForBill] =
+    useState<ClientWithStats | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   // Notifications / Toasts
-  const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
   // Add Client Form State
   const [formData, setFormData] = useState({
@@ -54,7 +66,9 @@ function ClientsContent() {
   const [isSubmittingClient, setIsSubmittingClient] = useState(false);
 
   // Quick Bill Form State
-  const [quickBillTitle, setQuickBillTitle] = useState("Professional Services & Development Sprint");
+  const [quickBillTitle, setQuickBillTitle] = useState(
+    "Professional Services & Development Sprint",
+  );
   const [quickBillAmount, setQuickBillAmount] = useState("1500");
   const [isSubmittingQuickBill, setIsSubmittingQuickBill] = useState(false);
 
@@ -77,7 +91,10 @@ function ClientsContent() {
     }
   }, [clients, selectedClientForHistory]);
 
-  const showToast = (message: string, type: "success" | "error" = "success") => {
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3600);
   };
@@ -125,7 +142,10 @@ function ClientsContent() {
       });
       showToast(`Client "${created.name}" added successfully!`);
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to add client";
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to add client";
       showToast(msg, "error");
     } finally {
       setIsSubmittingClient(false);
@@ -141,7 +161,10 @@ function ClientsContent() {
       }
       showToast(`Client "${name}" removed from directory.`);
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to remove client";
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to remove client";
       showToast(msg, "error");
     }
   };
@@ -168,9 +191,14 @@ function ClientsContent() {
       });
 
       setSelectedClientForBill(null);
-      showToast(`Quick Bill ${created.code} generated for ${selectedClientForBill.name}!`);
+      showToast(
+        `Quick Bill ${created.code} generated for ${selectedClientForBill.name}!`,
+      );
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to create invoice";
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to create invoice";
       showToast(msg, "error");
     } finally {
       setIsSubmittingQuickBill(false);
@@ -183,7 +211,7 @@ function ClientsContent() {
     : [];
 
   return (
-    <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 motion-page">
+    <div className="workspace-page motion-page">
       {/* Toast Notification */}
       <MotionPresence>
         {notification && (
@@ -206,22 +234,16 @@ function ClientsContent() {
       </MotionPresence>
 
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-4xl md:text-[42px] font-serif font-normal text-neutral-900 tracking-tight leading-none">
-            Clients
-          </h1>
-          <p className="text-sm text-neutral-500 mt-2 font-normal">
-            Manage your client relationships, contracts, and ledger balance.
-          </p>
-        </div>
-
-        <button
+      <PageHeader
+        title="Clients"
+        description="Manage your client relationships, contracts, and ledger balance."
+      >
+        <Button
+          variant="primary"
           onClick={() => {
             setFormErrors({});
             setIsAddModalOpen(true);
           }}
-          className="group inline-flex items-center gap-2.5 px-4 py-2.5 bg-white border border-neutral-200/90 rounded-xl text-sm font-medium text-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-neutral-50 hover:border-neutral-300 hover:shadow-sm transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7c3aed]/40"
         >
           <div className="w-4 h-4 flex items-center justify-center">
             <UserPlus
@@ -230,8 +252,8 @@ function ClientsContent() {
             />
           </div>
           <span>Add Client</span>
-        </button>
-      </div>
+        </Button>
+      </PageHeader>
 
       {/* Client Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -245,24 +267,24 @@ function ClientsContent() {
           ))
         ) : clients.length === 0 ? (
           // Clean Empty State
-          <div className="col-span-full bg-white rounded-2xl border border-neutral-200/80 p-12 text-center flex flex-col items-center justify-center shadow-xs">
-            <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center text-neutral-400 mb-3.5">
-              <User className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-semibold text-neutral-900 tracking-tight">No clients yet</h3>
-            <p className="text-sm text-neutral-500 mt-1 max-w-sm font-normal">
-              Add your first client to start organizing business relationships, tracking billings, and issuing invoices.
-            </p>
-            <button
-              onClick={() => {
-                setFormErrors({});
-                setIsAddModalOpen(true);
-              }}
-              className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
+          <div className="ui-card col-span-full">
+            <EmptyState
+              title="No clients yet"
+              description="Add your first client to start organizing business relationships, tracking billings, and issuing invoices."
+              icon={<User />}
             >
-              <UserPlus className="w-4 h-4" />
-              <span>Add Client</span>
-            </button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setFormErrors({});
+                  setIsAddModalOpen(true);
+                }}
+                className="mt-5"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Add Client</span>
+              </Button>
+            </EmptyState>
           </div>
         ) : (
           clients.map((client) => {
@@ -271,7 +293,7 @@ function ClientsContent() {
             return (
               <div
                 key={client.id}
-                className="motion-card relative bg-[#ececf0] hover:bg-[#eaeaf0] transition-colors rounded-2xl p-5 border border-neutral-200/60 shadow-xs flex flex-col justify-between group"
+                className="ui-card motion-card relative transition-colors p-5 flex flex-col justify-between group"
               >
                 {/* Top Bar: Avatar, Title, Category, Menu */}
                 <div>
@@ -297,39 +319,47 @@ function ClientsContent() {
 
                     {/* 3-dots Context Menu Button */}
                     <div className="relative">
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="icon"
                         onClick={() =>
-                          setActiveMenuId(activeMenuId === client.id ? null : client.id)
+                          setActiveMenuId(
+                            activeMenuId === client.id ? null : client.id,
+                          )
                         }
-                        className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-white/60 transition-colors cursor-pointer"
+
                         aria-label="Options"
                       >
                         <MoreVertical className="w-4 h-4" />
-                      </button>
+                      </Button>
 
                       {/* Dropdown Menu */}
                       {activeMenuId === client.id && (
                         <div className="absolute right-0 top-8 z-30 bg-white rounded-xl shadow-lg border border-neutral-200 py-1.5 w-44 text-xs font-medium text-neutral-700">
-                          <button
+                          <Button
+                            variant="menu"
                             onClick={() => {
                               setSelectedClientForHistory(client);
                               setActiveMenuId(null);
                             }}
-                            className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 cursor-pointer"
+                            className="w-full"
                           >
                             <Receipt className="w-3.5 h-3.5 text-neutral-400" />
                             <span>View Ledger</span>
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="menu"
                             onClick={() => {
-                              router.push(`/invoices?new=1&client=${client.id}`);
+                              router.push(
+                                `/invoices?new=1&client=${client.id}`,
+                              );
                               setActiveMenuId(null);
                             }}
-                            className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 cursor-pointer"
+                            className="w-full"
                           >
                             <Plus className="w-3.5 h-3.5 text-neutral-400" />
                             <span>New Invoice</span>
-                          </button>
+                          </Button>
                           {client.driveUrl && (
                             <a
                               href={client.driveUrl}
@@ -342,13 +372,16 @@ function ClientsContent() {
                             </a>
                           )}
                           <div className="my-1 border-t border-neutral-100" />
-                          <button
-                            onClick={() => handleDeleteClient(client.id, client.name)}
-                            className="w-full px-3.5 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                          <Button
+                            variant="danger"
+                            onClick={() =>
+                              handleDeleteClient(client.id, client.name)
+                            }
+                            className="w-full"
                           >
                             <Trash2 className="w-3.5 h-3.5 text-red-400" />
                             <span>Delete Client</span>
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -385,7 +418,10 @@ function ClientsContent() {
                             : "text-neutral-500"
                         }`}
                       >
-                        {formatCents(client.outstandingBalanceCents, client.currency)}
+                        {formatCents(
+                          client.outstandingBalanceCents,
+                          client.currency,
+                        )}
                       </span>
                     </div>
                   </div>
@@ -415,27 +451,28 @@ function ClientsContent() {
                 {/* Bottom Action Footer */}
                 <div className="mt-5 pt-3.5 border-t border-neutral-200/70 flex items-center justify-between">
                   <span className="text-xs text-neutral-500 font-medium">
-                    {client.invoicesCount} {client.invoicesCount === 1 ? "invoice" : "invoices"}
+                    {client.invoicesCount}{" "}
+                    {client.invoicesCount === 1 ? "invoice" : "invoices"}
                   </span>
 
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={() => setSelectedClientForHistory(client)}
-                      className="px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg shadow-xs hover:bg-neutral-50 transition-colors cursor-pointer"
                     >
                       Ledger
-                    </button>
+                    </Button>
 
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={() => {
                         setSelectedClientForBill(client);
                         setQuickBillAmount("1500");
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#7c3aed] text-white rounded-lg text-xs font-semibold hover:bg-[#6d28d9] transition-colors shadow-xs cursor-pointer"
                     >
                       <Zap className="w-3.5 h-3.5 fill-white" />
                       <span>Quick Bill</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -451,7 +488,7 @@ function ClientsContent() {
             kind="dialog"
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
-            <MotionSurface
+            <MotionSurface onDismiss={() => setIsAddModalOpen(false)}
               kind="panel"
               className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
             >
@@ -469,15 +506,20 @@ function ClientsContent() {
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
-              <form onSubmit={handleAddClient} className="p-6 space-y-4 text-xs font-medium text-neutral-700">
+              <form
+                onSubmit={handleAddClient}
+                className="p-6 space-y-4 text-xs font-medium text-neutral-700"
+              >
                 <div>
                   <label className="block mb-1.5 text-neutral-700 font-semibold">
                     Client / Company Name *
@@ -486,14 +528,20 @@ function ClientsContent() {
                     type="text"
                     required
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     placeholder="e.g. Apex Architecture Ltd"
-                    className={`w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 ${
-                      formErrors.name ? "border-rose-400 bg-rose-50/20" : "border-neutral-200"
+                    className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 ${
+                      formErrors.name
+                        ? "border-rose-400 bg-rose-50/20"
+                        : "border-neutral-200"
                     }`}
                   />
                   {formErrors.name && (
-                    <span className="text-rose-600 text-[11px] mt-1 block">{formErrors.name}</span>
+                    <span className="text-rose-600 text-[11px] mt-1 block">
+                      {formErrors.name}
+                    </span>
                   )}
                 </div>
 
@@ -504,8 +552,10 @@ function ClientsContent() {
                     </label>
                     <select
                       value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 bg-white"
+                      onChange={(e) =>
+                        setFormData({ ...formData, category: e.target.value })
+                      }
+                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     >
                       <option value="Enterprise">Enterprise</option>
                       <option value="Startup">Startup</option>
@@ -526,7 +576,7 @@ function ClientsContent() {
                           currency: e.target.value as "USD" | "LKR" | "EUR",
                         })
                       }
-                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 bg-white"
+                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     >
                       <option value="USD">USD ($)</option>
                       <option value="LKR">LKR (Rs.)</option>
@@ -543,9 +593,14 @@ function ClientsContent() {
                     <input
                       type="text"
                       value={formData.contactPerson}
-                      onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          contactPerson: e.target.value,
+                        })
+                      }
                       placeholder="e.g. Sarah Jenkins"
-                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
 
@@ -556,9 +611,14 @@ function ClientsContent() {
                     <input
                       type="text"
                       value={formData.contactRole}
-                      onChange={(e) => setFormData({ ...formData, contactRole: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          contactRole: e.target.value,
+                        })
+                      }
                       placeholder="e.g. Director / CEO"
-                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
                 </div>
@@ -572,14 +632,20 @@ function ClientsContent() {
                       type="email"
                       required
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
                       placeholder="sarah@apexarch.com"
-                      className={`w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 ${
-                        formErrors.email ? "border-rose-400 bg-rose-50/20" : "border-neutral-200"
+                      className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 ${
+                        formErrors.email
+                          ? "border-rose-400 bg-rose-50/20"
+                          : "border-neutral-200"
                       }`}
                     />
                     {formErrors.email && (
-                      <span className="text-rose-600 text-[11px] mt-1 block">{formErrors.email}</span>
+                      <span className="text-rose-600 text-[11px] mt-1 block">
+                        {formErrors.email}
+                      </span>
                     )}
                   </div>
 
@@ -590,9 +656,11 @@ function ClientsContent() {
                     <input
                       type="text"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
                       placeholder="+1 (555) 284-9102"
-                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
                 </div>
@@ -604,27 +672,29 @@ function ClientsContent() {
                   <input
                     type="url"
                     value={formData.driveUrl}
-                    onChange={(e) => setFormData({ ...formData, driveUrl: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, driveUrl: e.target.value })
+                    }
                     placeholder="https://drive.google.com/drive/folders/..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                   />
                 </div>
 
                 <div className="pt-4 flex items-center justify-end gap-3 border-t border-neutral-100">
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="primary"
                     type="submit"
                     disabled={isSubmittingClient}
-                    className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
                     {isSubmittingClient ? "Saving..." : "Save Client"}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </MotionSurface>
@@ -639,7 +709,7 @@ function ClientsContent() {
             kind="dialog"
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
-            <MotionSurface
+            <MotionSurface onDismiss={() => setSelectedClientForHistory(null)}
               kind="panel"
               className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-neutral-200 overflow-hidden"
             >
@@ -657,12 +727,14 @@ function ClientsContent() {
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setSelectedClientForHistory(null)}
-                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
               <div className="p-6 space-y-5">
@@ -673,7 +745,10 @@ function ClientsContent() {
                       TOTAL BILLED
                     </span>
                     <span className="text-base font-bold text-neutral-900 mt-1 block">
-                      {formatCents(selectedClientForHistory.totalBilledCents, selectedClientForHistory.currency)}
+                      {formatCents(
+                        selectedClientForHistory.totalBilledCents,
+                        selectedClientForHistory.currency,
+                      )}
                     </span>
                   </div>
                   <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
@@ -681,7 +756,10 @@ function ClientsContent() {
                       TOTAL PAID
                     </span>
                     <span className="text-base font-bold text-emerald-700 mt-1 block">
-                      {formatCents(selectedClientForHistory.totalPaidCents, selectedClientForHistory.currency)}
+                      {formatCents(
+                        selectedClientForHistory.totalPaidCents,
+                        selectedClientForHistory.currency,
+                      )}
                     </span>
                   </div>
                   <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100">
@@ -689,7 +767,10 @@ function ClientsContent() {
                       OUTSTANDING
                     </span>
                     <span className="text-base font-bold text-rose-700 mt-1 block font-mono">
-                      {formatCents(selectedClientForHistory.outstandingBalanceCents, selectedClientForHistory.currency)}
+                      {formatCents(
+                        selectedClientForHistory.outstandingBalanceCents,
+                        selectedClientForHistory.currency,
+                      )}
                     </span>
                   </div>
                 </div>
@@ -698,8 +779,11 @@ function ClientsContent() {
                 <div className="text-xs text-neutral-600 space-y-1 bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <div>
-                      <strong>Contact:</strong> {selectedClientForHistory.contactPerson}
-                      {selectedClientForHistory.contactRole ? ` · ${selectedClientForHistory.contactRole}` : ""}
+                      <strong>Contact:</strong>{" "}
+                      {selectedClientForHistory.contactPerson}
+                      {selectedClientForHistory.contactRole
+                        ? ` · ${selectedClientForHistory.contactRole}`
+                        : ""}
                     </div>
                     <div>
                       <strong>Email:</strong> {selectedClientForHistory.email}
@@ -725,25 +809,29 @@ function ClientsContent() {
                       Invoices & Payment Records
                     </h4>
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
+                        variant="ghost"
                         onClick={() => {
-                          router.push(`/invoices?new=1&client=${selectedClientForHistory.id}`);
+                          router.push(
+                            `/invoices?new=1&client=${selectedClientForHistory.id}`,
+                          );
                         }}
-                        className="text-xs text-[#7c3aed] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <Plus className="w-3 h-3" />
                         <span>New Invoice</span>
-                      </button>
+                      </Button>
                       <span className="text-neutral-300">·</span>
-                      <button
+                      <Button
+                        variant="ghost"
                         onClick={() => {
-                          router.push(`/invoices?client=${selectedClientForHistory.id}`);
+                          router.push(
+                            `/invoices?client=${selectedClientForHistory.id}`,
+                          );
                         }}
-                        className="text-xs text-neutral-600 hover:underline font-medium flex items-center gap-1 cursor-pointer"
                       >
                         <span>View all</span>
                         <ArrowRight className="w-3 h-3" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -751,8 +839,12 @@ function ClientsContent() {
                     <table className="w-full text-left text-xs">
                       <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 sticky top-0">
                         <tr>
-                          <th className="py-2.5 px-4 font-semibold">Invoice Code</th>
-                          <th className="py-2.5 px-4 font-semibold">Issue Date</th>
+                          <th className="py-2.5 px-4 font-semibold">
+                            Invoice Code
+                          </th>
+                          <th className="py-2.5 px-4 font-semibold">
+                            Issue Date
+                          </th>
                           <th className="py-2.5 px-4 font-semibold">Amount</th>
                           <th className="py-2.5 px-4 font-semibold">Status</th>
                         </tr>
@@ -762,7 +854,9 @@ function ClientsContent() {
                           clientLedgerInvoices.map((inv) => (
                             <tr
                               key={inv.id}
-                              onClick={() => router.push(`/invoices?invoice=${inv.id}`)}
+                              onClick={() =>
+                                router.push(`/invoices?invoice=${inv.id}`)
+                              }
                               className="hover:bg-purple-50/40 transition-colors cursor-pointer"
                             >
                               <td className="py-3 px-4 font-mono font-medium text-neutral-900">
@@ -780,10 +874,10 @@ function ClientsContent() {
                                     inv.status === "PAID"
                                       ? "bg-emerald-100 text-emerald-700"
                                       : inv.status === "OVERDUE"
-                                      ? "bg-rose-100 text-rose-700"
-                                      : inv.status === "DRAFT"
-                                      ? "bg-neutral-100 text-neutral-600"
-                                      : "bg-blue-100 text-blue-700"
+                                        ? "bg-rose-100 text-rose-700"
+                                        : inv.status === "DRAFT"
+                                          ? "bg-neutral-100 text-neutral-600"
+                                          : "bg-blue-100 text-blue-700"
                                   }`}
                                 >
                                   {inv.status}
@@ -793,7 +887,10 @@ function ClientsContent() {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={4} className="py-6 text-center text-neutral-400">
+                            <td
+                              colSpan={4}
+                              className="py-6 text-center text-neutral-400"
+                            >
                               No invoices generated for this client yet.
                             </td>
                           </tr>
@@ -805,12 +902,12 @@ function ClientsContent() {
               </div>
 
               <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex justify-end">
-                <button
+                <Button
+                  variant="primary"
                   onClick={() => setSelectedClientForHistory(null)}
-                  className="px-4 py-2 bg-neutral-900 text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
                   Close Ledger
-                </button>
+                </Button>
               </div>
             </MotionSurface>
           </MotionSurface>
@@ -824,7 +921,7 @@ function ClientsContent() {
             kind="dialog"
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
-            <MotionSurface
+            <MotionSurface onDismiss={() => setSelectedClientForBill(null)}
               kind="panel"
               className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
             >
@@ -842,12 +939,14 @@ function ClientsContent() {
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setSelectedClientForBill(null)}
-                  className="p-1 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
 
               <div className="p-6 space-y-4 text-xs font-medium text-neutral-700">
@@ -859,7 +958,7 @@ function ClientsContent() {
                     type="text"
                     value={quickBillTitle}
                     onChange={(e) => setQuickBillTitle(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                   />
                 </div>
 
@@ -874,7 +973,7 @@ function ClientsContent() {
                       min="0"
                       value={quickBillAmount}
                       onChange={(e) => setQuickBillAmount(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
                     />
                   </div>
 
@@ -886,7 +985,7 @@ function ClientsContent() {
                       type="text"
                       readOnly
                       value="Net 7 Days (Default)"
-                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 bg-neutral-100/70 text-sm text-neutral-600"
+                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-600"
                     />
                   </div>
                 </div>
@@ -899,7 +998,10 @@ function ClientsContent() {
                       defaultChecked
                       className="w-4 h-4 text-[#7c3aed] rounded-sm focus:ring-[#7c3aed]"
                     />
-                    <label htmlFor="deposit" className="text-xs font-medium text-neutral-700">
+                    <label
+                      htmlFor="deposit"
+                      className="text-xs font-medium text-neutral-700"
+                    >
                       Require 50% Upfront Deposit
                     </label>
                   </div>
@@ -910,21 +1012,23 @@ function ClientsContent() {
                 </div>
 
                 <div className="pt-4 flex items-center justify-end gap-3 border-t border-neutral-100">
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => setSelectedClientForBill(null)}
-                    className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="primary"
                     type="button"
                     disabled={isSubmittingQuickBill}
                     onClick={handleQuickBillSubmit}
-                    className="px-5 py-2.5 bg-[#6941C6] hover:bg-[#5b32be] disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer"
                   >
-                    {isSubmittingQuickBill ? "Creating..." : "Generate & Save Invoice"}
-                  </button>
+                    {isSubmittingQuickBill
+                      ? "Creating..."
+                      : "Generate & Save Invoice"}
+                  </Button>
                 </div>
               </div>
             </MotionSurface>
@@ -939,7 +1043,7 @@ export default function ClientsPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 lg:p-10 max-w-7xl mx-auto space-y-8 animate-pulse">
+        <div className="workspace-page motion-page">
           <div className="h-10 w-48 bg-neutral-200 rounded-xl" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="h-64 bg-neutral-200 rounded-2xl" />

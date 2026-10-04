@@ -30,7 +30,12 @@ const mainNavItems: NavItem[] = [
   { id: "clients", name: "Clients", href: "/clients", icon: Users },
   { id: "catalog", name: "Catalog", href: "/catalog", icon: Shapes },
   { id: "expenses", name: "Expenses", href: "/expenses", icon: CreditCard },
-  { id: "outsourcing", name: "Outsourcing", href: "/outsourcing", icon: GitFork },
+  {
+    id: "outsourcing",
+    name: "Outsourcing",
+    href: "/outsourcing",
+    icon: GitFork,
+  },
   { id: "tasks", name: "Tasks", href: "/tasks", icon: ClipboardList },
   { id: "analytics", name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
@@ -44,16 +49,18 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 min-w-[16rem] h-full flex flex-col justify-between bg-white border-r border-neutral-200/70 select-none z-30 app-no-drag">
+    <aside className="workspace-sidebar h-full flex flex-col justify-between bg-white border-r border-neutral-200/70 select-none z-30 app-no-drag">
       {/* Top Header: App Branding */}
-      <div className="flex flex-col">
+      <div className="workspace-sidebar-top flex flex-col">
         <Link
           href="/"
           className="h-20 px-6 flex items-center gap-3.5 group transition-colors"
         >
           {/* Logo badge with animated hover pulse */}
           <div className="w-10 h-10 rounded-full bg-[#7c3aed] flex items-center justify-center text-white shadow-sm transition-transform duration-300 group-hover:scale-105 group-hover:shadow-purple-200 group-hover:shadow-md">
-            <span className="font-bold text-lg leading-none tracking-tight">B</span>
+            <span className="font-bold text-lg leading-none tracking-tight">
+              B
+            </span>
           </div>
 
           <div className="flex flex-col">
@@ -105,13 +112,13 @@ export default function Sidebar() {
       </div>
 
       {/* Bottom Pinned Area: Settings & Support */}
-      <div className="p-3.5 border-t border-neutral-100/80 space-y-1">
+      <div className="shrink-0 p-3.5 border-t border-neutral-100/80 space-y-1">
         {footerNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive =
-            item.href.startsWith("/#")
-              ? false
-              : pathname === item.href || Boolean(pathname?.startsWith(item.href));
+          const isActive = item.href.startsWith("/#")
+            ? false
+            : pathname === item.href ||
+              Boolean(pathname?.startsWith(item.href));
 
           return (
             <Link
