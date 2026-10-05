@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, shell, Menu, Tray, nativeImage, nativeTheme } from "electron";
+import { app, BrowserWindow, dialog, protocol, net, shell, Menu, Tray, nativeImage, nativeTheme } from "electron";
 import path from "path";
 import fs from "fs";
 import { pathToFileURL } from "url";
@@ -11,6 +11,14 @@ import { registerVendorHandlers } from "./ipc/vendors";
 import { registerAnalyticsHandlers } from "./ipc/analytics";
 
 import { registerThemeHandlers, windowThemeColors } from "./theme";
+import { registerCatalogHandlers } from "./ipc/catalog";
+
+const testProfile = process.env.BILLFLOW_USER_DATA;
+if (testProfile) {
+  if (!path.isAbsolute(testProfile)) throw new Error("BILLFLOW_USER_DATA must be absolute.");
+  fs.mkdirSync(testProfile, {recursive:true});
+  app.setPath("userData",testProfile);
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -107,7 +115,9 @@ function createWindow() {
     },
   });
 
-  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.once("ready-to-show", () => {
+    if (!(testProfile && process.env.BILLFLOW_VERIFY_HIDDEN === "1")) mainWindow?.show();
+  });
 
   // Handle external links safely via default system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -147,7 +157,10 @@ function createWindow() {
 app.whenReady().then(() => {
   if (process.platform === "darwin") app.dock?.setIcon(appIconPath());
   // Initialize database and migrations
-  initDatabase();
+  try { initDatabase(); } catch (error) {
+    dialog.showErrorBox("BillFlow database upgrade failed", error instanceof Error ? error.message : String(error));
+    app.quit(); return;
+  }
 
   // Register IPC handlers
   registerClientHandlers(broadcastDataChanged);
@@ -157,10 +170,11 @@ app.whenReady().then(() => {
   registerSettingsHandlers(broadcastDataChanged);
   registerVendorHandlers(broadcastDataChanged);
   registerAnalyticsHandlers();
+  registerCatalogHandlers(broadcastDataChanged);
 
   // Register production static file protocol
   const outDir = app.isPackaged
-    ? path.join(process.resourcesPath, "out")
+    ? path.join(app.getAppPath(), "out")
     : path.join(__dirname, "../out");
 
   protocol.handle("app", async (req) => {

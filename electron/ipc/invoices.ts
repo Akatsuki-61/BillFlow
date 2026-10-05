@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import crypto from "crypto";
 import { eq, desc } from "drizzle-orm";
 import { getDb } from "../db";
-import { clients, invoices, settings } from "../db/schema";
+import { clients, invoices, settings, catalogItems } from "../db/schema";
 import { newInvoiceSchema, invoicePatchSchema } from "../validation";
 import { AppError, formatError } from "./errors";
 import {
@@ -81,6 +81,36 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
   }));
 }
 
+export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
+  const value = newInvoiceSchema.parse(input);
+  const {requestId,...details} = value;
+  const requestHash = crypto.createHash("sha256").update(JSON.stringify(details)).digest("hex");
+  const id = requestId || crypto.randomUUID();
+  const db = getDb();
+  db.transaction(tx => {
+    const existing = tx.select().from(invoices).where(eq(invoices.id,id)).get();
+    if (existing) {
+      if (existing.requestHash !== requestHash) throw new AppError("CONFLICT", "This invoice request was already used with different details.");
+      return;
+    }
+    if (value.catalogItemId && !tx.select().from(catalogItems).where(eq(catalogItems.id,value.catalogItemId)).get()) throw new AppError("NOT_FOUND", "The selected Catalog item no longer exists.");
+    let clientId=value.clientId;
+    if (value.newClient) {
+      clientId=crypto.randomUUID();
+      tx.insert(clients).values({id:clientId,...value.newClient}).run();
+    } else if (!clientId || !tx.select().from(clients).where(eq(clients.id,clientId)).get()) {
+      throw new AppError("CLIENT_NOT_FOUND", "The specified client does not exist.");
+    }
+    tx.insert(invoices).values({
+      id, requestHash, code:value.code || getNextInvoiceCode(), clientId:clientId!, catalogItemId:value.catalogItemId || null,
+      title:value.title || null, amountCents:value.amountCents, currency:value.currency,
+      issueDate:value.issueDate || new Date().toISOString().split("T")[0], dueDate:value.dueDate || null,
+      status:value.status, paidCents:value.status === "PAID" ? value.amountCents : 0,
+    }).run();
+  });
+  return listInvoicesWithClient().find(row=>row.id===id)!;
+}
+
 export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle("invoices:list", async (_event, filter?: { clientId?: string }) => {
     try {
@@ -100,42 +130,9 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("invoices:create", async (_event, input: NewInvoiceInput) => {
     try {
-      const validated = newInvoiceSchema.parse(input);
-      const db = getDb();
-
-      // Check client exists
-      const client = db.select().from(clients).where(eq(clients.id, validated.clientId)).get();
-      if (!client) {
-        throw new AppError("CLIENT_NOT_FOUND", "The specified client does not exist.");
-      }
-
-      const id = crypto.randomUUID();
-      const code = validated.code && validated.code.trim() !== ""
-        ? validated.code.trim()
-        : getNextInvoiceCode();
-
-      const today = new Date().toISOString().split("T")[0];
-      const issueDate = validated.issueDate || today;
-      const paidCents = validated.status === "PAID" ? validated.amountCents : 0;
-
-      db.insert(invoices)
-        .values({
-          id,
-          code,
-          clientId: validated.clientId,
-          title: validated.title || null,
-          amountCents: validated.amountCents,
-          currency: validated.currency,
-          issueDate,
-          dueDate: validated.dueDate || null,
-          status: validated.status,
-          paidCents,
-        })
-        .run();
-
+      const created = createInvoice(input);
       broadcastDataChanged();
-      const all = listInvoicesWithClient();
-      return all.find((inv) => inv.id === id)!;
+      return created;
     } catch (err) {
       throw formatError(err);
     }
@@ -161,6 +158,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
           .set({
             code: validated.code ?? existing.code,
             clientId: validated.clientId ?? existing.clientId,
+            catalogItemId: validated.catalogItemId !== undefined ? validated.catalogItemId : existing.catalogItemId,
             title: validated.title !== undefined ? validated.title : existing.title,
             amountCents: newAmount,
             currency: validated.currency ?? existing.currency,

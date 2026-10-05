@@ -6,6 +6,9 @@ import type {
   InvoicePatchInput,
   InvoiceStatus,
   DashboardSummary,
+  CatalogItem,
+  NewCatalogItemInput,
+  CatalogItemPatchInput,
 } from "./billing";
 import type {
   AppSettings,
@@ -51,6 +54,13 @@ export interface BillFlowAPI {
   };
   analytics: {
     summary: (period?: string) => Promise<AnalyticsSummaryPayload>;
+  };
+  catalog: {
+    list: () => Promise<CatalogItem[]>;
+    create: (input: NewCatalogItemInput) => Promise<CatalogItem>;
+    update: (id: string, patch: CatalogItemPatchInput) => Promise<CatalogItem>;
+    remove: (id: string) => Promise<{ success: boolean }>;
+    bulkImport: (items: NewCatalogItemInput[]) => Promise<{ success: boolean; count: number }>;
   };
   dashboard: {
     summary: () => Promise<DashboardSummary>;

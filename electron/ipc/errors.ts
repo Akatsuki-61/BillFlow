@@ -10,30 +10,11 @@ export class AppError extends Error {
   }
 }
 
-export function formatError(err: unknown) {
-  if (err instanceof AppError) {
-    return {
-      code: err.code,
-      message: err.message,
-      fieldErrors: err.fieldErrors,
-    };
-  }
+export function formatError(err: unknown): AppError {
+  if (err instanceof AppError) return err;
   if (err && typeof err === "object" && "issues" in err) {
-    // Zod error
-    const issues = (err as { issues: Array<{ path: Array<string | number>; message: string }> }).issues;
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of issues) {
-      const field = issue.path.join(".");
-      if (field) fieldErrors[field] = issue.message;
-    }
-    return {
-      code: "VALIDATION_ERROR",
-      message: issues[0]?.message || "Validation failed",
-      fieldErrors,
-    };
+    const issues = (err as {issues: {path:(string|number)[];message:string}[]}).issues;
+    return new AppError("VALIDATION_ERROR", issues[0]?.message || "Validation failed", Object.fromEntries(issues.map(issue=>[issue.path.join("."),issue.message])));
   }
-  return {
-    code: "INTERNAL_ERROR",
-    message: err instanceof Error ? err.message : String(err),
-  };
+  return new AppError("INTERNAL_ERROR", err instanceof Error ? err.message : String(err));
 }

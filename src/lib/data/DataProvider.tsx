@@ -12,6 +12,7 @@ import type {
   InvoiceStatus,
   DashboardSummary,
   Currency,
+  CatalogItem, NewCatalogItemInput, CatalogItemPatchInput,
 } from "@/types/billing";
 import { getActiveInvoiceCurrency } from "@/lib/format";
 import type {
@@ -33,6 +34,7 @@ interface DataContextType {
   clients: ClientWithStats[];
   invoices: InvoiceWithClient[];
   vendors: VendorItem[];
+  catalogItems: CatalogItem[];
   dashboard: DashboardSummary | null;
   settings: AppSettings | null;
   activeCurrency: Currency;
@@ -47,6 +49,10 @@ interface DataContextType {
   setInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
   deleteInvoice: (id: string) => Promise<void>;
   getNextInvoiceCode: () => Promise<string>;
+  createCatalogItem: (input: NewCatalogItemInput) => Promise<CatalogItem>;
+  updateCatalogItem: (id: string, patch: CatalogItemPatchInput) => Promise<CatalogItem>;
+  deleteCatalogItem: (id: string) => Promise<void>;
+  bulkImportCatalogItems: (items: NewCatalogItemInput[]) => Promise<number>;
   createVendor: (input: NewVendorInput) => Promise<VendorItem>;
   updateVendor: (id: string, patch: VendorPatchInput) => Promise<VendorItem>;
   setVendorStatus: (id: string, status: "PENDING" | "PAID") => Promise<VendorItem>;
@@ -63,6 +69,7 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | null>(null);
 
 // In-memory fallback repository when running outside Electron
+let memoryCatalog: CatalogItem[] = [];
 let memoryClients: ClientWithStats[] = [];
 let memoryInvoices: InvoiceWithClient[] = [];
 let memoryVendors: VendorItem[] = [];
@@ -98,6 +105,7 @@ async function loadBrowserSnapshot() {
     clients: [...memoryClients],
     invoices: [...memoryInvoices],
     vendors: [...memoryVendors],
+    catalogItems: [...memoryCatalog],
     settings: { ...memorySettings },
     dashboard: {
       activeClients: memoryClients.length,
@@ -112,6 +120,7 @@ async function loadBrowserSnapshot() {
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [invoices, setInvoices] = useState<InvoiceWithClient[]>([]);
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [vendors, setVendors] = useState<VendorItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -125,14 +134,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const loadSnapshot = useCallback(async () => {
     if (checkIsElectron() && window.billflow) {
-      const [clients, invoices, dashboard, settings, vendors] = await Promise.all([
+      const [clients, invoices, dashboard, settings, vendors, catalogItems] = await Promise.all([
         window.billflow.clients.list(),
         window.billflow.invoices.list(),
         window.billflow.dashboard.summary(),
         window.billflow.settings.get(),
         window.billflow.vendors.list(),
+        window.billflow.catalog.list(),
       ]);
-      return { clients, invoices, dashboard, settings, vendors, isElectron: true };
+      return { clients, invoices, dashboard, settings, vendors, catalogItems, isElectron: true };
     }
     return { ...await loadBrowserSnapshot(), isElectron: false };
   }, [checkIsElectron]);
@@ -142,6 +152,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setClients(snapshot.clients);
     setInvoices(snapshot.invoices);
     setVendors(snapshot.vendors);
+    setCatalogItems(snapshot.catalogItems);
     setSettings(snapshot.settings);
     setDashboard(snapshot.dashboard);
     setError(null);
@@ -216,6 +227,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await refresh();
       return created;
     } else {
+      if (!input.clientId || input.newClient) throw new Error("Open the desktop app to create a new client with its invoice.");
       const client = memoryClients.find((c) => c.id === input.clientId);
       const id = `inv-${Date.now()}`;
       const code = input.code || `INV-${new Date().getFullYear()}-${String(memoryInvoices.length + 1).padStart(3, "0")}`;
@@ -224,6 +236,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         id,
         code,
         clientId: input.clientId,
+        catalogItemId: input.catalogItemId || null,
         title: input.title || null,
         amountCents: input.amountCents,
         currency: input.currency,
@@ -384,6 +397,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await window.billflow.settings.reset();
       await refresh();
     } else {
+      memoryCatalog = [];
       memoryClients = [];
       memoryInvoices = [];
       memoryVendors = [];
@@ -397,6 +411,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       await refresh();
     }
+  };
+
+  const createCatalogItem = async (input: NewCatalogItemInput): Promise<CatalogItem> => {
+    if (!checkIsElectron() || !window.billflow) throw new Error("Open the desktop app to save Catalog records.");
+    const created = await window.billflow.catalog.create(input);
+    await refresh(); return created;
+  };
+  const updateCatalogItem = async (id: string, patch: CatalogItemPatchInput): Promise<CatalogItem> => {
+    if (!checkIsElectron() || !window.billflow) throw new Error("Open the desktop app to save Catalog records.");
+    const updated = await window.billflow.catalog.update(id, patch);
+    await refresh(); return updated;
+  };
+  const deleteCatalogItem = async (id: string): Promise<void> => {
+    if (!checkIsElectron() || !window.billflow) throw new Error("Open the desktop app to save Catalog records.");
+    await window.billflow.catalog.remove(id); await refresh();
+  };
+  const bulkImportCatalogItems = async (items: NewCatalogItemInput[]): Promise<number> => {
+    if (!checkIsElectron() || !window.billflow) throw new Error("Open the desktop app to import Catalog records.");
+    const result = await window.billflow.catalog.bulkImport(items);
+    await refresh(); return result.count;
   };
 
   const createVendor = async (input: NewVendorInput): Promise<VendorItem> => {
@@ -587,6 +621,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         clients,
         invoices,
         vendors,
+        catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems,
         dashboard,
         settings,
         activeCurrency,
@@ -762,4 +797,9 @@ export function useAnalyticsSummary(period?: string) {
     error: result?.query === query ? result.error : null,
     refreshSummary,
   };
+}
+
+export function useCatalog() {
+  const { catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems, isLoading, isElectron, error } = useData();
+  return { catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems, isLoading, isElectron, error };
 }

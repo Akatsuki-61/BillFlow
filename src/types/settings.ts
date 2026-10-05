@@ -32,4 +32,6 @@ export interface ExportDataPayload {
   settings: AppSettings;
   clients: unknown[];
   invoices: unknown[];
+  catalogItems?: unknown[];
+  vendors?: unknown[];
 }

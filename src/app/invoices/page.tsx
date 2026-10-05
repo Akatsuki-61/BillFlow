@@ -9,9 +9,8 @@ import {
 } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   Plus,
   Receipt,
@@ -20,10 +19,9 @@ import {
   Pencil,
   Trash2,
   X,
-  Building,
   AlertCircle,
 } from "lucide-react";
-import { useInvoices, useClients } from "@/lib/data/DataProvider";
+import { useInvoices, useClients, useCatalog } from "@/lib/data/DataProvider";
 import {
   formatCents,
   formatDateDisplay,
@@ -51,6 +49,14 @@ function InvoicesContent() {
   } = useInvoices();
 
   const { clients } = useClients();
+  const { catalogItems } = useCatalog();
+  const [catalogItemId, setCatalogItemId] = useState("");
+  const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientContact,setClientContact]=useState("");
+  const [clientCategory,setClientCategory]=useState("Enterprise");
+  const requestId = useRef<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -133,6 +139,8 @@ function InvoicesContent() {
 
   // When opening Add Invoice modal, prefill the next code
   const handleOpenAddModal = async () => {
+    requestId.current = null;
+    setClientMode(clients.length ? "existing" : "new");
     try {
       const code = await getNextInvoiceCode();
       setNewCode(code);
@@ -282,7 +290,7 @@ function InvoicesContent() {
   // Add Invoice Form Submit
   const handleAddInvoiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClientId) {
+    if (clientMode === "existing" && !newClientId) {
       showToast("Please select a client", "error");
       return;
     }
@@ -292,9 +300,12 @@ function InvoicesContent() {
       const amountCents = parseAmountToCents(newAmount);
       const today = new Date().toISOString().split("T")[0];
 
+      requestId.current ||= crypto.randomUUID();
       const created = await createInvoice({
+        requestId: requestId.current,
+        catalogItemId: catalogItemId || null,
+        ...(clientMode === "new" ? {newClient:{name:clientName,email:clientEmail,currency:newCurrency,contactPerson:clientContact || clientName,category:clientCategory}} : {clientId:newClientId}),
         code: newCode.trim() || undefined,
-        clientId: newClientId,
         title: newTitle.trim() || undefined,
         amountCents,
         currency: newCurrency,
@@ -304,6 +315,8 @@ function InvoicesContent() {
       });
 
       setShowAddInvoiceModal(false);
+      requestId.current = null;
+      setCatalogItemId(""); setClientName(""); setClientEmail(""); setClientContact("");
       setNewTitle("");
       setNewAmount("");
       setNewDueDate("");
@@ -653,7 +666,7 @@ function InvoicesContent() {
                       Create New Invoice
                     </h3>
                     <p className="text-xs text-content-neutral-400">
-                      Record a billable invoice against an existing client.
+                      Select a client or save a new client with this invoice.
                     </p>
                   </div>
                 </div>
@@ -667,34 +680,21 @@ function InvoicesContent() {
                 </Button>
               </div>
 
-              {clients.length === 0 ? (
-                <div className="p-6 text-center space-y-4">
-                  <div className="w-12 h-12 rounded-xl bg-surface-amber-50 text-content-amber-600 flex items-center justify-center mx-auto">
-                    <Building className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-semibold text-content-neutral-900">
-                    No Clients Found
-                  </h4>
-                  <p className="text-xs text-content-neutral-500 max-w-sm mx-auto">
-                    Invoices must be associated with an existing client. Please
-                    add a client before creating an invoice.
-                  </p>
-                  <div className="pt-2">
-                    <Link
-                      href="/clients"
-                      onClick={() => setShowAddInvoiceModal(false)}
-                      className="ui-button ui-button--primary"
-                    >
-                      <span>Go to Clients</span>
-                      <span>→</span>
-                    </Link>
-                  </div>
-                </div>
-              ) : (
                 <form
                   onSubmit={handleAddInvoiceSubmit}
                   className="p-6 space-y-4 text-xs font-medium text-content-neutral-700"
                 >
+                  <div className="flex gap-2">
+                    <Button type="button" variant={clientMode === "existing" ? "primary" : "secondary"} onClick={()=>setClientMode("existing")}>Existing client</Button>
+                    <Button type="button" variant={clientMode === "new" ? "primary" : "secondary"} onClick={()=>setClientMode("new")}>Add new client</Button>
+                  </div>
+                  {clientMode === "new" && <div className="grid grid-cols-2 gap-3">
+                    <label>Client name<input aria-label="New client name" className="ui-field w-full" required value={clientName} onChange={e=>setClientName(e.target.value)} /></label>
+                    <label>Email<input aria-label="New client email" className="ui-field w-full" type="email" required value={clientEmail} onChange={e=>setClientEmail(e.target.value)} /></label>
+                    <label>Contact person<input aria-label="New client contact" className="ui-field w-full" value={clientContact} onChange={e=>setClientContact(e.target.value)} /></label>
+                    <label>Category<select aria-label="New client category" className="ui-field w-full" value={clientCategory} onChange={e=>setClientCategory(e.target.value)}>{["Enterprise","Corporate","Small Business","Startup","Retainer"].map(value=><option key={value}>{value}</option>)}</select></label>
+                    <p className="col-span-2 text-content-neutral-500">The client will also appear in Clients.</p>
+                  </div>}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
@@ -710,12 +710,12 @@ function InvoicesContent() {
                       />
                     </div>
 
-                    <div>
+                    <div hidden={clientMode === "new"}>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                         Target Client *
                       </label>
                       <select
-                        required
+                        required={clientMode === "existing"}
                         value={newClientId}
                         onChange={(e) => {
                           const cid = e.target.value;
@@ -735,6 +735,16 @@ function InvoicesContent() {
                     </div>
                   </div>
 
+                  <label className="block">Catalog service
+                    <select aria-label="Catalog service" className="ui-field w-full" value={catalogItemId} onChange={e=>{
+                      setCatalogItemId(e.target.value);
+                      const item=catalogItems.find(row=>row.id===e.target.value);
+                      if(item){setNewTitle(item.title);setNewAmount(item.price);setNewCurrency(item.currency);}
+                    }}>
+                      <option value="">Custom service</option>
+                      {catalogItems.map(item=><option key={item.id} value={item.id}>{item.title} · {item.currency} {item.price}</option>)}
+                    </select>
+                  </label>
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Deliverable Description / Title
@@ -834,7 +844,6 @@ function InvoicesContent() {
                     </Button>
                   </div>
                 </form>
-              )}
             </MotionSurface>
           </MotionSurface>
         )}

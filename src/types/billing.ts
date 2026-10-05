@@ -10,7 +10,7 @@ export interface Client {
   contactRole?: string | null;
   email: string;
   phone?: string | null;
-  currency: "USD" | "LKR" | "EUR";
+  currency: Currency;
   driveUrl?: string | null;
   hasQuickBill: boolean;
   createdAt: string;
@@ -41,7 +41,7 @@ export interface NewClientInput {
   contactRole?: string;
   email: string;
   phone?: string;
-  currency: "USD" | "LKR" | "EUR";
+  currency: Currency;
   driveUrl?: string;
 }
 
@@ -51,6 +51,7 @@ export interface Invoice {
   id: string;
   code: string;
   clientId: string;
+  catalogItemId?: string | null;
   title?: string | null;
   amountCents: number;
   currency: Currency;
@@ -68,8 +69,11 @@ export interface InvoiceWithClient extends Invoice {
 }
 
 export interface NewInvoiceInput {
-  clientId: string;
+  clientId?: string;
+  newClient?: NewClientInput;
+  requestId?: string;
   code?: string;
+  catalogItemId?: string | null;
   title?: string;
   amountCents: number;
   currency: Currency;
@@ -81,6 +85,7 @@ export interface NewInvoiceInput {
 export interface InvoicePatchInput {
   code?: string;
   clientId?: string;
+  catalogItemId?: string | null;
   title?: string;
   amountCents?: number;
   currency?: Currency;
@@ -94,4 +99,45 @@ export interface DashboardSummary {
   totalBilledByCurrency: Record<string, number>;
   outstandingByCurrency: Record<string, number>;
   recentInvoices: InvoiceWithClient[];
+}
+
+export type CatalogCategory = "Development" | "Design" | "Consulting" | "Licensing";
+export type CatalogIconType = "code" | "design" | "cloud" | "consulting";
+
+export interface CatalogItem {
+  id: string;
+  title: string;
+  category: CatalogCategory;
+  sku: string;
+  description: string;
+  price: string; // Decimal display value derived from priceCents.
+  priceCents: number;
+  currency: Currency;
+  unit: string;
+  iconType: CatalogIconType;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface NewCatalogItemInput {
+  requestId?: string;
+  title: string;
+  category: CatalogCategory;
+  sku: string;
+  description?: string;
+  price: string;
+  currency?: Currency;
+  unit?: string;
+  iconType?: CatalogIconType;
+}
+
+export interface CatalogItemPatchInput {
+  title?: string;
+  category?: CatalogCategory;
+  sku?: string;
+  description?: string;
+  price?: string;
+  currency?: Currency;
+  unit?: string;
+  iconType?: CatalogIconType;
 }

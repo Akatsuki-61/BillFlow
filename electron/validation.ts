@@ -16,7 +16,7 @@ export const newClientSchema = z.object({
     .refine((val) => val.includes("@"), "Email must contain an '@' sign")
     .pipe(z.string().email("Please provide a valid email address")),
   phone: z.string().trim().max(40).optional(),
-  currency: z.enum(["USD", "LKR", "EUR"]).default("USD"),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
   driveUrl: z
     .string()
     .trim()
@@ -26,24 +26,53 @@ export const newClientSchema = z.object({
 });
 
 export const newInvoiceSchema = z.object({
-  clientId: z.string().min(1, "Please select an existing client"),
+  clientId: z.string().min(1).optional(),
+  newClient: newClientSchema.optional(),
+  requestId: z.string().uuid().optional(),
   code: z.string().trim().min(1).max(40).optional(),
+  catalogItemId: z.string().trim().nullable().optional(),
   title: z.string().trim().max(160).optional(),
   amountCents: z.number().int().nonnegative("Amount must be positive"),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
   issueDate: z.string().optional(),
   dueDate: z.string().nullable().optional(),
   status: z.enum(["DRAFT", "UNPAID", "PAID", "OVERDUE"]).default("UNPAID"),
-});
+}).refine(input => Boolean(input.clientId) !== Boolean(input.newClient), "Select a client or provide new client details.");
 
 export const invoicePatchSchema = z.object({
   code: z.string().trim().min(1).max(40).optional(),
   clientId: z.string().min(1).optional(),
+  catalogItemId: z.string().trim().nullable().optional(),
   title: z.string().trim().max(160).optional(),
   amountCents: z.number().int().nonnegative().optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
   dueDate: z.string().nullable().optional(),
   status: z.enum(["DRAFT", "UNPAID", "PAID", "OVERDUE"]).optional(),
+});
+
+export const catalogPriceSchema = z.string().trim().regex(/^\d+(?:\.\d{1,2})?$/, "Price must be a non-negative amount with up to two decimal places.").refine(value => Number.isSafeInteger(Math.round(Number(value) * 100)), "Price is too large.");
+
+export const newCatalogItemSchema = z.object({
+  requestId: z.string().uuid().optional(),
+  title: z.string().trim().min(1, "Title is required").max(160),
+  category: z.enum(["Development", "Design", "Consulting", "Licensing"]).default("Development"),
+  sku: z.string().trim().min(1, "SKU is required").max(60),
+  description: z.string().trim().default(""),
+  price: catalogPriceSchema,
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("LKR"),
+  unit: z.string().trim().default("/ Hourly"),
+  iconType: z.enum(["code", "design", "cloud", "consulting"]).default("code"),
+});
+
+export const catalogItemPatchSchema = z.object({
+  title: z.string().trim().min(1).max(160).optional(),
+  category: z.enum(["Development", "Design", "Consulting", "Licensing"]).optional(),
+  sku: z.string().trim().min(1).max(60).optional(),
+  description: z.string().trim().optional(),
+  price: catalogPriceSchema.optional(),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  unit: z.string().trim().optional(),
+  iconType: z.enum(["code", "design", "cloud", "consulting"]).optional(),
 });
 
 export const updateSettingsSchema = z.object({
