@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
+import "./catalog.css";
 
 export interface CatalogItem {
   id: string;
@@ -330,13 +331,7 @@ export default function CatalogView() {
 
           {/* Total Items Metric Card */}
           <div className="relative overflow-hidden bg-white rounded-2xl border border-neutral-200/80 p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div
-              className="absolute -top-8 -right-8 w-36 h-36 rounded-full pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(circle, rgba(124, 58, 237, 0.12) 0%, rgba(124, 58, 237, 0.02) 60%, transparent 75%)",
-              }}
-            />
+            <div className="catalog-items-glow" />
             <span className="block text-[11px] font-bold tracking-wider text-neutral-400 uppercase mb-2">
               Total Items
             </span>

@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import "./invoices.css";
 
 interface Invoice {
   id: string;
@@ -324,13 +325,7 @@ export default function InvoicesPage() {
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-4 flex-1">
           {/* Total Outstanding Card */}
           <div className="relative overflow-hidden w-full sm:w-[260px] bg-white rounded-2xl border border-neutral-200/80 px-5 py-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div
-              className="absolute -top-6 -right-6 w-32 h-32 rounded-full pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.02) 60%, transparent 75%)",
-              }}
-            />
+            <div className="invoices-outstanding-glow" />
             <span className="block text-[11px] font-bold tracking-wider text-neutral-500 uppercase mb-2">
               Total Outstanding
             </span>
@@ -346,13 +341,7 @@ export default function InvoicesPage() {
 
           {/* Overdue Card */}
           <div className="relative overflow-hidden w-full sm:w-[260px] bg-white rounded-2xl border border-neutral-200/80 px-5 py-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div
-              className="absolute -top-6 -right-6 w-32 h-32 rounded-full pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(circle, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.02) 60%, transparent 75%)",
-              }}
-            />
+            <div className="invoices-overdue-glow" />
             <span className="block text-[11px] font-bold tracking-wider text-neutral-500 uppercase mb-2">
               Overdue
             </span>

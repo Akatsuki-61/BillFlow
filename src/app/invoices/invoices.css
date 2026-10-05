@@ -1,0 +1,183 @@
+/* Invoices Page Dedicated Stylesheet */
+
+/* Background Ambient Glows (eliminating inline styles) */
+.invoices-outstanding-glow {
+  position: absolute;
+  top: -1.5rem;
+  right: -1.5rem;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(16, 185, 129, 0.12) 0%,
+    rgba(16, 185, 129, 0.02) 60%,
+    transparent 75%
+  );
+}
+
+.invoices-overdue-glow {
+  position: absolute;
+  top: -1.5rem;
+  right: -1.5rem;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(239, 68, 68, 0.12) 0%,
+    rgba(239, 68, 68, 0.02) 60%,
+    transparent 75%
+  );
+}
+
+/* Stat Cards */
+.invoices-stat-card {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  padding: 1.125rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+@media (min-width: 640px) {
+  .invoices-stat-card {
+    width: 260px;
+  }
+}
+
+/* Filter Bar */
+.invoices-filter-container {
+  background-color: rgba(237, 237, 240, 0.7);
+  padding: 0.25rem;
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid rgba(229, 231, 235, 0.5);
+}
+
+.invoices-filter-tab {
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 150ms ease-in-out;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.invoices-filter-tab:hover {
+  color: #1f2937;
+  background-color: rgba(229, 231, 235, 0.4);
+}
+
+.invoices-filter-tab-active {
+  background-color: #ffffff;
+  color: #111827;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(229, 231, 235, 0.6);
+}
+
+/* Status Badges */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.badge-status-overdue {
+  background-color: rgba(254, 226, 226, 0.7);
+  color: #dc2626;
+  border: 1px solid rgba(254, 202, 202, 0.5);
+}
+
+.badge-status-unpaid {
+  background-color: #fef3c7;
+  color: #b45309;
+  border: 1px solid rgba(253, 230, 138, 0.8);
+}
+
+.badge-status-paid {
+  background-color: rgba(220, 252, 231, 0.7);
+  color: #047857;
+  border: 1px solid rgba(167, 243, 208, 0.6);
+}
+
+.badge-status-draft {
+  background-color: #ffffff;
+  color: #52525b;
+  border: 1px solid #d4d4d8;
+}
+
+/* Action Buttons */
+.invoices-btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background-color: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  border-radius: 0.75rem;
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 150ms ease-in-out;
+  cursor: pointer;
+}
+
+.invoices-btn-secondary:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+/* Modals */
+.invoices-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  padding: 1rem;
+}
+
+.invoices-modal-panel {
+  background-color: #ffffff;
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  padding: 1.5rem;
+  font-family: inherit;
+}
+
+.invoices-dropdown-card {
+  position: absolute;
+  right: 1.5rem;
+  width: 13rem;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  padding: 0.5rem 0;
+  z-index: 40;
+  text-align: left;
+  font-size: 0.75rem;
+}
