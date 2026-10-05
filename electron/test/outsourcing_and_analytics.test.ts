@@ -6,7 +6,7 @@ import { initDatabase, closeDatabaseForTesting, getDb } from "../db";
 import { clients, invoices, vendors } from "../db/schema";
 import { listVendors } from "../ipc/vendors";
 import { getAnalyticsSummary } from "../ipc/analytics";
-import { newVendorSchema, vendorPatchSchema } from "../validation";
+import { newVendorSchema } from "../validation";
 import { eq } from "drizzle-orm";
 import {
   getActiveInvoiceCurrency,

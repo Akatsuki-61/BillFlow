@@ -6,6 +6,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useSyncExternalStore,
 } from "react";
 import {
   WIDGET_CATALOG,
@@ -47,6 +48,10 @@ const STORAGE_KEY_DASHBOARD = "billflow_dashboard_widgets_v2";
 const STORAGE_KEY_ANALYTICS = "billflow_analytics_widgets_v2";
 const STORAGE_KEY_SIZES = "billflow_widget_sizes_v2";
 
+const subscribeToHydration = () => () => {};
+const clientHydrationSnapshot = () => true;
+const serverHydrationSnapshot = () => false;
+
 export function WidgetProvider({ children }: { children: React.ReactNode }) {
   const [dashboardWidgets, setDashboardWidgets] = useState<string[]>(
     DEFAULT_DASHBOARD_WIDGET_IDS,
@@ -70,8 +75,11 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
     }, 3200);
   }, []);
 
-  // Hydrate from localStorage on client mount
-  useEffect(() => {
+  // Keep server and hydration output identical, then load browser preferences once.
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration, clientHydrationSnapshot, serverHydrationSnapshot,
+  );
+  if (hydrated && !isInitialized) {
     try {
       const storedDash = localStorage.getItem(STORAGE_KEY_DASHBOARD);
       if (storedDash) {
@@ -99,7 +107,7 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsInitialized(true);
     }
-  }, []);
+  }
 
   // Persist dashboard widgets changes
   useEffect(() => {

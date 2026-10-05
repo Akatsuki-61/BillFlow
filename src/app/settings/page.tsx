@@ -6,7 +6,7 @@ import {
   SegmentedControl,
 } from "@/components/ui/Workspace";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useEffectEvent, useMemo, Suspense } from "react";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import {
   User,
@@ -90,8 +90,10 @@ function SettingsContent() {
   const [resetConfirmation, setResetConfirmation] = useState("");
   const [isResetting, setIsResetting] = useState(false);
 
-  // Sync settings into form
-  useEffect(() => {
+  // Reset the draft when newly loaded or saved settings replace the source.
+  const [previousSettings, setPreviousSettings] = useState(settings);
+  if (previousSettings !== settings) {
+    setPreviousSettings(settings);
     if (settings) {
       setFormState({
         businessName: settings.businessName || "",
@@ -112,7 +114,7 @@ function SettingsContent() {
         currencyDisplay: settings.currencyDisplay || "symbol",
       });
     }
-  }, [settings]);
+  }
 
   // Load live DB path
   useEffect(() => {
@@ -187,19 +189,21 @@ function SettingsContent() {
     }
   };
 
+  const saveFromShortcut = useEffectEvent(() => {
+    if (isDirty && !isSaving) void handleSave();
+  });
+
   // Keyboard shortcut Cmd+S / Ctrl+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        if (isDirty && !isSaving) {
-          handleSave();
-        }
+        saveFromShortcut();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDirty, isSaving, formState]);
+  }, []);
 
   const handleExportJson = async () => {
     try {

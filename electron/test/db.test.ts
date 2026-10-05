@@ -9,7 +9,7 @@ import { getNextInvoiceCode } from "../ipc/invoices";
 import { getDashboardSummary } from "../ipc/dashboard";
 import { listVendors } from "../ipc/vendors";
 import { getAnalyticsSummary } from "../ipc/analytics";
-import { newClientSchema, newInvoiceSchema, newVendorSchema, vendorPatchSchema } from "../validation";
+import { newClientSchema, newInvoiceSchema, newVendorSchema } from "../validation";
 import { eq } from "drizzle-orm";
 
 describe("Database & Interconnection Tests", () => {

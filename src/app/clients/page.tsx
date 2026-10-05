@@ -3,7 +3,7 @@
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   UserPlus,
@@ -39,8 +39,19 @@ function ClientsContent() {
   const { createInvoice, invoices: allInvoices } = useInvoices();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedClientForHistory, setSelectedClientForHistory] =
-    useState<ClientWithStats | null>(null);
+  const targetClientId = searchParams.get("client");
+  const [previousTargetClientId, setPreviousTargetClientId] = useState(targetClientId);
+  const [historyClientId, setHistoryClientId] = useState<string | null | undefined>();
+  if (previousTargetClientId !== targetClientId) {
+    setPreviousTargetClientId(targetClientId);
+    setHistoryClientId(undefined);
+  }
+  const selectedClientForHistory = clients.find(
+    (client) => client.id === (historyClientId === undefined ? targetClientId : historyClientId),
+  ) ?? null;
+  const setSelectedClientForHistory = (client: ClientWithStats | null) => {
+    setHistoryClientId(client?.id ?? null);
+  };
   const [selectedClientForBill, setSelectedClientForBill] =
     useState<ClientWithStats | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -71,25 +82,6 @@ function ClientsContent() {
   );
   const [quickBillAmount, setQuickBillAmount] = useState("1500");
   const [isSubmittingQuickBill, setIsSubmittingQuickBill] = useState(false);
-
-  // Handle URL param ?client=<id> to deep link to client ledger
-  useEffect(() => {
-    const targetClientId = searchParams.get("client");
-    if (targetClientId && clients.length > 0) {
-      const match = clients.find((c) => c.id === targetClientId);
-      if (match) {
-        setSelectedClientForHistory(match);
-      }
-    }
-  }, [searchParams, clients]);
-
-  // Keep selectedClientForHistory synced with live clients data
-  useEffect(() => {
-    if (selectedClientForHistory) {
-      const updated = clients.find((c) => c.id === selectedClientForHistory.id);
-      if (updated) setSelectedClientForHistory(updated);
-    }
-  }, [clients, selectedClientForHistory]);
 
   const showToast = (
     message: string,

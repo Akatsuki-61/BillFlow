@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import { getDb } from "../db";
-import { clients, invoices, vendors } from "../db/schema";
+import { clients, vendors } from "../db/schema";
 import { formatError } from "./errors";
 import { listInvoicesWithClient } from "./invoices";
 import { AnalyticsSummaryPayload } from "../../src/types/analytics";
@@ -45,7 +45,6 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
 
   let totalRevenueCents = 0;
   let paidCents = 0;
-  let paidCount = 0;
   let pendingReceivablesCents = 0;
   let unpaidCount = 0;
   let overdueCents = 0;
@@ -57,7 +56,6 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
       totalRevenueCents += inv.amountCents;
       if (inv.status === "PAID") {
         paidCents += inv.amountCents;
-        paidCount += 1;
       } else {
         const unpaid = Math.max(0, inv.amountCents - (inv.paidCents || 0));
         pendingReceivablesCents += unpaid;

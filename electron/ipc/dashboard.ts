@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import { getDb } from "../db";
-import { clients, invoices } from "../db/schema";
+import { clients } from "../db/schema";
 import { formatError } from "./errors";
 import { listInvoicesWithClient } from "./invoices";
 import { DashboardSummary } from "../../src/types/billing";

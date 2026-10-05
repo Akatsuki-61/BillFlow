@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { MotionPresence } from "@/components/ui/MotionSurface";
 
 export interface ContextMenuItem {
   label: string;

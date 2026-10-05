@@ -1,5 +1,7 @@
 "use client";
 
+import { readBrowserPreferences } from "./browserStorage";
+
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import type {
   ClientWithStats,
@@ -85,6 +87,28 @@ let memorySettings: AppSettings = {
   updatedAt: new Date().toISOString(),
 };
 
+// Browser storage implements the same async snapshot contract as desktop IPC.
+async function loadBrowserSnapshot() {
+  if (typeof window !== "undefined") {
+    const saved = readBrowserPreferences(memorySettings, memoryVendors, localStorage);
+    memorySettings = saved.settings;
+    memoryVendors = saved.vendors;
+  }
+  return {
+    clients: [...memoryClients],
+    invoices: [...memoryInvoices],
+    vendors: [...memoryVendors],
+    settings: { ...memorySettings },
+    dashboard: {
+      activeClients: memoryClients.length,
+      unpaidCount: memoryInvoices.filter((invoice) => invoice.status !== "PAID" && invoice.status !== "DRAFT").length,
+      totalBilledByCurrency: {},
+      outstandingByCurrency: {},
+      recentInvoices: memoryInvoices.slice(0, 5),
+    },
+  };
+}
+
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [invoices, setInvoices] = useState<InvoiceWithClient[]>([]);
@@ -99,66 +123,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return typeof window !== "undefined" && Boolean(window.billflow?.isElectron);
   }, []);
 
-  const refresh = useCallback(async () => {
-    try {
-      if (checkIsElectron() && window.billflow) {
-        setIsElectron(true);
-        const [cList, iList, dSummary, sSettings, vList] = await Promise.all([
-          window.billflow.clients.list(),
-          window.billflow.invoices.list(),
-          window.billflow.dashboard.summary(),
-          window.billflow.settings.get(),
-          window.billflow.vendors.list(),
-        ]);
-        setClients(cList);
-        setInvoices(iList);
-        setDashboard(dSummary);
-        setSettings(sSettings);
-        setVendors(vList);
-      } else {
-        setIsElectron(false);
-        if (typeof window !== "undefined") {
-          const storedSettings = localStorage.getItem("billflow_memory_settings");
-          if (storedSettings) {
-            try {
-              memorySettings = { ...memorySettings, ...JSON.parse(storedSettings) };
-            } catch {
-              // ignore
-            }
-          }
-          const storedVendors = localStorage.getItem("billflow_outsourcing_vendors");
-          if (storedVendors) {
-            try {
-              const parsed = JSON.parse(storedVendors);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                memoryVendors = parsed;
-              }
-            } catch {
-              // ignore
-            }
-          }
-        }
-        setClients([...memoryClients]);
-        setInvoices([...memoryInvoices]);
-        setVendors([...memoryVendors]);
-        setSettings({ ...memorySettings });
-        setDashboard({
-          activeClients: memoryClients.length,
-          unpaidCount: memoryInvoices.filter((i) => i.status !== "PAID" && i.status !== "DRAFT").length,
-          totalBilledByCurrency: {},
-          outstandingByCurrency: {},
-          recentInvoices: memoryInvoices.slice(0, 5),
-        });
-      }
-      setError(null);
-    } catch (err: unknown) {
-      console.error("Failed to load billflow data:", err);
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Failed to load data";
-      setError(msg);
-    } finally {
-      setIsLoading(false);
+  const loadSnapshot = useCallback(async () => {
+    if (checkIsElectron() && window.billflow) {
+      const [clients, invoices, dashboard, settings, vendors] = await Promise.all([
+        window.billflow.clients.list(),
+        window.billflow.invoices.list(),
+        window.billflow.dashboard.summary(),
+        window.billflow.settings.get(),
+        window.billflow.vendors.list(),
+      ]);
+      return { clients, invoices, dashboard, settings, vendors, isElectron: true };
     }
+    return { ...await loadBrowserSnapshot(), isElectron: false };
   }, [checkIsElectron]);
+
+  const refresh = useCallback(() => loadSnapshot().then((snapshot) => {
+    setIsElectron(snapshot.isElectron);
+    setClients(snapshot.clients);
+    setInvoices(snapshot.invoices);
+    setVendors(snapshot.vendors);
+    setSettings(snapshot.settings);
+    setDashboard(snapshot.dashboard);
+    setError(null);
+  }).catch((err: unknown) => {
+    console.error("Failed to load billflow data:", err);
+    const message = err instanceof Error ? err.message : "Failed to load data";
+    setError(message);
+  }).finally(() => setIsLoading(false)), [loadSnapshot]);
 
   useEffect(() => {
     refresh();
@@ -500,13 +491,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const getAnalyticsSummary = async (period?: string): Promise<AnalyticsSummaryPayload> => {
+  const getAnalyticsSummary = useCallback(async (period?: string): Promise<AnalyticsSummaryPayload> => {
     if (checkIsElectron() && window.billflow) {
       return await window.billflow.analytics.summary(period);
     } else {
       let totalRevenueCents = 0;
       let paidCents = 0;
-      let paidCount = 0;
       let pendingReceivablesCents = 0;
       let unpaidCount = 0;
       let overdueCents = 0;
@@ -519,7 +509,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           totalRevenueCents += inv.amountCents;
           if (inv.status === "PAID") {
             paidCents += inv.amountCents;
-            paidCount += 1;
           } else {
             const unpaid = Math.max(0, inv.amountCents - (inv.paidCents || 0));
             pendingReceivablesCents += unpaid;
@@ -583,7 +572,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         monthlyTrends,
       };
     }
-  };
+  }, [checkIsElectron]);
 
   const activeCurrency: Currency = useMemo(() => {
     return getActiveInvoiceCurrency(
@@ -738,31 +727,39 @@ export function useVendors() {
 }
 
 export function useAnalyticsSummary(period?: string) {
-  const { getAnalyticsSummary } = useData();
-  const [data, setData] = useState<AnalyticsSummaryPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { getAnalyticsSummary, clients, invoices, vendors } = useData();
+  const query = useMemo(() => ({ period, clients, invoices, vendors }), [period, clients, invoices, vendors]);
+  const [result, setResult] = useState<{
+    query: typeof query;
+    data: AnalyticsSummaryPayload | null;
+    error: string | null;
+  } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await getAnalyticsSummary(period);
-      setData(res);
-      setError(null);
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String(err.message)
-          : "Failed to load analytics";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [getAnalyticsSummary, period]);
+  const fetchSummary = useCallback((isCurrent: () => boolean = () => true) =>
+    getAnalyticsSummary(query.period).then((data) => {
+      if (isCurrent()) setResult({ query, data, error: null });
+    }).catch((err: unknown) => {
+      if (isCurrent()) {
+        const message = err instanceof Error ? err.message : "Failed to load analytics";
+        setResult({ query, data: null, error: message });
+      }
+    }), [getAnalyticsSummary, query]);
 
   useEffect(() => {
-    fetchSummary();
+    let active = true;
+    void fetchSummary(() => active);
+    return () => { active = false; };
   }, [fetchSummary]);
 
-  return { data, loading, error, refreshSummary: fetchSummary };
+  const refreshSummary = () => {
+    setRefreshing(true);
+    return fetchSummary().finally(() => setRefreshing(false));
+  };
+  return {
+    data: result?.data ?? null,
+    loading: refreshing || result?.query !== query,
+    error: result?.query === query ? result.error : null,
+    refreshSummary,
+  };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -17,11 +17,9 @@ import {
   Receipt,
   Search,
   SlidersHorizontal,
-  User,
   UserPlus,
   Users,
   X,
-  Calendar,
   Check,
 } from "lucide-react";
 
@@ -35,7 +33,6 @@ import {
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { useClients, useVendors, useActiveCurrency } from "@/lib/data/DataProvider";
 import { formatCurrencyAmount, getCurrencySymbol } from "@/lib/format";
-import type { Currency } from "@/types/billing";
 import type { VendorItem } from "@/types/outsourcing";
 import "./outsourcing.css";
 
@@ -97,7 +94,10 @@ export default function OutsourcingView() {
   };
 
   // Handle task redirection deep link / query params
-  useEffect(() => {
+  const voucherQueryKey = searchParams.toString();
+  const [previousVoucherQueryKey, setPreviousVoucherQueryKey] = useState<string | null>(null);
+  if (previousVoucherQueryKey !== voucherQueryKey) {
+    setPreviousVoucherQueryKey(voucherQueryKey);
     const action = searchParams.get("action");
     if (action === "create-voucher") {
       const taskTitle = searchParams.get("taskTitle");
@@ -115,7 +115,7 @@ export default function OutsourcingView() {
       }
       setIsVendorModalOpen(true);
     }
-  }, [searchParams]);
+  }
 
   // Toggle vendor payment status between PENDING and PAID in local SQLite database
   const handleToggleStatus = async (id: string) => {
@@ -164,7 +164,7 @@ export default function OutsourcingView() {
     setIsSubmittingClient(true);
     try {
       // Save client directly into the local SQLite database via IPC/DataProvider
-      const created = await createClient({
+      await createClient({
         name: clientName.trim(),
         category: clientCategory,
         contactPerson: clientContactPerson.trim() || clientName.trim(),

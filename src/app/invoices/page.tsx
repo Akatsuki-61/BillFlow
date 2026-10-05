@@ -43,7 +43,6 @@ function InvoicesContent() {
 
   const {
     invoices: allInvoices,
-    isLoading: invoicesLoading,
     createInvoice,
     updateInvoice,
     setInvoiceStatus,
@@ -51,13 +50,12 @@ function InvoicesContent() {
     getNextInvoiceCode,
   } = useInvoices();
 
-  const { clients, isLoading: clientsLoading } = useClients();
+  const { clients } = useClients();
 
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [highlightedInvoiceId, setHighlightedInvoiceId] = useState<
+  const [expiredInvoiceHighlight, setExpiredInvoiceHighlight] = useState<
     string | null
   >(null);
 
@@ -108,26 +106,30 @@ function InvoicesContent() {
   const isNewParam = searchParams.get("new");
   const invoiceHighlightParam = searchParams.get("invoice");
 
+  const [previousHighlightParam, setPreviousHighlightParam] = useState(invoiceHighlightParam);
+  if (previousHighlightParam !== invoiceHighlightParam) {
+    setPreviousHighlightParam(invoiceHighlightParam);
+    setExpiredInvoiceHighlight(null);
+  }
+  const highlightedInvoiceId = expiredInvoiceHighlight === invoiceHighlightParam
+    ? null : invoiceHighlightParam;
   useEffect(() => {
-    if (invoiceHighlightParam) {
-      setHighlightedInvoiceId(invoiceHighlightParam);
-      const timer = setTimeout(() => {
-        setHighlightedInvoiceId(null);
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
+    if (!invoiceHighlightParam) return;
+    const timer = setTimeout(() => setExpiredInvoiceHighlight(invoiceHighlightParam), 2500);
+    return () => clearTimeout(timer);
   }, [invoiceHighlightParam]);
 
-  useEffect(() => {
+  const linkedClient = clients.find((client) => client.id === clientFilterParam);
+  const modalQueryKey = JSON.stringify([isNewParam, clientFilterParam, linkedClient?.currency]);
+  const [previousModalQueryKey, setPreviousModalQueryKey] = useState<string | null>(null);
+  if (previousModalQueryKey !== modalQueryKey) {
+    setPreviousModalQueryKey(modalQueryKey);
     if (isNewParam === "1") {
       setShowAddInvoiceModal(true);
-      if (clientFilterParam) {
-        setNewClientId(clientFilterParam);
-        const match = clients.find((c) => c.id === clientFilterParam);
-        if (match) setNewCurrency(match.currency);
-      }
+      if (clientFilterParam) setNewClientId(clientFilterParam);
+      if (linkedClient) setNewCurrency(linkedClient.currency);
     }
-  }, [isNewParam, clientFilterParam, clients]);
+  }
 
   // When opening Add Invoice modal, prefill the next code
   const handleOpenAddModal = async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -11,7 +11,6 @@ import {
   Kanban,
   TriangleAlert,
   GripVertical,
-  Layers,
   Clock,
   DollarSign,
   Briefcase,
@@ -35,9 +34,8 @@ import {
   useActiveCurrency,
 } from "@/lib/data/DataProvider";
 import { formatCents, formatDateDisplay, getCurrencySymbol } from "@/lib/format";
-import { DashboardPeriod, MonthlyGrowthPoint } from "@/types/dashboard";
+import { DashboardPeriod } from "@/types/dashboard";
 import { WidgetDisplaySize } from "@/types/widgets";
-import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import "../analytics/analytics.css";
 
 // Smooth Bezier Curve Path Generator for Financial Charts
@@ -328,7 +326,7 @@ export function WidgetRenderer({
     if (invoices.length > 0) {
       return invoices.slice(0, displaySize === "compact" ? 2 : 4);
     }
-    return (dashboard?.recentInvoices as any[]) ?? [];
+    return dashboard?.recentInvoices ?? [];
   }, [invoices, dashboard, displaySize]);
 
   // 6-month historical/projected monthly points for charts
@@ -1178,7 +1176,7 @@ export function WidgetRenderer({
                     No invoices generated yet.
                   </div>
                 ) : (
-                  displayInvoices.map((inv: any) => (
+                  displayInvoices.map((inv) => (
                     <div
                       key={inv.id}
                       onClick={() =>
@@ -1192,7 +1190,7 @@ export function WidgetRenderer({
                     >
                       <div className="min-w-0 pr-2">
                         <div className="text-xs font-semibold text-content-neutral-900 truncate">
-                          {inv.clientName || inv.client}
+                          {inv.clientName}
                         </div>
                         <div className="text-[10px] text-content-neutral-500 font-mono">
                           {inv.code}
@@ -1201,9 +1199,7 @@ export function WidgetRenderer({
 
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-serif text-xs font-semibold text-content-neutral-900">
-                          {typeof inv.amountCents === "number"
-                            ? formatCents(inv.amountCents, inv.currency)
-                            : inv.amount}
+                          {formatCents(inv.amountCents, inv.currency)}
                         </span>
                         <span
                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
