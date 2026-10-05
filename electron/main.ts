@@ -8,6 +8,8 @@ import { registerInvoiceHandlers } from "./ipc/invoices";
 import { registerDashboardHandlers } from "./ipc/dashboard";
 import { registerSettingsHandlers } from "./ipc/settings";
 
+import { registerThemeHandlers, windowThemeColors } from "./theme";
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "app",
@@ -33,7 +35,9 @@ function createWindow() {
   const isMac = process.platform === "darwin";
   const isWindows = process.platform === "win32";
 
+  const colors = windowThemeColors();
   mainWindow = new BrowserWindow({
+    show: false,
     width: 1440,
     height: 900,
     minWidth: 1100,
@@ -43,12 +47,11 @@ function createWindow() {
     trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
     titleBarOverlay: isWindows
       ? {
-          color: "#faf9f5",
-          symbolColor: "#111827",
+          ...colors,
           height: 40,
         }
       : false,
-    backgroundColor: "#faf9f5",
+    backgroundColor: colors.color,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -56,6 +59,8 @@ function createWindow() {
       sandbox: true,
     },
   });
+
+  mainWindow.once("ready-to-show", () => mainWindow?.show());
 
   // Handle external links safely via default system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -100,6 +105,7 @@ app.whenReady().then(() => {
   registerClientHandlers(broadcastDataChanged);
   registerInvoiceHandlers(broadcastDataChanged);
   registerDashboardHandlers();
+  registerThemeHandlers();
   registerSettingsHandlers(broadcastDataChanged);
 
   // Register production static file protocol

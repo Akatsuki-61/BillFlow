@@ -189,9 +189,9 @@ export default function ExpensesPage() {
         {notification && (
           <MotionSurface
             kind="toast"
-            className="fixed top-14 right-6 z-50 bg-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-neutral-700"
+            className="fixed top-14 right-6 z-50 bg-surface-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-line-neutral-700"
           >
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
             <span>{notification}</span>
           </MotionSurface>
         )}
@@ -211,7 +211,7 @@ export default function ExpensesPage() {
                 setSelectedCategory(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ui-field appearance-none border border-neutral-200/90 px-4 pr-9 font-semibold text-neutral-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-neutral-300 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+              className="ui-field appearance-none border border-line-neutral-200/90 px-4 pr-9 font-semibold text-content-neutral-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-line-neutral-300 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/40"
             >
               <option value="All Categories">All Categories</option>
               <option value="TRAVEL">TRAVEL</option>
@@ -221,7 +221,7 @@ export default function ExpensesPage() {
               <option value="AI INFRASTRUCTURE">AI INFRASTRUCTURE</option>
               <option value="HOSTING">HOSTING</option>
             </select>
-            <ChevronDown className="w-3.5 h-3.5 text-neutral-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-200" />
+            <ChevronDown className="w-3.5 h-3.5 text-content-neutral-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-200" />
           </div>
 
           <Button variant="secondary" onClick={handleExportPdf}>
@@ -263,29 +263,29 @@ export default function ExpensesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-neutral-200/60 bg-[#fbfbfe]">
+              <tr className="border-b border-line-neutral-200/60 bg-surface-bright">
                 <th className="w-16 py-3.5 px-6"></th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">
+                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest">
                   DATE
                 </th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">
+                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest">
                   MERCHANT / DESCRIPTION
                 </th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">
+                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest">
                   CATEGORY
                 </th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">
+                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest">
                   AMOUNT
                 </th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest text-center">
+                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest text-center">
                   DEDUCTIBLE
                 </th>
-                <th className="py-3.5 px-6 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest text-center">
+                <th className="py-3.5 px-6 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest text-center">
                   RECEIPT
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 text-xs">
+            <tbody className="divide-y divide-line-neutral-100 text-xs">
               {filteredExpenses.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-0 text-center">
@@ -311,11 +311,11 @@ export default function ExpensesPage() {
                   .map((item) => (
                     <tr
                       key={item.id}
-                      className="hover:bg-neutral-50/70 transition-colors group"
+                      className="hover:bg-surface-neutral-50/70 transition-colors group"
                     >
                       {/* Category Rounded Square Icon */}
                       <td className="py-4 px-6">
-                        <div className="w-10 h-10 rounded-xl bg-neutral-100/90 border border-neutral-200/60 flex items-center justify-center text-neutral-600 transition-all duration-300 group-hover:bg-[#f3efff] group-hover:border-[#e3d8fd] group-hover:text-[#7c3aed]">
+                        <div className="w-10 h-10 rounded-xl bg-surface-neutral-100/90 border border-line-neutral-200/60 flex items-center justify-center text-content-neutral-600 transition-all duration-300 group-hover:bg-accent-faint group-hover:border-border-accent group-hover:text-accent">
                           {item.iconType === "plane" && (
                             <Plane className="w-4.5 h-4.5 transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-105" />
                           )}
@@ -329,7 +329,7 @@ export default function ExpensesPage() {
                             <Package className="w-4.5 h-4.5 transition-transform duration-300 group-hover:-translate-y-px group-hover:scale-105" />
                           )}
                           {item.iconType === "ai" && (
-                            <Sparkles className="w-4.5 h-4.5 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-105 text-[#7c3aed]" />
+                            <Sparkles className="w-4.5 h-4.5 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-105 text-accent" />
                           )}
                           {item.iconType === "server" && (
                             <Server className="w-4.5 h-4.5 transition-transform duration-300 group-hover:scale-105" />
@@ -341,30 +341,30 @@ export default function ExpensesPage() {
                       </td>
 
                       {/* Date Column */}
-                      <td className="py-4 px-4 text-neutral-600 font-medium whitespace-nowrap">
+                      <td className="py-4 px-4 text-content-neutral-600 font-medium whitespace-nowrap">
                         {item.date}
                       </td>
 
                       {/* Merchant / Description Column */}
                       <td className="py-4 px-4">
-                        <div className="font-semibold text-neutral-900 text-sm">
+                        <div className="font-semibold text-content-neutral-900 text-sm">
                           {item.merchant}
                         </div>
-                        <div className="text-neutral-400 text-xs mt-0.5 max-w-md truncate font-normal">
+                        <div className="text-content-neutral-400 text-xs mt-0.5 max-w-md truncate font-normal">
                           {item.description}
                         </div>
                       </td>
 
                       {/* Category Pill Column */}
                       <td className="py-4 px-4 whitespace-nowrap">
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider text-neutral-600 bg-neutral-100 border border-neutral-200 uppercase">
+                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider text-content-neutral-600 bg-surface-neutral-100 border border-line-neutral-200 uppercase">
                           {item.category}
                         </span>
                       </td>
 
                       {/* Amount Column */}
                       <td className="py-4 px-4 whitespace-nowrap">
-                        <span className="font-bold text-sm text-neutral-900 font-mono">
+                        <span className="font-bold text-sm text-content-neutral-900 font-mono">
                           ${item.amount.toFixed(2)}
                         </span>
                       </td>
@@ -395,7 +395,7 @@ export default function ExpensesPage() {
                             <Paperclip className="w-4.5 h-4.5 transition-transform duration-200 group-hover/rc:scale-105 group-hover/rc:rotate-6" />
                           </Button>
                         ) : (
-                          <Paperclip className="w-4.5 h-4.5 text-neutral-300 mx-auto" />
+                          <Paperclip className="w-4.5 h-4.5 text-content-neutral-300 mx-auto" />
                         )}
                       </td>
                     </tr>
@@ -406,7 +406,7 @@ export default function ExpensesPage() {
         </div>
 
         {/* Table Footer with Entries Count & Pagination */}
-        <div className="py-4 px-6 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-400">
+        <div className="py-4 px-6 border-t border-line-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-content-neutral-400">
           <div>
             Showing{" "}
             {filteredExpenses.length === 0 ? 0 : (currentPage - 1) * 4 + 1} to{" "}
@@ -435,8 +435,8 @@ export default function ExpensesPage() {
                 onClick={() => setCurrentPage(pageNumber)}
                 className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold transition-all cursor-pointer ${
                   currentPage === pageNumber
-                    ? "bg-[#6941C6] text-white shadow-xs"
-                    : "text-neutral-600 hover:bg-neutral-100"
+                    ? "bg-accent-deep-solid text-white shadow-xs"
+                    : "text-content-neutral-600 hover:bg-surface-neutral-100"
                 }`}
               >
                 {pageNumber}
@@ -476,18 +476,18 @@ export default function ExpensesPage() {
             <MotionSurface
               onDismiss={() => setIsLogModalOpen(false)}
               kind="panel"
-              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
+              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
             >
-              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/60">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center">
                     <DollarSign className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-neutral-900">
+                    <h3 className="text-base font-semibold text-content-neutral-900">
                       Log Business Expense
                     </h3>
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs text-content-neutral-400">
                       UC-12: Operational Expense (OPEX) Tracker
                     </p>
                   </div>
@@ -504,7 +504,7 @@ export default function ExpensesPage() {
 
               {/* 1-Click Fast Presets per SRS REQ-EXP 02 */}
               <div className="px-6 pt-4">
-                <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                <label className="block text-[11px] font-semibold text-content-neutral-400 uppercase tracking-wider mb-2">
                   1-Click OPEX Presets (REQ-EXP 02)
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -569,11 +569,11 @@ export default function ExpensesPage() {
 
               <form
                 onSubmit={handleCreateExpense}
-                className="p-6 space-y-4 text-xs font-medium text-neutral-700"
+                className="p-6 space-y-4 text-xs font-medium text-content-neutral-700"
               >
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Payee / Merchant *
                     </label>
                     <input
@@ -584,12 +584,12 @@ export default function ExpensesPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, merchant: e.target.value })
                       }
-                      className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Amount (USD $) *
                     </label>
                     <input
@@ -601,13 +601,13 @@ export default function ExpensesPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, amount: e.target.value })
                       }
-                      className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 text-neutral-700 font-semibold">
+                  <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                     Expense Description
                   </label>
                   <input
@@ -617,13 +617,13 @@ export default function ExpensesPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, description: e.target.value })
                     }
-                    className="ui-field w-full px-3.5 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Category
                     </label>
                     <select
@@ -634,7 +634,7 @@ export default function ExpensesPage() {
                           category: e.target.value as ExpenseItem["category"],
                         })
                       }
-                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     >
                       <option value="SOFTWARE">SOFTWARE</option>
                       <option value="AI INFRASTRUCTURE">
@@ -649,7 +649,7 @@ export default function ExpensesPage() {
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Expense Date
                     </label>
                     <input
@@ -658,19 +658,19 @@ export default function ExpensesPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, date: e.target.value })
                       }
-                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
                 </div>
 
                 {/* Deductible & Receipt switches */}
-                <div className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-100 space-y-3">
+                <div className="p-3.5 bg-surface-neutral-50 rounded-xl border border-line-neutral-100 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-semibold text-neutral-800 block text-xs">
+                      <span className="font-semibold text-content-neutral-800 block text-xs">
                         Tax Deductible
                       </span>
-                      <span className="text-neutral-400 text-[11px] font-normal">
+                      <span className="text-content-neutral-400 text-[11px] font-normal">
                         Include in business tax write-offs
                       </span>
                     </div>
@@ -683,16 +683,16 @@ export default function ExpensesPage() {
                           deductible: e.target.checked,
                         })
                       }
-                      className="w-4 h-4 text-[#7c3aed] rounded-sm focus:ring-[#7c3aed]"
+                      className="w-4 h-4 text-accent rounded-sm focus:ring-accent"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-neutral-200/60">
+                  <div className="flex items-center justify-between pt-2 border-t border-line-neutral-200/60">
                     <div>
-                      <span className="font-semibold text-neutral-800 block text-xs">
+                      <span className="font-semibold text-content-neutral-800 block text-xs">
                         Attach Receipt
                       </span>
-                      <span className="text-neutral-400 text-[11px] font-normal">
+                      <span className="text-content-neutral-400 text-[11px] font-normal">
                         Store local proof of payment
                       </span>
                     </div>
@@ -705,12 +705,12 @@ export default function ExpensesPage() {
                           receiptAttached: e.target.checked,
                         })
                       }
-                      className="w-4 h-4 text-[#7c3aed] rounded-sm focus:ring-[#7c3aed]"
+                      className="w-4 h-4 text-accent rounded-sm focus:ring-accent"
                     />
                   </div>
                 </div>
 
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-neutral-100">
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-line-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
@@ -738,12 +738,12 @@ export default function ExpensesPage() {
             <MotionSurface
               onDismiss={() => setSelectedReceipt(null)}
               kind="panel"
-              className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-neutral-200 overflow-hidden"
+              className="bg-surface rounded-2xl w-full max-w-md shadow-2xl border border-line-neutral-200 overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+              <div className="px-6 py-4 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/60">
                 <div className="flex items-center gap-2">
-                  <Paperclip className="w-4 h-4 text-[#7c3aed]" />
-                  <h4 className="text-sm font-semibold text-neutral-900">
+                  <Paperclip className="w-4 h-4 text-accent" />
+                  <h4 className="text-sm font-semibold text-content-neutral-900">
                     Receipt Document
                   </h4>
                 </div>
@@ -757,19 +757,19 @@ export default function ExpensesPage() {
                 </Button>
               </div>
               <div className="p-6 text-center space-y-3">
-                <div className="ui-card w-16 h-16 text-[#7c3aed] flex items-center justify-center mx-auto border-purple-100">
+                <div className="ui-card w-16 h-16 text-accent flex items-center justify-center mx-auto border-line-purple-100">
                   <FileSpreadsheet className="w-8 h-8" />
                 </div>
                 <div>
-                  <span className="font-semibold text-neutral-800 text-sm block">
+                  <span className="font-semibold text-content-neutral-800 text-sm block">
                     {selectedReceipt}
                   </span>
-                  <span className="text-neutral-400 text-xs">
+                  <span className="text-content-neutral-400 text-xs">
                     Verified Local Receipt Attachment (Stored offline)
                   </span>
                 </div>
               </div>
-              <div className="px-6 py-3 bg-neutral-50 border-t border-neutral-100 flex justify-end">
+              <div className="px-6 py-3 bg-surface-neutral-50 border-t border-line-neutral-100 flex justify-end">
                 <Button
                   variant="primary"
                   onClick={() => setSelectedReceipt(null)}

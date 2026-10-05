@@ -99,11 +99,11 @@ export default function OutsourcingView() {
   const renderVendorIcon = (type: VendorItem["iconType"]) => {
     switch (type) {
       case "design":
-        return <SlidersHorizontal className="text-[#4b5563] text-[13px]" />;
+        return <SlidersHorizontal className="text-text-body text-[13px]" />;
       case "devops":
-        return <Code2 className="text-[#4b5563] text-[13px]" />;
+        return <Code2 className="text-text-body text-[13px]" />;
       case "legal":
-        return <FileText className="text-[#4b5563] text-[13px]" />;
+        return <FileText className="text-text-body text-[13px]" />;
     }
   };
 
@@ -114,9 +114,9 @@ export default function OutsourcingView() {
         {toastMessage && (
           <MotionSurface
             kind="toast"
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium"
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-toast text-white rounded-xl shadow-lg text-[12px] font-medium"
           >
-            <CheckCircle2 className="text-[#34d399] text-[13px]" />
+            <CheckCircle2 className="text-success-bright text-[13px]" />
             <span>{toastMessage}</span>
           </MotionSurface>
         )}
@@ -134,7 +134,7 @@ export default function OutsourcingView() {
             type="button"
             onClick={() => setIsClientModalOpen(true)}
           >
-            <UserPlus className="text-[11px] text-[#374151]" />
+            <UserPlus className="text-[11px] text-text-secondary" />
             <span>Add Client</span>
           </Button>
 
@@ -143,7 +143,7 @@ export default function OutsourcingView() {
             type="button"
             onClick={() => setIsExpenseModalOpen(true)}
           >
-            <Receipt className="text-[11px] text-[#374151]" />
+            <Receipt className="text-[11px] text-text-secondary" />
             <span>Log Expense</span>
           </Button>
         </div>
@@ -171,13 +171,13 @@ export default function OutsourcingView() {
       <div className="ui-card overflow-hidden mt-7">
         {/* Section title header */}
         <div className="px-6 py-4">
-          <h2 className="text-[15px] font-bold text-[#111827] tracking-tight">
+          <h2 className="text-[15px] font-bold text-text-primary tracking-tight">
             Vendor Directory
           </h2>
         </div>
 
         {/* Vendor list rows container */}
-        <div className="bg-white divide-y divide-neutral-100">
+        <div className="bg-surface divide-y divide-line-neutral-100">
           {vendors.length === 0 ? (
             <EmptyState
               title="No vendors yet"
@@ -187,18 +187,18 @@ export default function OutsourcingView() {
             vendors.map((vendor) => (
               <div
                 key={vendor.id}
-                className="px-6 py-4.5 flex items-center justify-between hover:bg-[#f4f4f0] transition-colors"
+                className="px-6 py-4.5 flex items-center justify-between hover:bg-surface-subtle transition-colors"
               >
                 {/* Left: Vendor category icon and credentials */}
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-[#eaeae5] flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center shrink-0">
                     {renderVendorIcon(vendor.iconType)}
                   </div>
                   <div>
-                    <h3 className="font-bold text-[13.5px] text-[#111827] leading-tight">
+                    <h3 className="font-bold text-[13.5px] text-text-primary leading-tight">
                       {vendor.name}
                     </h3>
-                    <p className="text-[11.5px] text-[#8e8e93] mt-0.5 font-normal">
+                    <p className="text-[11.5px] text-text-subtle mt-0.5 font-normal">
                       {vendor.service}
                     </p>
                   </div>
@@ -208,10 +208,10 @@ export default function OutsourcingView() {
                 <div className="flex items-center gap-5 sm:gap-6">
                   {/* Balance display */}
                   <div className="text-right">
-                    <span className="text-[9.5px] text-[#8e8e93] font-normal block leading-tight">
+                    <span className="text-[9.5px] text-text-subtle font-normal block leading-tight">
                       Current Balance
                     </span>
-                    <span className="text-[13.5px] font-bold text-[#111827] mt-0.5 block leading-tight">
+                    <span className="text-[13.5px] font-bold text-text-primary mt-0.5 block leading-tight">
                       $
                       {vendor.currentBalance.toLocaleString("en-US", {
                         minimumFractionDigits: 2,
@@ -226,8 +226,8 @@ export default function OutsourcingView() {
                     title="Click to toggle status"
                     className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-bold tracking-[0.06em] cursor-pointer uppercase transition-colors ${
                       vendor.status === "PAID"
-                        ? "text-[#15803d] bg-[#d6eddb] hover:bg-[#c4e5cb]"
-                        : "text-[#4b5563] bg-[#eaeae5] hover:bg-[#deded8]"
+                        ? "text-success bg-success-faint hover:bg-success-soft"
+                        : "text-text-body bg-surface-muted hover:bg-surface-strong"
                     }`}
                   >
                     {vendor.status}
@@ -273,10 +273,10 @@ export default function OutsourcingView() {
           >
             <MotionSurface onDismiss={() => setSelectedVendor(null)}
               kind="panel"
-              className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden"
+              className="bg-canvas rounded-2xl shadow-xl border border-border-muted w-full max-w-md overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-                <h3 className="font-bold text-[13px] text-[#111827]">
+              <div className="px-6 py-4 border-b border-surface-muted flex items-center justify-between">
+                <h3 className="font-bold text-[13px] text-text-primary">
                   Vendor Statement Voucher
                 </h3>
                 <Button
@@ -289,31 +289,31 @@ export default function OutsourcingView() {
                   <X className="text-sm" />
                 </Button>
               </div>
-              <div className="p-6 space-y-4 text-[12px] text-[#4b5563]">
+              <div className="p-6 space-y-4 text-[12px] text-text-body">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-bold text-[14px] text-[#111827]">
+                    <div className="font-bold text-[14px] text-text-primary">
                       {selectedVendor.name}
                     </div>
-                    <div className="text-[#8e8e93] text-[11px]">
+                    <div className="text-text-subtle text-[11px]">
                       {selectedVendor.service}
                     </div>
                   </div>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                       selectedVendor.status === "PAID"
-                        ? "text-[#15803d] bg-[#d6eddb]"
-                        : "text-[#4b5563] bg-[#eaeae5]"
+                        ? "text-success bg-success-faint"
+                        : "text-text-body bg-surface-muted"
                     }`}
                   >
                     {selectedVendor.status}
                   </span>
                 </div>
 
-                <div className="p-3 bg-[#eaeae5] rounded-xl space-y-1.5 border border-[#dcdcd7]">
+                <div className="p-3 bg-surface-muted rounded-xl space-y-1.5 border border-border-muted">
                   <div className="flex justify-between">
-                    <span className="text-[#6b7280]">Current Balance:</span>
-                    <span className="font-bold text-[#111827]">
+                    <span className="text-text-muted">Current Balance:</span>
+                    <span className="font-bold text-text-primary">
                       $
                       {selectedVendor.currentBalance.toLocaleString("en-US", {
                         minimumFractionDigits: 2,
@@ -321,14 +321,14 @@ export default function OutsourcingView() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#6b7280]">Scheduled Payout:</span>
-                    <span className="font-medium text-[#111827]">
+                    <span className="text-text-muted">Scheduled Payout:</span>
+                    <span className="font-medium text-text-primary">
                       Oct 15, 2026
                     </span>
                   </div>
                 </div>
               </div>
-              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end gap-2">
+              <div className="px-6 py-3.5 bg-surface-subtle border-t border-surface-muted flex justify-end gap-2">
                 <Button
                   variant="ghost"
                   type="button"
@@ -361,10 +361,10 @@ export default function OutsourcingView() {
           >
             <MotionSurface onDismiss={() => setIsClientModalOpen(false)}
               kind="panel"
-              className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden"
+              className="bg-canvas rounded-2xl shadow-xl border border-border-muted w-full max-w-md overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-                <h3 className="font-bold text-[13px] text-[#111827]">
+              <div className="px-6 py-4 border-b border-surface-muted flex items-center justify-between">
+                <h3 className="font-bold text-[13px] text-text-primary">
                   Add New Client
                 </h3>
                 <Button
@@ -379,7 +379,7 @@ export default function OutsourcingView() {
               </div>
               <form onSubmit={handleAddClient} className="p-6 space-y-3.5">
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                  <label className="block text-[11.5px] font-medium text-text-secondary mb-1">
                     Client Business Name
                   </label>
                   <input
@@ -388,11 +388,11 @@ export default function OutsourcingView() {
                     placeholder="e.g. Fintech Labs Inc."
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-[#dcdcd7] focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    className="ui-field w-full text-[12px] px-3 border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                  <label className="block text-[11.5px] font-medium text-text-secondary mb-1">
                     Email Address
                   </label>
                   <input
@@ -400,7 +400,7 @@ export default function OutsourcingView() {
                     placeholder="alex@fintechlabs.com"
                     value={clientEmail}
                     onChange={(e) => setClientEmail(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-[#dcdcd7] focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    className="ui-field w-full text-[12px] px-3 border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
                 <div className="pt-2 flex justify-end gap-2">
@@ -430,10 +430,10 @@ export default function OutsourcingView() {
           >
             <MotionSurface onDismiss={() => setIsExpenseModalOpen(false)}
               kind="panel"
-              className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden"
+              className="bg-canvas rounded-2xl shadow-xl border border-border-muted w-full max-w-md overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-                <h3 className="font-bold text-[13px] text-[#111827]">
+              <div className="px-6 py-4 border-b border-surface-muted flex items-center justify-between">
+                <h3 className="font-bold text-[13px] text-text-primary">
                   Log Business Expense
                 </h3>
                 <Button
@@ -448,7 +448,7 @@ export default function OutsourcingView() {
               </div>
               <form onSubmit={handleLogExpense} className="p-6 space-y-3.5">
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                  <label className="block text-[11.5px] font-medium text-text-secondary mb-1">
                     Expense Description
                   </label>
                   <input
@@ -457,11 +457,11 @@ export default function OutsourcingView() {
                     placeholder="e.g. Adobe Creative Cloud, Cloud Server"
                     value={expenseTitle}
                     onChange={(e) => setExpenseTitle(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-[#dcdcd7] focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    className="ui-field w-full text-[12px] px-3 border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                  <label className="block text-[11.5px] font-medium text-text-secondary mb-1">
                     Amount ($ USD)
                   </label>
                   <input
@@ -471,7 +471,7 @@ export default function OutsourcingView() {
                     placeholder="54.99"
                     value={expenseAmount}
                     onChange={(e) => setExpenseAmount(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-[#dcdcd7] focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    className="ui-field w-full text-[12px] px-3 border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
                 <div className="pt-2 flex justify-end gap-2">

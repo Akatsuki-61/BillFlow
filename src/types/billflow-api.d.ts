@@ -13,9 +13,15 @@ import type {
   ExportDataPayload,
 } from "./settings";
 
+import type { ThemePreference } from "../lib/theme";
+
 export interface BillFlowAPI {
   isElectron: boolean;
   platform?: string;
+  theme: {
+    initialPreference: ThemePreference;
+    setPreference: (preference: ThemePreference) => Promise<void>;
+  };
   clients: {
     list: () => Promise<ClientWithStats[]>;
     get: (id: string) => Promise<ClientWithStats>;

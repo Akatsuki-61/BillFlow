@@ -186,27 +186,27 @@ export function WidgetRenderer({
         <div
           className={`ui-card p-4 min-h-[140px] h-full flex flex-col justify-between rounded-2xl transition-all ${
             tone === "accent"
-              ? "border-purple-200/80 bg-purple-50/20"
+              ? "border-line-purple-200/80 bg-surface-purple-50/20"
               : tone === "warning"
-                ? "border-amber-200/80 bg-amber-50/20"
+                ? "border-line-amber-200/80 bg-surface-amber-50/20"
                 : ""
           }`}
         >
           <div>
-            <span className="text-[11px] font-medium text-neutral-500 block truncate">
+            <span className="text-[11px] font-medium text-content-neutral-500 block truncate">
               {label}
             </span>
-            <div className="font-serif text-xl sm:text-2xl font-semibold text-neutral-900 mt-1.5 tracking-tight truncate">
+            <div className="font-serif text-xl sm:text-2xl font-semibold text-content-neutral-900 mt-1.5 tracking-tight truncate">
               {value}
             </div>
           </div>
-          <div className="text-[11px] font-semibold text-neutral-600 pt-2 border-t border-neutral-100 flex items-center justify-between">
+          <div className="text-[11px] font-semibold text-content-neutral-600 pt-2 border-t border-line-neutral-100 flex items-center justify-between">
             <span className="truncate">{compactTag || "Active"}</span>
             {tone === "accent" && (
-              <span className="w-2 h-2 rounded-full bg-[#7c3aed]" />
+              <span className="w-2 h-2 rounded-full bg-accent-solid" />
             )}
             {tone === "warning" && (
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span className="w-2 h-2 rounded-full bg-surface-amber-500" />
             )}
           </div>
         </div>
@@ -232,8 +232,8 @@ export function WidgetRenderer({
           "Total Revenue",
           totalRevenueStr,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
-              <TrendingUp className="w-3 h-3 text-[#7c3aed]" />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-neutral-100 text-content-neutral-700 border-line-neutral-200/60">
+              <TrendingUp className="w-3 h-3 text-accent" />
               {totalRevenueStr !== "$0.00" ? "Active" : "0%"}
             </span>
             <span>billed to date</span>
@@ -248,7 +248,7 @@ export function WidgetRenderer({
           "Net Profit & Margin",
           totalRevenueStr,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60">
               <TrendingUp className="w-3 h-3" />
               Healthy
             </span>
@@ -264,7 +264,7 @@ export function WidgetRenderer({
           "Pending Receivables",
           pendingReceivablesStr,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-amber-50 text-amber-800 border-amber-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-amber-50 text-content-amber-800 border-line-amber-200/60">
               {unpaidCount} pending
             </span>
             <span>
@@ -283,7 +283,7 @@ export function WidgetRenderer({
           "Active Client Accounts",
           String(activeClientsCount),
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-blue-50 text-content-blue-700 border-line-blue-200/60">
               <Briefcase className="w-3 h-3" />
               {activeClientsCount} active
             </span>
@@ -299,7 +299,7 @@ export function WidgetRenderer({
           "Subcontractor Costs",
           "$0.00",
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60">
               <GitFork className="w-3 h-3" />
               0 vendors
             </span>
@@ -315,7 +315,7 @@ export function WidgetRenderer({
           "Operating Expenses",
           "$0.00",
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-neutral-100 text-content-neutral-700 border-line-neutral-200/60">
               0%
             </span>
             <span>software & cloud overhead</span>
@@ -330,7 +330,7 @@ export function WidgetRenderer({
           "Invoice Paid Ratio",
           `${paidRatioPct}%`,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200/60">
               <ShieldCheck className="w-3 h-3" />
               {paidCount} of {invoices.length} paid
             </span>
@@ -346,7 +346,7 @@ export function WidgetRenderer({
           "Average Invoice Size",
           avgInvoiceStr,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-neutral-100 text-content-neutral-700 border-line-neutral-200/60">
               <DollarSign className="w-3 h-3" />
               Average
             </span>
@@ -365,8 +365,8 @@ export function WidgetRenderer({
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
                 overdueInvoices.length > 0
-                  ? "bg-rose-50 text-rose-700 border-rose-200/60"
-                  : "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                  ? "bg-surface-rose-50 text-content-rose-700 border-line-rose-200/60"
+                  : "bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200/60"
               }`}
             >
               <Clock className="w-3 h-3" />
@@ -384,7 +384,7 @@ export function WidgetRenderer({
           "Cashflow Runway",
           "12+ mo",
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200/60">
               Stable
             </span>
             <span>operating cushion</span>
@@ -399,7 +399,7 @@ export function WidgetRenderer({
           "Client Concentration",
           "28%",
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-blue-50 text-content-blue-700 border-line-blue-200/60">
               <PieChart className="w-3 h-3" />
               Balanced
             </span>
@@ -415,7 +415,7 @@ export function WidgetRenderer({
           "Realized Hourly Yield",
           "$145/hr",
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60">
               <TrendingUp className="w-3 h-3" />
               Target Met
             </span>
@@ -433,40 +433,40 @@ export function WidgetRenderer({
               isCompact ? "p-4 space-y-3" : "p-6"
             }`}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+            <div className="flex items-center justify-between pb-3 border-b border-line-neutral-100">
               <div>
-                <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
+                <h3 className="text-sm font-semibold text-content-neutral-900 tracking-tight">
                   Revenue vs Expenses
                 </h3>
                 {!isCompact && (
-                  <p className="text-xs text-neutral-500 mt-0.5">
+                  <p className="text-xs text-content-neutral-500 mt-0.5">
                     Monthly cashflow and expense comparison.
                   </p>
                 )}
               </div>
               <div className="flex items-center gap-2.5 text-xs font-medium">
-                <span className="flex items-center gap-1 text-neutral-700">
-                  <span className="w-2 h-2 rounded-full bg-[#7c3aed]" />
+                <span className="flex items-center gap-1 text-content-neutral-700">
+                  <span className="w-2 h-2 rounded-full bg-accent-solid" />
                   <span>Rev</span>
                 </span>
-                <span className="flex items-center gap-1 text-neutral-700">
-                  <span className="w-2 h-2 rounded-full bg-neutral-300" />
+                <span className="flex items-center gap-1 text-content-neutral-700">
+                  <span className="w-2 h-2 rounded-full bg-surface-neutral-300" />
                   <span>Exp</span>
                 </span>
               </div>
             </div>
 
             <div
-              className={`text-center text-xs text-neutral-400 border border-dashed border-neutral-200/80 rounded-xl bg-neutral-50/50 flex items-center justify-center ${
+              className={`text-center text-xs text-content-neutral-400 border border-dashed border-line-neutral-200/80 rounded-xl bg-surface-neutral-50/50 flex items-center justify-center ${
                 isCompact ? "h-32 px-3" : "py-8 my-4"
               }`}
             >
               Cashflow analytics plot here as you bill clients.
             </div>
 
-            <div className="pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+            <div className="pt-2.5 border-t border-line-neutral-100 flex items-center justify-between text-xs text-content-neutral-500">
               <span>Gross: {totalRevenueStr}</span>
-              <span className="text-[#7c3aed] font-medium">Cashflow</span>
+              <span className="text-accent font-medium">Cashflow</span>
             </div>
           </div>
         );
@@ -479,27 +479,27 @@ export function WidgetRenderer({
               isCompact ? "p-4" : "p-6 space-y-6"
             }`}
           >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-line-neutral-100">
               <div>
-                <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
+                <h3 className="text-sm font-semibold text-content-neutral-900 tracking-tight">
                   Profit & Growth Trajectory
                 </h3>
                 {!isCompact && (
-                  <p className="text-xs text-neutral-500 mt-0.5">
+                  <p className="text-xs text-content-neutral-500 mt-0.5">
                     Month-over-month revenue intake and net retained profits.
                   </p>
                 )}
               </div>
 
               <div className="flex items-center gap-2.5">
-                <div className="flex rounded-lg border border-neutral-200 p-0.5 bg-neutral-50 text-[11px]">
+                <div className="flex rounded-lg border border-line-neutral-200 p-0.5 bg-surface-neutral-50 text-[11px]">
                   <button
                     type="button"
                     onClick={() => setChartMetric("profit")}
                     className={`px-2 py-0.5 rounded-md font-medium transition-all ${
                       chartMetric === "profit"
-                        ? "bg-white text-neutral-900 shadow-xs"
-                        : "text-neutral-500 hover:text-neutral-900"
+                        ? "bg-surface text-content-neutral-900 shadow-xs"
+                        : "text-content-neutral-500 hover:text-content-neutral-900"
                     }`}
                   >
                     Volume
@@ -509,8 +509,8 @@ export function WidgetRenderer({
                     onClick={() => setChartMetric("margin")}
                     className={`px-2 py-0.5 rounded-md font-medium transition-all ${
                       chartMetric === "margin"
-                        ? "bg-white text-neutral-900 shadow-xs"
-                        : "text-neutral-500 hover:text-neutral-900"
+                        ? "bg-surface text-content-neutral-900 shadow-xs"
+                        : "text-content-neutral-500 hover:text-content-neutral-900"
                     }`}
                   >
                     Margin
@@ -520,14 +520,14 @@ export function WidgetRenderer({
             </div>
 
             <div
-              className={`flex flex-col items-center justify-center text-center p-4 border border-dashed border-neutral-200/80 rounded-xl bg-neutral-50/50 ${
+              className={`flex flex-col items-center justify-center text-center p-4 border border-dashed border-line-neutral-200/80 rounded-xl bg-surface-neutral-50/50 ${
                 isCompact ? "h-32" : "h-44"
               }`}
             >
-              <span className="text-xs font-semibold text-neutral-800">
+              <span className="text-xs font-semibold text-content-neutral-800">
                 No revenue history yet
               </span>
-              <span className="text-[11px] text-neutral-400 mt-0.5 max-w-sm">
+              <span className="text-[11px] text-content-neutral-400 mt-0.5 max-w-sm">
                 Monthly trends plot here as you bill clients.
               </span>
             </div>
@@ -542,11 +542,11 @@ export function WidgetRenderer({
               isCompact ? "p-4 space-y-2" : "p-6"
             }`}
           >
-            <div className="flex justify-between items-center pb-2 mb-1 border-b border-neutral-100">
-              <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
+            <div className="flex justify-between items-center pb-2 mb-1 border-b border-line-neutral-100">
+              <h3 className="text-sm font-semibold text-content-neutral-900 tracking-tight">
                 Collection Gauge
               </h3>
-              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-surface-emerald-50 text-content-emerald-700 border border-line-emerald-200/60">
                 {paidRatioPct}%
               </span>
             </div>
@@ -565,7 +565,7 @@ export function WidgetRenderer({
                     cx="50"
                     cy="50"
                     r="40"
-                    stroke="#e5e5e5"
+                    stroke="var(--ui-border)"
                     strokeWidth="10"
                     fill="transparent"
                   />
@@ -573,7 +573,7 @@ export function WidgetRenderer({
                     cx="50"
                     cy="50"
                     r="40"
-                    stroke="#7c3aed"
+                    stroke="var(--ui-accent)"
                     strokeWidth="10"
                     strokeDasharray={2 * Math.PI * 40}
                     strokeDashoffset={
@@ -586,7 +586,7 @@ export function WidgetRenderer({
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                   <span
-                    className={`font-serif font-semibold text-neutral-900 leading-none ${
+                    className={`font-serif font-semibold text-content-neutral-900 leading-none ${
                       isCompact ? "text-lg" : "text-2xl"
                     }`}
                   >
@@ -596,7 +596,7 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <div className="text-center text-[11px] text-neutral-500 pt-1.5 border-t border-neutral-100">
+            <div className="text-center text-[11px] text-content-neutral-500 pt-1.5 border-t border-line-neutral-100">
               {paidCount} invoices collected
             </div>
           </div>
@@ -611,21 +611,21 @@ export function WidgetRenderer({
             }`}
           >
             <div>
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-line-neutral-100">
                 <div className="flex items-center gap-1.5">
-                  <TriangleAlert className="w-4 h-4 text-amber-600" />
-                  <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
+                  <TriangleAlert className="w-4 h-4 text-content-amber-600" />
+                  <h3 className="text-sm font-semibold text-content-neutral-900 tracking-tight">
                     Billing Alerts
                   </h3>
                 </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-neutral-100 text-neutral-600">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-surface-neutral-100 text-content-neutral-600">
                   {overdueInvoices.length}
                 </span>
               </div>
 
               <div className="space-y-2">
                 {overdueInvoices.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-neutral-400">
+                  <div className="py-6 text-center text-xs text-content-neutral-400">
                     No overdue accounts.
                   </div>
                 ) : (
@@ -639,17 +639,17 @@ export function WidgetRenderer({
                               `/invoices?invoice=${encodeURIComponent(inv.id)}`,
                             )
                       }
-                      className="flex items-center justify-between p-2 rounded-xl bg-neutral-50 hover:bg-neutral-100/80 transition-colors cursor-pointer border border-neutral-100"
+                      className="flex items-center justify-between p-2 rounded-xl bg-surface-neutral-50 hover:bg-surface-neutral-100/80 transition-colors cursor-pointer border border-line-neutral-100"
                     >
                       <div>
-                        <div className="text-xs font-semibold text-neutral-900">
+                        <div className="text-xs font-semibold text-content-neutral-900">
                           {inv.clientName || "Client Account"}
                         </div>
-                        <div className="text-[10px] text-rose-600 font-medium">
+                        <div className="text-[10px] text-content-rose-600 font-medium">
                           Due {formatDateDisplay(inv.dueDate)}
                         </div>
                       </div>
-                      <div className="font-serif text-xs font-semibold text-neutral-900">
+                      <div className="font-serif text-xs font-semibold text-content-neutral-900">
                         {formatCents(inv.amountCents, inv.currency)}
                       </div>
                     </div>
@@ -658,11 +658,11 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+            <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between text-xs text-content-neutral-500">
               <span>Overdue: {overdueTotalStr}</span>
               <Link
                 href="/invoices"
-                className="text-[#7c3aed] font-medium hover:underline text-[11px]"
+                className="text-accent font-medium hover:underline text-[11px]"
               >
                 Invoices →
               </Link>
@@ -679,16 +679,16 @@ export function WidgetRenderer({
             }`}
           >
             <div>
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-line-neutral-100">
                 <div className="flex items-center gap-1.5">
-                  <Receipt className="w-4 h-4 text-[#7c3aed]" />
-                  <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
+                  <Receipt className="w-4 h-4 text-accent" />
+                  <h3 className="text-sm font-semibold text-content-neutral-900 tracking-tight">
                     Recent Invoices
                   </h3>
                 </div>
                 <Link
                   href="/invoices"
-                  className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#7c3aed] hover:underline"
+                  className="inline-flex items-center gap-0.5 text-xs font-semibold text-accent hover:underline"
                 >
                   <span>All</span>
                   <ArrowUpRight className="w-3 h-3" />
@@ -697,7 +697,7 @@ export function WidgetRenderer({
 
               <div className="space-y-2">
                 {recentInvoicesList.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-neutral-400">
+                  <div className="py-6 text-center text-xs text-content-neutral-400">
                     No invoices generated yet.
                   </div>
                 ) : (
@@ -711,26 +711,26 @@ export function WidgetRenderer({
                               `/invoices?invoice=${encodeURIComponent(inv.id)}`,
                             )
                       }
-                      className="flex items-center justify-between p-2 rounded-xl bg-neutral-50 hover:bg-neutral-100/70 transition-colors cursor-pointer border border-neutral-100"
+                      className="flex items-center justify-between p-2 rounded-xl bg-surface-neutral-50 hover:bg-surface-neutral-100/70 transition-colors cursor-pointer border border-line-neutral-100"
                     >
                       <div className="min-w-0 pr-2">
-                        <div className="text-xs font-semibold text-neutral-900 truncate">
+                        <div className="text-xs font-semibold text-content-neutral-900 truncate">
                           {inv.clientName}
                         </div>
-                        <div className="text-[10px] text-neutral-500 font-mono">
+                        <div className="text-[10px] text-content-neutral-500 font-mono">
                           {inv.code}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-serif text-xs font-semibold text-neutral-900">
+                        <span className="font-serif text-xs font-semibold text-content-neutral-900">
                           {formatCents(inv.amountCents, inv.currency)}
                         </span>
                         <span
                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                             inv.status === "PAID"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-800"
+                              ? "bg-surface-emerald-50 text-content-emerald-700"
+                              : "bg-surface-amber-50 text-content-amber-800"
                           }`}
                         >
                           {inv.status}
@@ -742,11 +742,11 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+            <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between text-xs text-content-neutral-500">
               <span className="truncate">Balance: {pendingReceivablesStr}</span>
               <Link
                 href="/clients"
-                className="text-neutral-700 hover:text-neutral-900 font-medium text-[11px] shrink-0"
+                className="text-content-neutral-700 hover:text-content-neutral-900 font-medium text-[11px] shrink-0"
               >
                 Clients →
               </Link>
@@ -763,16 +763,16 @@ export function WidgetRenderer({
             }`}
           >
             <div>
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-100">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-line-neutral-100">
                 <div className="flex items-center gap-1.5">
-                  <Kanban className="w-4 h-4 text-[#7c3aed]" />
-                  <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
+                  <Kanban className="w-4 h-4 text-accent" />
+                  <h3 className="text-sm font-semibold text-content-neutral-900 tracking-tight">
                     Sprint Tasks
                   </h3>
                 </div>
                 <Link
                   href="/tasks"
-                  className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#7c3aed] hover:underline"
+                  className="inline-flex items-center gap-0.5 text-xs font-semibold text-accent hover:underline"
                 >
                   <span>Board</span>
                   <ArrowUpRight className="w-3 h-3" />
@@ -781,7 +781,7 @@ export function WidgetRenderer({
 
               <div className="space-y-2">
                 {activeTasks.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-neutral-400">
+                  <div className="py-6 text-center text-xs text-content-neutral-400">
                     No active deliverables.
                   </div>
                 ) : (
@@ -789,13 +789,13 @@ export function WidgetRenderer({
                     <div
                       key={t.id}
                       onClick={() => router.push("/tasks")}
-                      className="flex items-center justify-between p-2 rounded-xl bg-neutral-50 hover:bg-neutral-100/70 transition-colors cursor-pointer border border-neutral-100"
+                      className="flex items-center justify-between p-2 rounded-xl bg-surface-neutral-50 hover:bg-surface-neutral-100/70 transition-colors cursor-pointer border border-line-neutral-100"
                     >
                       <div className="min-w-0 pr-2">
-                        <div className="text-xs font-semibold text-neutral-900 truncate">
+                        <div className="text-xs font-semibold text-content-neutral-900 truncate">
                           {t.title}
                         </div>
-                        <div className="text-[10px] text-neutral-500">
+                        <div className="text-[10px] text-content-neutral-500">
                           {t.assignee} · {t.dueDate}
                         </div>
                       </div>
@@ -803,8 +803,8 @@ export function WidgetRenderer({
                       <span
                         className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
                           t.priority === "urgent"
-                            ? "bg-rose-100 text-rose-800"
-                            : "bg-amber-100 text-amber-800"
+                            ? "bg-surface-rose-100 text-content-rose-800"
+                            : "bg-surface-amber-100 text-content-amber-800"
                         }`}
                       >
                         {t.priority}
@@ -815,11 +815,11 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+            <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between text-xs text-content-neutral-500">
               <span>{activeTasks.length} in sprint</span>
               <Link
                 href="/outsourcing"
-                className="text-neutral-700 hover:text-neutral-900 font-medium text-[11px]"
+                className="text-content-neutral-700 hover:text-content-neutral-900 font-medium text-[11px]"
               >
                 Payouts →
               </Link>
@@ -852,13 +852,13 @@ export function WidgetRenderer({
           : ""
       } ${
         isEditing
-          ? "ring-2 ring-dashed ring-purple-300 rounded-2xl bg-purple-50/10 p-0.5"
+          ? "ring-2 ring-dashed ring-line-purple-300 rounded-2xl bg-surface-purple-50/10 p-0.5"
           : ""
       }`}
     >
       {/* Edit Mode Quick Actions Toolbar */}
       {isEditing && (
-        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 p-1 bg-white/95 rounded-xl border border-neutral-200/90 shadow-md backdrop-blur-xs select-none">
+        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 p-1 bg-surface/95 rounded-xl border border-line-neutral-200/90 shadow-md backdrop-blur-xs select-none">
           {onMoveLeft && (
             <button
               type="button"
@@ -867,7 +867,7 @@ export function WidgetRenderer({
                 onMoveLeft();
               }}
               title="Move Left / Earlier"
-              className="p-1 text-neutral-500 hover:text-neutral-900 rounded hover:bg-neutral-100 transition-colors"
+              className="p-1 text-content-neutral-500 hover:text-content-neutral-900 rounded hover:bg-surface-neutral-100 transition-colors"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
@@ -881,7 +881,7 @@ export function WidgetRenderer({
                 onMoveRight();
               }}
               title="Move Right / Later"
-              className="p-1 text-neutral-500 hover:text-neutral-900 rounded hover:bg-neutral-100 transition-colors"
+              className="p-1 text-content-neutral-500 hover:text-content-neutral-900 rounded hover:bg-surface-neutral-100 transition-colors"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -899,7 +899,7 @@ export function WidgetRenderer({
                   ? "Expand to Standard (Rectangle / Full)"
                   : "Shrink to Square / Half"
               }
-              className="p-1 text-[#7c3aed] hover:bg-purple-50 rounded transition-colors"
+              className="p-1 text-accent hover:bg-surface-purple-50 rounded transition-colors"
             >
               {isCompact ? (
                 <Maximize2 className="w-3.5 h-3.5" />
@@ -917,7 +917,7 @@ export function WidgetRenderer({
                 onRemove();
               }}
               title="Remove from Dashboard"
-              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors"
+              className="p-1 text-content-rose-500 hover:text-content-rose-700 hover:bg-surface-rose-50 rounded transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -927,8 +927,8 @@ export function WidgetRenderer({
 
       {/* Subtle Drag Handle Indicator on Hover in Analytics */}
       {isDraggable && source === "analytics" && !isEditing && (
-        <div className="absolute top-2.5 right-2.5 z-20 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 rounded-md bg-white/80 shadow-xs border border-neutral-200/60 pointer-events-none">
-          <GripVertical className="w-3.5 h-3.5 text-neutral-500" />
+        <div className="absolute top-2.5 right-2.5 z-20 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 rounded-md bg-surface/80 shadow-xs border border-line-neutral-200/60 pointer-events-none">
+          <GripVertical className="w-3.5 h-3.5 text-content-neutral-500" />
         </div>
       )}
 

@@ -96,9 +96,9 @@ export default function DashboardPage() {
               ? "Shrink to Square"
               : "Shrink to Half Width",
           icon: isTargetCompact ? (
-            <Maximize2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+            <Maximize2 className="w-3.5 h-3.5 text-accent" />
           ) : (
-            <Minimize2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+            <Minimize2 className="w-3.5 h-3.5 text-accent" />
           ),
           onClick: () => {
             if (contextMenu.widgetId) {
@@ -195,9 +195,9 @@ export default function DashboardPage() {
         {toastMessage && (
           <MotionSurface
             kind="toast"
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium"
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-toast text-white rounded-xl shadow-lg text-[12px] font-medium"
           >
-            <CheckCircle2 className="text-[#34d399] text-[13px]" />
+            <CheckCircle2 className="text-success-bright text-[13px]" />
             <span>{toastMessage}</span>
           </MotionSurface>
         )}
@@ -246,8 +246,8 @@ export default function DashboardPage() {
             }
             className={`w-8 h-8 transition-all ${
               isDashboardEditing
-                ? "bg-[#7c3aed] text-white shadow-xs"
-                : "text-neutral-400 hover:text-neutral-700 opacity-60 hover:opacity-100"
+                ? "bg-accent-solid text-white shadow-xs"
+                : "text-content-neutral-400 hover:text-content-neutral-700 opacity-60 hover:opacity-100"
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -260,17 +260,17 @@ export default function DashboardPage() {
         {isDashboardEditing && (
           <MotionSurface
             kind="panel"
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200/90 shadow-xs"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-surface-purple-50/80 border border-line-purple-200/90 shadow-xs"
           >
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#7c3aed] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <div className="w-7 h-7 rounded-lg bg-accent-solid text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Sparkles className="w-3.5 h-3.5" />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-neutral-900 leading-tight">
+                <h3 className="text-xs font-semibold text-content-neutral-900 leading-tight">
                   Dashboard Rearrange & Resize Mode
                 </h3>
-                <p className="text-[11px] text-neutral-500 mt-0.5">
+                <p className="text-[11px] text-content-neutral-500 mt-0.5">
                   Drag tiles to reorder. Click the resize icon on any card to
                   toggle between square/half-size and standard.
                 </p>
@@ -302,12 +302,12 @@ export default function DashboardPage() {
 
       {/* Main Dashboard Widget Feed */}
       {pinnedWidgets.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-neutral-300">
-          <Layers className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-neutral-900">
+        <div className="p-12 text-center bg-surface rounded-2xl border border-dashed border-line-neutral-300">
+          <Layers className="w-10 h-10 text-content-neutral-400 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-content-neutral-900">
             No widgets pinned to Dashboard
           </h3>
-          <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+          <p className="text-xs text-content-neutral-500 mt-1 max-w-sm mx-auto">
             Your dashboard is clear. Head over to the Analytics board to drag
             widgets onto the sidebar or right-click to pin them.
           </p>
@@ -321,9 +321,9 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div>
-          <div className="flex items-center justify-between mb-3 text-xs text-neutral-500 font-medium">
+          <div className="flex items-center justify-between mb-3 text-xs text-content-neutral-500 font-medium">
             <span>Key Business Metrics ({periodLabelMap[period]})</span>
-            <span className="text-[11px] text-neutral-400">
+            <span className="text-[11px] text-content-neutral-400">
               {pinnedWidgets.length} widgets active · Right-click any tile to
               resize or remove
             </span>
@@ -341,7 +341,7 @@ export default function DashboardPage() {
                   key={w.id}
                   className={`${colSpan} transition-all duration-200 ${
                     isOver
-                      ? "ring-2 ring-[#7c3aed] ring-offset-2 rounded-2xl scale-[1.02]"
+                      ? "ring-2 ring-accent ring-offset-2 rounded-2xl scale-[1.02]"
                       : ""
                   }`}
                   onDragOver={(e) => {

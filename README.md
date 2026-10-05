@@ -105,3 +105,7 @@ The app launches with a **blank slate** (no dummy data). Test by clicking **Add 
   - Export and import full workspace data via JSON and SQLite database backups.
 - [ ] **Currency Conversion**:
   - Add offline currency exchange rates to aggregate mixed currency totals on the dashboard.
+
+### Appearance
+
+Choose **Light**, **Dark**, or **System** under **Settings → Appearance**. Changes apply immediately and save on this device. System follows operating system appearance changes. The desktop app also themes native window controls; printed output retains light document colors.
