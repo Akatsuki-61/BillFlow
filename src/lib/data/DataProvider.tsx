@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import type {
   ClientWithStats,
   NewClientInput,
@@ -9,18 +9,31 @@ import type {
   InvoicePatchInput,
   InvoiceStatus,
   DashboardSummary,
+  Currency,
 } from "@/types/billing";
+import { getActiveInvoiceCurrency } from "@/lib/format";
 import type {
   AppSettings,
   UpdateSettingsInput,
   ExportDataPayload,
 } from "@/types/settings";
+import type {
+  VendorItem,
+  NewVendorInput,
+  VendorPatchInput,
+} from "@/types/outsourcing";
+import type {
+  AnalyticsSummaryPayload,
+  AnalyticsMonthlyTrend,
+} from "@/types/analytics";
 
 interface DataContextType {
   clients: ClientWithStats[];
   invoices: InvoiceWithClient[];
+  vendors: VendorItem[];
   dashboard: DashboardSummary | null;
   settings: AppSettings | null;
+  activeCurrency: Currency;
   isLoading: boolean;
   isElectron: boolean;
   error: string | null;
@@ -32,6 +45,11 @@ interface DataContextType {
   setInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
   deleteInvoice: (id: string) => Promise<void>;
   getNextInvoiceCode: () => Promise<string>;
+  createVendor: (input: NewVendorInput) => Promise<VendorItem>;
+  updateVendor: (id: string, patch: VendorPatchInput) => Promise<VendorItem>;
+  setVendorStatus: (id: string, status: "PENDING" | "PAID") => Promise<VendorItem>;
+  deleteVendor: (id: string) => Promise<void>;
+  getAnalyticsSummary: (period?: string) => Promise<AnalyticsSummaryPayload>;
   updateSettings: (patch: UpdateSettingsInput) => Promise<AppSettings>;
   getDbPath: () => Promise<string>;
   revealDbFile: () => Promise<void>;
@@ -45,6 +63,7 @@ const DataContext = createContext<DataContextType | null>(null);
 // In-memory fallback repository when running outside Electron
 let memoryClients: ClientWithStats[] = [];
 let memoryInvoices: InvoiceWithClient[] = [];
+let memoryVendors: VendorItem[] = [];
 let memorySettings: AppSettings = {
   id: "default",
   businessName: "",
@@ -69,6 +88,7 @@ let memorySettings: AppSettings = {
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [invoices, setInvoices] = useState<InvoiceWithClient[]>([]);
+  const [vendors, setVendors] = useState<VendorItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -83,23 +103,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       if (checkIsElectron() && window.billflow) {
         setIsElectron(true);
-        const [cList, iList, dSummary, sSettings] = await Promise.all([
+        const [cList, iList, dSummary, sSettings, vList] = await Promise.all([
           window.billflow.clients.list(),
           window.billflow.invoices.list(),
           window.billflow.dashboard.summary(),
           window.billflow.settings.get(),
+          window.billflow.vendors.list(),
         ]);
         setClients(cList);
         setInvoices(iList);
         setDashboard(dSummary);
         setSettings(sSettings);
+        setVendors(vList);
       } else {
         setIsElectron(false);
         if (typeof window !== "undefined") {
-          const stored = localStorage.getItem("billflow_memory_settings");
-          if (stored) {
+          const storedSettings = localStorage.getItem("billflow_memory_settings");
+          if (storedSettings) {
             try {
-              memorySettings = { ...memorySettings, ...JSON.parse(stored) };
+              memorySettings = { ...memorySettings, ...JSON.parse(storedSettings) };
+            } catch {
+              // ignore
+            }
+          }
+          const storedVendors = localStorage.getItem("billflow_outsourcing_vendors");
+          if (storedVendors) {
+            try {
+              const parsed = JSON.parse(storedVendors);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                memoryVendors = parsed;
+              }
             } catch {
               // ignore
             }
@@ -107,6 +140,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
         setClients([...memoryClients]);
         setInvoices([...memoryInvoices]);
+        setVendors([...memoryVendors]);
         setSettings({ ...memorySettings });
         setDashboard({
           activeClients: memoryClients.length,
@@ -361,24 +395,212 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } else {
       memoryClients = [];
       memoryInvoices = [];
+      memoryVendors = [];
       memorySettings = {
         ...memorySettings,
         nextInvoiceSeq: 1,
       };
       if (typeof window !== "undefined") {
         localStorage.removeItem("billflow_memory_settings");
+        localStorage.removeItem("billflow_outsourcing_vendors");
       }
       await refresh();
     }
   };
+
+  const createVendor = async (input: NewVendorInput): Promise<VendorItem> => {
+    if (checkIsElectron() && window.billflow) {
+      const created = await window.billflow.vendors.create(input);
+      await refresh();
+      return created;
+    } else {
+      const id = `vnd-${Date.now()}`;
+      const balance =
+        typeof input.currentBalance === "number"
+          ? input.currentBalance
+          : typeof input.balanceCents === "number"
+            ? Math.round(input.balanceCents / 100)
+            : 0;
+      const client = memoryClients.find((c) => c.id === input.linkedClientId);
+      const newVendor: VendorItem = {
+        id,
+        name: input.name,
+        service: input.service,
+        currentBalance: balance,
+        status: input.status || "PENDING",
+        iconType: input.iconType || "devops",
+        email: input.email,
+        phone: input.phone,
+        linkedClientId: input.linkedClientId,
+        linkedClientName: input.linkedClientName || client?.name,
+        payoutDueDate: input.payoutDueDate,
+        notes: input.notes,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      memoryVendors = [newVendor, ...memoryVendors];
+      if (typeof window !== "undefined") {
+        localStorage.setItem("billflow_outsourcing_vendors", JSON.stringify(memoryVendors));
+      }
+      await refresh();
+      return newVendor;
+    }
+  };
+
+  const updateVendor = async (id: string, patch: VendorPatchInput): Promise<VendorItem> => {
+    if (checkIsElectron() && window.billflow) {
+      const updated = await window.billflow.vendors.update(id, patch);
+      await refresh();
+      return updated;
+    } else {
+      const idx = memoryVendors.findIndex((v) => v.id === id);
+      if (idx === -1) throw new Error("Vendor not found");
+      const existing = memoryVendors[idx];
+      const balance =
+        typeof patch.currentBalance === "number"
+          ? patch.currentBalance
+          : typeof patch.balanceCents === "number"
+            ? Math.round(patch.balanceCents / 100)
+            : existing.currentBalance;
+      const updated: VendorItem = {
+        ...existing,
+        ...patch,
+        currentBalance: balance,
+        updatedAt: new Date().toISOString(),
+      };
+      memoryVendors[idx] = updated;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("billflow_outsourcing_vendors", JSON.stringify(memoryVendors));
+      }
+      await refresh();
+      return updated;
+    }
+  };
+
+  const setVendorStatus = async (id: string, status: "PENDING" | "PAID"): Promise<VendorItem> => {
+    if (checkIsElectron() && window.billflow) {
+      const updated = await window.billflow.vendors.setStatus(id, status);
+      await refresh();
+      return updated;
+    } else {
+      return updateVendor(id, { status });
+    }
+  };
+
+  const deleteVendor = async (id: string): Promise<void> => {
+    if (checkIsElectron() && window.billflow) {
+      await window.billflow.vendors.remove(id);
+      await refresh();
+    } else {
+      memoryVendors = memoryVendors.filter((v) => v.id !== id);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("billflow_outsourcing_vendors", JSON.stringify(memoryVendors));
+      }
+      await refresh();
+    }
+  };
+
+  const getAnalyticsSummary = async (period?: string): Promise<AnalyticsSummaryPayload> => {
+    if (checkIsElectron() && window.billflow) {
+      return await window.billflow.analytics.summary(period);
+    } else {
+      let totalRevenueCents = 0;
+      let paidCents = 0;
+      let paidCount = 0;
+      let pendingReceivablesCents = 0;
+      let unpaidCount = 0;
+      let overdueCents = 0;
+      let overdueCount = 0;
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+
+      for (const inv of memoryInvoices) {
+        if (inv.status !== "DRAFT") {
+          totalRevenueCents += inv.amountCents;
+          if (inv.status === "PAID") {
+            paidCents += inv.amountCents;
+            paidCount += 1;
+          } else {
+            const unpaid = Math.max(0, inv.amountCents - (inv.paidCents || 0));
+            pendingReceivablesCents += unpaid;
+            unpaidCount += 1;
+            if (inv.status === "OVERDUE" || (inv.dueDate && inv.dueDate < todayStr)) {
+              overdueCents += unpaid;
+              overdueCount += 1;
+            }
+          }
+        }
+      }
+
+      let totalOutsourcedCents = 0;
+      for (const v of memoryVendors) {
+        totalOutsourcedCents += v.currentBalance * 100;
+      }
+
+      const netProfitCents = Math.max(0, totalRevenueCents - totalOutsourcedCents);
+      const marginPct = totalRevenueCents > 0 ? Math.round((netProfitCents / totalRevenueCents) * 100) : 100;
+      const paidRatioPct = totalRevenueCents > 0 ? Math.round((paidCents / totalRevenueCents) * 100) : 100;
+      const avgInvoiceCents = memoryInvoices.length > 0 ? Math.round(totalRevenueCents / memoryInvoices.length) : 0;
+      const topClientName = memoryClients[0]?.name || "N/A";
+      const topClientPct = totalRevenueCents > 0 ? 35 : 0;
+      const effectiveHourlyRate = avgInvoiceCents > 0 ? Math.max(65, Math.round(avgInvoiceCents / 1600)) : 145;
+      const monthlyBurn = Math.max(100000, Math.round(totalOutsourcedCents / 3));
+      const availableLiquidity = paidCents + Math.round(pendingReceivablesCents * 0.75);
+      const cashflowRunwayMonths = monthlyBurn > 0 ? Math.min(24, Math.max(1, Math.round(availableLiquidity / monthlyBurn))) : 12;
+
+      const monthlyTrends: AnalyticsMonthlyTrend[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const label = d.toLocaleString("default", { month: "short" });
+        monthlyTrends.push({
+          key,
+          label,
+          revenueCents: 0,
+          expensesCents: Math.round(totalOutsourcedCents / 6),
+          profitCents: 0,
+          marginPct: 100,
+        });
+      }
+
+      return {
+        totalRevenueCents,
+        totalOutsourcedCents,
+        netProfitCents,
+        marginPct,
+        pendingReceivablesCents,
+        unpaidCount,
+        overdueCents,
+        overdueCount,
+        paidRatioPct,
+        avgInvoiceCents,
+        activeClientsCount: memoryClients.length,
+        vendorsCount: memoryVendors.length,
+        topClientName,
+        topClientPct,
+        effectiveHourlyRate,
+        cashflowRunwayMonths,
+        monthlyTrends,
+      };
+    }
+  };
+
+  const activeCurrency: Currency = useMemo(() => {
+    return getActiveInvoiceCurrency(
+      invoices,
+      (settings?.defaultCurrency as Currency) || "USD",
+    );
+  }, [invoices, settings]);
 
   return (
     <DataContext.Provider
       value={{
         clients,
         invoices,
+        vendors,
         dashboard,
         settings,
+        activeCurrency,
         isLoading,
         isElectron,
         error,
@@ -390,6 +612,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setInvoiceStatus,
         deleteInvoice,
         getNextInvoiceCode,
+        createVendor,
+        updateVendor,
+        setVendorStatus,
+        deleteVendor,
+        getAnalyticsSummary,
         updateSettings,
         getDbPath,
         revealDbFile,
@@ -411,6 +638,11 @@ export function useData() {
   return context;
 }
 
+export function useActiveCurrency() {
+  const { activeCurrency } = useData();
+  return { activeCurrency };
+}
+
 export function useClients() {
   const { clients, isLoading, error, createClient, deleteClient, refresh } = useData();
   return { clients, isLoading, error, createClient, deleteClient, refresh };
@@ -419,6 +651,7 @@ export function useClients() {
 export function useInvoices(filter?: { clientId?: string }) {
   const {
     invoices,
+    activeCurrency,
     isLoading,
     error,
     createInvoice,
@@ -436,6 +669,7 @@ export function useInvoices(filter?: { clientId?: string }) {
   return {
     invoices: filteredInvoices,
     allInvoices: invoices,
+    activeCurrency,
     isLoading,
     error,
     createInvoice,
@@ -477,4 +711,58 @@ export function useSettings() {
     resetData,
     refresh,
   };
+}
+
+export function useVendors() {
+  const {
+    vendors,
+    isLoading,
+    error,
+    createVendor,
+    updateVendor,
+    setVendorStatus,
+    deleteVendor,
+    refresh,
+  } = useData();
+
+  return {
+    vendors,
+    isLoading,
+    error,
+    createVendor,
+    updateVendor,
+    setVendorStatus,
+    deleteVendor,
+    refresh,
+  };
+}
+
+export function useAnalyticsSummary(period?: string) {
+  const { getAnalyticsSummary } = useData();
+  const [data, setData] = useState<AnalyticsSummaryPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await getAnalyticsSummary(period);
+      setData(res);
+      setError(null);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to load analytics";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [getAnalyticsSummary, period]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
+  return { data, loading, error, refreshSummary: fetchSummary };
 }

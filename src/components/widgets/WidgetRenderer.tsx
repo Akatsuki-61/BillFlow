@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -22,20 +22,45 @@ import {
   Maximize2,
   Minimize2,
   X,
+  BarChart3,
+  Activity,
+  Sparkles,
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/Workspace";
 import {
   useDashboardSummary,
   useInvoices,
   useClients,
+  useVendors,
+  useActiveCurrency,
 } from "@/lib/data/DataProvider";
-import { formatCents, formatDateDisplay } from "@/lib/format";
+import { formatCents, formatDateDisplay, getCurrencySymbol } from "@/lib/format";
 import { DashboardPeriod, MonthlyGrowthPoint } from "@/types/dashboard";
 import { WidgetDisplaySize } from "@/types/widgets";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
+import "../analytics/analytics.css";
 
-// Synthetic monthly growth trend dataset
-const growthDataset: MonthlyGrowthPoint[] = [];
+// Smooth Bezier Curve Path Generator for Financial Charts
+function getSmoothPath(points: Array<{ x: number; y: number }>): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = i > 0 ? points[i - 1] : points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = i < points.length - 2 ? points[i + 2] : p2;
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
 
 // Sample active sprint tasks
 const activeTasks = [
@@ -98,60 +123,187 @@ export function WidgetRenderer({
   const { dashboard } = useDashboardSummary();
   const { invoices } = useInvoices();
   const { clients } = useClients();
+  const { vendors } = useVendors();
+  const { activeCurrency } = useActiveCurrency();
 
   const [chartMetric, setChartMetric] = useState<"profit" | "margin">("profit");
 
-  const formatCurrencyMap = (map?: Record<string, number>): string => {
-    if (!map || Object.keys(map).length === 0) return "$0.00";
-    const nonZero = Object.entries(map).filter(([, cents]) => cents > 0);
-    if (nonZero.length === 0) return "$0.00";
-    return nonZero.map(([curr, cents]) => formatCents(cents, curr)).join(" · ");
-  };
+  // Filter invoices according to selected period
+  const filteredInvoices = useMemo(() => {
+    if (!period || period === "all") return invoices;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
 
-  const totalRevenueStr = useMemo(
-    () => formatCurrencyMap(dashboard?.totalBilledByCurrency),
-    [dashboard],
-  );
-  const pendingReceivablesStr = useMemo(
-    () => formatCurrencyMap(dashboard?.outstandingByCurrency),
-    [dashboard],
-  );
+    const subset = invoices.filter((inv) => {
+      if (!inv.issueDate) return true;
+      const invDate = new Date(inv.issueDate);
+      if (isNaN(invDate.getTime())) return true;
 
-  const activeClientsCount = dashboard?.activeClients ?? clients.length;
-  const unpaidCount = dashboard?.unpaidCount ?? 0;
-  const recentInvoicesList = dashboard?.recentInvoices ?? [];
-
-  // Live computed metrics across invoices
-  const { paidCount, totalInvoicedCents, paidRatioPct, avgInvoiceStr } =
-    useMemo(() => {
-      if (invoices.length === 0) {
-        return {
-          paidCount: 0,
-          totalInvoicedCents: 0,
-          paidRatioPct: 100,
-          avgInvoiceStr: "$0.00",
-        };
+      if (period === "year") {
+        return invDate.getFullYear() === currentYear;
       }
-      let paid = 0;
-      let totalCents = 0;
-      let paidCents = 0;
-      invoices.forEach((inv) => {
-        totalCents += inv.amountCents;
-        if (inv.status === "PAID") {
-          paid += 1;
-          paidCents += inv.amountCents;
-        }
-      });
-      const ratio =
-        totalCents > 0 ? Math.round((paidCents / totalCents) * 100) : 100;
-      const avg = totalCents / invoices.length;
+      if (period === "month") {
+        return (
+          invDate.getFullYear() === currentYear &&
+          invDate.getMonth() === currentMonth
+        );
+      }
+      if (period === "quarter") {
+        const invQuarter = Math.floor(invDate.getMonth() / 3);
+        const currQuarter = Math.floor(currentMonth / 3);
+        return (
+          invDate.getFullYear() === currentYear &&
+          invQuarter === currQuarter
+        );
+      }
+      return true;
+    });
+
+    return subset.length > 0 ? subset : invoices;
+  }, [invoices, period]);
+
+  // Total Outsourced Subcontractor Costs (cents)
+  const totalOutsourcedCents = useMemo(() => {
+    return vendors.reduce(
+      (sum, v) => sum + (Number(v.currentBalance) || 0) * 100,
+      0,
+    );
+  }, [vendors]);
+
+  const outsourcedCostsStr = useMemo(() => {
+    return formatCents(totalOutsourcedCents, activeCurrency);
+  }, [totalOutsourcedCents, activeCurrency]);
+
+  // Aggregate metrics from live invoices
+  const {
+    totalRevenueCents,
+    paidCount,
+    paidCents,
+    pendingCents,
+    pendingCount,
+    paidRatioPct,
+    avgInvoiceCents,
+    avgInvoiceStr,
+  } = useMemo(() => {
+    if (filteredInvoices.length === 0) {
       return {
-        paidCount: paid,
-        totalInvoicedCents: totalCents,
-        paidRatioPct: ratio,
-        avgInvoiceStr: formatCents(Math.round(avg), "USD"),
+        totalRevenueCents: 0,
+        paidCount: 0,
+        paidCents: 0,
+        pendingCents: 0,
+        pendingCount: 0,
+        paidRatioPct: 100,
+        avgInvoiceCents: 0,
+        avgInvoiceStr: formatCents(0, activeCurrency),
       };
-    }, [invoices]);
+    }
+
+    let total = 0;
+    let paid = 0;
+    let paidAmt = 0;
+    let pendingAmt = 0;
+    let pendingCnt = 0;
+
+    filteredInvoices.forEach((inv) => {
+      total += inv.amountCents;
+      if (inv.status === "PAID") {
+        paid += 1;
+        paidAmt += inv.amountCents;
+      } else {
+        pendingCnt += 1;
+        pendingAmt += inv.amountCents - (inv.paidCents || 0);
+      }
+    });
+
+    const ratio = total > 0 ? Math.round((paidAmt / total) * 100) : 100;
+    const avg = Math.round(total / filteredInvoices.length);
+
+    return {
+      totalRevenueCents: total,
+      paidCount: paid,
+      paidCents: paidAmt,
+      pendingCents: pendingAmt,
+      pendingCount: pendingCnt,
+      paidRatioPct: ratio,
+      avgInvoiceCents: avg,
+      avgInvoiceStr: formatCents(avg, activeCurrency),
+    };
+  }, [filteredInvoices, activeCurrency]);
+
+  const totalRevenueStr = useMemo(() => {
+    return formatCents(totalRevenueCents, activeCurrency);
+  }, [totalRevenueCents, activeCurrency]);
+
+  const pendingReceivablesStr = useMemo(() => {
+    return formatCents(pendingCents, activeCurrency);
+  }, [pendingCents, activeCurrency]);
+
+  // Net Profit & Margins
+  const netProfitCents = useMemo(() => {
+    return Math.max(0, totalRevenueCents - totalOutsourcedCents);
+  }, [totalRevenueCents, totalOutsourcedCents]);
+
+  const netProfitStr = useMemo(() => {
+    return formatCents(netProfitCents, activeCurrency);
+  }, [netProfitCents, activeCurrency]);
+
+  const marginPct = useMemo(() => {
+    if (totalRevenueCents <= 0) return 100;
+    const net = Math.max(0, totalRevenueCents - totalOutsourcedCents);
+    return Math.round((net / totalRevenueCents) * 100);
+  }, [totalRevenueCents, totalOutsourcedCents]);
+
+  // Operating Expenses (Outsourced costs + 5% software overhead)
+  const opexCents = useMemo(() => {
+    return totalOutsourcedCents + Math.round(totalRevenueCents * 0.05);
+  }, [totalOutsourcedCents, totalRevenueCents]);
+
+  const opexStr = useMemo(() => {
+    return formatCents(opexCents, activeCurrency);
+  }, [opexCents, activeCurrency]);
+
+  const opexRatioPct = useMemo(() => {
+    if (totalRevenueCents <= 0) return 5;
+    return Math.min(100, Math.round((opexCents / totalRevenueCents) * 100));
+  }, [opexCents, totalRevenueCents]);
+
+  // Active Clients count
+  const activeClientsCount = dashboard?.activeClients ?? clients.length;
+
+  // Top Client Concentration
+  const topClient = useMemo(() => {
+    if (clients.length === 0) return null;
+    return clients.reduce((max, c) => {
+      const maxBilled = max?.totalBilledCents || 0;
+      return c.totalBilledCents > maxBilled ? c : max;
+    }, clients[0]);
+  }, [clients]);
+
+  const topClientPct = useMemo(() => {
+    if (!topClient || totalRevenueCents <= 0) return 0;
+    return Math.min(
+      100,
+      Math.round((topClient.totalBilledCents / totalRevenueCents) * 100),
+    );
+  }, [topClient, totalRevenueCents]);
+
+  // Realized Hourly Yield
+  const effectiveHourlyRate = useMemo(() => {
+    if (avgInvoiceCents <= 0) return 145;
+    return Math.max(65, Math.round(avgInvoiceCents / 1600));
+  }, [avgInvoiceCents]);
+
+  // Cashflow Runway
+  const runwayMonths = useMemo(() => {
+    const monthlyBurn = Math.max(100000, Math.round(totalOutsourcedCents / 3));
+    const availableLiquidity = paidCents + Math.round(pendingCents * 0.75);
+    if (monthlyBurn <= 0 || availableLiquidity <= 0) return 12;
+    return Math.min(
+      24,
+      Math.max(1, Math.round(availableLiquidity / monthlyBurn)),
+    );
+  }, [totalOutsourcedCents, paidCents, pendingCents]);
 
   // Overdue count and amount
   const overdueInvoices = useMemo(() => {
@@ -168,8 +320,70 @@ export function WidgetRenderer({
       (acc, inv) => acc + inv.amountCents,
       0,
     );
-    return formatCents(cents, "USD");
-  }, [overdueInvoices]);
+    return formatCents(cents, activeCurrency);
+  }, [overdueInvoices, activeCurrency]);
+
+  // Display invoices for recent invoices widget
+  const displayInvoices = useMemo(() => {
+    if (invoices.length > 0) {
+      return invoices.slice(0, displaySize === "compact" ? 2 : 4);
+    }
+    return (dashboard?.recentInvoices as any[]) ?? [];
+  }, [invoices, dashboard, displaySize]);
+
+  // 6-month historical/projected monthly points for charts
+  const monthlyStats = useMemo(() => {
+    const months: Array<{
+      key: string;
+      label: string;
+      revenueCents: number;
+      expensesCents: number;
+      profitCents: number;
+      marginPct: number;
+    }> = [];
+
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleString("default", { month: "short" });
+      months.push({
+        key,
+        label,
+        revenueCents: 0,
+        expensesCents: 0,
+        profitCents: 0,
+        marginPct: 100,
+      });
+    }
+
+    invoices.forEach((inv) => {
+      if (!inv.issueDate) return;
+      const invKey = inv.issueDate.slice(0, 7);
+      const target = months.find((m) => m.key === invKey);
+      if (target) {
+        target.revenueCents += inv.amountCents;
+      }
+    });
+
+    const hasInvoices = invoices.length > 0;
+    const avgMonthlyOutsourced = hasInvoices
+      ? Math.round(totalOutsourcedCents / 6)
+      : 0;
+
+    months.forEach((m) => {
+      m.expensesCents = m.revenueCents > 0
+        ? avgMonthlyOutsourced + Math.round(m.revenueCents * 0.05)
+        : 0;
+      m.profitCents = Math.max(0, m.revenueCents - m.expensesCents);
+      m.marginPct =
+        m.revenueCents > 0
+          ? Math.round((m.profitCents / m.revenueCents) * 100)
+          : 100;
+    });
+
+    return months;
+  }, [invoices, totalOutsourcedCents]);
 
   const isCompact = displaySize === "compact";
 
@@ -234,7 +448,7 @@ export function WidgetRenderer({
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
               <TrendingUp className="w-3 h-3 text-[#7c3aed]" />
-              {totalRevenueStr !== "$0.00" ? "Active" : "0%"}
+              {filteredInvoices.length} invoices
             </span>
             <span>billed to date</span>
           </>,
@@ -246,16 +460,16 @@ export function WidgetRenderer({
       case "net-profit":
         return renderMetric(
           "Net Profit & Margin",
-          totalRevenueStr,
+          netProfitStr,
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
               <TrendingUp className="w-3 h-3" />
-              Healthy
+              {marginPct}% margin
             </span>
             <span>net retained earnings</span>
           </>,
           "accent",
-          "Retained earnings",
+          `${marginPct}% margin`,
         );
 
       // 3. Pending Receivables
@@ -265,16 +479,16 @@ export function WidgetRenderer({
           pendingReceivablesStr,
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-amber-50 text-amber-800 border-amber-200/60">
-              {unpaidCount} pending
+              {pendingCount} pending
             </span>
             <span>
-              {unpaidCount === 1
+              {pendingCount === 1
                 ? "invoice awaiting payment"
                 : "invoices awaiting payment"}
             </span>
           </>,
           "warning",
-          `${unpaidCount} pending`,
+          `${pendingCount} pending`,
         );
 
       // 4. Active Clients
@@ -297,31 +511,31 @@ export function WidgetRenderer({
       case "outsourced-costs":
         return renderMetric(
           "Subcontractor Costs",
-          "$0.00",
+          outsourcedCostsStr,
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
               <GitFork className="w-3 h-3" />
-              0 vendors
+              {vendors.length} vendors
             </span>
             <span>active external contractors</span>
           </>,
           "default",
-          "0 contractors",
+          `${vendors.length} contractors`,
         );
 
       // 6. Operating Expenses
       case "operating-expenses":
         return renderMetric(
           "Operating Expenses",
-          "$0.00",
+          opexStr,
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-neutral-100 text-neutral-700 border-neutral-200/60">
-              0%
+              {opexRatioPct}%
             </span>
-            <span>software & cloud overhead</span>
+            <span>software & contractor overhead</span>
           </>,
           "default",
-          "Software & cloud",
+          "Software & tools",
         );
 
       // 7. Paid Ratio
@@ -332,7 +546,7 @@ export function WidgetRenderer({
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200/60">
               <ShieldCheck className="w-3 h-3" />
-              {paidCount} of {invoices.length} paid
+              {paidCount} of {filteredInvoices.length} paid
             </span>
             <span>on-time collection rate</span>
           </>,
@@ -382,7 +596,7 @@ export function WidgetRenderer({
       case "cashflow-runway":
         return renderMetric(
           "Cashflow Runway",
-          "12+ mo",
+          `${runwayMonths}+ mo`,
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200/60">
               Stable
@@ -397,23 +611,23 @@ export function WidgetRenderer({
       case "client-concentration":
         return renderMetric(
           "Client Concentration",
-          "28%",
+          `${topClientPct}%`,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200/60">
-              <PieChart className="w-3 h-3" />
-              Balanced
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200/60 truncate max-w-[120px]">
+              <PieChart className="w-3 h-3 shrink-0" />
+              <span className="truncate">{topClient ? topClient.name : "Diversified"}</span>
             </span>
-            <span>diversified revenue base</span>
+            <span>revenue concentration</span>
           </>,
           "default",
-          "Top client 28%",
+          `Top client ${topClientPct}%`,
         );
 
       // 12. Realized Hourly Yield
       case "effective-hourly-rate":
         return renderMetric(
           "Realized Hourly Yield",
-          "$145/hr",
+          `${getCurrencySymbol(activeCurrency)}${effectiveHourlyRate}/hr`,
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200/60">
               <TrendingUp className="w-3 h-3" />
@@ -426,116 +640,367 @@ export function WidgetRenderer({
         );
 
       // 13. Revenue vs Expenses Paired Bar Chart
-      case "revenue-expenses-chart":
+      case "revenue-expenses-chart": {
+        const rawMax = Math.max(
+          0,
+          ...monthlyStats.map((m) => Math.max(m.revenueCents, m.expensesCents)),
+        );
+        const maxChartVal = rawMax > 0 ? rawMax : 500000; // Reference ceiling
+        const topLabel = formatCents(maxChartVal, activeCurrency);
+        const midLabel = formatCents(Math.round(maxChartVal / 2), activeCurrency);
+
         return (
-          <div
-            className={`ui-card flex flex-col justify-between ${
-              isCompact ? "p-4 space-y-3" : "p-6"
-            }`}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
-              <div>
-                <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
-                  Revenue vs Expenses
-                </h3>
-                {!isCompact && (
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    Monthly cashflow and expense comparison.
-                  </p>
-                )}
+          <div className="analytics-creative-chart-card">
+            <div className="analytics-creative-header">
+              <div className="analytics-creative-title-group">
+                <div className="analytics-creative-icon-box">
+                  <BarChart3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="analytics-creative-title">
+                    Revenue vs Expenses
+                  </h3>
+                  {!isCompact && (
+                    <p className="analytics-creative-subtitle">
+                      6-month cashflow velocity and contractor payouts
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2.5 text-xs font-medium">
-                <span className="flex items-center gap-1 text-neutral-700">
-                  <span className="w-2 h-2 rounded-full bg-[#7c3aed]" />
-                  <span>Rev</span>
+
+              <div className="analytics-creative-controls">
+                <span className="analytics-legend-pill">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#7c3aed]" />
+                  <span>Revenue</span>
                 </span>
-                <span className="flex items-center gap-1 text-neutral-700">
-                  <span className="w-2 h-2 rounded-full bg-neutral-300" />
-                  <span>Exp</span>
+                <span className="analytics-legend-pill">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#cbd5e1]" />
+                  <span>Expenses</span>
                 </span>
               </div>
             </div>
 
-            <div
-              className={`text-center text-xs text-neutral-400 border border-dashed border-neutral-200/80 rounded-xl bg-neutral-50/50 flex items-center justify-center ${
-                isCompact ? "h-32 px-3" : "py-8 my-4"
-              }`}
-            >
-              Cashflow analytics plot here as you bill clients.
+            <div className="analytics-creative-canvas-area">
+              <svg
+                viewBox="0 0 540 170"
+                className="analytics-creative-svg"
+                preserveAspectRatio="none"
+              >
+                <defs>
+                  <linearGradient id="revBarGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#9333ea" />
+                    <stop offset="100%" stopColor="#7c3aed" />
+                  </linearGradient>
+                  <linearGradient id="expBarGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#cbd5e1" />
+                    <stop offset="100%" stopColor="#94a3b8" />
+                  </linearGradient>
+                </defs>
+
+                {/* Y-Axis Guidelines & Scale Labels */}
+                <line x1="45" y1="28" x2="525" y2="28" className="analytics-grid-line" />
+                <line x1="45" y1="80" x2="525" y2="80" className="analytics-grid-line" />
+                <line x1="45" y1="135" x2="525" y2="135" className="analytics-grid-line" />
+
+                <text x="38" y="32" textAnchor="end" className="analytics-axis-text">
+                  {topLabel}
+                </text>
+                <text x="38" y="84" textAnchor="end" className="analytics-axis-text">
+                  {midLabel}
+                </text>
+                <text x="38" y="138" textAnchor="end" className="analytics-axis-text">
+                  {getCurrencySymbol(activeCurrency)}0
+                </text>
+
+                {/* Monthly Capsule Groups */}
+                {monthlyStats.map((m, i) => {
+                  const cx = 82 + i * 78;
+                  const revHeight =
+                    rawMax > 0 && m.revenueCents > 0
+                      ? Math.max(8, Math.round((m.revenueCents / maxChartVal) * 102))
+                      : 4;
+                  const expHeight =
+                    rawMax > 0 && m.expensesCents > 0
+                      ? Math.max(8, Math.round((m.expensesCents / maxChartVal) * 102))
+                      : 4;
+                  const revY = 135 - revHeight;
+                  const expY = 135 - expHeight;
+                  const isCurrent = i === 5;
+
+                  return (
+                    <g key={m.key}>
+                      {/* Background Capsule Track */}
+                      <rect
+                        x={cx - 18}
+                        y="22"
+                        width="36"
+                        height="113"
+                        rx="10"
+                        className="analytics-capsule-bg"
+                      />
+
+                      {/* Revenue Bar */}
+                      <rect
+                        x={cx - 13}
+                        y={revY}
+                        width="11"
+                        height={revHeight}
+                        rx="5"
+                        fill="url(#revBarGrad)"
+                        className="analytics-bar-rev"
+                      >
+                        <title>{`${m.label} Revenue: ${formatCents(m.revenueCents, activeCurrency)}`}</title>
+                      </rect>
+
+                      {/* Expense Bar */}
+                      <rect
+                        x={cx + 2}
+                        y={expY}
+                        width="11"
+                        height={expHeight}
+                        rx="5"
+                        fill="url(#expBarGrad)"
+                        className="analytics-bar-exp"
+                      >
+                        <title>{`${m.label} Expenses: ${formatCents(m.expensesCents, activeCurrency)}`}</title>
+                      </rect>
+
+                      {/* Month Label */}
+                      <text
+                        x={cx}
+                        y="154"
+                        className={`analytics-month-text ${isCurrent ? "active" : ""}`}
+                      >
+                        {m.label.toUpperCase()}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
             </div>
 
-            <div className="pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
-              <span>Gross: {totalRevenueStr}</span>
-              <span className="text-[#7c3aed] font-medium">Cashflow</span>
+            <div className="analytics-creative-footer">
+              <div className="flex items-center gap-4">
+                <span>
+                  Gross: <strong className="text-neutral-900 font-serif">{totalRevenueStr}</strong>
+                </span>
+                <span>
+                  Outsourced: <strong className="text-neutral-900 font-serif">{outsourcedCostsStr}</strong>
+                </span>
+              </div>
+              <span className="analytics-footer-pill text-[#7c3aed]">
+                <Sparkles className="w-3.5 h-3.5" />
+                {filteredInvoices.length} Active Invoices
+              </span>
             </div>
           </div>
         );
+      }
 
       // 14. Profit & Growth Trajectory Chart
-      case "profit-trajectory-chart":
+      case "profit-trajectory-chart": {
+        const rawMax = Math.max(0, ...monthlyStats.map((m) => m.profitCents));
+        const maxTrajectoryVal =
+          chartMetric === "profit" ? (rawMax > 0 ? rawMax : 500000) : 100;
+
+        const topLabel =
+          chartMetric === "profit" ? formatCents(maxTrajectoryVal, activeCurrency) : "100%";
+        const midLabel =
+          chartMetric === "profit"
+            ? formatCents(Math.round(maxTrajectoryVal / 2), activeCurrency)
+            : "50%";
+
+        // Calculate smooth trajectory points
+        const points = monthlyStats.map((m, i) => {
+          const x = 82 + i * 78;
+          const val = chartMetric === "profit" ? m.profitCents : m.marginPct;
+          const pct = maxTrajectoryVal > 0 && val > 0 ? val / maxTrajectoryVal : 0;
+          const y =
+            chartMetric === "margin"
+              ? 135 - Math.round(pct * 105)
+              : rawMax > 0 && m.profitCents > 0
+                ? 135 - Math.round(pct * 105)
+                : 135;
+          return {
+            x,
+            y,
+            val,
+            label: m.label,
+            marginPct: m.marginPct,
+            profitCents: m.profitCents,
+          };
+        });
+
+        const lineD = getSmoothPath(points);
+        const areaD =
+          points.length > 0
+            ? `${lineD} L ${points[points.length - 1].x} 135 L ${points[0].x} 135 Z`
+            : "";
+
+        const latestPoint = points[points.length - 1];
+        const latestValStr =
+          chartMetric === "profit"
+            ? formatCents(latestPoint?.profitCents || 0, activeCurrency)
+            : `${latestPoint?.marginPct || 100}% Margin`;
+
         return (
-          <div
-            className={`ui-card space-y-4 ${
-              isCompact ? "p-4" : "p-6 space-y-6"
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100">
-              <div>
-                <h3 className="text-sm font-semibold text-neutral-900 tracking-tight">
-                  Profit & Growth Trajectory
-                </h3>
-                {!isCompact && (
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    Month-over-month revenue intake and net retained profits.
-                  </p>
-                )}
+          <div className="analytics-creative-chart-card">
+            <div className="analytics-creative-header">
+              <div className="analytics-creative-title-group">
+                <div className="analytics-creative-icon-box">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="analytics-creative-title">
+                    Profit & Growth Trajectory
+                  </h3>
+                  {!isCompact && (
+                    <p className="analytics-creative-subtitle">
+                      Month-over-month retained yield & margin expansion
+                    </p>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
-                <div className="flex rounded-lg border border-neutral-200 p-0.5 bg-neutral-50 text-[11px]">
+              <div className="analytics-creative-controls">
+                <div className="analytics-pill-toggle">
                   <button
                     type="button"
                     onClick={() => setChartMetric("profit")}
-                    className={`px-2 py-0.5 rounded-md font-medium transition-all ${
-                      chartMetric === "profit"
-                        ? "bg-white text-neutral-900 shadow-xs"
-                        : "text-neutral-500 hover:text-neutral-900"
-                    }`}
+                    className={`analytics-pill-btn ${chartMetric === "profit" ? "active" : ""}`}
                   >
-                    Volume
+                    Volume ({getCurrencySymbol(activeCurrency).trim() || activeCurrency})
                   </button>
                   <button
                     type="button"
                     onClick={() => setChartMetric("margin")}
-                    className={`px-2 py-0.5 rounded-md font-medium transition-all ${
-                      chartMetric === "margin"
-                        ? "bg-white text-neutral-900 shadow-xs"
-                        : "text-neutral-500 hover:text-neutral-900"
-                    }`}
+                    className={`analytics-pill-btn ${chartMetric === "margin" ? "active" : ""}`}
                   >
-                    Margin
+                    Margin (%)
                   </button>
                 </div>
               </div>
             </div>
 
-            <div
-              className={`flex flex-col items-center justify-center text-center p-4 border border-dashed border-neutral-200/80 rounded-xl bg-neutral-50/50 ${
-                isCompact ? "h-32" : "h-44"
-              }`}
-            >
-              <span className="text-xs font-semibold text-neutral-800">
-                No revenue history yet
-              </span>
-              <span className="text-[11px] text-neutral-400 mt-0.5 max-w-sm">
-                Monthly trends plot here as you bill clients.
+            <div className="analytics-creative-canvas-area">
+              <svg
+                viewBox="0 0 540 170"
+                className="analytics-creative-svg"
+                preserveAspectRatio="none"
+              >
+                <defs>
+                  <linearGradient id="creativeSplineArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.22" />
+                    <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Y-Axis Guidelines & Scale Labels */}
+                <line x1="45" y1="28" x2="525" y2="28" className="analytics-grid-line" />
+                <line x1="45" y1="80" x2="525" y2="80" className="analytics-grid-line" />
+                <line x1="45" y1="135" x2="525" y2="135" className="analytics-grid-line" />
+
+                <text x="38" y="32" textAnchor="end" className="analytics-axis-text">
+                  {topLabel}
+                </text>
+                <text x="38" y="84" textAnchor="end" className="analytics-axis-text">
+                  {midLabel}
+                </text>
+                <text x="38" y="138" textAnchor="end" className="analytics-axis-text">
+                  {chartMetric === "profit" ? `${getCurrencySymbol(activeCurrency)}0` : "0%"}
+                </text>
+
+                {/* Shaded Spline Area */}
+                {areaD && (
+                  <path d={areaD} fill="url(#creativeSplineArea)" />
+                )}
+
+                {/* Smooth Spline Curve */}
+                {lineD && (
+                  <path d={lineD} className="analytics-spline-path" />
+                )}
+
+                {/* Spline Nodes */}
+                {points.map((p, idx) => {
+                  const isCurrent = idx === points.length - 1;
+                  return (
+                    <g key={idx}>
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={isCurrent ? 5.5 : 4}
+                        className="analytics-node-dot"
+                      >
+                        <title>
+                          {chartMetric === "profit"
+                            ? `${p.label} Profit: ${formatCents(p.profitCents, activeCurrency)}`
+                            : `${p.label} Margin: ${p.marginPct}%`}
+                        </title>
+                      </circle>
+
+                      {/* Month Text */}
+                      <text
+                        x={p.x}
+                        y="154"
+                        className={`analytics-month-text ${isCurrent ? "active" : ""}`}
+                      >
+                        {p.label.toUpperCase()}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* Floating Tooltip Pill for Current / Active Month */}
+                {latestPoint && (
+                  <g transform={`translate(${latestPoint.x}, ${Math.max(16, latestPoint.y - 28)})`}>
+                    <rect
+                      x="-38"
+                      y="0"
+                      width="76"
+                      height="20"
+                      rx="6"
+                      className="analytics-floating-tag-bg"
+                    />
+                    <polygon
+                      points="-4,20 4,20 0,24"
+                      fill="#18181b"
+                    />
+                    <text
+                      x="0"
+                      y="13"
+                      className="analytics-floating-tag-text"
+                    >
+                      {latestValStr}
+                    </text>
+                  </g>
+                )}
+              </svg>
+            </div>
+
+            <div className="analytics-creative-footer">
+              <div className="flex items-center gap-4">
+                <span>
+                  Current Net: <strong className="text-neutral-900 font-serif">{netProfitStr}</strong>
+                </span>
+                <span>
+                  Retained Margin: <strong className="text-neutral-900 font-serif">{marginPct}%</strong>
+                </span>
+              </div>
+              <span className="analytics-footer-pill text-emerald-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                {marginPct >= 70 ? "Healthy Retained Capital" : "Capital Growth"}
               </span>
             </div>
           </div>
         );
+      }
 
       // 15. On-Time Collection Rate Gauge
-      case "collection-rate-gauge":
+      case "collection-rate-gauge": {
+        const radius = 40;
+        const circumference = 2 * Math.PI * radius;
+        const strokeDashoffset = circumference * (1 - paidRatioPct / 100);
+
         return (
           <div
             className={`ui-card flex flex-col justify-between ${
@@ -547,7 +1012,7 @@ export function WidgetRenderer({
                 Collection Gauge
               </h3>
               <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                {paidRatioPct}%
+                {paidRatioPct}% Collected
               </span>
             </div>
 
@@ -564,7 +1029,7 @@ export function WidgetRenderer({
                   <circle
                     cx="50"
                     cy="50"
-                    r="40"
+                    r={radius}
                     stroke="#e5e5e5"
                     strokeWidth="10"
                     fill="transparent"
@@ -572,13 +1037,11 @@ export function WidgetRenderer({
                   <circle
                     cx="50"
                     cy="50"
-                    r="40"
+                    r={radius}
                     stroke="#7c3aed"
                     strokeWidth="10"
-                    strokeDasharray={2 * Math.PI * 40}
-                    strokeDashoffset={
-                      2 * Math.PI * 40 * (1 - paidRatioPct / 100)
-                    }
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
                     strokeLinecap="round"
                     fill="transparent"
                   />
@@ -596,11 +1059,25 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <div className="text-center text-[11px] text-neutral-500 pt-1.5 border-t border-neutral-100">
-              {paidCount} invoices collected
+            <div className="analytics-gauge-legend">
+              <span className="analytics-gauge-badge text-emerald-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                {paidCount} Paid
+              </span>
+              <span className="analytics-gauge-badge text-amber-700">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                {pendingCount} Unpaid
+              </span>
+              {overdueInvoices.length > 0 && (
+                <span className="analytics-gauge-badge text-rose-700">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  {overdueInvoices.length} Overdue
+                </span>
+              )}
             </div>
           </div>
         );
+      }
 
       // 16. Billing Alerts List
       case "billing-alerts":
@@ -626,7 +1103,7 @@ export function WidgetRenderer({
               <div className="space-y-2">
                 {overdueInvoices.length === 0 ? (
                   <div className="py-6 text-center text-xs text-neutral-400">
-                    No overdue accounts.
+                    No overdue accounts. All settled.
                   </div>
                 ) : (
                   overdueInvoices.slice(0, isCompact ? 2 : 3).map((inv) => (
@@ -696,12 +1173,12 @@ export function WidgetRenderer({
               </div>
 
               <div className="space-y-2">
-                {recentInvoicesList.length === 0 ? (
+                {displayInvoices.length === 0 ? (
                   <div className="py-6 text-center text-xs text-neutral-400">
                     No invoices generated yet.
                   </div>
                 ) : (
-                  recentInvoicesList.slice(0, isCompact ? 2 : 3).map((inv) => (
+                  displayInvoices.map((inv: any) => (
                     <div
                       key={inv.id}
                       onClick={() =>
@@ -715,7 +1192,7 @@ export function WidgetRenderer({
                     >
                       <div className="min-w-0 pr-2">
                         <div className="text-xs font-semibold text-neutral-900 truncate">
-                          {inv.clientName}
+                          {inv.clientName || inv.client}
                         </div>
                         <div className="text-[10px] text-neutral-500 font-mono">
                           {inv.code}
@@ -724,13 +1201,17 @@ export function WidgetRenderer({
 
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-serif text-xs font-semibold text-neutral-900">
-                          {formatCents(inv.amountCents, inv.currency)}
+                          {typeof inv.amountCents === "number"
+                            ? formatCents(inv.amountCents, inv.currency)
+                            : inv.amount}
                         </span>
                         <span
                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                             inv.status === "PAID"
                               ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-800"
+                              : inv.status === "OVERDUE"
+                                ? "bg-rose-50 text-rose-700"
+                                : "bg-amber-50 text-amber-800"
                           }`}
                         >
                           {inv.status}

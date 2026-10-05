@@ -1,14 +1,28 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
+  AlertCircle,
+  Building,
   CheckCircle2,
   Code2,
   Download,
+  ExternalLink,
   FileText,
+  GitFork,
+  Link2,
+  Plus,
   Receipt,
+  Search,
   SlidersHorizontal,
+  User,
   UserPlus,
+  Users,
   X,
+  Calendar,
+  Check,
 } from "lucide-react";
 
 import {
@@ -19,83 +33,252 @@ import {
 } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { useClients, useVendors, useActiveCurrency } from "@/lib/data/DataProvider";
+import { formatCurrencyAmount, getCurrencySymbol } from "@/lib/format";
+import type { Currency } from "@/types/billing";
+import type { VendorItem } from "@/types/outsourcing";
+import "./outsourcing.css";
 
-import React, { useState } from "react";
-
-// Data model for sub-contractor vendors
-interface VendorItem {
-  id: string;
-  name: string;
-  service: string;
-  currentBalance: number;
-  status: "PENDING" | "PAID";
-  iconType: "design" | "devops" | "legal";
-}
-
-// Initial vendor dataset starts blank
-const initialVendors: VendorItem[] = [];
+export type { VendorItem };
 
 export default function OutsourcingView() {
-  // Main vendor directory state
-  const [vendors, setVendors] = useState<VendorItem[]>(initialVendors);
+  const searchParams = useSearchParams();
+  const { clients, createClient } = useClients();
+  const { vendors, createVendor, setVendorStatus } = useVendors();
+  const { activeCurrency } = useActiveCurrency();
+
+  // Filter & Search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "PAID">("ALL");
 
   // Modal dialog states
   const [selectedVendor, setSelectedVendor] = useState<VendorItem | null>(null);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
 
-  // Form input states
+  // Add Client Form States with explicit validation
   const [clientName, setClientName] = useState("");
+  const [clientCategory, setClientCategory] = useState("Enterprise");
+  const [clientContactPerson, setClientContactPerson] = useState("");
+  const [clientContactRole, setClientContactRole] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [clientCurrency, setClientCurrency] = useState<"USD" | "LKR" | "EUR">("USD");
+  const [clientDriveUrl, setClientDriveUrl] = useState("");
+  const [clientFormErrors, setClientFormErrors] = useState<Record<string, string>>({});
+  const [isSubmittingClient, setIsSubmittingClient] = useState(false);
+
+  // Add Vendor Form States
+  const [vendorName, setVendorName] = useState("");
+  const [vendorService, setVendorService] = useState("");
+  const [vendorBalance, setVendorBalance] = useState("");
+  const [vendorIconType, setVendorIconType] = useState<VendorItem["iconType"]>("devops");
+  const [vendorEmail, setVendorEmail] = useState("");
+  const [vendorLinkedClientId, setVendorLinkedClientId] = useState("");
+  const [vendorDueDate, setVendorDueDate] = useState("Oct 20, 2026");
+  const [vendorFormErrors, setVendorFormErrors] = useState<Record<string, string>>({});
+  const [isSubmittingVendor, setIsSubmittingVendor] = useState(false);
+
+  // Expense Form States
   const [expenseTitle, setExpenseTitle] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
 
   // Toast notification state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastNotification, setToastNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
   // Show auto-dismissing toast feedback
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToastNotification({ message, type });
+    setTimeout(() => setToastNotification(null), 3500);
   };
 
-  // Toggle vendor payment status between PENDING and PAID
-  const handleToggleStatus = (id: string) => {
-    setVendors(
-      vendors.map((v) =>
-        v.id === id
-          ? {
-              ...v,
-              status: v.status === "PENDING" ? "PAID" : "PENDING",
-              currentBalance: v.status === "PENDING" ? 0 : 4500,
-            }
-          : v,
-      ),
-    );
-    showToast("Status updated");
+  // Handle task redirection deep link / query params
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "create-voucher") {
+      const taskTitle = searchParams.get("taskTitle");
+      const vendorParam = searchParams.get("vendor");
+      const budget = searchParams.get("budget");
+
+      if (vendorParam) {
+        setVendorName(vendorParam);
+      }
+      if (taskTitle) {
+        setVendorService(`Outsourced Task: ${taskTitle}`);
+      }
+      if (budget) {
+        setVendorBalance(budget);
+      }
+      setIsVendorModalOpen(true);
+    }
+  }, [searchParams]);
+
+  // Toggle vendor payment status between PENDING and PAID in local SQLite database
+  const handleToggleStatus = async (id: string) => {
+    try {
+      const current = vendors.find((v) => v.id === id);
+      if (!current) return;
+      const nextStatus = current.status === "PENDING" ? "PAID" : "PENDING";
+      await setVendorStatus(id, nextStatus);
+      showToast("Vendor settlement status updated");
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to update vendor status";
+      showToast(msg, "error");
+    }
   };
 
-  // Submit handler for adding a new client
-  const handleAddClient = (e: React.FormEvent) => {
+  // Submit handler for adding a new client and saving to local DB
+  const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName) return;
-    showToast(`Client "${clientName}" added`);
-    setClientName("");
-    setClientEmail("");
-    setIsClientModalOpen(false);
+    setClientFormErrors({});
+
+    const errors: Record<string, string> = {};
+
+    // 1. Blank space validation for Client Name
+    if (!clientName.trim()) {
+      errors.name = "Client name cannot be blank or contain only spaces";
+    }
+
+    // 2. Blank space and @ sign validation for Email
+    if (!clientEmail.trim()) {
+      errors.email = "Email cannot be blank or contain only spaces";
+    } else if (!clientEmail.includes("@")) {
+      errors.email = "Email must contain an '@' sign (e.g. alex@fintechlabs.com)";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim())) {
+      errors.email = "Please enter a valid email address with a domain (e.g. name@domain.com)";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setClientFormErrors(errors);
+      showToast("Please fix the validation errors before saving.", "error");
+      return;
+    }
+
+    setIsSubmittingClient(true);
+    try {
+      // Save client directly into the local SQLite database via IPC/DataProvider
+      const created = await createClient({
+        name: clientName.trim(),
+        category: clientCategory,
+        contactPerson: clientContactPerson.trim() || clientName.trim(),
+        contactRole: clientContactRole.trim() || undefined,
+        email: clientEmail.trim(),
+        phone: clientPhone.trim() || undefined,
+        currency: clientCurrency,
+        driveUrl: clientDriveUrl.trim() || undefined,
+      });
+
+      showToast("Saved");
+
+      // Reset form fields
+      setClientName("");
+      setClientCategory("Enterprise");
+      setClientContactPerson("");
+      setClientContactRole("");
+      setClientEmail("");
+      setClientPhone("");
+      setClientCurrency("USD");
+      setClientDriveUrl("");
+      setClientFormErrors({});
+      setIsClientModalOpen(false);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to save client";
+      showToast(msg, "error");
+    } finally {
+      setIsSubmittingClient(false);
+    }
+  };
+
+  // Submit handler for adding a new vendor / outsourced task to local SQLite database
+  const handleAddVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setVendorFormErrors({});
+
+    const errors: Record<string, string> = {};
+    if (!vendorName.trim()) {
+      errors.name = "Vendor name cannot be blank or contain only spaces";
+    }
+    if (!vendorService.trim()) {
+      errors.service = "Service description cannot be blank";
+    }
+
+    const numBalance = parseFloat(vendorBalance);
+    if (isNaN(numBalance) || numBalance < 0) {
+      errors.balance = "Please enter a valid positive balance or amount";
+    }
+
+    if (vendorEmail.trim() && !vendorEmail.includes("@")) {
+      errors.email = "Email must contain an '@' sign (e.g. vendor@company.com)";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setVendorFormErrors(errors);
+      showToast("Please fix the vendor form errors.", "error");
+      return;
+    }
+
+    setIsSubmittingVendor(true);
+    try {
+      const linkedClient = clients.find((c) => c.id === vendorLinkedClientId);
+
+      await createVendor({
+        name: vendorName.trim(),
+        service: vendorService.trim(),
+        currentBalance: numBalance,
+        balanceCents: Math.round(numBalance * 100),
+        status: "PENDING",
+        iconType: vendorIconType,
+        email: vendorEmail.trim() || undefined,
+        linkedClientId: linkedClient?.id,
+        linkedClientName: linkedClient?.name,
+        payoutDueDate: vendorDueDate.trim() || undefined,
+      });
+
+      showToast("Saved");
+
+      // Reset vendor modal state
+      setVendorName("");
+      setVendorService("");
+      setVendorBalance("");
+      setVendorEmail("");
+      setVendorLinkedClientId("");
+      setVendorFormErrors({});
+      setIsVendorModalOpen(false);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to save vendor";
+      showToast(msg, "error");
+    } finally {
+      setIsSubmittingVendor(false);
+    }
   };
 
   // Submit handler for logging a business expense
   const handleLogExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!expenseTitle || !expenseAmount) return;
-    showToast(`Expense "${expenseTitle}" logged`);
+    if (!expenseTitle.trim() || !expenseAmount.trim()) {
+      showToast("Please provide expense title and amount.", "error");
+      return;
+    }
+    showToast(`Expense "${expenseTitle}" logged successfully`);
     setExpenseTitle("");
     setExpenseAmount("");
     setIsExpenseModalOpen(false);
   };
 
-  // Render Font Awesome vector icon based on vendor category
+  // Render vector icon based on vendor category
   const renderVendorIcon = (type: VendorItem["iconType"]) => {
     switch (type) {
       case "design":
@@ -104,20 +287,53 @@ export default function OutsourcingView() {
         return <Code2 className="text-[#4b5563] text-[13px]" />;
       case "legal":
         return <FileText className="text-[#4b5563] text-[13px]" />;
+      case "development":
+        return <Code2 className="text-[#4b5563] text-[13px]" />;
     }
   };
 
+  // Filter vendors based on status and search query
+  const filteredVendors = vendors.filter((v) => {
+    const matchesSearch =
+      v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      v.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (v.linkedClientName &&
+        v.linkedClientName.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesStatus =
+      statusFilter === "ALL" ? true : v.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  // Calculate dynamic metrics
+  const outstandingPayables = vendors
+    .filter((v) => v.status === "PENDING")
+    .reduce((sum, v) => sum + v.currentBalance, 0);
+
+  const settledPayouts = vendors
+    .filter((v) => v.status === "PAID")
+    .reduce((sum, v) => sum + v.currentBalance, 0);
+
   return (
-    <div className="workspace-page motion-page">
+    <div className="workspace-page motion-page outsourcing-page-container">
       {/* Toast Feedback Notification */}
       <MotionPresence>
-        {toastMessage && (
+        {toastNotification && (
           <MotionSurface
             kind="toast"
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#18181b] text-white rounded-xl shadow-lg text-[12px] font-medium"
+            className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 text-white rounded-xl shadow-xl text-[12px] font-medium ${
+              toastNotification.type === "error"
+                ? "bg-rose-900 border border-rose-700"
+                : "bg-[#18181b] border border-neutral-700"
+            }`}
           >
-            <CheckCircle2 className="text-[#34d399] text-[13px]" />
-            <span>{toastMessage}</span>
+            {toastNotification.type === "error" ? (
+              <AlertCircle className="text-rose-400 text-[14px] shrink-0" />
+            ) : (
+              <CheckCircle2 className="text-[#34d399] text-[14px] shrink-0" />
+            )}
+            <span>{toastNotification.message}</span>
           </MotionSurface>
         )}
       </MotionPresence>
@@ -125,97 +341,220 @@ export default function OutsourcingView() {
       {/* Top Header: Title, subtitle, and primary action buttons */}
       <PageHeader
         title="Outsourcing"
-        description="Manage your subcontractors, vendor balances, and payouts."
+        description="Manage your subcontractors, client-linked deliverables, vendor balances, and payouts."
       >
-        {/* Action buttons: Add Client & Log Expense */}
-        <div className="flex items-center gap-2.5">
+        <div className="outsourcing-header-actions">
+          {/* Active invoice currency indicator */}
+          <span
+            className="outsourcing-currency-badge"
+            title="Viewing currency synced with your invoices"
+          >
+            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
+          </span>
+
+          {/* Link Client button directly navigating to Clients page */}
+          <Link href="/clients">
+            <Button
+              variant="secondary"
+              type="button"
+              title="Open Clients Directory"
+            >
+              <Users className="outsourcing-action-icon" />
+              <span>Clients</span>
+            </Button>
+          </Link>
+
+          {/* Add Client button opening the Add Client Modal with local DB persistence */}
           <Button
             variant="secondary"
             type="button"
-            onClick={() => setIsClientModalOpen(true)}
+            onClick={() => {
+              setClientFormErrors({});
+              setIsClientModalOpen(true);
+            }}
           >
-            <UserPlus className="text-[11px] text-[#374151]" />
+            <UserPlus className="outsourcing-action-icon" />
             <span>Add Client</span>
           </Button>
 
+          {/* Add Vendor / Task button */}
+          <Button
+            variant="primary"
+            type="button"
+            onClick={() => {
+              setVendorFormErrors({});
+              setIsVendorModalOpen(true);
+            }}
+          >
+            <Plus className="text-[12px]" />
+            <span>Add Vendor</span>
+          </Button>
+
+          {/* Log Expense button */}
           <Button
             variant="secondary"
             type="button"
             onClick={() => setIsExpenseModalOpen(true)}
           >
-            <Receipt className="text-[11px] text-[#374151]" />
+            <Receipt className="outsourcing-action-icon" />
             <span>Log Expense</span>
           </Button>
         </div>
       </PageHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Metric Cards Row */}
+      <div className="outsourcing-metrics-grid">
         <MetricCard
           label="Outstanding Payables"
-          value={`$${vendors.reduce((sum, vendor) => sum + vendor.currentBalance, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-          footer="awaiting settlement"
+          value={formatCurrencyAmount(outstandingPayables, activeCurrency)}
+          footer={`${vendors.filter((v) => v.status === "PENDING").length} awaiting settlement`}
         />
         <MetricCard
-          label="Active Vendors"
+          label="Settled Payouts"
+          value={formatCurrencyAmount(settledPayouts, activeCurrency)}
+          footer={`${vendors.filter((v) => v.status === "PAID").length} settled to date`}
+        />
+        <MetricCard
+          label="Active Subcontractors"
           value={vendors.length}
-          footer="in the vendor directory"
+          footer="registered vendors"
         />
         <MetricCard
-          label="Next Payout Run"
-          value="—"
-          footer="no payout scheduled"
+          label="Linked Clients"
+          value={clients.length}
+          footer="in database"
         />
       </div>
 
       {/* Main Vendor Directory Card */}
-      <div className="ui-card overflow-hidden mt-7">
-        {/* Section title header */}
-        <div className="px-6 py-4">
-          <h2 className="text-[15px] font-bold text-[#111827] tracking-tight">
-            Vendor Directory
-          </h2>
+      <div className="ui-card vendor-directory-card">
+        {/* Section title & controls header */}
+        <div className="vendor-directory-header">
+          <div>
+            <h2 className="vendor-directory-title">
+              Vendor & Subcontractor Directory
+            </h2>
+            <p className="vendor-directory-subtitle">
+              Track vendor deliverables, linked client projects, and settlement vouchers.
+            </p>
+          </div>
+
+          {/* Search and status filters */}
+          <div className="vendor-controls-group">
+            <div className="vendor-search-wrapper">
+              <Search className="vendor-search-icon" />
+              <input
+                type="text"
+                placeholder="Search vendor or client..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="vendor-search-input"
+              />
+            </div>
+
+            <div className="vendor-status-filter">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("ALL")}
+                className={`vendor-filter-btn ${statusFilter === "ALL" ? "active" : ""}`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("PENDING")}
+                className={`vendor-filter-btn ${statusFilter === "PENDING" ? "active" : ""}`}
+              >
+                Pending
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("PAID")}
+                className={`vendor-filter-btn ${statusFilter === "PAID" ? "active" : ""}`}
+              >
+                Paid
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Vendor list rows container */}
         <div className="bg-white divide-y divide-neutral-100">
-          {vendors.length === 0 ? (
+          {filteredVendors.length === 0 ? (
             <EmptyState
-              title="No vendors yet"
-              description="Your subcontractors and vendor balances will appear here."
-            />
+              title={
+                vendors.length === 0
+                  ? "No vendors yet"
+                  : "No matching vendors found"
+              }
+              description={
+                vendors.length === 0
+                  ? "Your subcontractors, client-linked deliverables, and vendor balances will appear here."
+                  : "Try adjusting your search query or status filter."
+              }
+            >
+              {vendors.length === 0 && (
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setVendorFormErrors({});
+                      setIsVendorModalOpen(true);
+                    }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add First Vendor</span>
+                  </Button>
+                </div>
+              )}
+            </EmptyState>
           ) : (
-            vendors.map((vendor) => (
+            filteredVendors.map((vendor) => (
               <div
                 key={vendor.id}
-                className="px-6 py-4.5 flex items-center justify-between hover:bg-[#f4f4f0] transition-colors"
+                className="vendor-list-row"
               >
                 {/* Left: Vendor category icon and credentials */}
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-[#eaeae5] flex items-center justify-center shrink-0">
+                <div className="vendor-info-group">
+                  <div className="vendor-avatar-icon">
                     {renderVendorIcon(vendor.iconType)}
                   </div>
                   <div>
-                    <h3 className="font-bold text-[13.5px] text-[#111827] leading-tight">
-                      {vendor.name}
-                    </h3>
-                    <p className="text-[11.5px] text-[#8e8e93] mt-0.5 font-normal">
+                    <div className="vendor-name-row">
+                      <h3 className="vendor-name-heading">
+                        {vendor.name}
+                      </h3>
+                      {vendor.linkedClientName && (
+                        <Link
+                          href={
+                            vendor.linkedClientId
+                              ? `/clients?client=${vendor.linkedClientId}`
+                              : "/clients"
+                          }
+                          className="vendor-client-badge"
+                          title="View linked client in Client Directory"
+                        >
+                          <Building className="w-3 h-3" />
+                          <span>{vendor.linkedClientName}</span>
+                          <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                        </Link>
+                      )}
+                    </div>
+                    <p className="vendor-service-desc">
                       {vendor.service}
                     </p>
                   </div>
                 </div>
 
-                {/* Right: Current balance, status pill, and action button */}
-                <div className="flex items-center gap-5 sm:gap-6">
+                {/* Right: Current balance, status pill, and action buttons */}
+                <div className="vendor-actions-group">
                   {/* Balance display */}
-                  <div className="text-right">
-                    <span className="text-[9.5px] text-[#8e8e93] font-normal block leading-tight">
+                  <div className="vendor-balance-box">
+                    <span className="vendor-balance-label">
                       Current Balance
                     </span>
-                    <span className="text-[13.5px] font-bold text-[#111827] mt-0.5 block leading-tight">
-                      $
-                      {vendor.currentBalance.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                      })}
+                    <span className="vendor-balance-amount">
+                      {formatCurrencyAmount(vendor.currentBalance, activeCurrency)}
                     </span>
                   </div>
 
@@ -223,40 +562,26 @@ export default function OutsourcingView() {
                   <button
                     type="button"
                     onClick={() => handleToggleStatus(vendor.id)}
-                    title="Click to toggle status"
-                    className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-bold tracking-[0.06em] cursor-pointer uppercase transition-colors ${
-                      vendor.status === "PAID"
-                        ? "text-[#15803d] bg-[#d6eddb] hover:bg-[#c4e5cb]"
-                        : "text-[#4b5563] bg-[#eaeae5] hover:bg-[#deded8]"
-                    }`}
+                    title="Click to toggle settlement status"
+                    className={`vendor-status-pill status-${vendor.status.toLowerCase()}`}
                   >
-                    {vendor.status}
+                    {vendor.status === "PAID" && (
+                      <Check className="w-2.5 h-2.5" />
+                    )}
+                    <span>{vendor.status}</span>
                   </button>
 
-                  {/* Action button: Purple solid button or neutral outlined button */}
-                  {vendor.status === "PENDING" ? (
-                    <Button
-                      variant="primary"
-                      size="icon"
-                      type="button"
-                      onClick={() => setSelectedVendor(vendor)}
-                      title="Download Statement"
-                      className="shrink-0"
-                    >
-                      <Download className="text-[11px]" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      type="button"
-                      onClick={() => setSelectedVendor(vendor)}
-                      title="View Settlement Receipt"
-                      className="shrink-0"
-                    >
-                      <Download className="text-[11px]" />
-                    </Button>
-                  )}
+                  {/* Action button: Statement Voucher */}
+                  <Button
+                    variant={vendor.status === "PENDING" ? "primary" : "secondary"}
+                    size="icon"
+                    type="button"
+                    onClick={() => setSelectedVendor(vendor)}
+                    title="View Statement Voucher"
+                    className="shrink-0"
+                  >
+                    <Download className="text-[11px]" />
+                  </Button>
                 </div>
               </div>
             ))
@@ -269,16 +594,20 @@ export default function OutsourcingView() {
         {selectedVendor && (
           <MotionSurface
             kind="dialog"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+            className="outsourcing-modal-overlay"
           >
-            <MotionSurface onDismiss={() => setSelectedVendor(null)}
+            <MotionSurface
+              onDismiss={() => setSelectedVendor(null)}
               kind="panel"
-              className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden"
+              className="outsourcing-modal-panel voucher-panel"
             >
-              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-                <h3 className="font-bold text-[13px] text-[#111827]">
-                  Vendor Statement Voucher
-                </h3>
+              <div className="outsourcing-modal-header">
+                <div className="flex items-center gap-2">
+                  <GitFork className="w-4 h-4 text-[#7c3aed]" />
+                  <h3 className="outsourcing-modal-title">
+                    Vendor Statement Voucher
+                  </h3>
+                </div>
                 <Button
                   aria-label="Close"
                   variant="ghost"
@@ -289,84 +618,140 @@ export default function OutsourcingView() {
                   <X className="text-sm" />
                 </Button>
               </div>
-              <div className="p-6 space-y-4 text-[12px] text-[#4b5563]">
+
+              <div className="outsourcing-modal-body text-[12px] text-[#4b5563]">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-bold text-[14px] text-[#111827]">
+                    <div className="font-bold text-[15px] text-[#111827]">
                       {selectedVendor.name}
                     </div>
-                    <div className="text-[#8e8e93] text-[11px]">
+                    <div className="text-[#8e8e93] text-[11.5px] mt-0.5">
                       {selectedVendor.service}
                     </div>
+                    {selectedVendor.email && (
+                      <div className="text-[#6b7280] text-[11px] mt-1">
+                        Email: {selectedVendor.email}
+                      </div>
+                    )}
                   </div>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                      selectedVendor.status === "PAID"
-                        ? "text-[#15803d] bg-[#d6eddb]"
-                        : "text-[#4b5563] bg-[#eaeae5]"
-                    }`}
+                    className={`vendor-status-pill status-${selectedVendor.status.toLowerCase()}`}
                   >
                     {selectedVendor.status}
                   </span>
                 </div>
 
-                <div className="p-3 bg-[#eaeae5] rounded-xl space-y-1.5 border border-[#dcdcd7]">
-                  <div className="flex justify-between">
+                {selectedVendor.linkedClientName && (
+                  <div className="voucher-client-box">
+                    <div>
+                      <span className="text-[10.5px] text-[#7c3aed] font-medium block">
+                        Linked Client Project
+                      </span>
+                      <span className="font-semibold text-neutral-900 text-xs">
+                        {selectedVendor.linkedClientName}
+                      </span>
+                    </div>
+                    <Link
+                      href={
+                        selectedVendor.linkedClientId
+                          ? `/clients?client=${selectedVendor.linkedClientId}`
+                          : "/clients"
+                      }
+                      className="text-xs font-semibold text-[#7c3aed] hover:underline flex items-center gap-1"
+                    >
+                      <span>View Client</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </div>
+                )}
+
+                <div className="voucher-settlement-card">
+                  <div className="voucher-settlement-row">
                     <span className="text-[#6b7280]">Current Balance:</span>
-                    <span className="font-bold text-[#111827]">
-                      $
-                      {selectedVendor.currentBalance.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                      })}
+                    <span className="font-bold text-[#111827] font-mono text-[13px]">
+                      {formatCurrencyAmount(selectedVendor.currentBalance, activeCurrency)}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#6b7280]">Scheduled Payout:</span>
+                  <div className="voucher-settlement-row">
+                    <span className="text-[#6b7280]">Scheduled Settlement:</span>
                     <span className="font-medium text-[#111827]">
-                      Oct 15, 2026
+                      {selectedVendor.payoutDueDate || "Oct 15, 2026"}
+                    </span>
+                  </div>
+                  <div className="voucher-settlement-row">
+                    <span className="text-[#6b7280]">Settlement Method:</span>
+                    <span className="font-medium text-[#111827]">
+                      Wire / Direct ACH
                     </span>
                   </div>
                 </div>
               </div>
-              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex justify-end gap-2">
+
+              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex items-center justify-between gap-2">
                 <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={() => setSelectedVendor(null)}
-                >
-                  Close
-                </Button>
-                <Button
-                  variant="primary"
+                  variant="secondary"
                   type="button"
                   onClick={() => {
-                    window.print();
-                    setSelectedVendor(null);
+                    handleToggleStatus(selectedVendor.id);
+                    setSelectedVendor((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            status:
+                              prev.status === "PENDING" ? "PAID" : "PENDING",
+                          }
+                        : null,
+                    );
                   }}
                 >
-                  Download PDF
+                  Mark as {selectedVendor.status === "PENDING" ? "Paid" : "Pending"}
                 </Button>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => setSelectedVendor(null)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={() => {
+                      window.print();
+                      setSelectedVendor(null);
+                    }}
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Download PDF</span>
+                  </Button>
+                </div>
               </div>
             </MotionSurface>
           </MotionSurface>
         )}
       </MotionPresence>
 
-      {/* Modal Dialog: Add New Client */}
+      {/* Modal Dialog: Add New Client (Saves to Local DB + Validates Blank Space & @ Sign) */}
       <MotionPresence>
         {isClientModalOpen && (
           <MotionSurface
             kind="dialog"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+            className="outsourcing-modal-overlay"
           >
-            <MotionSurface onDismiss={() => setIsClientModalOpen(false)}
+            <MotionSurface
+              onDismiss={() => setIsClientModalOpen(false)}
               kind="panel"
-              className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden"
+              className="outsourcing-modal-panel"
             >
-              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-                <h3 className="font-bold text-[13px] text-[#111827]">
-                  Add New Client
-                </h3>
+              <div className="outsourcing-modal-header">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-[#7c3aed]" />
+                  <h3 className="outsourcing-modal-title">
+                    Add New Client
+                  </h3>
+                </div>
                 <Button
                   aria-label="Close"
                   variant="ghost"
@@ -377,33 +762,162 @@ export default function OutsourcingView() {
                   <X className="text-sm" />
                 </Button>
               </div>
-              <form onSubmit={handleAddClient} className="p-6 space-y-3.5">
+
+              <form onSubmit={handleAddClient} className="p-6 space-y-4">
+                {/* Client Name Input */}
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
-                    Client Business Name
+                  <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    Client Business Name *
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Fintech Labs Inc."
                     value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-[#dcdcd7] focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    onChange={(e) => {
+                      setClientName(e.target.value);
+                      if (clientFormErrors.name) {
+                        setClientFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.name;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
+                      clientFormErrors.name
+                        ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400 text-rose-900"
+                        : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                    }`}
                   />
+                  {clientFormErrors.name && (
+                    <p className="text-rose-600 text-[11px] mt-1.5 flex items-center gap-1.5 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{clientFormErrors.name}</span>
+                    </p>
+                  )}
                 </div>
+
+                {/* Email Address Input with explicit @ sign validation */}
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
-                    Email Address
+                  <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    Email Address *
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     placeholder="alex@fintechlabs.com"
                     value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-[#dcdcd7] focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    onChange={(e) => {
+                      setClientEmail(e.target.value);
+                      if (clientFormErrors.email) {
+                        setClientFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.email;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
+                      clientFormErrors.email
+                        ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400 text-rose-900"
+                        : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                    }`}
+                  />
+                  {clientFormErrors.email && (
+                    <p className="text-rose-600 text-[11px] mt-1.5 flex items-center gap-1.5 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{clientFormErrors.email}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Category & Currency */}
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={clientCategory}
+                      onChange={(e) => setClientCategory(e.target.value)}
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    >
+                      <option value="Enterprise">Enterprise</option>
+                      <option value="Startup">Startup</option>
+                      <option value="Agency">Agency</option>
+                      <option value="Small Business">Small Business</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                      Billing Currency
+                    </label>
+                    <select
+                      value={clientCurrency}
+                      onChange={(e) =>
+                        setClientCurrency(
+                          e.target.value as "USD" | "LKR" | "EUR",
+                        )
+                      }
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    >
+                      <option value="USD">USD ($)</option>
+                      <option value="LKR">LKR (Rs.)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="CAD">CAD (CA$)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Contact Person & Phone */}
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                      Contact Person
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Sarah Jenkins"
+                      value={clientContactPerson}
+                      onChange={(e) => setClientContactPerson(e.target.value)}
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                      Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="+1 (555) 284-9102"
+                      value={clientPhone}
+                      onChange={(e) => setClientPhone(e.target.value)}
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    />
+                  </div>
+                </div>
+
+                {/* Client Link / Drive Folder Link Field */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[12px] font-semibold text-[#374151] flex items-center gap-1.5">
+                      <Link2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+                      <span>Client Resource Link / Drive Folder</span>
+                    </label>
+                    <span className="text-[10.5px] text-neutral-400">Optional</span>
+                  </div>
+                  <input
+                    type="url"
+                    placeholder="https://drive.google.com/drive/folders/... or website"
+                    value={clientDriveUrl}
+                    onChange={(e) => setClientDriveUrl(e.target.value)}
+                    className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
                   />
                 </div>
-                <div className="pt-2 flex justify-end gap-2">
+
+                {/* Modal Footer Controls */}
+                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
@@ -411,8 +925,234 @@ export default function OutsourcingView() {
                   >
                     Cancel
                   </Button>
-                  <Button variant="primary" type="submit">
-                    Save Client
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={isSubmittingClient}
+                  >
+                    {isSubmittingClient ? "Saved" : "Save"}
+                  </Button>
+                </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
+
+      {/* Modal Dialog: Add New Subcontractor / Vendor */}
+      <MotionPresence>
+        {isVendorModalOpen && (
+          <MotionSurface
+            kind="dialog"
+            className="outsourcing-modal-overlay"
+          >
+            <MotionSurface
+              onDismiss={() => setIsVendorModalOpen(false)}
+              kind="panel"
+              className="outsourcing-modal-panel"
+            >
+              <div className="outsourcing-modal-header">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-[#7c3aed]" />
+                  <h3 className="outsourcing-modal-title">
+                    Add Subcontractor / Outsource Task
+                  </h3>
+                </div>
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
+                  type="button"
+                  onClick={() => setIsVendorModalOpen(false)}
+                >
+                  <X className="text-sm" />
+                </Button>
+              </div>
+
+              <form onSubmit={handleAddVendor} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    Vendor / Contractor Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. CloudScale Architecture Group"
+                    value={vendorName}
+                    onChange={(e) => {
+                      setVendorName(e.target.value);
+                      if (vendorFormErrors.name) {
+                        setVendorFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.name;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
+                      vendorFormErrors.name
+                        ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400"
+                        : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                    }`}
+                  />
+                  {vendorFormErrors.name && (
+                    <p className="text-rose-600 text-[11px] mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{vendorFormErrors.name}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    Service Scope & Deliverable Description *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Multi-region Cloud Deployments & Security Hardening"
+                    value={vendorService}
+                    onChange={(e) => {
+                      setVendorService(e.target.value);
+                      if (vendorFormErrors.service) {
+                        setVendorFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.service;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
+                      vendorFormErrors.service
+                        ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400"
+                        : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                    }`}
+                  />
+                  {vendorFormErrors.service && (
+                    <p className="text-rose-600 text-[11px] mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{vendorFormErrors.service}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                      Agreed Balance / Payout ({getCurrencySymbol(activeCurrency).trim() || activeCurrency}) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="2500.00"
+                      value={vendorBalance}
+                      onChange={(e) => {
+                        setVendorBalance(e.target.value);
+                        if (vendorFormErrors.balance) {
+                          setVendorFormErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.balance;
+                            return next;
+                          });
+                        }
+                      }}
+                      className={`ui-field w-full text-[13px] px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 ${
+                        vendorFormErrors.balance
+                          ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400"
+                          : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                      }`}
+                    />
+                    {vendorFormErrors.balance && (
+                      <p className="text-rose-600 text-[11px] mt-1 font-medium">
+                        {vendorFormErrors.balance}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={vendorIconType}
+                      onChange={(e) =>
+                        setVendorIconType(
+                          e.target.value as VendorItem["iconType"],
+                        )
+                      }
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    >
+                      <option value="devops">DevOps & Cloud</option>
+                      <option value="design">UI/UX Design</option>
+                      <option value="legal">Legal & Compliance</option>
+                      <option value="development">Software Development</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Link to Client Dropdown */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[12px] font-semibold text-[#374151] flex items-center gap-1.5">
+                      <Building className="w-3.5 h-3.5 text-[#7c3aed]" />
+                      <span>Link to Client Project</span>
+                    </label>
+                    <span className="text-[10.5px] text-neutral-400">Optional</span>
+                  </div>
+                  <select
+                    value={vendorLinkedClientId}
+                    onChange={(e) => setVendorLinkedClientId(e.target.value)}
+                    className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                  >
+                    <option value="">No Client Linked (Internal / General)</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.category})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                      Contractor Email
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="vendor@company.com"
+                      value={vendorEmail}
+                      onChange={(e) => setVendorEmail(e.target.value)}
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                      Payout Due Date
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Oct 28, 2026"
+                      value={vendorDueDate}
+                      onChange={(e) => setVendorDueDate(e.target.value)}
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-neutral-100">
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => setIsVendorModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={isSubmittingVendor}
+                  >
+                    {isSubmittingVendor ? "Saved" : "Save"}
                   </Button>
                 </div>
               </form>
@@ -426,14 +1166,15 @@ export default function OutsourcingView() {
         {isExpenseModalOpen && (
           <MotionSurface
             kind="dialog"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+            className="outsourcing-modal-overlay"
           >
-            <MotionSurface onDismiss={() => setIsExpenseModalOpen(false)}
+            <MotionSurface
+              onDismiss={() => setIsExpenseModalOpen(false)}
               kind="panel"
-              className="bg-[#faf9f5] rounded-2xl shadow-xl border border-[#dcdcd7] w-full max-w-md overflow-hidden"
+              className="outsourcing-modal-panel voucher-panel"
             >
-              <div className="px-6 py-4 border-b border-[#eaeae5] flex items-center justify-between">
-                <h3 className="font-bold text-[13px] text-[#111827]">
+              <div className="outsourcing-modal-header">
+                <h3 className="outsourcing-modal-title">
                   Log Business Expense
                 </h3>
                 <Button
@@ -462,7 +1203,7 @@ export default function OutsourcingView() {
                 </div>
                 <div>
                   <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
-                    Amount ($ USD)
+                    Amount ({getCurrencySymbol(activeCurrency).trim() || activeCurrency})
                   </label>
                   <input
                     type="number"

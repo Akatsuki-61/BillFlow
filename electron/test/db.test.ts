@@ -3,11 +3,13 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { initDatabase, closeDatabaseForTesting, getDb } from "../db";
-import { clients, invoices } from "../db/schema";
+import { clients, invoices, vendors } from "../db/schema";
 import { listClientsWithStats } from "../ipc/clients";
 import { getNextInvoiceCode } from "../ipc/invoices";
 import { getDashboardSummary } from "../ipc/dashboard";
-import { newClientSchema, newInvoiceSchema } from "../validation";
+import { listVendors } from "../ipc/vendors";
+import { getAnalyticsSummary } from "../ipc/analytics";
+import { newClientSchema, newInvoiceSchema, newVendorSchema, vendorPatchSchema } from "../validation";
 import { eq } from "drizzle-orm";
 
 describe("Database & Interconnection Tests", () => {
@@ -50,6 +52,39 @@ describe("Database & Interconnection Tests", () => {
         currency: "USD",
       });
       expect(invalid.success).toBe(false);
+      if (!invalid.success) {
+        expect(invalid.error.issues.some((i) => i.message.includes("@"))).toBe(true);
+      }
+    });
+
+    it("rejects client with blank space data in name or email", () => {
+      const blankName = newClientSchema.safeParse({
+        name: "    ",
+        email: "alex@fintechlabs.com",
+        currency: "USD",
+      });
+      expect(blankName.success).toBe(false);
+      if (!blankName.success) {
+        expect(
+          blankName.error.issues.some((i) =>
+            i.message.toLowerCase().includes("blank"),
+          ),
+        ).toBe(true);
+      }
+
+      const blankEmail = newClientSchema.safeParse({
+        name: "Fintech Labs",
+        email: "    ",
+        currency: "USD",
+      });
+      expect(blankEmail.success).toBe(false);
+      if (!blankEmail.success) {
+        expect(
+          blankEmail.error.issues.some((i) =>
+            i.message.toLowerCase().includes("blank"),
+          ),
+        ).toBe(true);
+      }
     });
 
     it("validates invoice schema and enforces integer cents", () => {
@@ -281,6 +316,149 @@ describe("Database & Interconnection Tests", () => {
       expect(restoredClients.length).toBe(1);
       expect(restoredInvoices.length).toBe(1);
       expect(restoredInvoices[0].code).toBe("BK-2026-001");
+    });
+  });
+
+  describe("Outsourcing Vendor Validation & Persistence", () => {
+    it("validates vendor input and rejects blank space data", () => {
+      const valid = newVendorSchema.safeParse({
+        name: "DevOps Nexus",
+        service: "CI/CD Pipeline Support",
+        balanceCents: 320000,
+        status: "PENDING",
+        iconType: "devops",
+        email: "ops@devopsnexus.io",
+      });
+      expect(valid.success).toBe(true);
+
+      const blankName = newVendorSchema.safeParse({
+        name: "   ",
+        service: "Development",
+        balanceCents: 100000,
+        status: "PENDING",
+      });
+      expect(blankName.success).toBe(false);
+
+      const invalidEmail = newVendorSchema.safeParse({
+        name: "Nexus",
+        service: "DevOps",
+        balanceCents: 50000,
+        status: "PENDING",
+        email: "invalid-email-no-at-sign",
+      });
+      expect(invalidEmail.success).toBe(false);
+    });
+
+    it("persists vendors, links clients, and toggles settlement status", () => {
+      const db = getDb();
+
+      // Create a client
+      const clientId = "cli-vnd-test-1";
+      db.insert(clients).values({
+        id: clientId,
+        name: "Fintech Labs Inc.",
+        contactPerson: "Jane",
+        email: "jane@fintech.io",
+        currency: "USD",
+        hasQuickBill: true,
+      }).run();
+
+      // Insert vendor
+      const vendorId = "vnd-test-1";
+      db.insert(vendors).values({
+        id: vendorId,
+        name: "DevOps Nexus",
+        service: "Kubernetes Migration",
+        balanceCents: 350000,
+        status: "PENDING",
+        iconType: "devops",
+        email: "devops@nexus.com",
+        linkedClientId: clientId,
+        payoutDueDate: "2026-10-25",
+      }).run();
+
+      const list = listVendors();
+      const found = list.find((v) => v.id === vendorId);
+      expect(found).toBeDefined();
+      expect(found?.name).toBe("DevOps Nexus");
+      expect(found?.currentBalance).toBe(3500); // 350000 cents = $3,500
+      expect(found?.linkedClientName).toBe("Fintech Labs Inc.");
+      expect(found?.status).toBe("PENDING");
+
+      // Update status to PAID
+      db.update(vendors)
+        .set({ status: "PAID", updatedAt: new Date().toISOString() })
+        .where(eq(vendors.id, vendorId))
+        .run();
+
+      const updatedList = listVendors();
+      const updatedFound = updatedList.find((v) => v.id === vendorId);
+      expect(updatedFound?.status).toBe("PAID");
+    });
+  });
+
+  describe("Real-Time Analytics Engine", () => {
+    it("computes live financial summary with revenue, expenses, net profit, and margins", () => {
+      const db = getDb();
+      db.delete(vendors).run();
+
+      // Client
+      db.insert(clients).values({
+        id: "cli-an-1",
+        name: "Apex Global",
+        contactPerson: "Mark",
+        email: "mark@apex.com",
+        currency: "USD",
+        hasQuickBill: true,
+      }).run();
+
+      // Invoices: 1 paid $5,000 (500000 cents), 1 unpaid $3,000 (300000 cents)
+      db.insert(invoices).values({
+        id: "inv-an-1",
+        code: "INV-2026-001",
+        clientId: "cli-an-1",
+        amountCents: 500000,
+        paidCents: 500000,
+        currency: "USD",
+        issueDate: "2026-10-01",
+        status: "PAID",
+      }).run();
+
+      db.insert(invoices).values({
+        id: "inv-an-2",
+        code: "INV-2026-002",
+        clientId: "cli-an-1",
+        amountCents: 300000,
+        paidCents: 0,
+        currency: "USD",
+        issueDate: "2026-10-02",
+        dueDate: "2026-09-01", // overdue
+        status: "OVERDUE",
+      }).run();
+
+      // Vendors: $2,000 (200000 cents) outsourced
+      db.insert(vendors).values({
+        id: "vnd-an-1",
+        name: "Cloud Ops",
+        service: "Infra",
+        balanceCents: 200000,
+        status: "PENDING",
+        iconType: "devops",
+      }).run();
+
+      const summary = getAnalyticsSummary();
+
+      expect(summary.totalRevenueCents).toBe(800000); // $8,000
+      expect(summary.totalOutsourcedCents).toBe(200000); // $2,000
+      expect(summary.netProfitCents).toBe(600000); // $6,000
+      expect(summary.marginPct).toBe(75); // 6000 / 8000 = 75%
+      expect(summary.pendingReceivablesCents).toBe(300000); // $3,000
+      expect(summary.overdueCents).toBe(300000);
+      expect(summary.overdueCount).toBe(1);
+      expect(summary.activeClientsCount).toBe(1);
+      expect(summary.vendorsCount).toBe(1);
+      expect(summary.topClientName).toBe("Apex Global");
+      expect(summary.monthlyTrends.length).toBe(6);
     });
   });
 });

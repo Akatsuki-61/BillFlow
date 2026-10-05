@@ -7,6 +7,8 @@ import { registerClientHandlers } from "./ipc/clients";
 import { registerInvoiceHandlers } from "./ipc/invoices";
 import { registerDashboardHandlers } from "./ipc/dashboard";
 import { registerSettingsHandlers } from "./ipc/settings";
+import { registerVendorHandlers } from "./ipc/vendors";
+import { registerAnalyticsHandlers } from "./ipc/analytics";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -20,6 +22,8 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ]);
+
+app.setName("BillFlow");
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -101,6 +105,8 @@ app.whenReady().then(() => {
   registerInvoiceHandlers(broadcastDataChanged);
   registerDashboardHandlers();
   registerSettingsHandlers(broadcastDataChanged);
+  registerVendorHandlers(broadcastDataChanged);
+  registerAnalyticsHandlers();
 
   // Register production static file protocol
   const outDir = app.isPackaged

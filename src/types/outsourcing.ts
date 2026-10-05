@@ -1,3 +1,5 @@
+import type { Currency } from "./billing";
+
 // Status definitions for outsourced deliverables
 export type OutsourcingStatus = "Ongoing" | "Under Review" | "Done";
 
@@ -5,7 +7,7 @@ export type OutsourcingStatus = "Ongoing" | "Under Review" | "Done";
 export type PayoutStatus = "Unpaid" | "Paid";
 
 // Supported billing currencies
-export type Currency = "USD" | "LKR" | "EUR";
+export type { Currency };
 
 // Data interface for an outsourced deliverable task
 export interface OutsourcedTask {
@@ -38,4 +40,52 @@ export interface OutsourcingStats {
   activeCount: number;
   underReviewCount: number;
   doneCount: number;
+}
+
+// Vendor / Subcontractor entity stored in SQLite DB
+export interface VendorItem {
+  id: string;
+  name: string;
+  service: string;
+  currentBalance: number; // in dollars for UI display
+  status: "PENDING" | "PAID";
+  iconType: "design" | "devops" | "legal" | "development";
+  email?: string | null;
+  phone?: string | null;
+  linkedClientId?: string | null;
+  linkedClientName?: string | null;
+  payoutDueDate?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface NewVendorInput {
+  name: string;
+  service: string;
+  currentBalance?: number;
+  balanceCents?: number;
+  status?: "PENDING" | "PAID";
+  iconType?: "design" | "devops" | "legal" | "development";
+  email?: string;
+  phone?: string;
+  linkedClientId?: string;
+  linkedClientName?: string;
+  payoutDueDate?: string;
+  notes?: string;
+}
+
+export interface VendorPatchInput {
+  name?: string;
+  service?: string;
+  currentBalance?: number;
+  balanceCents?: number;
+  status?: "PENDING" | "PAID";
+  iconType?: "design" | "devops" | "legal" | "development";
+  email?: string | null;
+  phone?: string | null;
+  linkedClientId?: string | null;
+  linkedClientName?: string | null;
+  payoutDueDate?: string | null;
+  notes?: string | null;
 }

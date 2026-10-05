@@ -13,6 +13,12 @@ import type {
   UpdateSettingsInput,
   ExportDataPayload,
 } from "../src/types/settings";
+import type {
+  VendorItem,
+  NewVendorInput,
+  VendorPatchInput,
+} from "../src/types/outsourcing";
+import type { AnalyticsSummaryPayload } from "../src/types/analytics";
 
 contextBridge.exposeInMainWorld("billflow", {
   isElectron: true,
@@ -37,6 +43,21 @@ contextBridge.exposeInMainWorld("billflow", {
       ipcRenderer.invoke("invoices:setStatus", id, status),
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("invoices:remove", id),
+  },
+  vendors: {
+    list: (): Promise<VendorItem[]> => ipcRenderer.invoke("vendors:list"),
+    create: (input: NewVendorInput): Promise<VendorItem> =>
+      ipcRenderer.invoke("vendors:create", input),
+    update: (id: string, patch: VendorPatchInput): Promise<VendorItem> =>
+      ipcRenderer.invoke("vendors:update", id, patch),
+    setStatus: (id: string, status: "PENDING" | "PAID"): Promise<VendorItem> =>
+      ipcRenderer.invoke("vendors:setStatus", id, status),
+    remove: (id: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("vendors:remove", id),
+  },
+  analytics: {
+    summary: (period?: string): Promise<AnalyticsSummaryPayload> =>
+      ipcRenderer.invoke("analytics:summary", period),
   },
   dashboard: {
     summary: (): Promise<DashboardSummary> => ipcRenderer.invoke("dashboard:summary"),

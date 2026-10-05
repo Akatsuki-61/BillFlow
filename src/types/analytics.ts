@@ -24,3 +24,32 @@ export interface AnalyticsSummary {
   billedAmount: number;
   collectionRatePercentage: number;
 }
+
+export interface AnalyticsMonthlyTrend {
+  key: string;
+  label: string;
+  revenueCents: number;
+  expensesCents: number;
+  profitCents: number;
+  marginPct: number;
+}
+
+export interface AnalyticsSummaryPayload {
+  totalRevenueCents: number;
+  totalOutsourcedCents: number;
+  netProfitCents: number;
+  marginPct: number;
+  pendingReceivablesCents: number;
+  unpaidCount: number;
+  overdueCents: number;
+  overdueCount: number;
+  paidRatioPct: number;
+  avgInvoiceCents: number;
+  activeClientsCount: number;
+  vendorsCount: number;
+  topClientName: string;
+  topClientPct: number;
+  effectiveHourlyRate: number;
+  cashflowRunwayMonths: number;
+  monthlyTrends: AnalyticsMonthlyTrend[];
+}

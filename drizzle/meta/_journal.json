@@ -15,6 +15,13 @@
       "when": 1791108953458,
       "tag": "0001_massive_gamora",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791215500000,
+      "tag": "0002_add_vendors",
+      "breakpoints": true
     }
   ]
 }

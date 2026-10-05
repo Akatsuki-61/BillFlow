@@ -12,6 +12,12 @@ import type {
   UpdateSettingsInput,
   ExportDataPayload,
 } from "./settings";
+import type {
+  VendorItem,
+  NewVendorInput,
+  VendorPatchInput,
+} from "./outsourcing";
+import type { AnalyticsSummaryPayload } from "./analytics";
 
 export interface BillFlowAPI {
   isElectron: boolean;
@@ -29,6 +35,16 @@ export interface BillFlowAPI {
     update: (id: string, patch: InvoicePatchInput) => Promise<InvoiceWithClient>;
     setStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
     remove: (id: string) => Promise<{ success: boolean }>;
+  };
+  vendors: {
+    list: () => Promise<VendorItem[]>;
+    create: (input: NewVendorInput) => Promise<VendorItem>;
+    update: (id: string, patch: VendorPatchInput) => Promise<VendorItem>;
+    setStatus: (id: string, status: "PENDING" | "PAID") => Promise<VendorItem>;
+    remove: (id: string) => Promise<{ success: boolean }>;
+  };
+  analytics: {
+    summary: (period?: string) => Promise<AnalyticsSummaryPayload>;
   };
   dashboard: {
     summary: () => Promise<DashboardSummary>;

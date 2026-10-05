@@ -11,7 +11,6 @@ import {
   EyeOff,
   RotateCcw,
   X,
-  Layers,
   Sparkles,
 } from "lucide-react";
 import {
@@ -24,8 +23,11 @@ import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import { useWidgetContext } from "@/context/WidgetContext";
+import { useActiveCurrency } from "@/lib/data/DataProvider";
+import { getCurrencySymbol } from "@/lib/format";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { Timeframe } from "@/types/analytics";
+import "./analytics.css";
 
 const quarterOptions = Array.from({ length: 4 }, (_, offset) => {
   const date = new Date();
@@ -47,6 +49,8 @@ export default function AnalyticsView() {
     toastMessage,
     showToast,
   } = useWidgetContext();
+
+  const { activeCurrency } = useActiveCurrency();
 
   // Selected timeframe filter state: Month, Quarter, or Year
   const [timeframe, setTimeframe] = useState<Timeframe>("Quarter");
@@ -81,10 +85,6 @@ export default function AnalyticsView() {
     setContextMenu({ isOpen: false, x: 0, y: 0, widgetId: null });
   };
 
-  // Build context menu options for targeted widget
-  const targetWidgetMeta = WIDGET_CATALOG.find(
-    (w) => w.id === contextMenu.widgetId,
-  );
   const isTargetPinned = contextMenu.widgetId
     ? isPinnedToDashboard(contextMenu.widgetId)
     : false;
@@ -128,13 +128,15 @@ export default function AnalyticsView() {
     analyticsWidgets.includes(w.id),
   );
   const metricWidgets = visibleWidgets.filter((w) => w.size === "metric");
-  const chartWidgets = visibleWidgets.filter((w) => w.size === "full" || w.size === "wide");
+  const chartWidgets = visibleWidgets.filter(
+    (w) => w.category === "charts" && w.size !== "medium",
+  );
   const otherWidgets = visibleWidgets.filter(
-    (w) => w.size === "medium" || (!metricWidgets.includes(w) && !chartWidgets.includes(w)),
+    (w) => !metricWidgets.includes(w) && !chartWidgets.includes(w),
   );
 
   return (
-    <div className="workspace-page motion-page">
+    <div className="workspace-page motion-page analytics-page-container">
       {/* Toast Feedback Notification */}
       <MotionPresence>
         {toastMessage && (
@@ -159,10 +161,18 @@ export default function AnalyticsView() {
 
       {/* Top Header */}
       <PageHeader
-        title="Analytics & Widget Storage"
-        description="Central widget storage. Drag cards to the Dashboard in the sidebar, or right-click to pin."
+        title="Analytics & Financial Performance"
+        description="Executive financial intelligence and real-time operational analytics. Monitor cashflow velocity, profit margins, contractor allocations, and collection efficiency across billing cycles."
       >
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="analytics-header-controls">
+          {/* Active invoice currency indicator */}
+          <span
+            className="analytics-currency-badge"
+            title="Viewing currency synced with your invoices"
+          >
+            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
+          </span>
+
           <SegmentedControl
             value={timeframe}
             onChange={setTimeframe}
@@ -173,7 +183,7 @@ export default function AnalyticsView() {
           />
 
           {/* Quarter Dropdown */}
-          <div className="relative">
+          <div className="analytics-dropdown-relative">
             <Button
               variant="secondary"
               type="button"
@@ -243,22 +253,36 @@ export default function AnalyticsView() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Section 1: KPI Metrics Grid */}
           {metricWidgets.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-3 text-xs text-neutral-500 font-medium">
-                <span>Key Business Indicators ({selectedQuarter})</span>
-                <span className="text-[11px] text-neutral-400">
-                  {metricWidgets.length} KPI cards active
+              <div className="flex items-center justify-between mb-3 text-xs">
+                <div>
+                  <h2 className="font-semibold text-neutral-800 tracking-tight uppercase text-[11px]">
+                    Key Business Indicators ({selectedQuarter})
+                  </h2>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Core financial health, active retainers, and operating margins.
+                  </p>
+                </div>
+                <span className="text-[11px] text-neutral-500 font-medium bg-neutral-100 px-2 py-0.5 rounded-md">
+                  {metricWidgets.length} KPIs active
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="analytics-metrics-grid">
                 {metricWidgets.map((w) => (
                   <WidgetRenderer
                     key={w.id}
                     widgetId={w.id}
                     source="analytics"
+                    period={
+                      timeframe === "Month"
+                        ? "month"
+                        : timeframe === "Year"
+                          ? "year"
+                          : "quarter"
+                    }
                     isDraggable={true}
                     onContextMenu={handleContextMenu}
                   />
@@ -267,18 +291,35 @@ export default function AnalyticsView() {
             </div>
           )}
 
-          {/* Section 2: Charts & Visualizations */}
+          {/* Section 2: Charts & Visualizations (Side-by-Side on Desktop) */}
           {chartWidgets.length > 0 && (
-            <div className="space-y-4">
-              <div className="text-xs text-neutral-500 font-medium">
-                Financial Trends & Profit Trajectory
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <div>
+                  <h2 className="font-semibold text-neutral-800 tracking-tight uppercase text-[11px]">
+                    Financial Velocity & Profit Trajectory
+                  </h2>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    6-month rolling cashflow intake, contractor disbursements, and retained net earnings.
+                  </p>
+                </div>
+                <span className="text-[11px] font-medium text-[#7c3aed] bg-purple-50 border border-purple-200/60 px-2 py-0.5 rounded-md">
+                  Interactive Visualizations
+                </span>
               </div>
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {chartWidgets.map((w) => (
                   <WidgetRenderer
                     key={w.id}
                     widgetId={w.id}
                     source="analytics"
+                    period={
+                      timeframe === "Month"
+                        ? "month"
+                        : timeframe === "Year"
+                          ? "year"
+                          : "quarter"
+                    }
                     isDraggable={true}
                     onContextMenu={handleContextMenu}
                   />
@@ -290,8 +331,18 @@ export default function AnalyticsView() {
           {/* Section 3: Operational Feeds, Alerts & Gauges */}
           {otherWidgets.length > 0 && (
             <div className="space-y-3">
-              <div className="text-xs text-neutral-500 font-medium">
-                Operational Feeds & Account Health
+              <div className="flex items-center justify-between text-xs">
+                <div>
+                  <h2 className="font-semibold text-neutral-800 tracking-tight uppercase text-[11px]">
+                    Operational Feeds & Account Health
+                  </h2>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Recent client invoices, deliverables in sprint, and settlement alerts.
+                  </p>
+                </div>
+                <span className="text-[11px] text-neutral-500 font-medium bg-neutral-100 px-2 py-0.5 rounded-md">
+                  {otherWidgets.length} Feeds active
+                </span>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {otherWidgets.map((w) => (
@@ -299,6 +350,13 @@ export default function AnalyticsView() {
                     key={w.id}
                     widgetId={w.id}
                     source="analytics"
+                    period={
+                      timeframe === "Month"
+                        ? "month"
+                        : timeframe === "Year"
+                          ? "year"
+                          : "quarter"
+                    }
                     isDraggable={true}
                     onContextMenu={handleContextMenu}
                   />
@@ -314,17 +372,17 @@ export default function AnalyticsView() {
         {isCustomizeModalOpen && (
           <MotionSurface
             kind="dialog"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-xs"
+            className="analytics-customize-overlay"
           >
             <MotionSurface
               onDismiss={() => setIsCustomizeModalOpen(false)}
               kind="panel"
-              className="bg-white rounded-2xl w-full max-w-xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-neutral-200 overflow-hidden"
+              className="analytics-customize-panel"
             >
               {/* Modal Header */}
-              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between">
+              <div className="analytics-customize-header">
                 <div>
-                  <h2 className="text-lg font-serif font-semibold text-neutral-900">
+                  <h2 className="analytics-customize-title text-lg font-serif">
                     Customize Analytics Widgets
                   </h2>
                   <p className="text-xs text-neutral-500 mt-0.5">
@@ -413,7 +471,7 @@ export default function AnalyticsView() {
               </div>
 
               {/* Modal Actions */}
-              <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
+              <div className="analytics-customize-footer">
                 <Button
                   variant="ghost"
                   type="button"

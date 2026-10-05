@@ -66,10 +66,37 @@ export const settings = sqliteTable("settings", {
   updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
 });
 
+export const vendors = sqliteTable(
+  "vendors",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    service: text("service").notNull(),
+    balanceCents: integer("balance_cents").notNull().default(0),
+    status: text("status", { enum: ["PENDING", "PAID"] }).notNull().default("PENDING"),
+    iconType: text("icon_type", { enum: ["design", "devops", "legal", "development"] })
+      .notNull()
+      .default("devops"),
+    email: text("email"),
+    phone: text("phone"),
+    linkedClientId: text("linked_client_id").references(() => clients.id, { onDelete: "set null" }),
+    linkedClientName: text("linked_client_name"),
+    payoutDueDate: text("payout_due_date"),
+    notes: text("notes"),
+    createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+    updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (table) => [
+    index("vendors_linked_client_id_idx").on(table.linkedClientId),
+  ]
+);
+
 export type ClientRow = typeof clients.$inferSelect;
 export type InsertClientRow = typeof clients.$inferInsert;
 export type InvoiceRow = typeof invoices.$inferSelect;
 export type InsertInvoiceRow = typeof invoices.$inferInsert;
 export type SettingRow = typeof settings.$inferSelect;
 export type InsertSettingRow = typeof settings.$inferInsert;
+export type VendorRow = typeof vendors.$inferSelect;
+export type InsertVendorRow = typeof vendors.$inferInsert;
 
