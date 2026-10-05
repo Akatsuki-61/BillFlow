@@ -16,6 +16,10 @@ import {
   FileSpreadsheet,
   MoreHorizontal,
   Trash2,
+  Info,
+  Download,
+  Copy,
+  Check,
 } from "lucide-react";
 import "./catalog.css";
 
@@ -113,8 +117,43 @@ export default function CatalogView() {
   // Modals state
   const [showNewItemModal, setShowNewItemModal] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [showImportInfoModal, setShowImportInfoModal] = useState(false);
+  const [activeGuideTab, setActiveGuideTab] = useState<"table" | "csv" | "excel">("table");
+  const [copied, setCopied] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
+
+  const downloadSampleCSV = () => {
+    const csvContent =
+      `title,category,sku,price,currency,unit,description\n` +
+      `"Full-Stack Web Application","Development","DEV-FS-01",250000.00,"LKR","sprint","Complete Next.js, Node.js and SQLite development sprint"\n` +
+      `"Brand Identity & Design System","Design","DSGN-UI-02",95000.00,"LKR","package","Logo system, Figma UI kit, and typography standards"\n` +
+      `"Cloud Infrastructure Assessment","Consulting","CONS-AUD-03",60000.00,"LKR","audit","Security, Docker deployment, and database performance review"\n` +
+      `"Enterprise Software License","Licensing","LIC-PRO-04",350000.00,"LKR","year","Multi-seat business software license with ongoing updates"`;
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "billflow-catalog-template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const copySampleCSV = () => {
+    const csvText =
+      `title,category,sku,price,currency,unit,description\n` +
+      `"Full-Stack Web Application","Development","DEV-FS-01",250000.00,"LKR","sprint","Complete Next.js, Node.js and SQLite development sprint"\n` +
+      `"Brand Identity & Design System","Design","DSGN-UI-02",95000.00,"LKR","package","Logo system, Figma UI kit, and typography standards"\n` +
+      `"Cloud Infrastructure Assessment","Consulting","CONS-AUD-03",60000.00,"LKR","audit","Security, Docker deployment, and database performance review"\n` +
+      `"Enterprise Software License","Licensing","LIC-PRO-04",350000.00,"LKR","year","Multi-seat business software license with ongoing updates"`;
+
+    navigator.clipboard.writeText(csvText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // New Item Form state
   const [newTitle, setNewTitle] = useState("");
@@ -264,14 +303,24 @@ export default function CatalogView() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowBulkImportModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-xl text-neutral-800 text-[13px] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-neutral-50 transition-all cursor-pointer"
-          >
-            <Upload className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
-            <span>Bulk Import</span>
-          </button>
+          <div className="inline-flex items-center shadow-[0_1px_2px_rgba(0,0,0,0.03)] rounded-xl">
+            <button
+              type="button"
+              onClick={() => setShowBulkImportModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-l-xl text-neutral-800 text-[13px] font-medium hover:bg-neutral-50 transition-all cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
+              <span>Bulk Import</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowImportInfoModal(true)}
+              title="Bulk Import File Format Guide (CSV & Excel)"
+              className="flex items-center justify-center px-2.5 py-2.5 bg-white border-y border-r border-neutral-200/90 hover:border-neutral-300 rounded-r-xl text-neutral-500 hover:text-purple-600 hover:bg-purple-50/50 transition-all cursor-pointer group"
+            >
+              <Info className="w-4 h-4 text-neutral-500 group-hover:text-purple-600 transition-colors" strokeWidth={2} />
+            </button>
+          </div>
 
           <button
             type="button"
@@ -848,9 +897,19 @@ export default function CatalogView() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
             <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <h3 className="text-lg font-semibold text-neutral-900">
-                Bulk Import Items
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-neutral-900">
+                  Bulk Import Items
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowImportInfoModal(true)}
+                  title="View CSV / Excel format guide"
+                  className="p-1 text-neutral-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowBulkImportModal(false)}
@@ -870,6 +929,18 @@ export default function CatalogView() {
               </p>
             </div>
 
+            <div className="mt-3 flex items-center justify-between px-1 text-xs text-neutral-500">
+              <span>Supports .csv and .xlsx files</span>
+              <button
+                type="button"
+                onClick={() => setShowImportInfoModal(true)}
+                className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-1 cursor-pointer hover:underline"
+              >
+                <Info className="w-3.5 h-3.5" />
+                <span>File Format Guide & Template</span>
+              </button>
+            </div>
+
             <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
               <button
                 type="button"
@@ -884,6 +955,302 @@ export default function CatalogView() {
                 className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
               >
                 Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Information / Guide Modal */}
+      {showImportInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="import-guide-modal animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-neutral-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 shrink-0">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-neutral-900">
+                    Bulk Import File Format Guide
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    How to structure your CSV or Excel (.xlsx) file to import catalog items correctly.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowImportInfoModal(false)}
+                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Guide Tabs */}
+            <div className="mt-4">
+              <div className="import-guide-tab-bar">
+                <button
+                  type="button"
+                  onClick={() => setActiveGuideTab("table")}
+                  className={`import-guide-tab ${activeGuideTab === "table" ? "import-guide-tab-active" : ""}`}
+                >
+                  Column Structure & Rules
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveGuideTab("csv")}
+                  className={`import-guide-tab ${activeGuideTab === "csv" ? "import-guide-tab-active" : ""}`}
+                >
+                  Sample CSV Format
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveGuideTab("excel")}
+                  className={`import-guide-tab ${activeGuideTab === "excel" ? "import-guide-tab-active" : ""}`}
+                >
+                  Excel (.xlsx) Guidelines
+                </button>
+              </div>
+            </div>
+
+            {/* Tab 1: Column Structure & Rules */}
+            {activeGuideTab === "table" && (
+              <div className="mt-5 space-y-4">
+                <div className="overflow-x-auto rounded-xl border border-neutral-200">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 font-semibold uppercase tracking-wider text-[11px]">
+                        <th className="py-2.5 px-3">Column Name</th>
+                        <th className="py-2.5 px-3">Required</th>
+                        <th className="py-2.5 px-3">Type</th>
+                        <th className="py-2.5 px-3">Example Values</th>
+                        <th className="py-2.5 px-3">Description & Valid Values</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100 text-neutral-700">
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-semibold text-neutral-900 bg-neutral-50/50">title</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            REQUIRED
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500">Text</td>
+                        <td className="py-2.5 px-3 font-medium text-neutral-900">Full-Stack Sprint</td>
+                        <td className="py-2.5 px-3 text-neutral-600">The product or service name displayed in catalog.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-semibold text-neutral-900 bg-neutral-50/50">category</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            REQUIRED
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500">Option</td>
+                        <td className="py-2.5 px-3 font-medium text-purple-700">Development</td>
+                        <td className="py-2.5 px-3 text-neutral-600">
+                          Must be one of: <strong className="text-neutral-900">Development</strong>, <strong className="text-neutral-900">Design</strong>, <strong className="text-neutral-900">Consulting</strong>, <strong className="text-neutral-900">Licensing</strong>.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-semibold text-neutral-900 bg-neutral-50/50">sku</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            REQUIRED
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500">Text</td>
+                        <td className="py-2.5 px-3 font-mono text-neutral-800">DEV-FS-01</td>
+                        <td className="py-2.5 px-3 text-neutral-600">
+                          Stock Keeping Unit code (unique product code identifier).
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-semibold text-neutral-900 bg-neutral-50/50">price</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            REQUIRED
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500">Number</td>
+                        <td className="py-2.5 px-3 font-semibold text-neutral-900">250000.00</td>
+                        <td className="py-2.5 px-3 text-neutral-600">
+                          Plain numeric amount. Do not include currency symbols ($ or Rs.).
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-semibold text-neutral-900 bg-neutral-50/50">currency</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                            OPTIONAL
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500">Code (3-letter)</td>
+                        <td className="py-2.5 px-3 font-medium text-neutral-900">LKR</td>
+                        <td className="py-2.5 px-3 text-neutral-600">
+                          Currency code: <strong className="text-neutral-900">LKR</strong> (Sri Lankan Rupees), <strong className="text-neutral-900">USD</strong>, <strong className="text-neutral-900">EUR</strong>, <strong className="text-neutral-900">GBP</strong>, <strong className="text-neutral-900">CAD</strong>. Defaults to LKR.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-semibold text-neutral-900 bg-neutral-50/50">unit</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                            OPTIONAL
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500">Text</td>
+                        <td className="py-2.5 px-3 font-medium text-neutral-900">sprint</td>
+                        <td className="py-2.5 px-3 text-neutral-600">
+                          e.g. <span className="font-mono">/ Hourly</span>, <span className="font-mono">package</span>, <span className="font-mono">sprint</span>, <span className="font-mono">month</span>, <span className="font-mono">license</span>. Defaults to / Hourly.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-semibold text-neutral-900 bg-neutral-50/50">description</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                            OPTIONAL
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-neutral-500">Text</td>
+                        <td className="py-2.5 px-3 text-neutral-700">Scope deliverable details...</td>
+                        <td className="py-2.5 px-3 text-neutral-600">
+                          Detailed description of the deliverables and scope.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-3.5 bg-purple-50/70 border border-purple-200/80 rounded-xl text-xs text-purple-900 space-y-1">
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <Info className="w-4 h-4 text-purple-600 shrink-0" />
+                    Important Header Row Requirement
+                  </p>
+                  <p className="text-purple-800">
+                    Row 1 of your spreadsheet must contain the exact column names above (in any case). Data rows start immediately on Row 2.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Sample CSV Format */}
+            {activeGuideTab === "csv" && (
+              <div className="mt-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-neutral-700">
+                    Raw CSV Text Example (.csv)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={copySampleCSV}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700 font-semibold">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-neutral-500" />
+                          <span>Copy CSV</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadSampleCSV}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold text-white transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Template</span>
+                    </button>
+                  </div>
+                </div>
+
+                <pre className="import-guide-code-box">
+{`title,category,sku,price,currency,unit,description
+"Full-Stack Web Application","Development","DEV-FS-01",250000.00,"LKR","sprint","Complete Next.js, Node.js and SQLite development sprint"
+"Brand Identity & Design System","Design","DSGN-UI-02",95000.00,"LKR","package","Logo system, Figma UI kit, and typography standards"
+"Cloud Infrastructure Assessment","Consulting","CONS-AUD-03",60000.00,"LKR","audit","Security, Docker deployment, and database performance review"
+"Enterprise Software License","Licensing","LIC-PRO-04",350000.00,"LKR","year","Multi-seat business software license with ongoing updates"`}
+                </pre>
+
+                <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-600 space-y-1">
+                  <p className="font-semibold text-neutral-800">CSV Formatting Best Practices:</p>
+                  <ul className="list-disc list-inside space-y-0.5 text-neutral-600">
+                    <li>Wrap text containing commas or special characters in double quotation marks <code className="bg-neutral-200 px-1 py-0.5 rounded">&quot;...&quot;</code>.</li>
+                    <li>Ensure UTF-8 encoding so international symbols and characters preserve cleanly.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Excel (.xlsx) Guidelines */}
+            {activeGuideTab === "excel" && (
+              <div className="mt-5 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl border border-neutral-200 bg-neutral-50/60 space-y-2">
+                    <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider block">
+                      Excel Spreadsheet Layout
+                    </span>
+                    <ul className="text-xs text-neutral-600 space-y-1.5">
+                      <li>• <strong>Column A:</strong> <span className="font-mono text-neutral-800">title</span> (Product or service name)</li>
+                      <li>• <strong>Column B:</strong> <span className="font-mono text-neutral-800">category</span> (Development, Design, Consulting, Licensing)</li>
+                      <li>• <strong>Column C:</strong> <span className="font-mono text-neutral-800">sku</span> (Unique code, e.g. DEV-001)</li>
+                      <li>• <strong>Column D:</strong> <span className="font-mono text-neutral-800">price</span> (Numeric value only)</li>
+                      <li>• <strong>Column E:</strong> <span className="font-mono text-neutral-800">currency</span> (LKR, USD, EUR, GBP, CAD)</li>
+                      <li>• <strong>Column F:</strong> <span className="font-mono text-neutral-800">unit</span> (/ Hourly, sprint, package, etc.)</li>
+                      <li>• <strong>Column G:</strong> <span className="font-mono text-neutral-800">description</span> (Detailed scope)</li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-neutral-200 bg-neutral-50/60 space-y-2">
+                    <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider block">
+                      Do&apos;s and Don&apos;ts in Excel
+                    </span>
+                    <ul className="text-xs space-y-1.5 text-neutral-600">
+                      <li className="text-emerald-700">✓ <strong>DO</strong> format the Price column as General or Number.</li>
+                      <li className="text-emerald-700">✓ <strong>DO</strong> start your data on row 2 right after headers.</li>
+                      <li className="text-rose-700">✗ <strong>DO NOT</strong> type currency signs like &quot;Rs.&quot; or &quot;$&quot; inside the Price cell.</li>
+                      <li className="text-rose-700">✗ <strong>DO NOT</strong> merge cells or leave empty rows between items.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="flex justify-start">
+                  <button
+                    type="button"
+                    onClick={downloadSampleCSV}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Compatible Spreadsheet Template (.csv)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-5 mt-6 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={downloadSampleCSV}
+                className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-800 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download Sample CSV Template</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowImportInfoModal(false)}
+                className="px-5 py-2 text-xs font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Got it, Close
               </button>
             </div>
           </div>
