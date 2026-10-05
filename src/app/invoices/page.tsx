@@ -15,25 +15,12 @@ import {
   Users,
   Sparkles,
 } from "lucide-react";
-import { useClients } from "@/lib/data/DataProvider";
+import { useInvoices, useClients, useCatalog } from "@/lib/data/DataProvider";
+import type { InvoiceWithClient, InvoiceStatus, Currency } from "@/types/billing";
 import "./invoices.css";
 
-interface Invoice {
-  id: string;
-  code: string;
-  client: string;
-  amount: string;
-  currency: string;
-  dueDate: string;
-  dueSubtext?: string;
-  isOverdue?: boolean;
-  isDueSoon?: boolean;
-  status: "OVERDUE" | "UNPAID" | "PAID" | "DRAFT";
-  isDraftCode?: boolean;
-}
-
 const getCurrencySymbol = (currency: string) => {
-  switch (currency.toUpperCase()) {
+  switch (currency?.toUpperCase()) {
     case "LKR":
       return "Rs. ";
     case "EUR":
@@ -47,8 +34,8 @@ const getCurrencySymbol = (currency: string) => {
   }
 };
 
-const formatAmountWithCurrency = (numStr: string, currency: string) => {
-  const parsed = parseFloat(numStr || "0");
+const formatAmountWithCurrency = (numStr: string | number, currency: string) => {
+  const parsed = typeof numStr === "number" ? numStr : parseFloat(numStr || "0");
   const symbol = getCurrencySymbol(currency);
   return `${symbol}${parsed.toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -56,58 +43,64 @@ const formatAmountWithCurrency = (numStr: string, currency: string) => {
   })}`;
 };
 
-const initialInvoices: Invoice[] = [
-  {
-    id: "1",
-    code: "INV-2023-089",
-    client: "Globex Corporation",
-    amount: "Rs. 12,450.00",
-    currency: "LKR",
-    dueDate: "Oct 12, 2023",
-    dueSubtext: "14 days late",
-    isOverdue: true,
-    status: "OVERDUE",
-  },
-  {
-    id: "2",
-    code: "INV-2023-090",
-    client: "Initech LLC",
-    amount: "Rs. 4,200.50",
-    currency: "LKR",
-    dueDate: "Oct 28, 2023",
-    dueSubtext: "in 2 days",
-    isDueSoon: true,
-    status: "UNPAID",
-  },
-  {
-    id: "3",
-    code: "INV-2023-085",
-    client: "Stark Industries",
-    amount: "Rs. 85,000.00",
-    currency: "LKR",
-    dueDate: "Oct 15, 2023",
-    status: "PAID",
-  },
-  {
-    id: "4",
-    code: "Draft",
-    client: "Wayne Enterprises",
-    amount: "Rs. 1,500.00",
-    currency: "LKR",
-    dueDate: "Not Set",
-    status: "DRAFT",
-    isDraftCode: true,
-  },
-];
+const formatDueDateDisplay = (dateStr: string | null | undefined, status: InvoiceStatus) => {
+  if (!dateStr) {
+    return status === "DRAFT" ? "Not Set" : "Pending";
+  }
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  } catch {}
+  return dateStr;
+};
+
+const getDueSubtext = (dateStr: string | null | undefined, status: InvoiceStatus) => {
+  if (status === "OVERDUE") {
+    if (dateStr) {
+      try {
+        const diffMs = Date.now() - new Date(dateStr).getTime();
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (days > 0) return `${days} days late`;
+      } catch {}
+    }
+    return "Overdue";
+  }
+  if (status === "UNPAID") {
+    if (dateStr) {
+      try {
+        const diffMs = new Date(dateStr).getTime() - Date.now();
+        const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        if (days > 0) return `in ${days} days`;
+        if (days === 0) return "due today";
+      } catch {}
+    }
+    return "Pending";
+  }
+  return undefined;
+};
 
 type FilterTab = "All Invoices" | "Drafts" | "Overdue" | "Paid";
 
 export default function InvoicesPage() {
+  const {
+    invoices: dbInvoices,
+    createInvoice,
+    updateInvoice,
+    setInvoiceStatus,
+    deleteInvoice,
+    getNextInvoiceCode,
+  } = useInvoices();
   const { clients, createClient } = useClients();
+  const { catalogItems } = useCatalog();
 
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -129,7 +122,9 @@ export default function InvoicesPage() {
   const [newAmount, setNewAmount] = useState("");
   const [newCurrency, setNewCurrency] = useState("LKR");
   const [newDueDate, setNewDueDate] = useState("");
-  const [newStatus, setNewStatus] = useState<"UNPAID" | "OVERDUE" | "PAID" | "DRAFT">("UNPAID");
+  const [newStatus, setNewStatus] = useState<InvoiceStatus>("UNPAID");
+  const [selectedCatalogItemId, setSelectedCatalogItemId] = useState<string>("");
+  const [newInvoiceTitle, setNewInvoiceTitle] = useState("");
 
   // Client Selection / Creation Mode
   const [clientMode, setClientMode] = useState<"select" | "new">("select");
@@ -140,23 +135,38 @@ export default function InvoicesPage() {
   const [newClientCategory, setNewClientCategory] = useState("Enterprise");
 
   // Edit Invoice Modal state
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceWithClient | null>(null);
   const [editCode, setEditCode] = useState("");
   const [editClient, setEditClient] = useState("");
   const [editAmount, setEditAmount] = useState("");
   const [editCurrency, setEditCurrency] = useState("LKR");
   const [editDueDate, setEditDueDate] = useState("");
-  const [editStatus, setEditStatus] = useState<"UNPAID" | "OVERDUE" | "PAID" | "DRAFT">("UNPAID");
+  const [editStatus, setEditStatus] = useState<InvoiceStatus>("UNPAID");
 
   // Delete Confirm Modal state
-  const [deletingInvoice, setDeletingInvoice] = useState<Invoice | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState<InvoiceWithClient | null>(null);
 
-  const filteredInvoices = invoices.filter((inv) => {
+  const filteredInvoices = dbInvoices.filter((inv) => {
     if (activeTab === "Drafts") return inv.status === "DRAFT";
     if (activeTab === "Overdue") return inv.status === "OVERDUE";
     if (activeTab === "Paid") return inv.status === "PAID";
     return true;
   });
+
+  const outstandingCents = dbInvoices
+    .filter((inv) => inv.status === "UNPAID" || inv.status === "OVERDUE")
+    .reduce((sum, inv) => sum + (inv.amountCents - (inv.paidCents || 0)), 0);
+
+  const overdueCents = dbInvoices
+    .filter((inv) => inv.status === "OVERDUE")
+    .reduce((sum, inv) => sum + (inv.amountCents - (inv.paidCents || 0)), 0);
+
+  const tabCounts = {
+    "All Invoices": dbInvoices.length,
+    "Drafts": dbInvoices.filter((i) => i.status === "DRAFT").length,
+    "Overdue": dbInvoices.filter((i) => i.status === "OVERDUE").length,
+    "Paid": dbInvoices.filter((i) => i.status === "PAID").length,
+  };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -177,92 +187,88 @@ export default function InvoicesPage() {
     filteredInvoices.every((inv) => selectedIds.includes(inv.id));
 
   // Quick Change Status
-  const handleChangeStatus = (
+  const handleChangeStatus = async (
     id: string,
-    nextStatus: "OVERDUE" | "UNPAID" | "PAID" | "DRAFT"
+    nextStatus: InvoiceStatus
   ) => {
-    setInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id === id) {
-          return {
-            ...inv,
-            status: nextStatus,
-            isOverdue: nextStatus === "OVERDUE",
-            dueSubtext:
-              nextStatus === "OVERDUE"
-                ? "Overdue"
-                : nextStatus === "UNPAID"
-                ? "Pending"
-                : undefined,
-          };
-        }
-        return inv;
-      })
-    );
+    try {
+      await setInvoiceStatus(id, nextStatus);
+      showToast(`Invoice status updated to ${nextStatus}`);
+    } catch (err) {
+      console.error("Failed to update invoice status:", err);
+      showToast("Failed to update status", "error");
+    }
     setOpenMenuId(null);
   };
 
   // Open Edit Modal
-  const handleOpenEdit = (inv: Invoice) => {
+  const handleOpenEdit = (inv: InvoiceWithClient) => {
     setEditingInvoice(inv);
     setEditCode(inv.code);
-    setEditClient(inv.client);
-    setEditAmount(inv.amount.replace(/[^0-9.]/g, ""));
+    setEditClient(inv.clientName);
+    setEditAmount((inv.amountCents / 100).toFixed(2));
     setEditCurrency(inv.currency || "LKR");
-    setEditDueDate(inv.dueDate);
+    setEditDueDate(inv.dueDate || "");
     setEditStatus(inv.status);
     setOpenMenuId(null);
   };
 
   // Save Edit Changes
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingInvoice) return;
 
-    const formattedAmount = formatAmountWithCurrency(editAmount, editCurrency);
+    const numericAmount = parseFloat(editAmount.replace(/[^0-9.]/g, "") || "0");
+    const amountCents = Math.round(numericAmount * 100);
 
-    setInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id === editingInvoice.id) {
-          return {
-            ...inv,
-            code: editCode.trim() || inv.code,
-            client: editClient.trim() || inv.client,
-            amount: formattedAmount,
-            currency: editCurrency,
-            dueDate: editDueDate || inv.dueDate,
-            status: editStatus,
-            isOverdue: editStatus === "OVERDUE",
-            dueSubtext:
-              editStatus === "OVERDUE"
-                ? "Overdue"
-                : editStatus === "UNPAID"
-                ? "Pending"
-                : undefined,
-          };
-        }
-        return inv;
-      })
-    );
+    try {
+      await updateInvoice(editingInvoice.id, {
+        code: editCode.trim() || editingInvoice.code,
+        amountCents,
+        currency: editCurrency as Currency,
+        dueDate: editDueDate || null,
+        status: editStatus,
+      });
+      showToast("Invoice updated successfully!");
+    } catch (err) {
+      console.error("Failed to update invoice:", err);
+      showToast("Failed to update invoice", "error");
+    }
 
     setEditingInvoice(null);
   };
 
   // Execute Delete
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deletingInvoice) {
-      setInvoices((prev) => prev.filter((inv) => inv.id !== deletingInvoice.id));
-      setSelectedIds((prev) => prev.filter((id) => id !== deletingInvoice.id));
+      try {
+        await deleteInvoice(deletingInvoice.id);
+        setSelectedIds((prev) => prev.filter((id) => id !== deletingInvoice.id));
+        showToast("Invoice deleted successfully");
+      } catch (err) {
+        console.error("Failed to delete invoice:", err);
+        showToast("Failed to delete invoice", "error");
+      }
       setDeletingInvoice(null);
       setOpenMenuId(null);
     }
+  };
+
+  const handleOpenAddInvoice = async () => {
+    try {
+      const code = await getNextInvoiceCode();
+      setNewCode(code);
+    } catch {
+      setNewCode(`INV-${new Date().getFullYear()}-${String(dbInvoices.length + 1).padStart(3, "0")}`);
+    }
+    setShowAddInvoiceModal(true);
   };
 
   // Add Invoice Form Submit
   const handleAddInvoiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    let finalClientName = newClient.trim();
+    let targetClientId = selectedClientId;
 
     if (clientMode === "new") {
       if (!newClientName.trim()) {
@@ -281,68 +287,53 @@ export default function InvoicesPage() {
           email: emailToUse,
           currency: (newCurrency as "USD" | "LKR" | "EUR") || "LKR",
         });
-        finalClientName = createdClient.name;
+        targetClientId = createdClient.id;
         showToast(
           `Invoice created and "${createdClient.name}" added to Clients page!`,
         );
       } catch (err: unknown) {
         console.error("Failed to create client:", err);
-        finalClientName = newClientName.trim();
-        showToast(`Invoice created for "${finalClientName}"`);
+        showToast("Failed to create new client", "error");
+        return;
       }
     } else {
-      if (!finalClientName) {
+      if (!targetClientId) {
         alert("Please select a client from the list or switch to 'Add New Client'.");
         return;
       }
-      showToast(`Invoice created for "${finalClientName}"!`);
     }
 
-    const formattedAmount = formatAmountWithCurrency(newAmount, newCurrency);
+    const numericAmount = parseFloat(newAmount.replace(/[^0-9.]/g, "") || "0");
+    const amountCents = Math.round(numericAmount * 100);
 
-    let formattedDate = newDueDate;
-    if (newDueDate) {
-      try {
-        const d = new Date(newDueDate);
-        formattedDate = d.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        });
-      } catch {
-        formattedDate = newDueDate;
-      }
-    } else {
-      formattedDate = newStatus === "DRAFT" ? "Not Set" : "Pending";
+    try {
+      await createInvoice({
+        clientId: targetClientId,
+        catalogItemId: selectedCatalogItemId || null,
+        code: newCode.trim() || undefined,
+        title: newInvoiceTitle.trim() || undefined,
+        amountCents,
+        currency: newCurrency as Currency,
+        dueDate: newDueDate || null,
+        status: newStatus,
+      });
+      showToast("Invoice created successfully!");
+    } catch (err) {
+      console.error("Failed to create invoice:", err);
+      showToast("Failed to create invoice", "error");
     }
 
-    const createdInvoice: Invoice = {
-      id: Date.now().toString(),
-      code: newCode.trim() || `INV-2023-0${invoices.length + 90}`,
-      client: finalClientName,
-      amount: formattedAmount,
-      currency: newCurrency,
-      dueDate: formattedDate,
-      dueSubtext:
-        newStatus === "OVERDUE" ? "Overdue" : newStatus === "UNPAID" ? "Pending" : undefined,
-      isOverdue: newStatus === "OVERDUE",
-      isDraftCode: newStatus === "DRAFT" && newCode.toLowerCase() === "draft",
-      status: newStatus,
-    };
-
-    setInvoices([createdInvoice, ...invoices]);
     setShowAddInvoiceModal(false);
-
-    setNewCode(`INV-2023-0${invoices.length + 92}`);
-    setNewClient("");
-    setSelectedClientId("");
-    setNewClientName("");
-    setNewClientEmail("");
-    setNewClientContact("");
+    setSelectedCatalogItemId("");
+    setNewInvoiceTitle("");
     setNewAmount("");
     setNewDueDate("");
     setNewStatus("UNPAID");
     setClientMode("select");
+    setSelectedClientId("");
+    setNewClientName("");
+    setNewClientEmail("");
+    setNewClientContact("");
   };
 
   return (
@@ -380,7 +371,7 @@ export default function InvoicesPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setShowAddInvoiceModal(true)}
+            onClick={handleOpenAddInvoice}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-xl text-neutral-800 text-[13px] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-neutral-50 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 text-neutral-700" strokeWidth={2.2} />
@@ -400,10 +391,7 @@ export default function InvoicesPage() {
             </span>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl md:text-[28px] font-bold text-neutral-900 tracking-tight leading-none">
-                Rs. 124,500
-              </span>
-              <span className="text-[11px] font-semibold text-neutral-400 uppercase">
-                LKR
+                {formatAmountWithCurrency((outstandingCents / 100).toFixed(2), "LKR")}
               </span>
             </div>
           </div>
@@ -416,10 +404,7 @@ export default function InvoicesPage() {
             </span>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl md:text-[28px] font-bold text-[#DC2626] tracking-tight leading-none">
-                Rs. 18,200
-              </span>
-              <span className="text-[11px] font-semibold text-neutral-400 uppercase">
-                LKR
+                {formatAmountWithCurrency((overdueCents / 100).toFixed(2), "LKR")}
               </span>
             </div>
           </div>
@@ -441,7 +426,7 @@ export default function InvoicesPage() {
                       : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-200/40"
                   }`}
                 >
-                  {tab}
+                  {tab} <span className="opacity-75 font-normal">({tabCounts[tab]})</span>
                 </button>
               );
             }
@@ -524,14 +509,14 @@ export default function InvoicesPage() {
                         <div className="flex items-center gap-2">
                           <span
                             className={`text-sm text-neutral-900 leading-tight ${
-                              inv.isDraftCode
+                              inv.code.toLowerCase() === "draft"
                                 ? "font-normal italic"
                                 : "font-semibold"
                             }`}
                           >
                             {inv.code}
                           </span>
-                          {inv.isOverdue && (
+                          {inv.status === "OVERDUE" && (
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
@@ -539,14 +524,17 @@ export default function InvoicesPage() {
                           )}
                         </div>
                         <div className="text-xs text-neutral-400 mt-1 font-normal">
-                          {inv.client}
+                          {inv.clientName}
+                          {inv.title && (
+                            <span className="text-neutral-500 font-medium"> • {inv.title}</span>
+                          )}
                         </div>
                       </td>
 
                       {/* Amount */}
                       <td className="py-4.5 px-4">
                         <div className="text-sm font-semibold text-neutral-900 leading-tight">
-                          {inv.amount}
+                          {formatAmountWithCurrency((inv.amountCents / 100).toFixed(2), inv.currency)}
                         </div>
                         <div className="text-[11px] font-medium text-neutral-400 mt-1 uppercase">
                           {inv.currency}
@@ -557,24 +545,24 @@ export default function InvoicesPage() {
                       <td className="py-4.5 px-4">
                         <div
                           className={`text-sm leading-tight ${
-                            inv.isOverdue
+                            inv.status === "OVERDUE"
                               ? "font-semibold text-[#DC2626]"
                               : inv.status === "DRAFT"
                               ? "text-neutral-500 italic font-normal"
                               : "text-neutral-800 font-medium"
                           }`}
                         >
-                          {inv.dueDate}
+                          {formatDueDateDisplay(inv.dueDate, inv.status)}
                         </div>
-                        {inv.dueSubtext && (
+                        {getDueSubtext(inv.dueDate, inv.status) && (
                           <div
                             className={`text-xs mt-1 ${
-                              inv.isOverdue
+                              inv.status === "OVERDUE"
                                 ? "text-red-500 font-medium"
                                 : "text-neutral-400 font-normal"
                             }`}
                           >
-                            {inv.dueSubtext}
+                            {getDueSubtext(inv.dueDate, inv.status)}
                           </div>
                         )}
                       </td>
@@ -742,7 +730,7 @@ export default function InvoicesPage() {
         {/* Table Footer & Pagination */}
         <div className="px-6 py-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
           <div>
-            Showing 1-{filteredInvoices.length} of 124 invoices
+            Showing {filteredInvoices.length === 0 ? 0 : 1}-{filteredInvoices.length} of {dbInvoices.length} invoices
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -964,8 +952,10 @@ export default function InvoicesPage() {
 
             <p className="text-sm text-neutral-600 mt-2">
               Are you sure you want to permanently delete the invoice for{" "}
-              <strong className="text-neutral-900">{deletingInvoice.client}</strong> valued at{" "}
-              <strong className="text-neutral-900">{deletingInvoice.amount}</strong>?
+              <strong className="text-neutral-900">{deletingInvoice.clientName}</strong> valued at{" "}
+              <strong className="text-neutral-900">
+                {formatAmountWithCurrency((deletingInvoice.amountCents / 100).toFixed(2), deletingInvoice.currency)}
+              </strong>?
             </p>
 
             <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
@@ -1158,6 +1148,66 @@ export default function InvoicesPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Standard Catalog Item Selector */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+                    Standard Catalog Item (Optional)
+                  </label>
+                  {selectedCatalogItemId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCatalogItemId("");
+                        setNewInvoiceTitle("");
+                      }}
+                      className="text-[10px] text-purple-600 hover:underline font-semibold cursor-pointer"
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={selectedCatalogItemId}
+                  onChange={(e) => {
+                    const catId = e.target.value;
+                    setSelectedCatalogItemId(catId);
+                    const item = catalogItems.find((c) => c.id === catId);
+                    if (item) {
+                      setNewInvoiceTitle(item.title);
+                      const rawPrice = item.price.replace(/[^0-9.]/g, "");
+                      if (rawPrice) setNewAmount(rawPrice);
+                      if (item.currency) setNewCurrency(item.currency);
+                    }
+                  }}
+                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                >
+                  <option value="">-- Custom Item / None --</option>
+                  {catalogItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title} ({item.sku}) • {item.currency} {item.price} {item.unit}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-neutral-400 mt-1">
+                  Selecting a catalog item auto-fills title, pricing, and currency.
+                </p>
+              </div>
+
+              {/* Item Title / Description */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  Item / Service Description
+                </label>
+                <input
+                  type="text"
+                  value={newInvoiceTitle}
+                  onChange={(e) => setNewInvoiceTitle(e.target.value)}
+                  placeholder="e.g. Senior Full-Stack Development Sprint"
+                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

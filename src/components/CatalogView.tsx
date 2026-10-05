@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Upload,
   Plus,
@@ -20,20 +20,18 @@ import {
   Download,
   Copy,
   Check,
+  FileText,
+  CheckCircle2,
 } from "lucide-react";
+import { useCatalog, useClients, useInvoices } from "@/lib/data/DataProvider";
+import type {
+  CatalogItem,
+  CatalogCategory,
+  CatalogIconType,
+  Currency,
+  NewCatalogItemInput,
+} from "@/types/billing";
 import "./catalog.css";
-
-export interface CatalogItem {
-  id: string;
-  title: string;
-  category: "Development" | "Design" | "Consulting" | "Licensing";
-  sku: string;
-  description: string;
-  price: string;
-  currency: string;
-  unit: string;
-  iconType: "code" | "design" | "cloud" | "consulting";
-}
 
 const getCurrencyPrefix = (currency: string) => {
   switch (currency.toUpperCase()) {
@@ -59,45 +57,6 @@ const formatPriceWithCurrency = (priceStr: string, currency: string) => {
   })}`;
 };
 
-const initialCatalogItems: CatalogItem[] = [
-  {
-    id: "1",
-    title: "Senior Full-Stack Development",
-    category: "Development",
-    sku: "DEV-001",
-    description:
-      "Architecture design, API implementation, and frontend React development.",
-    price: "Rs. 45,000.00",
-    currency: "LKR",
-    unit: "/ Hourly",
-    iconType: "code",
-  },
-  {
-    id: "2",
-    title: "UI/UX Design Sprint",
-    category: "Design",
-    sku: "DES-042",
-    description:
-      "Comprehensive wireframing, high-fidelity prototyping, and user testing sessions.",
-    price: "Rs. 360,000.00",
-    currency: "LKR",
-    unit: "/ Daily",
-    iconType: "design",
-  },
-  {
-    id: "3",
-    title: "Enterprise Server License",
-    category: "Licensing",
-    sku: "LIC-991",
-    description:
-      "Annual license for self-hosted enterprise infrastructure deployment.",
-    price: "Rs. 1,500,000.00",
-    currency: "LKR",
-    unit: "/ Unit",
-    iconType: "cloud",
-  },
-];
-
 const categoryList = [
   "All Items",
   "Development",
@@ -109,10 +68,30 @@ const categoryList = [
 type Category = (typeof categoryList)[number];
 
 export default function CatalogView() {
+  const {
+    catalogItems,
+    createCatalogItem,
+    updateCatalogItem,
+    deleteCatalogItem,
+    bulkImportCatalogItems,
+  } = useCatalog();
+  const { clients } = useClients();
+  const { createInvoice } = useInvoices();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category>("All Items");
-  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>(initialCatalogItems);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Notifications / Toast
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3600);
+  };
 
   // Modals state
   const [showNewItemModal, setShowNewItemModal] = useState(false);
@@ -122,6 +101,15 @@ export default function CatalogView() {
   const [copied, setCopied] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
+
+  // Quick Create Invoice from Catalog Item State
+  const [quickInvoiceItem, setQuickInvoiceItem] = useState<CatalogItem | null>(null);
+  const [invoiceClientId, setInvoiceClientId] = useState<string>("");
+  const [invoiceAmount, setInvoiceAmount] = useState<string>("");
+  const [invoiceCurrency, setInvoiceCurrency] = useState<string>("LKR");
+  const [invoiceDueDate, setInvoiceDueDate] = useState<string>("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const downloadSampleCSV = () => {
     const csvContent =
@@ -184,31 +172,43 @@ export default function CatalogView() {
     return matchesCategory && matchesSearch;
   });
 
-  const handleCreateItem = (e: React.FormEvent) => {
+  const categoryCounts: Record<string, number> = {
+    "All Items": catalogItems.length,
+    Development: catalogItems.filter((i) => i.category === "Development").length,
+    Design: catalogItems.filter((i) => i.category === "Design").length,
+    Consulting: catalogItems.filter((i) => i.category === "Consulting").length,
+    Licensing: catalogItems.filter((i) => i.category === "Licensing").length,
+  };
+
+  const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const formattedPrice = formatPriceWithCurrency(newPrice, newCurrency);
+    const rawPrice = newPrice.replace(/[^0-9.]/g, "") || "0";
 
-    const iconTypeMap: Record<string, "code" | "design" | "cloud" | "consulting"> = {
+    const iconTypeMap: Record<string, CatalogIconType> = {
       Development: "code",
       Design: "design",
       Licensing: "cloud",
       Consulting: "consulting",
     };
 
-    const newItem: CatalogItem = {
-      id: Date.now().toString(),
-      title: newTitle.trim() || "New Catalog Item",
-      category: newCategory,
-      sku: newSku.trim() || `SKU-${Date.now().toString().slice(-4)}`,
-      description: newDescription.trim() || "Standard product/service unit description.",
-      price: formattedPrice,
-      currency: newCurrency,
-      unit: newUnit,
-      iconType: iconTypeMap[newCategory] || "code",
-    };
+    try {
+      await createCatalogItem({
+        title: newTitle.trim() || "New Catalog Item",
+        category: newCategory,
+        sku: newSku.trim() || `SKU-${Date.now().toString().slice(-4)}`,
+        description: newDescription.trim() || "",
+        price: rawPrice,
+        currency: newCurrency as Currency,
+        unit: newUnit,
+        iconType: iconTypeMap[newCategory] || "code",
+      });
+      showToast("Catalog item created successfully!");
+    } catch (err) {
+      console.error("Failed to create catalog item:", err);
+      showToast("Failed to create catalog item", "error");
+    }
 
-    setCatalogItems([newItem, ...catalogItems]);
     setShowNewItemModal(false);
 
     // Reset Form
@@ -231,47 +231,136 @@ export default function CatalogView() {
     setOpenMenuId(null);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
 
-    const formattedPrice = formatPriceWithCurrency(editPrice, editCurrency);
+    const rawPrice = editPrice.replace(/[^0-9.]/g, "") || "0";
 
-    const iconTypeMap: Record<string, "code" | "design" | "cloud" | "consulting"> = {
+    const iconTypeMap: Record<string, CatalogIconType> = {
       Development: "code",
       Design: "design",
       Licensing: "cloud",
       Consulting: "consulting",
     };
 
-    setCatalogItems((prev) =>
-      prev.map((item) => {
-        if (item.id === editingItem.id) {
-          return {
-            ...item,
-            title: editTitle.trim() || item.title,
-            category: editCategory,
-            sku: editSku.trim() || item.sku,
-            price: formattedPrice,
-            currency: editCurrency,
-            unit: editUnit,
-            description: editDescription.trim() || item.description,
-            iconType: iconTypeMap[editCategory] || item.iconType,
-          };
-        }
-        return item;
-      })
-    );
+    try {
+      await updateCatalogItem(editingItem.id, {
+        title: editTitle.trim() || editingItem.title,
+        category: editCategory,
+        sku: editSku.trim() || editingItem.sku,
+        price: rawPrice,
+        currency: editCurrency as Currency,
+        unit: editUnit,
+        description: editDescription.trim() || editingItem.description,
+        iconType: iconTypeMap[editCategory] || editingItem.iconType,
+      });
+      showToast("Catalog item updated successfully!");
+    } catch (err) {
+      console.error("Failed to update item:", err);
+      showToast("Failed to update item", "error");
+    }
 
     setEditingItem(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deletingItem) {
-      setCatalogItems((prev) => prev.filter((item) => item.id !== deletingItem.id));
+      try {
+        await deleteCatalogItem(deletingItem.id);
+        showToast("Catalog item deleted successfully!");
+      } catch (err) {
+        console.error("Failed to delete item:", err);
+        showToast("Failed to delete item", "error");
+      }
       setDeletingItem(null);
       setOpenMenuId(null);
     }
+  };
+
+  const handleOpenCreateInvoice = (item: CatalogItem) => {
+    setQuickInvoiceItem(item);
+    setInvoiceAmount(item.price.replace(/[^0-9.]/g, ""));
+    setInvoiceCurrency(item.currency || "LKR");
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    setInvoiceDueDate(d.toISOString().split("T")[0]);
+    if (clients.length > 0) {
+      setInvoiceClientId(clients[0].id);
+    } else {
+      setInvoiceClientId("");
+    }
+  };
+
+  const handleCreateInvoiceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickInvoiceItem) return;
+    if (!invoiceClientId) {
+      alert("Please select a client or create one on the Clients page.");
+      return;
+    }
+
+    const numericAmount = parseFloat(invoiceAmount.replace(/[^0-9.]/g, "") || "0");
+    const amountCents = Math.round(numericAmount * 100);
+
+    try {
+      await createInvoice({
+        clientId: invoiceClientId,
+        catalogItemId: quickInvoiceItem.id,
+        title: quickInvoiceItem.title,
+        amountCents,
+        currency: invoiceCurrency as Currency,
+        dueDate: invoiceDueDate || null,
+        status: "UNPAID",
+      });
+      showToast(`Invoice created for "${quickInvoiceItem.title}"!`);
+      setQuickInvoiceItem(null);
+    } catch (err) {
+      console.error("Failed to create invoice from catalog item:", err);
+      showToast("Failed to create invoice", "error");
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
+      if (lines.length <= 1) return;
+
+      const newItems: NewCatalogItemInput[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(",").map((p) => p.trim().replace(/^"|"$/g, ""));
+        if (parts.length >= 4) {
+          newItems.push({
+            title: parts[0] || "Imported Item",
+            category: (parts[1] as CatalogCategory) || "Development",
+            sku: parts[2] || `SKU-IMP-${Date.now().toString().slice(-4)}-${i}`,
+            price: parts[3] ? parts[3].replace(/[^0-9.]/g, "") : "0",
+            currency: (parts[4] as Currency) || "LKR",
+            unit: parts[5] || "/ Hourly",
+            description: parts[6] || "",
+          });
+        }
+      }
+
+      if (newItems.length > 0) {
+        try {
+          const count = await bulkImportCatalogItems(newItems);
+          showToast(`Successfully imported ${count} catalog items!`);
+          setShowBulkImportModal(false);
+        } catch (err) {
+          console.error("Failed bulk import:", err);
+          showToast("Failed to import catalog items", "error");
+        }
+      }
+    };
+    reader.readAsText(file);
   };
 
   const renderIcon = (type: CatalogItem["iconType"]) => {
@@ -290,6 +379,24 @@ export default function CatalogView() {
 
   return (
     <div className="w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
+      {/* Toast Notification */}
+      {notification && (
+        <div
+          className={`fixed top-14 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+            notification.type === "error"
+              ? "bg-rose-950 border-rose-800 text-rose-100"
+              : "bg-neutral-900 border-neutral-700 text-white"
+          }`}
+        >
+          {notification.type === "error" ? (
+            <span className="w-2 h-2 rounded-full bg-rose-400" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          )}
+          <span>{notification.message}</span>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
         <div>
@@ -370,7 +477,7 @@ export default function CatalogView() {
                           : "bg-white border border-neutral-200/80 text-neutral-700 font-medium hover:bg-neutral-50 hover:text-neutral-900"
                       }`}
                     >
-                      {category}
+                      {category} <span className="opacity-70 font-normal">({categoryCounts[category]})</span>
                     </button>
                   );
                 })}
@@ -385,12 +492,12 @@ export default function CatalogView() {
               Total Items
             </span>
             <div className="text-4xl md:text-[42px] font-bold text-neutral-900 tracking-tight leading-none">
-              {139 + catalogItems.length}
+              {catalogItems.length}
             </div>
             <div className="flex items-center gap-1.5 text-xs font-normal mt-4">
               <TrendingUp className="w-4 h-4 text-emerald-600" strokeWidth={2.2} />
-              <span className="font-bold text-emerald-600">+12</span>
-              <span className="text-neutral-500">this month</span>
+              <span className="font-bold text-emerald-600">Active</span>
+              <span className="text-neutral-500">items in catalog</span>
             </div>
           </div>
         </div>
@@ -444,7 +551,7 @@ export default function CatalogView() {
                     <div className="flex items-start gap-2 shrink-0">
                       <div className="text-right">
                         <div className="text-lg md:text-xl font-bold text-neutral-900 tracking-tight leading-none">
-                          {item.price}
+                          {formatPriceWithCurrency(item.price, item.currency)}
                         </div>
                         <div className="text-xs text-neutral-500 font-medium mt-1">
                           {item.unit}
@@ -478,6 +585,18 @@ export default function CatalogView() {
                             />
 
                             <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-2xl shadow-xl border border-neutral-200/90 py-1.5 z-40 text-left text-xs animate-in fade-in zoom-in-95 duration-100 font-medium">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleOpenCreateInvoice(item);
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-neutral-700 hover:text-purple-700 hover:bg-purple-50/60 transition-colors cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-purple-600" />
+                                <span>Create Invoice</span>
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => handleOpenEdit(item)}
@@ -514,7 +633,7 @@ export default function CatalogView() {
           {/* Footer & Pagination */}
           <div className="pt-6 mt-4 border-t border-neutral-300/60 flex items-center justify-between text-xs text-neutral-500">
             <div>
-              Showing 1-{filteredItems.length} of {139 + catalogItems.length} items
+              Showing {filteredItems.length === 0 ? 0 : 1}-{filteredItems.length} of {catalogItems.length} items
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -647,7 +766,7 @@ export default function CatalogView() {
                   </label>
                   <select
                     value={editUnit}
-                    onChange={(e) => setNewUnit(e.target.value)}
+                    onChange={(e) => setEditUnit(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
                   >
                     <option value="/ Hourly">/ Hourly</option>
@@ -919,9 +1038,20 @@ export default function CatalogView() {
               </button>
             </div>
 
-            <div className="mt-4 p-8 border-2 border-dashed border-neutral-200 rounded-2xl text-center hover:border-purple-400 transition-colors cursor-pointer">
-              <FileSpreadsheet className="w-10 h-10 text-neutral-400 mx-auto mb-2" />
-              <p className="text-sm font-semibold text-neutral-800">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".csv"
+              className="hidden"
+            />
+
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-4 p-8 border-2 border-dashed border-neutral-200 rounded-2xl text-center hover:border-purple-400 hover:bg-purple-50/20 transition-all cursor-pointer group"
+            >
+              <FileSpreadsheet className="w-10 h-10 text-neutral-400 group-hover:text-purple-600 mx-auto mb-2 transition-colors" />
+              <p className="text-sm font-semibold text-neutral-800 group-hover:text-purple-700 transition-colors">
                 Upload CSV or Excel file
               </p>
               <p className="text-xs text-neutral-400 mt-1">
@@ -951,12 +1081,156 @@ export default function CatalogView() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowBulkImportModal(false)}
+                onClick={() => fileInputRef.current?.click()}
                 className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
               >
-                Import
+                Choose File to Import
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Create Invoice for Catalog Item Modal */}
+      {quickInvoiceItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
+            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900">
+                  Create Invoice from Catalog Item
+                </h3>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Generate a draft invoice linked to this standardized service/product.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickInvoiceItem(null)}
+                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateInvoiceSubmit} className="mt-5 space-y-4">
+              {/* Item Summary Info Box */}
+              <div className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200/80 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-white border border-neutral-200 flex items-center justify-center shrink-0">
+                  {renderIcon(quickInvoiceItem.iconType)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-neutral-900 truncate">
+                    {quickInvoiceItem.title}
+                  </div>
+                  <div className="text-xs text-neutral-500 flex items-center gap-2 mt-0.5">
+                    <span>SKU: {quickInvoiceItem.sku}</span>
+                    <span>•</span>
+                    <span className="font-medium text-neutral-700">
+                      Standard: {formatPriceWithCurrency(quickInvoiceItem.price, quickInvoiceItem.currency)} {quickInvoiceItem.unit}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Client Selection */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+                    Billed Client <span className="text-purple-600">*</span>
+                  </label>
+                  <a
+                    href="/clients"
+                    className="text-xs text-purple-600 hover:text-purple-700 hover:underline"
+                  >
+                    + Manage Clients
+                  </a>
+                </div>
+                {clients.length === 0 ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                    No clients found. Please add a client first to create invoices.
+                  </div>
+                ) : (
+                  <select
+                    required
+                    value={invoiceClientId}
+                    onChange={(e) => setInvoiceClientId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                  >
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.category ? `(${c.category})` : ""} {c.email ? `• ${c.email}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Price and Currency */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Invoice Amount
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={invoiceAmount}
+                    onChange={(e) => setInvoiceAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Currency
+                  </label>
+                  <select
+                    value={invoiceCurrency}
+                    onChange={(e) => setInvoiceCurrency(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                  >
+                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                    <option value="USD">USD ($ US Dollar)</option>
+                    <option value="EUR">EUR (€ Euro)</option>
+                    <option value="GBP">GBP (£ British Pound)</option>
+                    <option value="CAD">CAD ($ Canadian Dollar)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={invoiceDueDate}
+                  onChange={(e) => setInvoiceDueDate(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setQuickInvoiceItem(null)}
+                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={clients.length === 0}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Generate Invoice
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

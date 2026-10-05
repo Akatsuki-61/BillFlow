@@ -9,6 +9,9 @@ import type {
   InvoicePatchInput,
   InvoiceStatus,
   DashboardSummary,
+  CatalogItem,
+  NewCatalogItemInput,
+  CatalogItemPatchInput,
 } from "@/types/billing";
 import type {
   AppSettings,
@@ -19,6 +22,7 @@ import type {
 interface DataContextType {
   clients: ClientWithStats[];
   invoices: InvoiceWithClient[];
+  catalogItems: CatalogItem[];
   dashboard: DashboardSummary | null;
   settings: AppSettings | null;
   isLoading: boolean;
@@ -32,6 +36,10 @@ interface DataContextType {
   setInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
   deleteInvoice: (id: string) => Promise<void>;
   getNextInvoiceCode: () => Promise<string>;
+  createCatalogItem: (input: NewCatalogItemInput) => Promise<CatalogItem>;
+  updateCatalogItem: (id: string, patch: CatalogItemPatchInput) => Promise<CatalogItem>;
+  deleteCatalogItem: (id: string) => Promise<void>;
+  bulkImportCatalogItems: (items: NewCatalogItemInput[]) => Promise<number>;
   updateSettings: (patch: UpdateSettingsInput) => Promise<AppSettings>;
   getDbPath: () => Promise<string>;
   revealDbFile: () => Promise<void>;
@@ -121,9 +129,128 @@ const defaultFallbackClients: ClientWithStats[] = [
   },
 ];
 
+export const defaultFallbackCatalogItems: CatalogItem[] = [
+  {
+    id: "cat-1",
+    title: "Senior Full-Stack Development",
+    category: "Development",
+    sku: "DEV-001",
+    description: "Architecture design, API implementation, and frontend React development.",
+    price: "45000.00",
+    currency: "LKR",
+    unit: "/ Hourly",
+    iconType: "code",
+  },
+  {
+    id: "cat-2",
+    title: "UI/UX Design Sprint",
+    category: "Design",
+    sku: "DES-042",
+    description: "Comprehensive wireframing, high-fidelity prototyping, and user testing sessions.",
+    price: "360000.00",
+    currency: "LKR",
+    unit: "/ Daily",
+    iconType: "design",
+  },
+  {
+    id: "cat-3",
+    title: "Enterprise Server License",
+    category: "Licensing",
+    sku: "LIC-991",
+    description: "Annual license for self-hosted enterprise infrastructure deployment.",
+    price: "1500000.00",
+    currency: "LKR",
+    unit: "/ Unit",
+    iconType: "cloud",
+  },
+  {
+    id: "cat-4",
+    title: "Cloud Architecture Audit",
+    category: "Consulting",
+    sku: "CONS-012",
+    description: "Security assessment, Docker containerization, and AWS database review.",
+    price: "60000.00",
+    currency: "LKR",
+    unit: "/ Project",
+    iconType: "consulting",
+  },
+];
+
+export const defaultFallbackInvoices: InvoiceWithClient[] = [
+  {
+    id: "inv-globex-01",
+    code: "INV-2023-089",
+    clientId: "cli-globex",
+    catalogItemId: "cat-1",
+    title: "Senior Full-Stack Development",
+    amountCents: 1245000,
+    currency: "LKR",
+    issueDate: "2023-10-01",
+    dueDate: "2023-10-12",
+    status: "OVERDUE",
+    paidCents: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    clientName: "Globex Corporation",
+    clientEmail: "hank@globex.com",
+  },
+  {
+    id: "inv-initech-01",
+    code: "INV-2023-090",
+    clientId: "cli-initech",
+    catalogItemId: "cat-2",
+    title: "UI/UX Design Sprint",
+    amountCents: 420050,
+    currency: "LKR",
+    issueDate: "2023-10-14",
+    dueDate: "2023-10-28",
+    status: "UNPAID",
+    paidCents: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    clientName: "Initech LLC",
+    clientEmail: "peter@initech.com",
+  },
+  {
+    id: "inv-stark-01",
+    code: "INV-2023-085",
+    clientId: "cli-stark",
+    catalogItemId: "cat-3",
+    title: "Enterprise Server License",
+    amountCents: 8500000,
+    currency: "LKR",
+    issueDate: "2023-10-01",
+    dueDate: "2023-10-15",
+    status: "PAID",
+    paidCents: 8500000,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    clientName: "Stark Industries",
+    clientEmail: "tony@starkindustries.com",
+  },
+  {
+    id: "inv-wayne-01",
+    code: "Draft",
+    clientId: "cli-wayne",
+    catalogItemId: "cat-4",
+    title: "Cloud Architecture Audit",
+    amountCents: 150000,
+    currency: "LKR",
+    issueDate: "2023-10-20",
+    dueDate: null,
+    status: "DRAFT",
+    paidCents: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    clientName: "Wayne Enterprises",
+    clientEmail: "bruce@wayneenterprises.com",
+  },
+];
+
 // In-memory fallback repository when running outside Electron
 let memoryClients: ClientWithStats[] = [...defaultFallbackClients];
-let memoryInvoices: InvoiceWithClient[] = [];
+let memoryInvoices: InvoiceWithClient[] = [...defaultFallbackInvoices];
+let memoryCatalog: CatalogItem[] = [...defaultFallbackCatalogItems];
 let memorySettings: AppSettings = {
   id: "default",
   businessName: "",
@@ -148,6 +275,7 @@ let memorySettings: AppSettings = {
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [invoices, setInvoices] = useState<InvoiceWithClient[]>([]);
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -162,14 +290,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       if (checkIsElectron() && window.billflow) {
         setIsElectron(true);
-        const [cList, iList, dSummary, sSettings] = await Promise.all([
+        const [cList, iList, catList, dSummary, sSettings] = await Promise.all([
           window.billflow.clients.list(),
           window.billflow.invoices.list(),
+          window.billflow.catalog.list(),
           window.billflow.dashboard.summary(),
           window.billflow.settings.get(),
         ]);
         setClients(cList);
         setInvoices(iList);
+        setCatalogItems(catList);
         setDashboard(dSummary);
         setSettings(sSettings);
       } else {
@@ -194,9 +324,32 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
               // ignore
             }
           }
+          const storedInvoices = localStorage.getItem("billflow_memory_invoices");
+          if (storedInvoices) {
+            try {
+              const parsed = JSON.parse(storedInvoices);
+              if (Array.isArray(parsed)) {
+                memoryInvoices = parsed;
+              }
+            } catch {
+              // ignore
+            }
+          }
+          const storedCatalog = localStorage.getItem("billflow_memory_catalog");
+          if (storedCatalog) {
+            try {
+              const parsed = JSON.parse(storedCatalog);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                memoryCatalog = parsed;
+              }
+            } catch {
+              // ignore
+            }
+          }
         }
         setClients([...memoryClients]);
         setInvoices([...memoryInvoices]);
+        setCatalogItems([...memoryCatalog]);
         setSettings({ ...memorySettings });
         setDashboard({
           activeClients: memoryClients.length,
@@ -303,6 +456,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         id,
         code,
         clientId: input.clientId,
+        catalogItemId: input.catalogItemId || null,
         title: input.title || null,
         amountCents: input.amountCents,
         currency: input.currency,
@@ -316,6 +470,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         clientEmail: client?.email,
       };
       memoryInvoices = [newInv, ...memoryInvoices];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_invoices", JSON.stringify(memoryInvoices));
+        } catch {}
+      }
       await refresh();
       return newInv;
     }
@@ -336,6 +495,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const updated: InvoiceWithClient = {
         ...target,
         ...patch,
+        catalogItemId: patch.catalogItemId !== undefined ? patch.catalogItemId : target.catalogItemId,
         amountCents: newAmount,
         status: newStatus,
         paidCents: newStatus === "PAID" ? newAmount : 0,
@@ -344,6 +504,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
       };
       memoryInvoices[idx] = updated;
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_invoices", JSON.stringify(memoryInvoices));
+        } catch {}
+      }
       await refresh();
       return updated;
     }
@@ -365,6 +530,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await refresh();
     } else {
       memoryInvoices = memoryInvoices.filter((i) => i.id !== id);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_invoices", JSON.stringify(memoryInvoices));
+        } catch {}
+      }
       await refresh();
     }
   };
@@ -382,6 +552,111 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         : `${prefix}-${year}-`;
       const nextSeq = Math.max(memorySettings.nextInvoiceSeq || 1, memoryInvoices.length + 1);
       return `${activePrefix}${String(nextSeq).padStart(3, "0")}`;
+    }
+  };
+
+  const createCatalogItem = async (input: NewCatalogItemInput): Promise<CatalogItem> => {
+    if (checkIsElectron() && window.billflow) {
+      const created = await window.billflow.catalog.create(input);
+      await refresh();
+      return created;
+    } else {
+      const id = `cat-${Date.now()}`;
+      const newItem: CatalogItem = {
+        id,
+        title: input.title,
+        category: input.category,
+        sku: input.sku,
+        description: input.description || "",
+        price: input.price,
+        currency: input.currency || "LKR",
+        unit: input.unit || "/ Hourly",
+        iconType: input.iconType || "code",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      memoryCatalog = [newItem, ...memoryCatalog];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_catalog", JSON.stringify(memoryCatalog));
+        } catch {}
+      }
+      await refresh();
+      return newItem;
+    }
+  };
+
+  const updateCatalogItem = async (id: string, patch: CatalogItemPatchInput): Promise<CatalogItem> => {
+    if (checkIsElectron() && window.billflow) {
+      const updated = await window.billflow.catalog.update(id, patch);
+      await refresh();
+      return updated;
+    } else {
+      const idx = memoryCatalog.findIndex((c) => c.id === id);
+      if (idx === -1) throw new Error("Catalog item not found");
+      const target = memoryCatalog[idx];
+      const updated: CatalogItem = {
+        ...target,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      memoryCatalog[idx] = updated;
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_catalog", JSON.stringify(memoryCatalog));
+        } catch {}
+      }
+      await refresh();
+      return updated;
+    }
+  };
+
+  const deleteCatalogItem = async (id: string): Promise<void> => {
+    if (checkIsElectron() && window.billflow) {
+      await window.billflow.catalog.remove(id);
+      await refresh();
+    } else {
+      memoryCatalog = memoryCatalog.filter((c) => c.id !== id);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_catalog", JSON.stringify(memoryCatalog));
+        } catch {}
+      }
+      await refresh();
+    }
+  };
+
+  const bulkImportCatalogItems = async (items: NewCatalogItemInput[]): Promise<number> => {
+    if (checkIsElectron() && window.billflow) {
+      const res = await window.billflow.catalog.bulkImport(items);
+      await refresh();
+      return res.count;
+    } else {
+      let count = 0;
+      for (const item of items) {
+        const id = `cat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        memoryCatalog.push({
+          id,
+          title: item.title,
+          category: item.category,
+          sku: item.sku,
+          description: item.description || "",
+          price: item.price,
+          currency: item.currency || "LKR",
+          unit: item.unit || "/ Hourly",
+          iconType: item.iconType || "code",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        count++;
+      }
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_catalog", JSON.stringify(memoryCatalog));
+        } catch {}
+      }
+      await refresh();
+      return count;
     }
   };
 
@@ -465,12 +740,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } else {
       memoryClients = [];
       memoryInvoices = [];
+      memoryCatalog = [];
       memorySettings = {
         ...memorySettings,
         nextInvoiceSeq: 1,
       };
       if (typeof window !== "undefined") {
         localStorage.removeItem("billflow_memory_settings");
+        localStorage.removeItem("billflow_memory_clients");
+        localStorage.removeItem("billflow_memory_invoices");
+        localStorage.removeItem("billflow_memory_catalog");
       }
       await refresh();
     }
@@ -481,6 +760,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       value={{
         clients,
         invoices,
+        catalogItems,
         dashboard,
         settings,
         isLoading,
@@ -494,6 +774,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setInvoiceStatus,
         deleteInvoice,
         getNextInvoiceCode,
+        createCatalogItem,
+        updateCatalogItem,
+        deleteCatalogItem,
+        bulkImportCatalogItems,
         updateSettings,
         getDbPath,
         revealDbFile,
@@ -547,6 +831,29 @@ export function useInvoices(filter?: { clientId?: string }) {
     setInvoiceStatus,
     deleteInvoice,
     getNextInvoiceCode,
+    refresh,
+  };
+}
+
+export function useCatalog() {
+  const {
+    catalogItems,
+    isLoading,
+    error,
+    createCatalogItem,
+    updateCatalogItem,
+    deleteCatalogItem,
+    bulkImportCatalogItems,
+    refresh,
+  } = useData();
+  return {
+    catalogItems,
+    isLoading,
+    error,
+    createCatalogItem,
+    updateCatalogItem,
+    deleteCatalogItem,
+    bulkImportCatalogItems,
     refresh,
   };
 }

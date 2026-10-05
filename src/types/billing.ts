@@ -51,6 +51,7 @@ export interface Invoice {
   id: string;
   code: string;
   clientId: string;
+  catalogItemId?: string | null;
   title?: string | null;
   amountCents: number;
   currency: Currency;
@@ -70,6 +71,7 @@ export interface InvoiceWithClient extends Invoice {
 export interface NewInvoiceInput {
   clientId: string;
   code?: string;
+  catalogItemId?: string | null;
   title?: string;
   amountCents: number;
   currency: Currency;
@@ -81,6 +83,7 @@ export interface NewInvoiceInput {
 export interface InvoicePatchInput {
   code?: string;
   clientId?: string;
+  catalogItemId?: string | null;
   title?: string;
   amountCents?: number;
   currency?: Currency;
@@ -94,4 +97,43 @@ export interface DashboardSummary {
   totalBilledByCurrency: Record<string, number>;
   outstandingByCurrency: Record<string, number>;
   recentInvoices: InvoiceWithClient[];
+}
+
+export type CatalogCategory = "Development" | "Design" | "Consulting" | "Licensing";
+export type CatalogIconType = "code" | "design" | "cloud" | "consulting";
+
+export interface CatalogItem {
+  id: string;
+  title: string;
+  category: CatalogCategory;
+  sku: string;
+  description: string;
+  price: string;
+  currency: Currency;
+  unit: string;
+  iconType: CatalogIconType;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface NewCatalogItemInput {
+  title: string;
+  category: CatalogCategory;
+  sku: string;
+  description?: string;
+  price: string;
+  currency?: Currency;
+  unit?: string;
+  iconType?: CatalogIconType;
+}
+
+export interface CatalogItemPatchInput {
+  title?: string;
+  category?: CatalogCategory;
+  sku?: string;
+  description?: string;
+  price?: string;
+  currency?: Currency;
+  unit?: string;
+  iconType?: CatalogIconType;
 }

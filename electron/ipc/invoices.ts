@@ -123,6 +123,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
           id,
           code,
           clientId: validated.clientId,
+          catalogItemId: validated.catalogItemId || null,
           title: validated.title || null,
           amountCents: validated.amountCents,
           currency: validated.currency,
@@ -161,6 +162,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
           .set({
             code: validated.code ?? existing.code,
             clientId: validated.clientId ?? existing.clientId,
+            catalogItemId: validated.catalogItemId !== undefined ? validated.catalogItemId : existing.catalogItemId,
             title: validated.title !== undefined ? validated.title : existing.title,
             amountCents: newAmount,
             currency: validated.currency ?? existing.currency,

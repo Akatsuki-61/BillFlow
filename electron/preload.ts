@@ -7,6 +7,9 @@ import type {
   InvoicePatchInput,
   InvoiceStatus,
   DashboardSummary,
+  CatalogItem,
+  NewCatalogItemInput,
+  CatalogItemPatchInput,
 } from "../src/types/billing";
 import type {
   AppSettings,
@@ -37,6 +40,17 @@ contextBridge.exposeInMainWorld("billflow", {
       ipcRenderer.invoke("invoices:setStatus", id, status),
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("invoices:remove", id),
+  },
+  catalog: {
+    list: (): Promise<CatalogItem[]> => ipcRenderer.invoke("catalog:list"),
+    create: (input: NewCatalogItemInput): Promise<CatalogItem> =>
+      ipcRenderer.invoke("catalog:create", input),
+    update: (id: string, patch: CatalogItemPatchInput): Promise<CatalogItem> =>
+      ipcRenderer.invoke("catalog:update", id, patch),
+    remove: (id: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("catalog:remove", id),
+    bulkImport: (items: NewCatalogItemInput[]): Promise<{ success: boolean; count: number }> =>
+      ipcRenderer.invoke("catalog:bulkImport", items),
   },
   dashboard: {
     summary: (): Promise<DashboardSummary> => ipcRenderer.invoke("dashboard:summary"),

@@ -6,6 +6,9 @@ import type {
   InvoicePatchInput,
   InvoiceStatus,
   DashboardSummary,
+  CatalogItem,
+  NewCatalogItemInput,
+  CatalogItemPatchInput,
 } from "./billing";
 import type {
   AppSettings,
@@ -29,6 +32,13 @@ export interface BillFlowAPI {
     update: (id: string, patch: InvoicePatchInput) => Promise<InvoiceWithClient>;
     setStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
     remove: (id: string) => Promise<{ success: boolean }>;
+  };
+  catalog: {
+    list: () => Promise<CatalogItem[]>;
+    create: (input: NewCatalogItemInput) => Promise<CatalogItem>;
+    update: (id: string, patch: CatalogItemPatchInput) => Promise<CatalogItem>;
+    remove: (id: string) => Promise<{ success: boolean }>;
+    bulkImport: (items: NewCatalogItemInput[]) => Promise<{ success: boolean; count: number }>;
   };
   dashboard: {
     summary: () => Promise<DashboardSummary>;

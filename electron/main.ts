@@ -7,6 +7,7 @@ import { registerClientHandlers } from "./ipc/clients";
 import { registerInvoiceHandlers } from "./ipc/invoices";
 import { registerDashboardHandlers } from "./ipc/dashboard";
 import { registerSettingsHandlers } from "./ipc/settings";
+import { registerCatalogHandlers } from "./ipc/catalog";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -101,6 +102,7 @@ app.whenReady().then(() => {
   registerInvoiceHandlers(broadcastDataChanged);
   registerDashboardHandlers();
   registerSettingsHandlers(broadcastDataChanged);
+  registerCatalogHandlers(broadcastDataChanged);
 
   // Register production static file protocol
   const outDir = app.isPackaged

@@ -24,6 +24,7 @@ export const invoices = sqliteTable(
     clientId: text("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "restrict" }),
+    catalogItemId: text("catalog_item_id"),
     title: text("title"),
     amountCents: integer("amount_cents").notNull(),
     currency: text("currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
@@ -42,6 +43,26 @@ export const invoices = sqliteTable(
     index("invoices_client_id_idx").on(table.clientId),
   ]
 );
+
+export const catalogItems = sqliteTable("catalog_items", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  category: text("category", { enum: ["Development", "Design", "Consulting", "Licensing"] })
+    .notNull()
+    .default("Development"),
+  sku: text("sku").notNull().unique(),
+  description: text("description").notNull().default(""),
+  price: text("price").notNull().default("0"),
+  currency: text("currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
+    .notNull()
+    .default("LKR"),
+  unit: text("unit").notNull().default("/ Hourly"),
+  iconType: text("icon_type", { enum: ["code", "design", "cloud", "consulting"] })
+    .notNull()
+    .default("code"),
+  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+});
 
 export const settings = sqliteTable("settings", {
   id: text("id").primaryKey().default("default"),
@@ -70,6 +91,8 @@ export type ClientRow = typeof clients.$inferSelect;
 export type InsertClientRow = typeof clients.$inferInsert;
 export type InvoiceRow = typeof invoices.$inferSelect;
 export type InsertInvoiceRow = typeof invoices.$inferInsert;
+export type CatalogItemRow = typeof catalogItems.$inferSelect;
+export type InsertCatalogItemRow = typeof catalogItems.$inferInsert;
 export type SettingRow = typeof settings.$inferSelect;
 export type InsertSettingRow = typeof settings.$inferInsert;
 
