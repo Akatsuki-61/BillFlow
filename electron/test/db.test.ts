@@ -31,21 +31,21 @@ describe("Database & Interconnection Tests", () => {
   describe("Validation Schemas", () => {
     it("validates valid client input", () => {
       const valid = newClientSchema.safeParse({
-        name: "Acme Corp",
+        name: "Apex Technologies",
         category: "Enterprise",
-        email: "billing@acme.com",
+        email: "billing@apextechnologies.com",
         currency: "USD",
       });
       expect(valid.success).toBe(true);
       if (valid.success) {
-        expect(valid.data.name).toBe("Acme Corp");
+        expect(valid.data.name).toBe("Apex Technologies");
         expect(valid.data.currency).toBe("USD");
       }
     });
 
     it("rejects client with invalid email", () => {
       const invalid = newClientSchema.safeParse({
-        name: "Acme Corp",
+        name: "Apex Technologies",
         email: "not-an-email",
         currency: "USD",
       });
@@ -82,20 +82,20 @@ describe("Database & Interconnection Tests", () => {
 
       db.insert(clients).values({
         id: clientAId,
-        name: "Stark Industries",
+        name: "Sterling Financial Technologies",
         category: "Enterprise",
-        contactPerson: "Tony Stark",
-        email: "tony@stark.com",
+        contactPerson: "Anthony Miller",
+        email: "anthony@sterlingfintech.com",
         currency: "USD",
         hasQuickBill: true,
       }).run();
 
       db.insert(clients).values({
         id: clientBId,
-        name: "Wayne Enterprises",
+        name: "Vanguard Global Advisory",
         category: "Enterprise",
-        contactPerson: "Bruce Wayne",
-        email: "bruce@wayne.com",
+        contactPerson: "Benjamin Walker",
+        email: "benjamin@vanguardadvisory.com",
         currency: "USD",
         hasQuickBill: true,
       }).run();
@@ -104,23 +104,23 @@ describe("Database & Interconnection Tests", () => {
       let clientStats = listClientsWithStats();
       expect(clientStats.length).toBe(2);
 
-      const starkInitial = clientStats.find((c) => c.id === clientAId);
-      expect(starkInitial?.totalBilledCents).toBe(0);
-      expect(starkInitial?.outstandingBalanceCents).toBe(0);
-      expect(starkInitial?.invoicesCount).toBe(0);
+      const sterlingInitial = clientStats.find((c) => c.id === clientAId);
+      expect(sterlingInitial?.totalBilledCents).toBe(0);
+      expect(sterlingInitial?.outstandingBalanceCents).toBe(0);
+      expect(sterlingInitial?.invoicesCount).toBe(0);
 
       // 2. Next invoice code sequence
       const nextCode1 = getNextInvoiceCode();
       const currentYear = new Date().getFullYear();
       expect(nextCode1).toBe(`INV-${currentYear}-001`);
 
-      // 3. Create an invoice for Stark Industries ($1,500.00 / 150000 cents, UNPAID)
+      // 3. Create an invoice for Sterling Financial Technologies ($1,500.00 / 150000 cents, UNPAID)
       const invId1 = "inv-test-1";
       db.insert(invoices).values({
         id: invId1,
         code: nextCode1,
         clientId: clientAId,
-        title: "Arc Reactor Consulting",
+        title: "Cloud Infrastructure Consulting",
         amountCents: 150000,
         currency: "USD",
         issueDate: "2026-10-01",
@@ -133,21 +133,21 @@ describe("Database & Interconnection Tests", () => {
       const nextCode2 = getNextInvoiceCode();
       expect(nextCode2).toBe(`INV-${currentYear}-002`);
 
-      // 4. Verify Stark Industries stats are dynamically computed
+      // 4. Verify Sterling Financial Technologies stats are dynamically computed
       clientStats = listClientsWithStats();
-      const starkAfterInv = clientStats.find((c) => c.id === clientAId);
-      expect(starkAfterInv?.totalBilledCents).toBe(150000);
-      expect(starkAfterInv?.totalPaidCents).toBe(0);
-      expect(starkAfterInv?.outstandingBalanceCents).toBe(150000);
-      expect(starkAfterInv?.invoicesCount).toBe(1);
-      expect(starkAfterInv?.recentInvoices.length).toBe(1);
-      expect(starkAfterInv?.recentInvoices[0].code).toBe(nextCode1);
+      const sterlingAfterInv = clientStats.find((c) => c.id === clientAId);
+      expect(sterlingAfterInv?.totalBilledCents).toBe(150000);
+      expect(sterlingAfterInv?.totalPaidCents).toBe(0);
+      expect(sterlingAfterInv?.outstandingBalanceCents).toBe(150000);
+      expect(sterlingAfterInv?.invoicesCount).toBe(1);
+      expect(sterlingAfterInv?.recentInvoices.length).toBe(1);
+      expect(sterlingAfterInv?.recentInvoices[0].code).toBe(nextCode1);
 
-      // Wayne Enterprises must remain completely unaffected (0 balance)
-      const wayneAfterInv = clientStats.find((c) => c.id === clientBId);
-      expect(wayneAfterInv?.totalBilledCents).toBe(0);
-      expect(wayneAfterInv?.outstandingBalanceCents).toBe(0);
-      expect(wayneAfterInv?.invoicesCount).toBe(0);
+      // Vanguard Global Advisory must remain completely unaffected (0 balance)
+      const vanguardAfterInv = clientStats.find((c) => c.id === clientBId);
+      expect(vanguardAfterInv?.totalBilledCents).toBe(0);
+      expect(vanguardAfterInv?.outstandingBalanceCents).toBe(0);
+      expect(vanguardAfterInv?.invoicesCount).toBe(0);
 
       // 5. Verify Dashboard summary aggregates correctly
       const dashboard = getDashboardSummary();
@@ -156,7 +156,7 @@ describe("Database & Interconnection Tests", () => {
       expect(dashboard.totalBilledByCurrency["USD"]).toBe(150000);
       expect(dashboard.outstandingByCurrency["USD"]).toBe(150000);
       expect(dashboard.recentInvoices.length).toBe(1);
-      expect(dashboard.recentInvoices[0].clientName).toBe("Stark Industries");
+      expect(dashboard.recentInvoices[0].clientName).toBe("Sterling Financial Technologies");
 
       // 6. Settle invoice (mark as PAID)
       db.update(invoices)
@@ -165,20 +165,20 @@ describe("Database & Interconnection Tests", () => {
         .run();
 
       clientStats = listClientsWithStats();
-      const starkAfterPaid = clientStats.find((c) => c.id === clientAId);
-      expect(starkAfterPaid?.totalBilledCents).toBe(150000);
-      expect(starkAfterPaid?.totalPaidCents).toBe(150000);
-      expect(starkAfterPaid?.outstandingBalanceCents).toBe(0);
+      const sterlingAfterPaid = clientStats.find((c) => c.id === clientAId);
+      expect(sterlingAfterPaid?.totalBilledCents).toBe(150000);
+      expect(sterlingAfterPaid?.totalPaidCents).toBe(150000);
+      expect(sterlingAfterPaid?.outstandingBalanceCents).toBe(0);
 
       const dashboardAfterPaid = getDashboardSummary();
       expect(dashboardAfterPaid.unpaidCount).toBe(0);
       expect(dashboardAfterPaid.outstandingByCurrency["USD"] || 0).toBe(0);
 
       // 7. Verify Client deletion is blocked when invoices exist
-      const starkInvoicesCount = db.select().from(invoices).where(eq(invoices.clientId, clientAId)).all().length;
-      expect(starkInvoicesCount).toBe(1);
+      const clientAInvoicesCount = db.select().from(invoices).where(eq(invoices.clientId, clientAId)).all().length;
+      expect(clientAInvoicesCount).toBe(1);
 
-      // 8. Delete Wayne Enterprises (has no invoices - must succeed)
+      // 8. Delete Vanguard Global Advisory (has no invoices - must succeed)
       db.delete(clients).where(eq(clients.id, clientBId)).run();
       const remainingClients = db.select().from(clients).all();
       expect(remainingClients.length).toBe(1);

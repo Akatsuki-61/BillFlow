@@ -1095,7 +1095,7 @@ export default function InvoicesPage() {
                             setNewClientName(e.target.value);
                             setNewClient(e.target.value);
                           }}
-                          placeholder="e.g. Acme Corporation"
+                          placeholder="e.g. Apex Technologies Inc."
                           className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                         />
                       </div>
@@ -1109,7 +1109,7 @@ export default function InvoicesPage() {
                           required={clientMode === "new"}
                           value={newClientEmail}
                           onChange={(e) => setNewClientEmail(e.target.value)}
-                          placeholder="e.g. billing@acme.com"
+                          placeholder="e.g. billing@apextech.com"
                           className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                         />
                       </div>
@@ -1124,7 +1124,7 @@ export default function InvoicesPage() {
                           type="text"
                           value={newClientContact}
                           onChange={(e) => setNewClientContact(e.target.value)}
-                          placeholder="e.g. John Doe (Optional)"
+                          placeholder="e.g. Alexander Wright (Optional)"
                           className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                         />
                       </div>

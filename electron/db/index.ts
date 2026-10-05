@@ -155,48 +155,48 @@ export function initDatabase(customPath?: string) {
         VALUES (@id, @name, @category, @contactPerson, @contactRole, @email, @phone, @currency, @driveUrl, @hasQuickBill)
       `);
       insertClient.run({
-        id: "cli-globex",
-        name: "Globex Corporation",
+        id: "cli-acorn",
+        name: "Acorn Global Logistics",
         category: "Enterprise",
-        contactPerson: "Hank Scorpio",
+        contactPerson: "Harold Sterling",
         contactRole: "Director",
-        email: "hank@globex.com",
+        email: "harold@acornglobal.com",
         phone: "+1 (555) 234-5678",
         currency: "LKR",
         driveUrl: null,
         hasQuickBill: 1,
       });
       insertClient.run({
-        id: "cli-initech",
-        name: "Initech LLC",
+        id: "cli-apex",
+        name: "Apex Digital Solutions",
         category: "Corporate",
-        contactPerson: "Peter Gibbons",
+        contactPerson: "Peter Vance",
         contactRole: "Lead Consultant",
-        email: "peter@initech.com",
+        email: "peter@apexdigital.com",
         phone: "+1 (555) 345-6789",
         currency: "LKR",
         driveUrl: null,
         hasQuickBill: 1,
       });
       insertClient.run({
-        id: "cli-stark",
-        name: "Stark Industries",
+        id: "cli-sterling",
+        name: "Sterling Financial Technologies",
         category: "Enterprise",
-        contactPerson: "Tony Stark",
-        contactRole: "CEO",
-        email: "tony@starkindustries.com",
+        contactPerson: "Anthony Miller",
+        contactRole: "Managing Director",
+        email: "anthony@sterlingfintech.com",
         phone: "+1 (555) 999-0000",
         currency: "LKR",
         driveUrl: null,
         hasQuickBill: 1,
       });
       insertClient.run({
-        id: "cli-wayne",
-        name: "Wayne Enterprises",
+        id: "cli-vanguard",
+        name: "Vanguard Global Advisory",
         category: "Corporate",
-        contactPerson: "Bruce Wayne",
-        contactRole: "Managing Director",
-        email: "bruce@wayneenterprises.com",
+        contactPerson: "Benjamin Walker",
+        contactRole: "Operations Director",
+        email: "benjamin@vanguardadvisory.com",
         phone: "+1 (555) 123-4567",
         currency: "LKR",
         driveUrl: null,
@@ -270,9 +270,9 @@ export function initDatabase(customPath?: string) {
         VALUES (@id, @code, @clientId, @catalogItemId, @title, @amountCents, @currency, @issueDate, @dueDate, @status, @paidCents)
       `);
       insertInvoice.run({
-        id: "inv-globex-01",
+        id: "inv-acorn-01",
         code: "INV-2023-089",
-        clientId: "cli-globex",
+        clientId: "cli-acorn",
         catalogItemId: "cat-1",
         title: "Senior Full-Stack Development",
         amountCents: 1245000,
@@ -283,9 +283,9 @@ export function initDatabase(customPath?: string) {
         paidCents: 0,
       });
       insertInvoice.run({
-        id: "inv-initech-01",
+        id: "inv-apex-01",
         code: "INV-2023-090",
-        clientId: "cli-initech",
+        clientId: "cli-apex",
         catalogItemId: "cat-2",
         title: "UI/UX Design Sprint",
         amountCents: 420050,
@@ -296,9 +296,9 @@ export function initDatabase(customPath?: string) {
         paidCents: 0,
       });
       insertInvoice.run({
-        id: "inv-stark-01",
+        id: "inv-sterling-01",
         code: "INV-2023-085",
-        clientId: "cli-stark",
+        clientId: "cli-sterling",
         catalogItemId: "cat-3",
         title: "Enterprise Server License",
         amountCents: 8500000,
@@ -309,9 +309,9 @@ export function initDatabase(customPath?: string) {
         paidCents: 8500000,
       });
       insertInvoice.run({
-        id: "inv-wayne-01",
+        id: "inv-vanguard-01",
         code: "Draft",
-        clientId: "cli-wayne",
+        clientId: "cli-vanguard",
         catalogItemId: "cat-4",
         title: "Cloud Architecture Audit",
         amountCents: 150000,
