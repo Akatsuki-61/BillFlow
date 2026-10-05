@@ -24,7 +24,9 @@ import type { AnalyticsSummaryPayload } from "./analytics";
 
 import type { ThemePreference } from "../lib/theme";
 
-export interface BillFlowAPI {
+import type { WorkflowAPI } from "./workflow";
+
+export interface BillFlowAPI extends WorkflowAPI {
   isElectron: boolean;
   platform?: string;
   theme: {

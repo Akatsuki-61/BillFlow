@@ -46,7 +46,7 @@ const mainNavItems: NavItem[] = [
 
 const footerNavItems: NavItem[] = [
   { id: "settings", name: "Settings", href: "/settings", icon: Settings },
-  { id: "support", name: "Support", href: "/#support", icon: HelpCircle },
+  { id: "support", name: "Support", href: "/support", icon: HelpCircle },
 ];
 
 export default function Sidebar() {

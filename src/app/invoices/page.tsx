@@ -21,7 +21,7 @@ import {
   X,
   AlertCircle,
 } from "lucide-react";
-import { useInvoices, useClients, useCatalog } from "@/lib/data/DataProvider";
+import { useInvoices, useClients, useCatalog, useSettings } from "@/lib/data/DataProvider";
 import {
   formatCents,
   formatDateDisplay,
@@ -50,12 +50,13 @@ function InvoicesContent() {
 
   const { clients } = useClients();
   const { catalogItems } = useCatalog();
+  const { settings } = useSettings();
   const [catalogItemId, setCatalogItemId] = useState("");
   const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
-  const [clientContact,setClientContact]=useState("");
-  const [clientCategory,setClientCategory]=useState("Enterprise");
+  const [clientContact, setClientContact] = useState("");
+  const [clientCategory, setClientCategory] = useState("Enterprise");
   const requestId = useRef<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
@@ -141,6 +142,9 @@ function InvoicesContent() {
   const handleOpenAddModal = async () => {
     requestId.current = null;
     setClientMode(clients.length ? "existing" : "new");
+    setNewCurrency(settings?.defaultCurrency || "LKR");
+    const due = new Date(); due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
+    setNewDueDate(due.toISOString().slice(0, 10));
     try {
       const code = await getNextInvoiceCode();
       setNewCode(code);
@@ -229,7 +233,7 @@ function InvoicesContent() {
   const handleOpenEdit = (inv: InvoiceWithClient) => {
     setEditingInvoice(inv);
     setEditCode(inv.code);
-    setEditClientId(inv.clientId);
+    setEditClientId(inv.clientId || "");
     setEditTitle(inv.title || "");
     setEditAmount(((inv.amountCents || 0) / 100).toFixed(2));
     setEditCurrency(inv.currency);

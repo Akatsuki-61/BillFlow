@@ -4,6 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { getDb } from "../db";
 import { clients, invoices, settings, catalogItems } from "../db/schema";
 import { newInvoiceSchema, invoicePatchSchema } from "../validation";
+import { getOrCreateSettings } from "./settings";
 import { AppError, formatError } from "./errors";
 import {
   InvoiceWithClient,
@@ -76,39 +77,71 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
     ...r.invoice,
     currency: r.invoice.currency as Currency,
     status: r.invoice.status as InvoiceStatus,
-    clientName: r.clientName || "Unknown Client",
-    clientEmail: r.clientEmail || undefined,
+    clientName: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).name : r.clientName || "Unknown Client",
+    clientEmail: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).email : r.clientEmail || undefined,
   }));
 }
 
 export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
   const value = newInvoiceSchema.parse(input);
-  const {requestId,...details} = value;
+  const { requestId, ...details } = value;
   const requestHash = crypto.createHash("sha256").update(JSON.stringify(details)).digest("hex");
   const id = requestId || crypto.randomUUID();
   const db = getDb();
   db.transaction(tx => {
-    const existing = tx.select().from(invoices).where(eq(invoices.id,id)).get();
+    const existing = tx.select().from(invoices).where(eq(invoices.id, id)).get();
     if (existing) {
       if (existing.requestHash !== requestHash) throw new AppError("CONFLICT", "This invoice request was already used with different details.");
       return;
     }
-    if (value.catalogItemId && !tx.select().from(catalogItems).where(eq(catalogItems.id,value.catalogItemId)).get()) throw new AppError("NOT_FOUND", "The selected Catalog item no longer exists.");
-    let clientId=value.clientId;
+    if (value.catalogItemId && !tx.select().from(catalogItems).where(eq(catalogItems.id, value.catalogItemId)).get()) {
+      throw new AppError("NOT_FOUND", "The selected Catalog item no longer exists.");
+    }
+    let clientId = value.clientId;
+    let client: typeof clients.$inferSelect | undefined;
     if (value.newClient) {
-      clientId=crypto.randomUUID();
-      tx.insert(clients).values({id:clientId,...value.newClient}).run();
-    } else if (!clientId || !tx.select().from(clients).where(eq(clients.id,clientId)).get()) {
+      clientId = crypto.randomUUID();
+      tx.insert(clients).values({ id: clientId, ...value.newClient }).run();
+      client = tx.select().from(clients).where(eq(clients.id, clientId)).get();
+    } else if (clientId) {
+      client = tx.select().from(clients).where(eq(clients.id, clientId)).get();
+      if (!client) {
+        throw new AppError("CLIENT_NOT_FOUND", "The specified client does not exist.");
+      }
+    } else {
       throw new AppError("CLIENT_NOT_FOUND", "The specified client does not exist.");
     }
+
+    const today = new Date().toISOString().split("T")[0];
+    const issueDate = value.issueDate || today;
+    const profile = getOrCreateSettings();
+    const defaultDue = new Date(`${issueDate}T00:00:00Z`);
+    defaultDue.setUTCDate(defaultDue.getUTCDate() + profile.defaultDueDays);
+    const dueDate = value.dueDate === undefined ? defaultDue.toISOString().slice(0, 10) : value.dueDate;
+
     tx.insert(invoices).values({
-      id, requestHash, code:value.code || getNextInvoiceCode(), clientId:clientId!, catalogItemId:value.catalogItemId || null,
-      title:value.title || null, amountCents:value.amountCents, currency:value.currency,
-      issueDate:value.issueDate || new Date().toISOString().split("T")[0], dueDate:value.dueDate || null,
-      status:value.status, paidCents:value.status === "PAID" ? value.amountCents : 0,
+      id,
+      requestHash,
+      code: value.code || getNextInvoiceCode(),
+      clientId: clientId || null,
+      catalogItemId: value.catalogItemId || null,
+      title: value.title || null,
+      clientSnapshot: client ? JSON.stringify({ name: client.name, email: client.email, contactPerson: client.contactPerson, phone: client.phone, driveUrl: client.driveUrl }) : null,
+      businessSnapshot: JSON.stringify(profile),
+      deliveryUrl: client?.driveUrl || null,
+      notes: profile.defaultNotes || null,
+      discountCents: 0,
+      taxCents: 0,
+      advanceCents: 0,
+      amountCents: value.amountCents,
+      currency: value.currency,
+      issueDate,
+      dueDate,
+      status: value.status || "UNPAID",
+      paidCents: value.status === "PAID" ? value.amountCents : 0,
     }).run();
   });
-  return listInvoicesWithClient().find(row=>row.id===id)!;
+  return listInvoicesWithClient().find(row => row.id === id)!;
 }
 
 export function registerInvoiceHandlers(broadcastDataChanged: () => void) {

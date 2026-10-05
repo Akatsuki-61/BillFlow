@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, protocol, net, shell, Menu, Tray, nativeImage, nativeTheme } from "electron";
+import { app, BrowserWindow, protocol, net, shell, Menu, Tray, nativeImage, nativeTheme, dialog } from "electron";
 import path from "path";
 import fs from "fs";
 import { pathToFileURL } from "url";
@@ -9,6 +9,9 @@ import { registerDashboardHandlers } from "./ipc/dashboard";
 import { registerSettingsHandlers } from "./ipc/settings";
 import { registerVendorHandlers } from "./ipc/vendors";
 import { registerAnalyticsHandlers } from "./ipc/analytics";
+
+import { registerTaskHandlers } from "./ipc/tasks";
+import { registerFileHandlers } from "./ipc/files";
 
 import { registerThemeHandlers, windowThemeColors } from "./theme";
 import { registerCatalogHandlers } from "./ipc/catalog";
@@ -34,6 +37,10 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.setName("BillFlow");
+if (process.env.BILLFLOW_USER_DATA) {
+  if (!path.isAbsolute(process.env.BILLFLOW_USER_DATA)) throw new Error("BILLFLOW_USER_DATA must be absolute.");
+  app.setPath("userData", process.env.BILLFLOW_USER_DATA);
+}
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -171,6 +178,8 @@ app.whenReady().then(() => {
   registerVendorHandlers(broadcastDataChanged);
   registerAnalyticsHandlers();
   registerCatalogHandlers(broadcastDataChanged);
+  registerTaskHandlers(broadcastDataChanged);
+  registerFileHandlers(broadcastDataChanged);
 
   // Register production static file protocol
   const outDir = app.isPackaged
@@ -210,6 +219,10 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+}).catch(error => {
+  console.error("BillFlow startup failed", error);
+  dialog.showErrorBox("BillFlow could not open your data", `${error instanceof Error ? error.message : String(error)}\nNo business writes were enabled. Keep your data directory and repair or reinstall the app.`);
+  app.quit();
 });
 
 app.on("window-all-closed", () => {

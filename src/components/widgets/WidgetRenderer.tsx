@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/Workspace";
 import {
+  useData,
   useDashboardSummary,
   useInvoices,
   useClients,
@@ -38,34 +39,6 @@ import { DashboardPeriod } from "@/types/dashboard";
 import { WidgetDisplaySize } from "@/types/widgets";
 import "../analytics/analytics.css";
 import { ProfitTrajectoryPlot } from "./ProfitTrajectoryPlot";
-
-// Sample active sprint tasks
-const activeTasks = [
-  {
-    id: "task-1",
-    title: "Client Portal Auth & Stripe Invoicing",
-    priority: "urgent" as const,
-    assignee: "Alex Carter",
-    dueDate: "Tomorrow",
-    isOutsourced: false,
-  },
-  {
-    id: "task-2",
-    title: "Quarterly Financial Audit & Tax Filing",
-    priority: "high" as const,
-    assignee: "Apex Accounting",
-    dueDate: "Oct 15",
-    isOutsourced: true,
-  },
-  {
-    id: "task-3",
-    title: "Enterprise Contract Onboarding Docs",
-    priority: "medium" as const,
-    assignee: "Morgan S.",
-    dueDate: "Oct 22",
-    isOutsourced: false,
-  },
-];
 
 interface WidgetRendererProps {
   widgetId: string;
@@ -102,6 +75,11 @@ export function WidgetRenderer({
   const { clients } = useClients();
   const { vendors } = useVendors();
   const { activeCurrency } = useActiveCurrency();
+  const { tasks } = useData();
+
+  const activeTasks = useMemo(() => {
+    return tasks.filter((t) => t.status !== "done");
+  }, [tasks]);
 
   const [chartMetric, setChartMetric] = useState<"profit" | "margin">("profit");
 
@@ -1115,7 +1093,7 @@ export function WidgetRenderer({
                           {t.title}
                         </div>
                         <div className="text-[10px] text-content-neutral-500">
-                          {t.assignee} · {t.dueDate}
+                          {typeof t.assignee === "object" ? t.assignee.name : (t.assignee || "Unassigned")} {t.dueDate ? `· ${t.dueDate}` : ""}
                         </div>
                       </div>
 

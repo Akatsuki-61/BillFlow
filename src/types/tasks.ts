@@ -35,7 +35,20 @@ export interface TaskItem {
   subtasks: Subtask[];
   isOutsourced?: boolean;
   outsourcedVendor?: string;
-  outsourceBudget?: number;
+  outsourceBudget?: number; // display amount in major units
+  outsourceBudgetCents?: number | null;
   clientName?: string;
   createdAt: string;
+  updatedAt?: string;
+  invoiceItemId?: string | null;
+  invoiceId?: string | null;
+  invoiceCode?: string | null;
+  clientId?: string | null;
+  deliveryUrl?: string | null;
+  currency?: import("./billing").Currency;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  activeSince?: string | null;
+  activeMilliseconds?: number;
+
 }

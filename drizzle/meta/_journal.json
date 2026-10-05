@@ -36,6 +36,13 @@
       "when": 1791233577285,
       "tag": "0004_catalog_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791234000000,
+      "tag": "0005_workflow_integration",
+      "breakpoints": true
     }
   ]
 }

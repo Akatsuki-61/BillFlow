@@ -47,3 +47,5 @@ next-env.d.ts
 
 # documentation
 /docs/
+WORKFLOW_AUDIT.md
+DEMO_BLOCKERS.md
