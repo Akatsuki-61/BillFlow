@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./theme.css";
 
 @theme {
   --font-serif: var(--font-newsreader), serif;
@@ -6,8 +7,6 @@
 }
 
 :root {
-  --background: #faf9f5;
-  --foreground: #111827;
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-fast: 180ms;
   --motion-normal: 260ms;
@@ -65,7 +64,7 @@ body {
 }
 
 :where(button, a, input, select, textarea, [role="button"]):focus-visible {
-  outline: 2px solid #7c3aed;
+  outline: 2px solid var(--ui-accent);
   outline-offset: 3px;
 }
 
@@ -230,9 +229,6 @@ aside nav a[aria-current="page"] svg {
 /* Shared desktop workspace vocabulary. Explicit ui-* classes opt into these rules. */
 :root {
   --sidebar-width: 240px;
-  --ui-accent: #7c3aed;
-  --ui-accent-hover: #6d28d9;
-  --ui-border: #e5e5e5;
   --ui-radius-control: 10px;
   --ui-radius-card: 16px;
   --ui-shadow: 0 1px 3px rgb(0 0 0 / 4%);
@@ -271,13 +267,13 @@ aside nav a[aria-current="page"] svg {
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.025em;
-  color: #171717;
+  color: var(--ui-text);
 }
 .workspace-heading p {
   margin-top: 6px;
   font-size: 14px;
   line-height: 1.6;
-  color: #737373;
+  color: var(--ui-muted);
   max-width: 68ch;
 }
 .workspace-actions {
@@ -326,56 +322,56 @@ aside nav a[aria-current="page"] svg {
   scale: 1;
 }
 .ui-button--primary {
-  background: var(--ui-accent);
+  background: var(--ui-accent-solid);
   color: white;
-  border-color: var(--ui-accent);
+  border-color: var(--ui-accent-solid);
   box-shadow: var(--ui-shadow);
 }
 .ui-button--primary:hover {
-  background: var(--ui-accent-hover);
-  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-solid-hover);
+  border-color: var(--ui-accent-solid-hover);
 }
 .ui-button--primary svg {
   color: inherit;
 }
 .ui-button--secondary {
-  background: white;
+  background: var(--ui-surface);
   border-color: var(--ui-border);
-  color: #404040;
+  color: var(--ui-secondary);
   box-shadow: var(--ui-shadow);
 }
 .ui-button--secondary:hover {
-  background: #fafafa;
-  border-color: #d4d4d4;
+  background: var(--ui-subtle);
+  border-color: var(--ui-border-strong);
 }
 .ui-button--ghost {
   background: transparent;
-  color: #525252;
+  color: var(--ui-secondary);
 }
 .ui-button--ghost:hover {
-  background: #f5f5f5;
-  color: #171717;
+  background: var(--ui-hover);
+  color: var(--ui-text);
 }
 .ui-button--danger {
-  background: #fff1f2;
-  border-color: #fecdd3;
-  color: #be123c;
+  background: var(--ui-danger-soft);
+  border-color: var(--ui-danger-border);
+  color: var(--ui-danger);
 }
 .ui-button--danger:hover {
-  background: #ffe4e6;
-  border-color: #fda4af;
+  background: var(--ui-danger-hover);
+  border-color: var(--ui-danger-border);
 }
 .ui-button--menu {
   width: 100%;
   justify-content: flex-start;
   border-radius: 6px;
   background: transparent;
-  color: #404040;
+  color: var(--ui-secondary);
   min-height: 36px;
   padding: 8px 12px;
 }
 .ui-button--menu:hover {
-  background: #f5f5f5;
+  background: var(--ui-hover);
 }
 .ui-button--small {
   min-height: 32px;
@@ -399,10 +395,10 @@ aside nav a[aria-current="page"] svg {
   padding-block: 8px;
   font-size: 13px;
   line-height: 22px;
-  background-color: #fff;
+  background-color: var(--ui-surface);
 }
 .ui-field::placeholder {
-  color: #a3a3a3;
+  color: var(--ui-placeholder);
 }
 .ui-textarea {
   min-height: 96px;
@@ -424,7 +420,7 @@ input[type="checkbox"] {
   padding: 3px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-control);
-  background: #f0efed;
+  background: var(--ui-inset);
   max-width: 100%;
 }
 .ui-segmented button {
@@ -436,7 +432,7 @@ input[type="checkbox"] {
   padding: 5px 12px;
   border: 1px solid transparent;
   border-radius: 7px;
-  color: #737373;
+  color: var(--ui-muted);
   font-size: 13px;
   line-height: 20px;
   font-weight: 500;
@@ -449,12 +445,12 @@ input[type="checkbox"] {
   scale: 1;
 }
 .ui-segmented button:hover {
-  color: #171717;
+  color: var(--ui-text);
 }
 .ui-segmented button[aria-pressed="true"] {
-  background: white;
-  border-color: #e5e5e5;
-  color: #171717;
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+  color: var(--ui-text);
   box-shadow: var(--ui-shadow);
 }
 .ui-segmented svg {
@@ -464,13 +460,13 @@ input[type="checkbox"] {
 }
 
 .ui-card {
-  background: white;
+  background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-card);
   box-shadow: var(--ui-shadow);
 }
 .ui-card:hover {
-  background-color: white;
+  background-color: var(--ui-surface);
   translate: none;
 }
 .ui-metric {
@@ -494,7 +490,7 @@ input[type="checkbox"] {
   font-size: 11px;
   line-height: 20px;
   font-weight: 600;
-  color: #737373;
+  color: var(--ui-muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -514,10 +510,10 @@ input[type="checkbox"] {
   color: var(--ui-accent);
 }
 .ui-metric--warning .ui-metric-value {
-  color: #b45309;
+  color: var(--ui-warning);
 }
 .ui-metric--success .ui-metric-value {
-  color: #047857;
+  color: var(--ui-success);
 }
 .ui-metric-footer {
   display: flex;
@@ -527,7 +523,7 @@ input[type="checkbox"] {
   gap: 6px;
   font-size: 12px;
   line-height: 18px;
-  color: #737373;
+  color: var(--ui-muted);
 }
 .ui-metric-footer .ui-button {
   min-height: 28px;
@@ -555,7 +551,7 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: #f5f3ff;
+  background: var(--ui-accent-soft);
   color: var(--ui-accent);
   margin-bottom: 2px;
 }
@@ -567,12 +563,12 @@ input[type="checkbox"] {
   font-size: 15px;
   line-height: 22px;
   font-weight: 600;
-  color: #262626;
+  color: var(--ui-text);
 }
 .ui-empty p {
   font-size: 13px;
   line-height: 1.65;
-  color: #737373;
+  color: var(--ui-muted);
   max-width: 48ch;
 }
 .ui-empty > .ui-button {
@@ -584,7 +580,7 @@ input[type="checkbox"] {
   height: 24px;
   padding: 3px;
   border-radius: 999px;
-  background: #d4d4d4;
+  background: var(--ui-border-strong);
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -611,7 +607,7 @@ input[type="checkbox"] {
 
 [data-motion-surface="panel"] {
   border-radius: var(--ui-radius-card);
-  background: white;
+  background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   box-shadow: 0 16px 48px rgb(0 0 0 / 16%);
 }
@@ -621,7 +617,7 @@ input[type="checkbox"] {
 [data-motion-surface="menu"] {
   padding: 4px;
   border-radius: 12px;
-  background: white;
+  background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
 }
@@ -629,10 +625,10 @@ input[type="checkbox"] {
 .workspace-page table th {
   font-size: 11px;
   line-height: 18px;
-  color: #737373;
+  color: var(--ui-muted);
   letter-spacing: 0.05em;
   padding-block: 14px;
-  background: #fafafa;
+  background: var(--ui-subtle);
 }
 .workspace-page table td {
   font-size: 13px;
@@ -678,10 +674,10 @@ input[type="checkbox"] {
   }
 }
 .ui-card--danger {
-  border-color: #fecdd3;
+  border-color: var(--ui-danger-border);
 }
 .ui-button--menu[aria-pressed="true"] {
-  background: #f5f3ff;
+  background: var(--ui-accent-soft);
   color: var(--ui-accent);
 }
 .ui-card :is(h2, h3) {

@@ -223,17 +223,17 @@ export default function CatalogView() {
   const renderIcon = (type: CatalogItem["iconType"]) => {
     switch (type) {
       case "code":
-        return <Code2 className="w-5 h-5 text-neutral-700" strokeWidth={1.8} />;
+        return <Code2 className="w-5 h-5 text-content-neutral-700" strokeWidth={1.8} />;
       case "design":
         return (
-          <Pencil className="w-4.5 h-4.5 text-neutral-700" strokeWidth={1.8} />
+          <Pencil className="w-4.5 h-4.5 text-content-neutral-700" strokeWidth={1.8} />
         );
       case "cloud":
-        return <Cloud className="w-5 h-5 text-neutral-700" strokeWidth={1.8} />;
+        return <Cloud className="w-5 h-5 text-content-neutral-700" strokeWidth={1.8} />;
       case "consulting":
       default:
         return (
-          <Briefcase className="w-5 h-5 text-neutral-700" strokeWidth={1.8} />
+          <Briefcase className="w-5 h-5 text-content-neutral-700" strokeWidth={1.8} />
         );
     }
   };
@@ -252,7 +252,7 @@ export default function CatalogView() {
             type="button"
             onClick={() => setShowBulkImportModal(true)}
           >
-            <Upload className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
+            <Upload className="w-4 h-4 text-content-neutral-700" strokeWidth={1.8} />
             <span>Bulk Import</span>
           </Button>
 
@@ -275,19 +275,19 @@ export default function CatalogView() {
           <div className="ui-card p-5">
             {/* Search Input */}
             <div className="relative">
-              <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search catalog..."
-                className="ui-field w-full pl-9 pr-3.5 border border-neutral-200/70 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-all"
+                className="ui-field w-full pl-9 pr-3.5 border border-line-neutral-200/70 text-content-neutral-900 placeholder:text-content-neutral-400 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 transition-all"
               />
             </div>
 
             {/* Categories Section */}
             <div className="mt-5">
-              <span className="block text-[11px] font-bold tracking-wider text-neutral-400 uppercase mb-3">
+              <span className="block text-[11px] font-bold tracking-wider text-content-neutral-400 uppercase mb-3">
                 Categories
               </span>
               <div className="flex flex-wrap gap-2">
@@ -322,13 +322,13 @@ export default function CatalogView() {
         <div className="ui-card lg:col-span-8 p-6 md:p-8 flex flex-col justify-between min-h-[360px]">
           <div>
             {/* Header Labels */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-neutral-300/60 text-[11px] font-bold tracking-wider text-neutral-500 uppercase">
+            <div className="flex items-center justify-between pb-3.5 border-b border-line-neutral-300/60 text-[11px] font-bold tracking-wider text-content-neutral-500 uppercase">
               <span>Item Details</span>
               <span>Unit / Price</span>
             </div>
 
             {/* Catalog Items Rows */}
-            <div className="divide-y divide-neutral-300/60">
+            <div className="divide-y divide-line-neutral-300/60">
               {filteredItems.length === 0 ? (
                 <EmptyState
                   title={
@@ -356,28 +356,28 @@ export default function CatalogView() {
                 filteredItems.map((item) => (
                   <div key={item.id} className="py-5 flex items-start gap-4">
                     {/* Left Icon Badge */}
-                    <div className="w-10 h-10 rounded-xl bg-white/90 border border-neutral-300/70 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                    <div className="w-10 h-10 rounded-xl bg-surface/90 border border-line-neutral-300/70 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
                       {renderIcon(item.iconType)}
                     </div>
 
                     {/* Middle Details & Description */}
                     <div className="flex-1 min-w-0 pr-2">
-                      <h3 className="text-base md:text-[17px] font-bold text-neutral-900 leading-snug tracking-tight">
+                      <h3 className="text-base md:text-[17px] font-bold text-content-neutral-900 leading-snug tracking-tight">
                         {item.title}
                       </h3>
 
                       {/* Category Badge & SKU */}
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/90 border border-neutral-300/80 text-neutral-600">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface/90 border border-line-neutral-300/80 text-content-neutral-600">
                           {item.category}
                         </span>
-                        <span className="text-xs text-neutral-500 font-medium">
+                        <span className="text-xs text-content-neutral-500 font-medium">
                           SKU: {item.sku}
                         </span>
                       </div>
 
                       {/* Description Box */}
-                      <div className="mt-3 px-3.5 py-2.5 bg-white/85 rounded-xl border border-neutral-300/80 text-xs text-neutral-700 leading-relaxed font-normal shadow-2xs">
+                      <div className="mt-3 px-3.5 py-2.5 bg-surface/85 rounded-xl border border-line-neutral-300/80 text-xs text-content-neutral-700 leading-relaxed font-normal shadow-2xs">
                         {item.description}
                       </div>
                     </div>
@@ -385,10 +385,10 @@ export default function CatalogView() {
                     {/* Right Price, Unit & 3-Dots Menu */}
                     <div className="flex items-start gap-2 shrink-0">
                       <div className="text-right">
-                        <div className="text-lg md:text-xl font-bold text-neutral-900 tracking-tight leading-none">
+                        <div className="text-lg md:text-xl font-bold text-content-neutral-900 tracking-tight leading-none">
                           {item.price}
                         </div>
-                        <div className="text-xs text-neutral-500 font-medium mt-1">
+                        <div className="text-xs text-content-neutral-500 font-medium mt-1">
                           {item.unit}
                         </div>
                       </div>
@@ -404,8 +404,8 @@ export default function CatalogView() {
                           }
                           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                             openMenuId === item.id
-                              ? "bg-neutral-300/70 text-neutral-900"
-                              : "text-neutral-400 hover:text-neutral-700 hover:bg-neutral-300/50"
+                              ? "bg-surface-neutral-300/70 text-content-neutral-900"
+                              : "text-content-neutral-400 hover:text-content-neutral-700 hover:bg-surface-neutral-300/50"
                           }`}
                           aria-label={`Options for ${item.title}`}
                           aria-expanded={openMenuId === item.id}
@@ -425,7 +425,7 @@ export default function CatalogView() {
 
                               <MotionSurface
                                 kind="menu"
-                                className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-2xl shadow-xl border border-neutral-200/90 py-1.5 z-40 text-left text-xs font-medium"
+                                className="absolute right-0 top-full mt-1.5 w-44 bg-surface rounded-2xl shadow-xl border border-line-neutral-200/90 py-1.5 z-40 text-left text-xs font-medium"
                               >
                                 <Button
                                   variant="ghost"
@@ -433,11 +433,11 @@ export default function CatalogView() {
                                   onClick={() => handleOpenEdit(item)}
                                   className="w-full"
                                 >
-                                  <Pencil className="w-3.5 h-3.5 text-neutral-500" />
+                                  <Pencil className="w-3.5 h-3.5 text-content-neutral-500" />
                                   <span>Edit Item</span>
                                 </Button>
 
-                                <div className="my-1 border-t border-neutral-100" />
+                                <div className="my-1 border-t border-line-neutral-100" />
 
                                 <Button
                                   variant="danger"
@@ -448,7 +448,7 @@ export default function CatalogView() {
                                   }}
                                   className="w-full"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                  <Trash2 className="w-3.5 h-3.5 text-content-red-500" />
                                   <span>Delete Item</span>
                                 </Button>
                               </MotionSurface>
@@ -464,7 +464,7 @@ export default function CatalogView() {
           </div>
 
           {/* Footer & Pagination */}
-          <div className="pt-6 mt-4 border-t border-neutral-300/60 flex items-center justify-between text-xs text-neutral-500">
+          <div className="pt-6 mt-4 border-t border-line-neutral-300/60 flex items-center justify-between text-xs text-content-neutral-500">
             <div>
               Showing {filteredItems.length} of {catalogItems.length} items
             </div>
@@ -505,14 +505,14 @@ export default function CatalogView() {
           >
             <MotionSurface onDismiss={() => setEditingItem(null)}
               kind="panel"
-              className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
+              className="bg-surface w-full max-w-lg rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+              <div className="flex items-center justify-between pb-4 border-b border-line-neutral-100">
                 <div>
-                  <h3 className="text-lg font-semibold text-neutral-900">
+                  <h3 className="text-lg font-semibold text-content-neutral-900">
                     Edit Catalog Item
                   </h3>
-                  <p className="text-xs text-neutral-400 mt-0.5">
+                  <p className="text-xs text-content-neutral-400 mt-0.5">
                     Update item specifications, price, currency, or description.
                   </p>
                 </div>
@@ -529,7 +529,7 @@ export default function CatalogView() {
 
               <form onSubmit={handleSaveEdit} className="mt-5 space-y-4">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                     Item Title
                   </label>
                   <input
@@ -537,13 +537,13 @@ export default function CatalogView() {
                     required
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    className="ui-field w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Category
                     </label>
                     <select
@@ -557,7 +557,7 @@ export default function CatalogView() {
                             | "Licensing",
                         )
                       }
-                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
                     >
                       <option value="Development">Development</option>
                       <option value="Design">Design</option>
@@ -567,9 +567,9 @@ export default function CatalogView() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       SKU Code{" "}
-                      <span className="normal-case font-normal text-neutral-400">
+                      <span className="normal-case font-normal text-content-neutral-400">
                         (Stock Keeping Unit)
                       </span>
                     </label>
@@ -578,14 +578,14 @@ export default function CatalogView() {
                       required
                       value={editSku}
                       onChange={(e) => setEditSku(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      className="ui-field w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Price
                     </label>
                     <input
@@ -594,18 +594,18 @@ export default function CatalogView() {
                       required
                       value={editPrice}
                       onChange={(e) => setEditPrice(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      className="ui-field w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Currency
                     </label>
                     <select
                       value={editCurrency}
                       onChange={(e) => setEditCurrency(e.target.value)}
-                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
                     >
                       <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
                       <option value="USD">USD ($ US Dollar)</option>
@@ -616,13 +616,13 @@ export default function CatalogView() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Pricing Unit
                     </label>
                     <select
                       value={editUnit}
                       onChange={(e) => setNewUnit(e.target.value)}
-                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
                     >
                       <option value="/ Hourly">/ Hourly</option>
                       <option value="/ Daily">/ Daily</option>
@@ -634,7 +634,7 @@ export default function CatalogView() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                     Item Description
                   </label>
                   <textarea
@@ -642,11 +642,11 @@ export default function CatalogView() {
                     required
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="ui-field ui-textarea w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    className="ui-field ui-textarea w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                   />
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
@@ -673,36 +673,36 @@ export default function CatalogView() {
           >
             <MotionSurface onDismiss={() => setDeletingItem(null)}
               kind="panel"
-              className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
+              className="bg-surface w-full max-w-md rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
             >
-              <div className="flex items-center gap-3 text-red-600 mb-3">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                  <Trash2 className="w-5 h-5 text-red-600" />
+              <div className="flex items-center gap-3 text-content-red-600 mb-3">
+                <div className="w-10 h-10 rounded-full bg-surface-red-100 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-content-red-600" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-neutral-900">
+                  <h3 className="text-base font-semibold text-content-neutral-900">
                     Delete Catalog Item?
                   </h3>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-content-neutral-500">
                     This action will permanently remove this item from your
                     catalog.
                   </p>
                 </div>
               </div>
 
-              <p className="text-sm text-neutral-600 mt-2">
+              <p className="text-sm text-content-neutral-600 mt-2">
                 Are you sure you want to delete{" "}
-                <strong className="text-neutral-900">
+                <strong className="text-content-neutral-900">
                   {deletingItem.title}
                 </strong>{" "}
                 ({deletingItem.sku}) valued at{" "}
-                <strong className="text-neutral-900">
+                <strong className="text-content-neutral-900">
                   {deletingItem.price} {deletingItem.unit}
                 </strong>
                 ?
               </p>
 
-              <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
+              <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-line-neutral-100">
                 <Button
                   variant="ghost"
                   type="button"
@@ -732,14 +732,14 @@ export default function CatalogView() {
           >
             <MotionSurface onDismiss={() => setShowNewItemModal(false)}
               kind="panel"
-              className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
+              className="bg-surface w-full max-w-lg rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+              <div className="flex items-center justify-between pb-4 border-b border-line-neutral-100">
                 <div>
-                  <h3 className="text-lg font-semibold text-neutral-900">
+                  <h3 className="text-lg font-semibold text-content-neutral-900">
                     New Catalog Item
                   </h3>
-                  <p className="text-xs text-neutral-400 mt-0.5">
+                  <p className="text-xs text-content-neutral-400 mt-0.5">
                     Define a standardized product, service, or pricing unit.
                   </p>
                 </div>
@@ -756,7 +756,7 @@ export default function CatalogView() {
 
               <form onSubmit={handleCreateItem} className="mt-5 space-y-4">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                     Item Title
                   </label>
                   <input
@@ -765,13 +765,13 @@ export default function CatalogView() {
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     placeholder="e.g. Senior Full-Stack Development"
-                    className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    className="ui-field w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Category
                     </label>
                     <select
@@ -785,7 +785,7 @@ export default function CatalogView() {
                             | "Licensing",
                         )
                       }
-                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
                     >
                       <option value="Development">Development</option>
                       <option value="Design">Design</option>
@@ -795,9 +795,9 @@ export default function CatalogView() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       SKU Code{" "}
-                      <span className="normal-case font-normal text-neutral-400">
+                      <span className="normal-case font-normal text-content-neutral-400">
                         (Stock Keeping Unit)
                       </span>
                     </label>
@@ -807,14 +807,14 @@ export default function CatalogView() {
                       value={newSku}
                       onChange={(e) => setNewSku(e.target.value)}
                       placeholder="e.g. DEV-001"
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      className="ui-field w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Price
                     </label>
                     <input
@@ -824,18 +824,18 @@ export default function CatalogView() {
                       value={newPrice}
                       onChange={(e) => setNewPrice(e.target.value)}
                       placeholder="45000.00"
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      className="ui-field w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Currency
                     </label>
                     <select
                       value={newCurrency}
                       onChange={(e) => setNewCurrency(e.target.value)}
-                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
                     >
                       <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
                       <option value="USD">USD ($ US Dollar)</option>
@@ -846,13 +846,13 @@ export default function CatalogView() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Pricing Unit
                     </label>
                     <select
                       value={newUnit}
                       onChange={(e) => setNewUnit(e.target.value)}
-                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                      className="ui-field w-full px-3 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
                     >
                       <option value="/ Hourly">/ Hourly</option>
                       <option value="/ Daily">/ Daily</option>
@@ -864,7 +864,7 @@ export default function CatalogView() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                     Item Description
                   </label>
                   <textarea
@@ -873,11 +873,11 @@ export default function CatalogView() {
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                     placeholder="Describe the scope, deliverables, or specifications of this item..."
-                    className="ui-field ui-textarea w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    className="ui-field ui-textarea w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                   />
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
@@ -904,10 +904,10 @@ export default function CatalogView() {
           >
             <MotionSurface onDismiss={() => setShowBulkImportModal(false)}
               kind="panel"
-              className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
+              className="bg-surface w-full max-w-md rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 font-sans"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-                <h3 className="text-lg font-semibold text-neutral-900">
+              <div className="flex items-center justify-between pb-4 border-b border-line-neutral-100">
+                <h3 className="text-lg font-semibold text-content-neutral-900">
                   Bulk Import Items
                 </h3>
                 <Button
@@ -921,17 +921,17 @@ export default function CatalogView() {
                 </Button>
               </div>
 
-              <div className="mt-4 p-8 border-2 border-dashed border-neutral-200 rounded-2xl text-center hover:border-purple-400 transition-colors cursor-pointer">
-                <FileSpreadsheet className="w-10 h-10 text-neutral-400 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-neutral-800">
+              <div className="mt-4 p-8 border-2 border-dashed border-line-neutral-200 rounded-2xl text-center hover:border-line-purple-400 transition-colors cursor-pointer">
+                <FileSpreadsheet className="w-10 h-10 text-content-neutral-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-content-neutral-800">
                   Upload CSV or Excel file
                 </p>
-                <p className="text-xs text-neutral-400 mt-1">
+                <p className="text-xs text-content-neutral-400 mt-1">
                   Drag and drop your catalog spreadsheet here or click to browse
                 </p>
               </div>
 
-              <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
+              <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-line-neutral-100">
                 <Button
                   variant="ghost"
                   type="button"

@@ -79,7 +79,7 @@ export function ContextMenu({
         <div
           ref={menuRef}
           style={{ top: `${adjustedY}px`, left: `${adjustedX}px` }}
-          className="fixed z-50 min-w-[200px] bg-white/95 backdrop-blur-md rounded-xl p-1.5 shadow-[0px_4px_20px_rgba(0,0,0,0.14),0px_0px_0px_1px_rgba(0,0,0,0.08)] border border-neutral-200/70 select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-50 min-w-[200px] bg-surface/95 backdrop-blur-md rounded-xl p-1.5 shadow-[0px_4px_20px_rgba(0,0,0,0.14),0px_0px_0px_1px_rgba(0,0,0,0.08)] border border-line-neutral-200/70 select-none animate-in fade-in zoom-in-95 duration-100"
         >
           <div className="flex flex-col gap-0.5">
             {items.map((item, index) => (
@@ -93,8 +93,8 @@ export function ContextMenu({
                 }}
                 className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left transition-colors cursor-pointer outline-none ${
                   item.tone === "danger"
-                    ? "text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                    : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
+                    ? "text-content-rose-600 hover:bg-surface-rose-50 hover:text-content-rose-700"
+                    : "text-content-neutral-700 hover:bg-surface-neutral-100 hover:text-content-neutral-900"
                 }`}
               >
                 {item.icon && (

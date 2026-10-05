@@ -219,14 +219,14 @@ function ClientsContent() {
             kind="toast"
             className={`fixed top-14 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
               notification.type === "error"
-                ? "bg-rose-950 border-rose-800 text-rose-100"
-                : "bg-neutral-900 border-neutral-700 text-white"
+                ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
+                : "bg-surface-neutral-900 border-line-neutral-700 text-white"
             }`}
           >
             {notification.type === "error" ? (
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-content-rose-400 shrink-0" />
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
             )}
             <span>{notification.message}</span>
           </MotionSurface>
@@ -247,7 +247,7 @@ function ClientsContent() {
         >
           <div className="w-4 h-4 flex items-center justify-center">
             <UserPlus
-              className="w-4 h-4 text-neutral-700 transition-transform duration-200 ease-out group-hover:scale-105 group-hover:-translate-y-px group-hover:text-[#7c3aed]"
+              className="w-4 h-4 text-content-neutral-700 transition-transform duration-200 ease-out group-hover:scale-105 group-hover:-translate-y-px group-hover:text-accent"
               strokeWidth={2}
             />
           </div>
@@ -262,7 +262,7 @@ function ClientsContent() {
           Array.from({ length: 3 }).map((_, idx) => (
             <div
               key={idx}
-              className="bg-[#ececf0] rounded-2xl p-5 border border-neutral-200/60 animate-pulse h-64"
+              className="bg-surface-secondary rounded-2xl p-5 border border-line-neutral-200/60 animate-pulse h-64"
             />
           ))
         ) : clients.length === 0 ? (
@@ -300,18 +300,18 @@ function ClientsContent() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3.5">
                       {/* Initials Avatar */}
-                      <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-xs border border-neutral-100 shrink-0 transition-transform duration-300 group-hover:scale-105">
-                        <span className="text-base font-bold text-[#7c3aed]">
+                      <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center shadow-xs border border-line-neutral-100 shrink-0 transition-transform duration-300 group-hover:scale-105">
+                        <span className="text-base font-bold text-accent">
                           {letter}
                         </span>
                       </div>
 
                       <div>
-                        <h2 className="text-[17px] font-semibold text-neutral-900 tracking-tight leading-snug">
+                        <h2 className="text-[17px] font-semibold text-content-neutral-900 tracking-tight leading-snug">
                           {client.name}
                         </h2>
-                        <div className="flex items-center gap-1.5 text-xs text-neutral-500 font-normal mt-0.5">
-                          <FolderClosed className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                        <div className="flex items-center gap-1.5 text-xs text-content-neutral-500 font-normal mt-0.5">
+                          <FolderClosed className="w-3.5 h-3.5 text-content-neutral-400 shrink-0" />
                           <span>{client.category}</span>
                         </div>
                       </div>
@@ -335,7 +335,7 @@ function ClientsContent() {
 
                       {/* Dropdown Menu */}
                       {activeMenuId === client.id && (
-                        <div className="absolute right-0 top-8 z-30 bg-white rounded-xl shadow-lg border border-neutral-200 py-1.5 w-44 text-xs font-medium text-neutral-700">
+                        <div className="absolute right-0 top-8 z-30 bg-surface rounded-xl shadow-lg border border-line-neutral-200 py-1.5 w-44 text-xs font-medium text-content-neutral-700">
                           <Button
                             variant="menu"
                             onClick={() => {
@@ -344,7 +344,7 @@ function ClientsContent() {
                             }}
                             className="w-full"
                           >
-                            <Receipt className="w-3.5 h-3.5 text-neutral-400" />
+                            <Receipt className="w-3.5 h-3.5 text-content-neutral-400" />
                             <span>View Ledger</span>
                           </Button>
                           <Button
@@ -357,7 +357,7 @@ function ClientsContent() {
                             }}
                             className="w-full"
                           >
-                            <Plus className="w-3.5 h-3.5 text-neutral-400" />
+                            <Plus className="w-3.5 h-3.5 text-content-neutral-400" />
                             <span>New Invoice</span>
                           </Button>
                           {client.driveUrl && (
@@ -365,13 +365,13 @@ function ClientsContent() {
                               href={client.driveUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="w-full px-3.5 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 text-neutral-700"
+                              className="w-full px-3.5 py-2 text-left hover:bg-surface-neutral-50 flex items-center gap-2 text-content-neutral-700"
                             >
-                              <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+                              <ExternalLink className="w-3.5 h-3.5 text-content-neutral-400" />
                               <span>Open Drive Folder</span>
                             </a>
                           )}
-                          <div className="my-1 border-t border-neutral-100" />
+                          <div className="my-1 border-t border-line-neutral-100" />
                           <Button
                             variant="danger"
                             onClick={() =>
@@ -379,7 +379,7 @@ function ClientsContent() {
                             }
                             className="w-full"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            <Trash2 className="w-3.5 h-3.5 text-content-red-400" />
                             <span>Delete Client</span>
                           </Button>
                         </div>
@@ -388,34 +388,34 @@ function ClientsContent() {
                   </div>
 
                   {/* Financial Metrics Strip */}
-                  <div className="mt-5 pt-4 border-t border-neutral-200/70 grid grid-cols-3 gap-2 text-left">
+                  <div className="mt-5 pt-4 border-t border-line-neutral-200/70 grid grid-cols-3 gap-2 text-left">
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 block leading-tight">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-content-neutral-400 block leading-tight">
                         TOTAL BILLED
                       </span>
-                      <span className="text-[15px] font-bold text-neutral-900 mt-1 block leading-tight">
+                      <span className="text-[15px] font-bold text-content-neutral-900 mt-1 block leading-tight">
                         {formatCents(client.totalBilledCents, client.currency)}
                       </span>
                     </div>
 
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 block leading-tight">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-content-neutral-400 block leading-tight">
                         TOTAL PAID
                       </span>
-                      <span className="text-[15px] font-bold text-emerald-700 mt-1 block leading-tight">
+                      <span className="text-[15px] font-bold text-content-emerald-700 mt-1 block leading-tight">
                         {formatCents(client.totalPaidCents, client.currency)}
                       </span>
                     </div>
 
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 block leading-tight">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-content-neutral-400 block leading-tight">
                         OUTSTANDING
                       </span>
                       <span
                         className={`text-[15px] font-bold mt-1 block leading-tight ${
                           client.outstandingBalanceCents > 0
-                            ? "text-rose-600 font-mono"
-                            : "text-neutral-500"
+                            ? "text-content-rose-600 font-mono"
+                            : "text-content-neutral-500"
                         }`}
                       >
                         {formatCents(
@@ -427,21 +427,21 @@ function ClientsContent() {
                   </div>
 
                   {/* Contact Info Row */}
-                  <div className="mt-4 pt-3.5 border-t border-neutral-200/50 space-y-1.5 text-xs text-neutral-600 font-normal">
+                  <div className="mt-4 pt-3.5 border-t border-line-neutral-200/50 space-y-1.5 text-xs text-content-neutral-600 font-normal">
                     <div className="flex items-center gap-2 truncate">
-                      <User className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <User className="w-3.5 h-3.5 text-content-neutral-400 shrink-0" />
                       <span className="truncate">
                         {client.contactPerson}
                         {client.contactRole ? ` (${client.contactRole})` : ""}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 truncate">
-                      <Mail className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <Mail className="w-3.5 h-3.5 text-content-neutral-400 shrink-0" />
                       <span className="truncate">{client.email}</span>
                     </div>
                     {client.phone && (
                       <div className="flex items-center gap-2 truncate">
-                        <Phone className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                        <Phone className="w-3.5 h-3.5 text-content-neutral-400 shrink-0" />
                         <span className="truncate">{client.phone}</span>
                       </div>
                     )}
@@ -449,8 +449,8 @@ function ClientsContent() {
                 </div>
 
                 {/* Bottom Action Footer */}
-                <div className="mt-5 pt-3.5 border-t border-neutral-200/70 flex items-center justify-between">
-                  <span className="text-xs text-neutral-500 font-medium">
+                <div className="mt-5 pt-3.5 border-t border-line-neutral-200/70 flex items-center justify-between">
+                  <span className="text-xs text-content-neutral-500 font-medium">
                     {client.invoicesCount}{" "}
                     {client.invoicesCount === 1 ? "invoice" : "invoices"}
                   </span>
@@ -490,18 +490,18 @@ function ClientsContent() {
           >
             <MotionSurface onDismiss={() => setIsAddModalOpen(false)}
               kind="panel"
-              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
+              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
             >
-              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#f3efff] text-[#7c3aed] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
                     <Building className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-neutral-900">
+                    <h3 className="text-base font-semibold text-content-neutral-900">
                       Add New Client
                     </h3>
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs text-content-neutral-400">
                       Create a new client profile in your local directory.
                     </p>
                   </div>
@@ -518,10 +518,10 @@ function ClientsContent() {
 
               <form
                 onSubmit={handleAddClient}
-                className="p-6 space-y-4 text-xs font-medium text-neutral-700"
+                className="p-6 space-y-4 text-xs font-medium text-content-neutral-700"
               >
                 <div>
-                  <label className="block mb-1.5 text-neutral-700 font-semibold">
+                  <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                     Client / Company Name *
                   </label>
                   <input
@@ -532,14 +532,14 @@ function ClientsContent() {
                       setFormData({ ...formData, name: e.target.value })
                     }
                     placeholder="e.g. Apex Architecture Ltd"
-                    className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 ${
+                    className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 ${
                       formErrors.name
-                        ? "border-rose-400 bg-rose-50/20"
-                        : "border-neutral-200"
+                        ? "border-line-rose-400 bg-surface-rose-50/20"
+                        : "border-line-neutral-200"
                     }`}
                   />
                   {formErrors.name && (
-                    <span className="text-rose-600 text-[11px] mt-1 block">
+                    <span className="text-content-rose-600 text-[11px] mt-1 block">
                       {formErrors.name}
                     </span>
                   )}
@@ -547,7 +547,7 @@ function ClientsContent() {
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Category
                     </label>
                     <select
@@ -555,7 +555,7 @@ function ClientsContent() {
                       onChange={(e) =>
                         setFormData({ ...formData, category: e.target.value })
                       }
-                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     >
                       <option value="Enterprise">Enterprise</option>
                       <option value="Startup">Startup</option>
@@ -565,7 +565,7 @@ function ClientsContent() {
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Billing Currency *
                     </label>
                     <select
@@ -576,7 +576,7 @@ function ClientsContent() {
                           currency: e.target.value as "USD" | "LKR" | "EUR",
                         })
                       }
-                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     >
                       <option value="USD">USD ($)</option>
                       <option value="LKR">LKR (Rs.)</option>
@@ -587,7 +587,7 @@ function ClientsContent() {
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Contact Person
                     </label>
                     <input
@@ -600,12 +600,12 @@ function ClientsContent() {
                         })
                       }
                       placeholder="e.g. Sarah Jenkins"
-                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Contact Role
                     </label>
                     <input
@@ -618,14 +618,14 @@ function ClientsContent() {
                         })
                       }
                       placeholder="e.g. Director / CEO"
-                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Email Address *
                     </label>
                     <input
@@ -636,21 +636,21 @@ function ClientsContent() {
                         setFormData({ ...formData, email: e.target.value })
                       }
                       placeholder="sarah@apexarch.com"
-                      className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 ${
+                      className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 ${
                         formErrors.email
-                          ? "border-rose-400 bg-rose-50/20"
-                          : "border-neutral-200"
+                          ? "border-line-rose-400 bg-surface-rose-50/20"
+                          : "border-line-neutral-200"
                       }`}
                     />
                     {formErrors.email && (
-                      <span className="text-rose-600 text-[11px] mt-1 block">
+                      <span className="text-content-rose-600 text-[11px] mt-1 block">
                         {formErrors.email}
                       </span>
                     )}
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Phone Number
                     </label>
                     <input
@@ -660,13 +660,13 @@ function ClientsContent() {
                         setFormData({ ...formData, phone: e.target.value })
                       }
                       placeholder="+1 (555) 284-9102"
-                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block mb-1.5 text-neutral-700 font-semibold">
+                  <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                     Google Drive Folder Link
                   </label>
                   <input
@@ -676,11 +676,11 @@ function ClientsContent() {
                       setFormData({ ...formData, driveUrl: e.target.value })
                     }
                     placeholder="https://drive.google.com/drive/folders/..."
-                    className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
                 </div>
 
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-neutral-100">
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-line-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
@@ -711,18 +711,18 @@ function ClientsContent() {
           >
             <MotionSurface onDismiss={() => setSelectedClientForHistory(null)}
               kind="panel"
-              className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-neutral-200 overflow-hidden"
+              className="bg-surface rounded-2xl w-full max-w-2xl shadow-2xl border border-line-neutral-200 overflow-hidden"
             >
-              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white border border-neutral-200 flex items-center justify-center font-bold text-[#7c3aed]">
+                  <div className="w-10 h-10 rounded-full bg-surface border border-line-neutral-200 flex items-center justify-center font-bold text-accent">
                     {selectedClientForHistory.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-neutral-900">
+                    <h3 className="text-base font-semibold text-content-neutral-900">
                       {selectedClientForHistory.name}
                     </h3>
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs text-content-neutral-400">
                       Client Ledger & Transaction History
                     </p>
                   </div>
@@ -740,33 +740,33 @@ function ClientsContent() {
               <div className="p-6 space-y-5">
                 {/* 3 Metric Cards */}
                 <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
-                    <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block">
+                  <div className="p-3 bg-surface-neutral-50 rounded-xl border border-line-neutral-100">
+                    <span className="text-[10px] text-content-neutral-400 font-bold uppercase tracking-wider block">
                       TOTAL BILLED
                     </span>
-                    <span className="text-base font-bold text-neutral-900 mt-1 block">
+                    <span className="text-base font-bold text-content-neutral-900 mt-1 block">
                       {formatCents(
                         selectedClientForHistory.totalBilledCents,
                         selectedClientForHistory.currency,
                       )}
                     </span>
                   </div>
-                  <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                    <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block">
+                  <div className="p-3 bg-surface-emerald-50/50 rounded-xl border border-line-emerald-100">
+                    <span className="text-[10px] text-content-emerald-600 font-bold uppercase tracking-wider block">
                       TOTAL PAID
                     </span>
-                    <span className="text-base font-bold text-emerald-700 mt-1 block">
+                    <span className="text-base font-bold text-content-emerald-700 mt-1 block">
                       {formatCents(
                         selectedClientForHistory.totalPaidCents,
                         selectedClientForHistory.currency,
                       )}
                     </span>
                   </div>
-                  <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100">
-                    <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider block">
+                  <div className="p-3 bg-surface-rose-50/50 rounded-xl border border-line-rose-100">
+                    <span className="text-[10px] text-content-rose-600 font-bold uppercase tracking-wider block">
                       OUTSTANDING
                     </span>
-                    <span className="text-base font-bold text-rose-700 mt-1 block font-mono">
+                    <span className="text-base font-bold text-content-rose-700 mt-1 block font-mono">
                       {formatCents(
                         selectedClientForHistory.outstandingBalanceCents,
                         selectedClientForHistory.currency,
@@ -776,7 +776,7 @@ function ClientsContent() {
                 </div>
 
                 {/* Contact Information & Drive */}
-                <div className="text-xs text-neutral-600 space-y-1 bg-neutral-50/50 p-3.5 rounded-xl border border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="text-xs text-content-neutral-600 space-y-1 bg-surface-neutral-50/50 p-3.5 rounded-xl border border-line-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <div>
                       <strong>Contact:</strong>{" "}
@@ -794,7 +794,7 @@ function ClientsContent() {
                       href={selectedClientForHistory.driveUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-[#7c3aed] font-semibold hover:underline"
+                      className="inline-flex items-center gap-1.5 text-xs text-accent font-semibold hover:underline"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Drive Folder</span>
@@ -805,7 +805,7 @@ function ClientsContent() {
                 {/* Invoices List Table */}
                 <div>
                   <div className="flex items-center justify-between mb-2.5">
-                    <h4 className="text-xs font-semibold text-neutral-900 uppercase tracking-wider">
+                    <h4 className="text-xs font-semibold text-content-neutral-900 uppercase tracking-wider">
                       Invoices & Payment Records
                     </h4>
                     <div className="flex items-center gap-2">
@@ -820,7 +820,7 @@ function ClientsContent() {
                         <Plus className="w-3 h-3" />
                         <span>New Invoice</span>
                       </Button>
-                      <span className="text-neutral-300">·</span>
+                      <span className="text-content-neutral-300">·</span>
                       <Button
                         variant="ghost"
                         onClick={() => {
@@ -835,9 +835,9 @@ function ClientsContent() {
                     </div>
                   </div>
 
-                  <div className="border border-neutral-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                  <div className="border border-line-neutral-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 sticky top-0">
+                      <thead className="bg-surface-neutral-50 border-b border-line-neutral-200 text-content-neutral-600 sticky top-0">
                         <tr>
                           <th className="py-2.5 px-4 font-semibold">
                             Invoice Code
@@ -849,7 +849,7 @@ function ClientsContent() {
                           <th className="py-2.5 px-4 font-semibold">Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-neutral-100">
+                      <tbody className="divide-y divide-line-neutral-100">
                         {clientLedgerInvoices.length > 0 ? (
                           clientLedgerInvoices.map((inv) => (
                             <tr
@@ -857,27 +857,27 @@ function ClientsContent() {
                               onClick={() =>
                                 router.push(`/invoices?invoice=${inv.id}`)
                               }
-                              className="hover:bg-purple-50/40 transition-colors cursor-pointer"
+                              className="hover:bg-surface-purple-50/40 transition-colors cursor-pointer"
                             >
-                              <td className="py-3 px-4 font-mono font-medium text-neutral-900">
+                              <td className="py-3 px-4 font-mono font-medium text-content-neutral-900">
                                 {inv.code}
                               </td>
-                              <td className="py-3 px-4 text-neutral-500">
+                              <td className="py-3 px-4 text-content-neutral-500">
                                 {formatDateDisplay(inv.issueDate)}
                               </td>
-                              <td className="py-3 px-4 font-semibold text-neutral-900">
+                              <td className="py-3 px-4 font-semibold text-content-neutral-900">
                                 {formatCents(inv.amountCents, inv.currency)}
                               </td>
                               <td className="py-3 px-4">
                                 <span
                                   className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                                     inv.status === "PAID"
-                                      ? "bg-emerald-100 text-emerald-700"
+                                      ? "bg-surface-emerald-100 text-content-emerald-700"
                                       : inv.status === "OVERDUE"
-                                        ? "bg-rose-100 text-rose-700"
+                                        ? "bg-surface-rose-100 text-content-rose-700"
                                         : inv.status === "DRAFT"
-                                          ? "bg-neutral-100 text-neutral-600"
-                                          : "bg-blue-100 text-blue-700"
+                                          ? "bg-surface-neutral-100 text-content-neutral-600"
+                                          : "bg-surface-blue-100 text-content-blue-700"
                                   }`}
                                 >
                                   {inv.status}
@@ -889,7 +889,7 @@ function ClientsContent() {
                           <tr>
                             <td
                               colSpan={4}
-                              className="py-6 text-center text-neutral-400"
+                              className="py-6 text-center text-content-neutral-400"
                             >
                               No invoices generated for this client yet.
                             </td>
@@ -901,7 +901,7 @@ function ClientsContent() {
                 </div>
               </div>
 
-              <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex justify-end">
+              <div className="px-6 py-4 bg-surface-neutral-50 border-t border-line-neutral-100 flex justify-end">
                 <Button
                   variant="primary"
                   onClick={() => setSelectedClientForHistory(null)}
@@ -923,18 +923,18 @@ function ClientsContent() {
           >
             <MotionSurface onDismiss={() => setSelectedClientForBill(null)}
               kind="panel"
-              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
+              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
             >
-              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/60">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center">
-                    <Zap className="w-4 h-4 fill-[#7c3aed]" />
+                  <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center">
+                    <Zap className="w-4 h-4 fill-accent" />
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-neutral-900">
+                    <h3 className="text-base font-semibold text-content-neutral-900">
                       Instant Quick Bill
                     </h3>
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs text-content-neutral-400">
                       Issuing to: {selectedClientForBill.name}
                     </p>
                   </div>
@@ -949,22 +949,22 @@ function ClientsContent() {
                 </Button>
               </div>
 
-              <div className="p-6 space-y-4 text-xs font-medium text-neutral-700">
+              <div className="p-6 space-y-4 text-xs font-medium text-content-neutral-700">
                 <div>
-                  <label className="block mb-1.5 text-neutral-700 font-semibold">
+                  <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                     Service Deliverable Title
                   </label>
                   <input
                     type="text"
                     value={quickBillTitle}
                     onChange={(e) => setQuickBillTitle(e.target.value)}
-                    className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Amount ({selectedClientForBill.currency})
                     </label>
                     <input
@@ -973,45 +973,45 @@ function ClientsContent() {
                       min="0"
                       value={quickBillAmount}
                       onChange={(e) => setQuickBillAmount(e.target.value)}
-                      className="ui-field w-full px-3 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-1.5 text-neutral-700 font-semibold">
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Payment Terms
                     </label>
                     <input
                       type="text"
                       readOnly
                       value="Net 7 Days (Default)"
-                      className="ui-field w-full px-3 border border-neutral-200 text-neutral-600"
+                      className="ui-field w-full px-3 border border-line-neutral-200 text-content-neutral-600"
                     />
                   </div>
                 </div>
 
-                <div className="p-3.5 bg-purple-50/60 rounded-xl border border-purple-100 flex items-center justify-between">
+                <div className="p-3.5 bg-surface-purple-50/60 rounded-xl border border-line-purple-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       id="deposit"
                       defaultChecked
-                      className="w-4 h-4 text-[#7c3aed] rounded-sm focus:ring-[#7c3aed]"
+                      className="w-4 h-4 text-accent rounded-sm focus:ring-accent"
                     />
                     <label
                       htmlFor="deposit"
-                      className="text-xs font-medium text-neutral-700"
+                      className="text-xs font-medium text-content-neutral-700"
                     >
                       Require 50% Upfront Deposit
                     </label>
                   </div>
-                  <span className="text-xs font-semibold text-[#7c3aed]">
+                  <span className="text-xs font-semibold text-accent">
                     Deposit: {getCurrencySymbol(selectedClientForBill.currency)}
                     {((parseFloat(quickBillAmount) || 0) * 0.5).toFixed(2)}
                   </span>
                 </div>
 
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-neutral-100">
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-line-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
@@ -1044,11 +1044,11 @@ export default function ClientsPage() {
     <Suspense
       fallback={
         <div className="workspace-page motion-page">
-          <div className="h-10 w-48 bg-neutral-200 rounded-xl" />
+          <div className="h-10 w-48 bg-surface-neutral-200 rounded-xl" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="h-64 bg-neutral-200 rounded-2xl" />
-            <div className="h-64 bg-neutral-200 rounded-2xl" />
-            <div className="h-64 bg-neutral-200 rounded-2xl" />
+            <div className="h-64 bg-surface-neutral-200 rounded-2xl" />
+            <div className="h-64 bg-surface-neutral-200 rounded-2xl" />
+            <div className="h-64 bg-surface-neutral-200 rounded-2xl" />
           </div>
         </div>
       }

@@ -282,13 +282,13 @@ export default function OutsourcingView() {
   const renderVendorIcon = (type: VendorItem["iconType"]) => {
     switch (type) {
       case "design":
-        return <SlidersHorizontal className="text-[#4b5563] text-[13px]" />;
+        return <SlidersHorizontal className="text-text-body text-[13px]" />;
       case "devops":
-        return <Code2 className="text-[#4b5563] text-[13px]" />;
+        return <Code2 className="text-text-body text-[13px]" />;
       case "legal":
-        return <FileText className="text-[#4b5563] text-[13px]" />;
+        return <FileText className="text-text-body text-[13px]" />;
       case "development":
-        return <Code2 className="text-[#4b5563] text-[13px]" />;
+        return <Code2 className="text-text-body text-[13px]" />;
     }
   };
 
@@ -325,13 +325,13 @@ export default function OutsourcingView() {
             className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 text-white rounded-xl shadow-xl text-[12px] font-medium ${
               toastNotification.type === "error"
                 ? "bg-rose-900 border border-rose-700"
-                : "bg-[#18181b] border border-neutral-700"
+                : "bg-toast border border-line-neutral-700"
             }`}
           >
             {toastNotification.type === "error" ? (
-              <AlertCircle className="text-rose-400 text-[14px] shrink-0" />
+              <AlertCircle className="text-content-rose-400 text-[14px] shrink-0" />
             ) : (
-              <CheckCircle2 className="text-[#34d399] text-[14px] shrink-0" />
+              <CheckCircle2 className="text-success-bright text-[14px] shrink-0" />
             )}
             <span>{toastNotification.message}</span>
           </MotionSurface>
@@ -479,7 +479,7 @@ export default function OutsourcingView() {
         </div>
 
         {/* Vendor list rows container */}
-        <div className="bg-white divide-y divide-neutral-100">
+        <div className="bg-surface divide-y divide-line-neutral-100">
           {filteredVendors.length === 0 ? (
             <EmptyState
               title={
@@ -603,7 +603,7 @@ export default function OutsourcingView() {
             >
               <div className="outsourcing-modal-header">
                 <div className="flex items-center gap-2">
-                  <GitFork className="w-4 h-4 text-[#7c3aed]" />
+                  <GitFork className="w-4 h-4 text-accent" />
                   <h3 className="outsourcing-modal-title">
                     Vendor Statement Voucher
                   </h3>
@@ -619,17 +619,17 @@ export default function OutsourcingView() {
                 </Button>
               </div>
 
-              <div className="outsourcing-modal-body text-[12px] text-[#4b5563]">
+              <div className="outsourcing-modal-body text-[12px] text-text-body">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-bold text-[15px] text-[#111827]">
+                    <div className="font-bold text-[15px] text-text-primary">
                       {selectedVendor.name}
                     </div>
-                    <div className="text-[#8e8e93] text-[11.5px] mt-0.5">
+                    <div className="text-text-subtle text-[11.5px] mt-0.5">
                       {selectedVendor.service}
                     </div>
                     {selectedVendor.email && (
-                      <div className="text-[#6b7280] text-[11px] mt-1">
+                      <div className="text-text-muted text-[11px] mt-1">
                         Email: {selectedVendor.email}
                       </div>
                     )}
@@ -644,10 +644,10 @@ export default function OutsourcingView() {
                 {selectedVendor.linkedClientName && (
                   <div className="voucher-client-box">
                     <div>
-                      <span className="text-[10.5px] text-[#7c3aed] font-medium block">
+                      <span className="text-[10.5px] text-accent font-medium block">
                         Linked Client Project
                       </span>
-                      <span className="font-semibold text-neutral-900 text-xs">
+                      <span className="font-semibold text-content-neutral-900 text-xs">
                         {selectedVendor.linkedClientName}
                       </span>
                     </div>
@@ -657,7 +657,7 @@ export default function OutsourcingView() {
                           ? `/clients?client=${selectedVendor.linkedClientId}`
                           : "/clients"
                       }
-                      className="text-xs font-semibold text-[#7c3aed] hover:underline flex items-center gap-1"
+                      className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
                     >
                       <span>View Client</span>
                       <ExternalLink className="w-3 h-3" />
@@ -667,27 +667,27 @@ export default function OutsourcingView() {
 
                 <div className="voucher-settlement-card">
                   <div className="voucher-settlement-row">
-                    <span className="text-[#6b7280]">Current Balance:</span>
-                    <span className="font-bold text-[#111827] font-mono text-[13px]">
+                    <span className="text-text-muted">Current Balance:</span>
+                    <span className="font-bold text-text-primary font-mono text-[13px]">
                       {formatCurrencyAmount(selectedVendor.currentBalance, activeCurrency)}
                     </span>
                   </div>
                   <div className="voucher-settlement-row">
-                    <span className="text-[#6b7280]">Scheduled Settlement:</span>
-                    <span className="font-medium text-[#111827]">
+                    <span className="text-text-muted">Scheduled Settlement:</span>
+                    <span className="font-medium text-text-primary">
                       {selectedVendor.payoutDueDate || "Oct 15, 2026"}
                     </span>
                   </div>
                   <div className="voucher-settlement-row">
-                    <span className="text-[#6b7280]">Settlement Method:</span>
-                    <span className="font-medium text-[#111827]">
+                    <span className="text-text-muted">Settlement Method:</span>
+                    <span className="font-medium text-text-primary">
                       Wire / Direct ACH
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="px-6 py-3.5 bg-[#f4f4f0] border-t border-[#eaeae5] flex items-center justify-between gap-2">
+              <div className="px-6 py-3.5 bg-surface-subtle border-t border-surface-muted flex items-center justify-between gap-2">
                 <Button
                   variant="secondary"
                   type="button"
@@ -747,7 +747,7 @@ export default function OutsourcingView() {
             >
               <div className="outsourcing-modal-header">
                 <div className="flex items-center gap-2">
-                  <UserPlus className="w-4 h-4 text-[#7c3aed]" />
+                  <UserPlus className="w-4 h-4 text-accent" />
                   <h3 className="outsourcing-modal-title">
                     Add New Client
                   </h3>
@@ -766,7 +766,7 @@ export default function OutsourcingView() {
               <form onSubmit={handleAddClient} className="p-6 space-y-4">
                 {/* Client Name Input */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                  <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                     Client Business Name *
                   </label>
                   <input
@@ -785,12 +785,12 @@ export default function OutsourcingView() {
                     }}
                     className={`ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
                       clientFormErrors.name
-                        ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400 text-rose-900"
-                        : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                        ? "border-line-rose-400 bg-surface-rose-50/20 focus:ring-rose-400 text-rose-900"
+                        : "border-border-muted focus:ring-focus"
                     }`}
                   />
                   {clientFormErrors.name && (
-                    <p className="text-rose-600 text-[11px] mt-1.5 flex items-center gap-1.5 font-medium">
+                    <p className="text-content-rose-600 text-[11px] mt-1.5 flex items-center gap-1.5 font-medium">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       <span>{clientFormErrors.name}</span>
                     </p>
@@ -799,7 +799,7 @@ export default function OutsourcingView() {
 
                 {/* Email Address Input with explicit @ sign validation */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                  <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                     Email Address *
                   </label>
                   <input
@@ -818,12 +818,12 @@ export default function OutsourcingView() {
                     }}
                     className={`ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
                       clientFormErrors.email
-                        ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400 text-rose-900"
-                        : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                        ? "border-line-rose-400 bg-surface-rose-50/20 focus:ring-rose-400 text-rose-900"
+                        : "border-border-muted focus:ring-focus"
                     }`}
                   />
                   {clientFormErrors.email && (
-                    <p className="text-rose-600 text-[11px] mt-1.5 flex items-center gap-1.5 font-medium">
+                    <p className="text-content-rose-600 text-[11px] mt-1.5 flex items-center gap-1.5 font-medium">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       <span>{clientFormErrors.email}</span>
                     </p>
@@ -833,13 +833,13 @@ export default function OutsourcingView() {
                 {/* Category & Currency */}
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                       Category
                     </label>
                     <select
                       value={clientCategory}
                       onChange={(e) => setClientCategory(e.target.value)}
-                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     >
                       <option value="Enterprise">Enterprise</option>
                       <option value="Startup">Startup</option>
@@ -849,7 +849,7 @@ export default function OutsourcingView() {
                   </div>
 
                   <div>
-                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                       Billing Currency
                     </label>
                     <select
@@ -859,7 +859,7 @@ export default function OutsourcingView() {
                           e.target.value as "USD" | "LKR" | "EUR",
                         )
                       }
-                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     >
                       <option value="USD">USD ($)</option>
                       <option value="LKR">LKR (Rs.)</option>
@@ -873,7 +873,7 @@ export default function OutsourcingView() {
                 {/* Contact Person & Phone */}
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                       Contact Person
                     </label>
                     <input
@@ -881,11 +881,11 @@ export default function OutsourcingView() {
                       placeholder="e.g. Sarah Jenkins"
                       value={clientContactPerson}
                       onChange={(e) => setClientContactPerson(e.target.value)}
-                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                       Phone Number
                     </label>
                     <input
@@ -893,7 +893,7 @@ export default function OutsourcingView() {
                       placeholder="+1 (555) 284-9102"
                       value={clientPhone}
                       onChange={(e) => setClientPhone(e.target.value)}
-                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     />
                   </div>
                 </div>
@@ -901,23 +901,23 @@ export default function OutsourcingView() {
                 {/* Client Link / Drive Folder Link Field */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[12px] font-semibold text-[#374151] flex items-center gap-1.5">
-                      <Link2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+                    <label className="text-[12px] font-semibold text-text-secondary flex items-center gap-1.5">
+                      <Link2 className="w-3.5 h-3.5 text-accent" />
                       <span>Client Resource Link / Drive Folder</span>
                     </label>
-                    <span className="text-[10.5px] text-neutral-400">Optional</span>
+                    <span className="text-[10.5px] text-content-neutral-400">Optional</span>
                   </div>
                   <input
                     type="url"
                     placeholder="https://drive.google.com/drive/folders/... or website"
                     value={clientDriveUrl}
                     onChange={(e) => setClientDriveUrl(e.target.value)}
-                    className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
 
                 {/* Modal Footer Controls */}
-                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-neutral-100">
+                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-line-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
@@ -953,7 +953,7 @@ export default function OutsourcingView() {
             >
               <div className="outsourcing-modal-header">
                 <div className="flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-[#7c3aed]" />
+                  <Plus className="w-4 h-4 text-accent" />
                   <h3 className="outsourcing-modal-title">
                     Add Subcontractor / Outsource Task
                   </h3>
@@ -971,7 +971,7 @@ export default function OutsourcingView() {
 
               <form onSubmit={handleAddVendor} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                  <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                     Vendor / Contractor Name *
                   </label>
                   <input
@@ -990,12 +990,12 @@ export default function OutsourcingView() {
                     }}
                     className={`ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
                       vendorFormErrors.name
-                        ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400"
-                        : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                        ? "border-line-rose-400 bg-surface-rose-50/20 focus:ring-rose-400"
+                        : "border-border-muted focus:ring-focus"
                     }`}
                   />
                   {vendorFormErrors.name && (
-                    <p className="text-rose-600 text-[11px] mt-1 flex items-center gap-1 font-medium">
+                    <p className="text-content-rose-600 text-[11px] mt-1 flex items-center gap-1 font-medium">
                       <AlertCircle className="w-3.5 h-3.5" />
                       <span>{vendorFormErrors.name}</span>
                     </p>
@@ -1003,7 +1003,7 @@ export default function OutsourcingView() {
                 </div>
 
                 <div>
-                  <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                  <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                     Service Scope & Deliverable Description *
                   </label>
                   <input
@@ -1022,12 +1022,12 @@ export default function OutsourcingView() {
                     }}
                     className={`ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
                       vendorFormErrors.service
-                        ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400"
-                        : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                        ? "border-line-rose-400 bg-surface-rose-50/20 focus:ring-rose-400"
+                        : "border-border-muted focus:ring-focus"
                     }`}
                   />
                   {vendorFormErrors.service && (
-                    <p className="text-rose-600 text-[11px] mt-1 flex items-center gap-1 font-medium">
+                    <p className="text-content-rose-600 text-[11px] mt-1 flex items-center gap-1 font-medium">
                       <AlertCircle className="w-3.5 h-3.5" />
                       <span>{vendorFormErrors.service}</span>
                     </p>
@@ -1036,7 +1036,7 @@ export default function OutsourcingView() {
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                       Agreed Balance / Payout ({getCurrencySymbol(activeCurrency).trim() || activeCurrency}) *
                     </label>
                     <input
@@ -1056,19 +1056,19 @@ export default function OutsourcingView() {
                       }}
                       className={`ui-field w-full text-[13px] px-3 py-2 border rounded-xl focus:outline-none focus:ring-2 ${
                         vendorFormErrors.balance
-                          ? "border-rose-400 bg-rose-50/20 focus:ring-rose-400"
-                          : "border-[#dcdcd7] focus:ring-[#7133f5]"
+                          ? "border-line-rose-400 bg-surface-rose-50/20 focus:ring-rose-400"
+                          : "border-border-muted focus:ring-focus"
                       }`}
                     />
                     {vendorFormErrors.balance && (
-                      <p className="text-rose-600 text-[11px] mt-1 font-medium">
+                      <p className="text-content-rose-600 text-[11px] mt-1 font-medium">
                         {vendorFormErrors.balance}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                       Category
                     </label>
                     <select
@@ -1078,7 +1078,7 @@ export default function OutsourcingView() {
                           e.target.value as VendorItem["iconType"],
                         )
                       }
-                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     >
                       <option value="devops">DevOps & Cloud</option>
                       <option value="design">UI/UX Design</option>
@@ -1091,16 +1091,16 @@ export default function OutsourcingView() {
                 {/* Link to Client Dropdown */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[12px] font-semibold text-[#374151] flex items-center gap-1.5">
-                      <Building className="w-3.5 h-3.5 text-[#7c3aed]" />
+                    <label className="text-[12px] font-semibold text-text-secondary flex items-center gap-1.5">
+                      <Building className="w-3.5 h-3.5 text-accent" />
                       <span>Link to Client Project</span>
                     </label>
-                    <span className="text-[10.5px] text-neutral-400">Optional</span>
+                    <span className="text-[10.5px] text-content-neutral-400">Optional</span>
                   </div>
                   <select
                     value={vendorLinkedClientId}
                     onChange={(e) => setVendorLinkedClientId(e.target.value)}
-                    className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                   >
                     <option value="">No Client Linked (Internal / General)</option>
                     {clients.map((c) => (
@@ -1113,7 +1113,7 @@ export default function OutsourcingView() {
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                       Contractor Email
                     </label>
                     <input
@@ -1121,12 +1121,12 @@ export default function OutsourcingView() {
                       placeholder="vendor@company.com"
                       value={vendorEmail}
                       onChange={(e) => setVendorEmail(e.target.value)}
-                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
                       Payout Due Date
                     </label>
                     <input
@@ -1134,12 +1134,12 @@ export default function OutsourcingView() {
                       placeholder="Oct 28, 2026"
                       value={vendorDueDate}
                       onChange={(e) => setVendorDueDate(e.target.value)}
-                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-[#dcdcd7] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     />
                   </div>
                 </div>
 
-                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-neutral-100">
+                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-line-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
@@ -1189,7 +1189,7 @@ export default function OutsourcingView() {
               </div>
               <form onSubmit={handleLogExpense} className="p-6 space-y-3.5">
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                  <label className="block text-[11.5px] font-medium text-text-secondary mb-1">
                     Expense Description
                   </label>
                   <input
@@ -1198,11 +1198,11 @@ export default function OutsourcingView() {
                     placeholder="e.g. Adobe Creative Cloud, Cloud Server"
                     value={expenseTitle}
                     onChange={(e) => setExpenseTitle(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-[#dcdcd7] focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    className="ui-field w-full text-[12px] px-3 border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#374151] mb-1">
+                  <label className="block text-[11.5px] font-medium text-text-secondary mb-1">
                     Amount ({getCurrencySymbol(activeCurrency).trim() || activeCurrency})
                   </label>
                   <input
@@ -1212,7 +1212,7 @@ export default function OutsourcingView() {
                     placeholder="54.99"
                     value={expenseAmount}
                     onChange={(e) => setExpenseAmount(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-[#dcdcd7] focus:outline-none focus:ring-2 focus:ring-[#7133f5]"
+                    className="ui-field w-full text-[12px] px-3 border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
                 <div className="pt-2 flex justify-end gap-2">

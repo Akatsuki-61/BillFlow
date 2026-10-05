@@ -20,9 +20,15 @@ import type {
 } from "../src/types/outsourcing";
 import type { AnalyticsSummaryPayload } from "../src/types/analytics";
 
+import type { ThemePreference } from "../src/lib/theme";
+
 contextBridge.exposeInMainWorld("billflow", {
   isElectron: true,
   platform: process.platform,
+  theme: {
+    initialPreference: ipcRenderer.sendSync("theme:initial") as ThemePreference,
+    setPreference: (preference: ThemePreference): Promise<void> => ipcRenderer.invoke("theme:set", preference),
+  },
   clients: {
     list: (): Promise<ClientWithStats[]> => ipcRenderer.invoke("clients:list"),
     get: (id: string): Promise<ClientWithStats> => ipcRenderer.invoke("clients:get", id),

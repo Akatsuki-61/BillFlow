@@ -11,6 +11,8 @@ import TitleBar from "@/components/TitleBar";
 import { NavProvider } from "@/context/NavContext";
 import { DataProvider } from "@/lib/data/DataProvider";
 import { WidgetProvider } from "@/context/WidgetContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { themeBootstrap } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -55,22 +57,29 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="light"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${inter.variable} ${newsreader.variable} h-full antialiased`}
     >
-      <body className="h-screen bg-[#faf9f5] text-neutral-900 flex flex-col antialiased selection:bg-purple-100 selection:text-purple-900 overflow-hidden">
-        <NavProvider>
-          <DataProvider>
-            <WidgetProvider>
-              <TitleBar />
-              <div className="flex flex-1 min-h-0 overflow-hidden">
-                <Sidebar />
-                <main className="workspace-scroll min-w-0 flex-1 bg-[#faf9f5] min-h-0 overflow-y-auto">
-                  {children}
-                </main>
-              </div>
-            </WidgetProvider>
-          </DataProvider>
-        </NavProvider>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
+      </head>
+      <body className="h-screen bg-canvas text-content-neutral-900 flex flex-col antialiased selection:bg-surface-purple-100 selection:text-content-purple-900 overflow-hidden">
+        <ThemeProvider>
+          <NavProvider>
+            <DataProvider>
+              <WidgetProvider>
+                <TitleBar />
+                <div className="flex flex-1 min-h-0 overflow-hidden">
+                  <Sidebar />
+                  <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
+                    {children}
+                  </main>
+                </div>
+              </WidgetProvider>
+            </DataProvider>
+          </NavProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
