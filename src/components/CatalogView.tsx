@@ -1167,7 +1167,7 @@ export default function CatalogView() {
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold text-white transition-colors cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Download Template</span>
+                      <span>Download Sample CSV Template</span>
                     </button>
                   </div>
                 </div>
@@ -1221,30 +1221,11 @@ export default function CatalogView() {
                     </ul>
                   </div>
                 </div>
-
-                <div className="flex justify-start">
-                  <button
-                    type="button"
-                    onClick={downloadSampleCSV}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Download Compatible Spreadsheet Template (.csv)</span>
-                  </button>
-                </div>
               </div>
             )}
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between pt-5 mt-6 border-t border-neutral-100">
-              <button
-                type="button"
-                onClick={downloadSampleCSV}
-                className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-800 cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-                <span>Download Sample CSV Template</span>
-              </button>
+            <div className="flex items-center justify-end pt-5 mt-6 border-t border-neutral-100">
               <button
                 type="button"
                 onClick={() => setShowImportInfoModal(false)}
