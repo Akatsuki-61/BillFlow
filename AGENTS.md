@@ -156,3 +156,7 @@ Acceptance means records and links survive an app restart, not just that a toast
 - Keep both light and dark mode working, including new dialogs and controls. Appearance settings belong under **Settings → Appearance**.
 - For the upcoming demo, prioritize completing the connected direct-work loop over unrelated features or visual-only placeholders. Additional invoice templates and the reverse **task first → create invoice** workflow are future work, not prerequisites for this first loop.
 - Do not treat this document as an instruction to implement every feature in every task. Use it as shared product context, implement the assigned scope, and report missing connections honestly.
+
+## Brand identity
+
+Use Lahiru's BillFlow V1 logo exports as the current brand identity. Original assets and usage notes are in `assets/brand/`; generated assets are in `public/brand/` and `build/`. Use the colored mark on light surfaces, the white mark on dark surfaces, and the app-shaped icon for desktop/browser icons. Preserve the supplied artwork and use `npm run brand:generate` to regenerate the required sizes and formats.

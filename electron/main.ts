@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, shell } from "electron";
+import { app, BrowserWindow, protocol, net, shell, Menu, Tray, nativeImage, nativeTheme } from "electron";
 import path from "path";
 import fs from "fs";
 import { pathToFileURL } from "url";
@@ -28,6 +28,48 @@ protocol.registerSchemesAsPrivileged([
 app.setName("BillFlow");
 
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+
+function appIconPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "brand", "icon.png")
+    : path.join(__dirname, "../build/icon.png");
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  if (mainWindow?.isMinimized()) mainWindow.restore();
+  mainWindow?.show();
+  mainWindow?.focus();
+}
+
+function createTray() {
+  if (process.platform !== "darwin" && process.platform !== "win32") return;
+  const directory = app.isPackaged
+    ? path.join(process.resourcesPath, "brand", "tray")
+    : path.join(__dirname, "../build/tray");
+  const trayImage = () => {
+    if (process.platform === "darwin") {
+      const image = nativeImage.createFromPath(path.join(directory, "trayTemplate.png"));
+      image.setTemplateImage(true);
+      return image;
+    }
+    // Follow the Windows taskbar theme, independently of the app's appearance.
+    return path.join(directory, nativeTheme.shouldUseDarkColorsForSystemIntegratedUI
+      ? "tray-white.ico" : "tray-color.ico");
+  };
+  tray = new Tray(trayImage());
+  tray.setToolTip("BillFlow");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Open BillFlow", click: showMainWindow },
+    { type: "separator" },
+    { label: "Quit BillFlow", click: () => app.quit() },
+  ]));
+  if (process.platform === "win32") {
+    tray.on("click", showMainWindow);
+    nativeTheme.on("updated", () => tray?.setImage(trayImage()));
+  }
+}
 
 function broadcastDataChanged() {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -47,6 +89,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     title: "BillFlow",
+    icon: appIconPath(),
     titleBarStyle: isMac ? "hiddenInset" : isWindows ? "hidden" : "default",
     trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
     titleBarOverlay: isWindows
@@ -102,6 +145,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin") app.dock?.setIcon(appIconPath());
   // Initialize database and migrations
   initDatabase();
 
@@ -145,6 +189,7 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  createTray();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -157,4 +202,9 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  tray?.destroy();
+  tray = null;
 });

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
@@ -62,11 +63,22 @@ export default function Sidebar() {
           href="/"
           className="h-20 px-6 flex items-center gap-3.5 group transition-colors"
         >
-          {/* Logo badge with animated hover pulse */}
-          <div className="w-10 h-10 rounded-full bg-accent-solid flex items-center justify-center text-white shadow-sm transition-transform duration-300 group-hover:scale-105 group-hover:shadow-shadow-shadow-purple-200 group-hover:shadow-md">
-            <span className="font-bold text-lg leading-none tracking-tight">
-              B
-            </span>
+          <div className="w-10 h-10 shrink-0 transition-transform duration-300 group-hover:scale-105">
+            <Image
+              src="/brand/logo-color.png"
+              alt=""
+              width={40}
+              height={40}
+              preload
+              className="dark:hidden"
+            />
+            <Image
+              src="/brand/logo-white.png"
+              alt=""
+              width={40}
+              height={40}
+              className="hidden dark:block"
+            />
           </div>
 
           <div className="flex flex-col">
