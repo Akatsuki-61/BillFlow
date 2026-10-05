@@ -8,6 +8,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "next dev",
+    "brand:generate": "node scripts/generate-brand-assets.mjs",
     "dev:electron": "concurrently -k \"next dev\" \"npm:electron:watch\"",
     "electron:watch": "wait-on tcp:3000 && tsup --watch --onSuccess \"electron .\"",
     "build:renderer": "next build",

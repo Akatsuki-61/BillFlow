@@ -11,20 +11,28 @@ asar: true
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
 extraResources:
+  - from: build/icon.png
+    to: brand/icon.png
+  - from: build/tray
+    to: brand/tray
   - from: drizzle
     to: drizzle
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
         - x64
 nsis:
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: BillFlow
 mac:
+  icon: build/icon.icns
   target:
     - target: dmg
       arch:

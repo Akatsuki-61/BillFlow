@@ -37,28 +37,7 @@ import { formatCents, formatDateDisplay, getCurrencySymbol } from "@/lib/format"
 import { DashboardPeriod } from "@/types/dashboard";
 import { WidgetDisplaySize } from "@/types/widgets";
 import "../analytics/analytics.css";
-
-// Smooth Bezier Curve Path Generator for Financial Charts
-function getSmoothPath(points: Array<{ x: number; y: number }>): string {
-  if (points.length === 0) return "";
-  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = i > 0 ? points[i - 1] : points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = i < points.length - 2 ? points[i + 2] : p2;
-
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
-  }
-  return d;
-}
+import { ProfitTrajectoryPlot } from "./ProfitTrajectoryPlot";
 
 // Sample active sprint tasks
 const activeTasks = [
@@ -797,50 +776,6 @@ export function WidgetRenderer({
 
       // 14. Profit & Growth Trajectory Chart
       case "profit-trajectory-chart": {
-        const rawMax = Math.max(0, ...monthlyStats.map((m) => m.profitCents));
-        const maxTrajectoryVal =
-          chartMetric === "profit" ? (rawMax > 0 ? rawMax : 500000) : 100;
-
-        const topLabel =
-          chartMetric === "profit" ? formatCents(maxTrajectoryVal, activeCurrency) : "100%";
-        const midLabel =
-          chartMetric === "profit"
-            ? formatCents(Math.round(maxTrajectoryVal / 2), activeCurrency)
-            : "50%";
-
-        // Calculate smooth trajectory points
-        const points = monthlyStats.map((m, i) => {
-          const x = 82 + i * 78;
-          const val = chartMetric === "profit" ? m.profitCents : m.marginPct;
-          const pct = maxTrajectoryVal > 0 && val > 0 ? val / maxTrajectoryVal : 0;
-          const y =
-            chartMetric === "margin"
-              ? 135 - Math.round(pct * 105)
-              : rawMax > 0 && m.profitCents > 0
-                ? 135 - Math.round(pct * 105)
-                : 135;
-          return {
-            x,
-            y,
-            val,
-            label: m.label,
-            marginPct: m.marginPct,
-            profitCents: m.profitCents,
-          };
-        });
-
-        const lineD = getSmoothPath(points);
-        const areaD =
-          points.length > 0
-            ? `${lineD} L ${points[points.length - 1].x} 135 L ${points[0].x} 135 Z`
-            : "";
-
-        const latestPoint = points[points.length - 1];
-        const latestValStr =
-          chartMetric === "profit"
-            ? formatCents(latestPoint?.profitCents || 0, activeCurrency)
-            : `${latestPoint?.marginPct || 100}% Margin`;
-
         return (
           <div className="analytics-creative-chart-card">
             <div className="analytics-creative-header">
@@ -880,100 +815,7 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <div className="analytics-creative-canvas-area">
-              <svg
-                viewBox="0 0 540 170"
-                className="analytics-creative-svg"
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient id="creativeSplineArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.22" />
-                    <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Y-Axis Guidelines & Scale Labels */}
-                <line x1="45" y1="28" x2="525" y2="28" className="analytics-grid-line" />
-                <line x1="45" y1="80" x2="525" y2="80" className="analytics-grid-line" />
-                <line x1="45" y1="135" x2="525" y2="135" className="analytics-grid-line" />
-
-                <text x="38" y="32" textAnchor="end" className="analytics-axis-text">
-                  {topLabel}
-                </text>
-                <text x="38" y="84" textAnchor="end" className="analytics-axis-text">
-                  {midLabel}
-                </text>
-                <text x="38" y="138" textAnchor="end" className="analytics-axis-text">
-                  {chartMetric === "profit" ? `${getCurrencySymbol(activeCurrency)}0` : "0%"}
-                </text>
-
-                {/* Shaded Spline Area */}
-                {areaD && (
-                  <path d={areaD} fill="url(#creativeSplineArea)" />
-                )}
-
-                {/* Smooth Spline Curve */}
-                {lineD && (
-                  <path d={lineD} className="analytics-spline-path" />
-                )}
-
-                {/* Spline Nodes */}
-                {points.map((p, idx) => {
-                  const isCurrent = idx === points.length - 1;
-                  return (
-                    <g key={idx}>
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={isCurrent ? 5.5 : 4}
-                        className="analytics-node-dot"
-                      >
-                        <title>
-                          {chartMetric === "profit"
-                            ? `${p.label} Profit: ${formatCents(p.profitCents, activeCurrency)}`
-                            : `${p.label} Margin: ${p.marginPct}%`}
-                        </title>
-                      </circle>
-
-                      {/* Month Text */}
-                      <text
-                        x={p.x}
-                        y="154"
-                        className={`analytics-month-text ${isCurrent ? "active" : ""}`}
-                      >
-                        {p.label.toUpperCase()}
-                      </text>
-                    </g>
-                  );
-                })}
-
-                {/* Floating Tooltip Pill for Current / Active Month */}
-                {latestPoint && (
-                  <g transform={`translate(${latestPoint.x}, ${Math.max(16, latestPoint.y - 28)})`}>
-                    <rect
-                      x="-38"
-                      y="0"
-                      width="76"
-                      height="20"
-                      rx="6"
-                      className="analytics-floating-tag-bg"
-                    />
-                    <polygon
-                      points="-4,20 4,20 0,24"
-                      fill="#18181b"
-                    />
-                    <text
-                      x="0"
-                      y="13"
-                      className="analytics-floating-tag-text"
-                    >
-                      {latestValStr}
-                    </text>
-                  </g>
-                )}
-              </svg>
-            </div>
+            <ProfitTrajectoryPlot months={monthlyStats} metric={chartMetric} currency={activeCurrency} />
 
             <div className="analytics-creative-footer">
               <div className="flex items-center gap-4">
