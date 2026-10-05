@@ -35,6 +35,60 @@ export function migrationFolder(customMigrations?: string): string {
 
 export function migrateDatabase(sqlite: Database.Database, customMigrations?: string) {
   const folder = migrationFolder(customMigrations);
+
+  // Reconcile development databases that ran intermediate branch migrations
+  // (where timestamps 1791229052132, 1791229210154, or 1791229943818 were recorded).
+  const hasMigrationTable = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='__drizzle_migrations'").get();
+  if (hasMigrationTable) {
+    const devBranchEntry = sqlite.prepare("SELECT 1 FROM __drizzle_migrations WHERE created_at IN (1791229052132, 1791229210154, 1791229943818)").get();
+    if (devBranchEntry) {
+      sqlite.transaction(() => {
+        sqlite.exec(`
+          CREATE TABLE IF NOT EXISTS "catalog_items" (
+            "id" text PRIMARY KEY NOT NULL,
+            "title" text NOT NULL,
+            "category" text DEFAULT 'Development' NOT NULL,
+            "sku" text NOT NULL UNIQUE,
+            "description" text DEFAULT '' NOT NULL,
+            "price_cents" integer DEFAULT 0 NOT NULL CHECK ("price_cents" >= 0 AND typeof("price_cents") = 'integer'),
+            "currency" text DEFAULT 'LKR' NOT NULL,
+            "unit" text DEFAULT '/ Hourly' NOT NULL,
+            "icon_type" text DEFAULT 'code' NOT NULL,
+            "created_at" text DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+            "updated_at" text DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+          );
+        `);
+        const invoiceColumns = (sqlite.prepare("PRAGMA table_info(invoices)").all() as Array<{ name: string }>).map(c => c.name);
+        if (!invoiceColumns.includes("catalog_item_id")) {
+          sqlite.exec('ALTER TABLE "invoices" ADD COLUMN "catalog_item_id" text REFERENCES "catalog_items"("id") ON DELETE set null');
+        }
+        if (!invoiceColumns.includes("request_hash")) {
+          sqlite.exec('ALTER TABLE "invoices" ADD COLUMN "request_hash" text');
+        }
+        const taskColumns = (sqlite.prepare("PRAGMA table_info(tasks)").all() as Array<{ name: string }>).map(c => c.name);
+        if (taskColumns.length && !taskColumns.includes("request_hash")) {
+          sqlite.exec('ALTER TABLE "tasks" ADD COLUMN "request_hash" text');
+        }
+        const settingColumns = (sqlite.prepare("PRAGMA table_info(settings)").all() as Array<{ name: string }>).map(c => c.name);
+        if (!settingColumns.includes("pdf_export_directory")) {
+          sqlite.exec('ALTER TABLE "settings" ADD COLUMN "pdf_export_directory" text');
+        }
+        sqlite.prepare("DELETE FROM __drizzle_migrations WHERE created_at IN (1791229052132, 1791229210154, 1791229943818)").run();
+        const existingTimestamps = new Set(
+          (sqlite.prepare("SELECT created_at FROM __drizzle_migrations").all() as Array<{ created_at: number }>).map(r => Number(r.created_at))
+        );
+        const journalEntries: Array<{ when: number; hash?: string }> = JSON.parse(
+          fs.readFileSync(path.join(folder, "meta/_journal.json"), "utf8")
+        ).entries;
+        for (const entry of journalEntries) {
+          if (!existingTimestamps.has(entry.when)) {
+            sqlite.prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)").run("reconciled", entry.when);
+          }
+        }
+      })();
+    }
+  }
+
   // Older Sandika profiles store decimal text. Reject unsafe values before
   // the versioned migration converts them to integer minor units.
   const legacy = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='catalog_items'").get();

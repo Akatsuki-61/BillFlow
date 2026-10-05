@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import Database from "better-sqlite3";
 import { initDatabase, closeDatabaseForTesting, getDb } from "../db";
 import { clients, invoices, vendors } from "../db/schema";
 import { listClientsWithStats } from "../ipc/clients";
@@ -459,6 +460,27 @@ describe("Database & Interconnection Tests", () => {
       expect(summary.vendorsCount).toBe(1);
       expect(summary.topClientName).toBe("Apex Global");
       expect(summary.monthlyTrends.length).toBe(6);
+    });
+
+    it("reconciles databases migrated on the intermediate Nipun branch without errors", () => {
+      closeDatabaseForTesting();
+      const branchDbPath = path.join(tempDir, "branch.db");
+      const sqlite = new Database(branchDbPath);
+      sqlite.exec(`
+        CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, hash text NOT NULL, created_at numeric);
+        INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('legacy', 1791105597906), ('legacy', 1791108953458), ('legacy', 1791215500000), ('legacy', 1791229052132), ('legacy', 1791229210154), ('legacy', 1791229943818);
+        CREATE TABLE clients (id text PRIMARY KEY, name text NOT NULL, contact_person text NOT NULL, email text NOT NULL);
+        CREATE TABLE invoices (id text PRIMARY KEY, code text NOT NULL, client_id text, title text, amount_cents integer NOT NULL, currency text NOT NULL, issue_date text NOT NULL, status text NOT NULL, paid_cents integer NOT NULL);
+        CREATE TABLE tasks (id text PRIMARY KEY, title text NOT NULL, assignee text NOT NULL, created_at text NOT NULL, updated_at text NOT NULL);
+        CREATE TABLE settings (id text PRIMARY KEY, business_name text NOT NULL);
+      `);
+      sqlite.close();
+      const { sqlite: connected } = initDatabase(branchDbPath);
+      expect(connected.pragma("foreign_key_check")).toEqual([]);
+      expect(connected.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='catalog_items'").get()).toBeTruthy();
+      const columns = (connected.prepare("PRAGMA table_info(invoices)").all() as { name: string }[]).map(c => c.name);
+      expect(columns).toContain("catalog_item_id");
+      expect(columns).toContain("request_hash");
     });
   });
 });
