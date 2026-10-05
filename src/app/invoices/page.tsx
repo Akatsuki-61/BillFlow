@@ -1,186 +1,142 @@
 "use client";
 
-import {
-  Button,
-  PageHeader,
-  SegmentedControl,
-  MetricCard,
-  EmptyState,
-} from "@/components/ui/Workspace";
-
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import React, { useState } from "react";
 import {
   Plus,
   Receipt,
+  ArrowDown,
   MoreHorizontal,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Pencil,
   Trash2,
   X,
-  Building,
-  AlertCircle,
 } from "lucide-react";
-import { useInvoices, useClients } from "@/lib/data/DataProvider";
-import {
-  formatCents,
-  formatDateDisplay,
-  parseAmountToCents,
-} from "@/lib/format";
-import type {
-  InvoiceWithClient,
-  InvoiceStatus,
-  Currency,
-} from "@/types/billing";
+
+interface Invoice {
+  id: string;
+  code: string;
+  client: string;
+  amount: string;
+  currency: string;
+  dueDate: string;
+  dueSubtext?: string;
+  isOverdue?: boolean;
+  isDueSoon?: boolean;
+  status: "OVERDUE" | "UNPAID" | "PAID" | "DRAFT";
+  isDraftCode?: boolean;
+}
+
+const getCurrencySymbol = (currency: string) => {
+  switch (currency.toUpperCase()) {
+    case "LKR":
+      return "Rs. ";
+    case "EUR":
+      return "€";
+    case "GBP":
+      return "£";
+    case "USD":
+    case "CAD":
+    default:
+      return "$";
+  }
+};
+
+const formatAmountWithCurrency = (numStr: string, currency: string) => {
+  const parsed = parseFloat(numStr || "0");
+  const symbol = getCurrencySymbol(currency);
+  return `${symbol}${parsed.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
+const initialInvoices: Invoice[] = [
+  {
+    id: "1",
+    code: "INV-2023-089",
+    client: "Globex Corporation",
+    amount: "Rs. 12,450.00",
+    currency: "LKR",
+    dueDate: "Oct 12, 2023",
+    dueSubtext: "14 days late",
+    isOverdue: true,
+    status: "OVERDUE",
+  },
+  {
+    id: "2",
+    code: "INV-2023-090",
+    client: "Initech LLC",
+    amount: "Rs. 4,200.50",
+    currency: "LKR",
+    dueDate: "Oct 28, 2023",
+    dueSubtext: "in 2 days",
+    isDueSoon: true,
+    status: "UNPAID",
+  },
+  {
+    id: "3",
+    code: "INV-2023-085",
+    client: "Stark Industries",
+    amount: "Rs. 85,000.00",
+    currency: "LKR",
+    dueDate: "Oct 15, 2023",
+    status: "PAID",
+  },
+  {
+    id: "4",
+    code: "Draft",
+    client: "Wayne Enterprises",
+    amount: "Rs. 1,500.00",
+    currency: "LKR",
+    dueDate: "Not Set",
+    status: "DRAFT",
+    isDraftCode: true,
+  },
+];
 
 type FilterTab = "All Invoices" | "Drafts" | "Overdue" | "Paid";
 
-function InvoicesContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const {
-    invoices: allInvoices,
-    isLoading: invoicesLoading,
-    createInvoice,
-    updateInvoice,
-    setInvoiceStatus,
-    deleteInvoice,
-    getNextInvoiceCode,
-  } = useInvoices();
-
-  const { clients, isLoading: clientsLoading } = useClients();
-
-  const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
+export default function InvoicesPage() {
+    const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [highlightedInvoiceId, setHighlightedInvoiceId] = useState<
-    string | null
-  >(null);
 
   // Add Invoice Modal state
-  const [showAddInvoiceModal, setShowAddInvoiceModal] =
-    useState<boolean>(false);
-  const [newCode, setNewCode] = useState("");
-  const [newClientId, setNewClientId] = useState("");
-  const [newTitle, setNewTitle] = useState("");
+  const [showAddInvoiceModal, setShowAddInvoiceModal] = useState<boolean>(false);
+  const [newCode, setNewCode] = useState("INV-2023-091");
+  const [newClient, setNewClient] = useState("");
   const [newAmount, setNewAmount] = useState("");
-  const [newCurrency, setNewCurrency] = useState<Currency>("LKR");
+  const [newCurrency, setNewCurrency] = useState("LKR");
   const [newDueDate, setNewDueDate] = useState("");
-  const [newStatus, setNewStatus] = useState<InvoiceStatus>("UNPAID");
-  const [isSubmittingNew, setIsSubmittingNew] = useState(false);
+  const [newStatus, setNewStatus] = useState<"UNPAID" | "OVERDUE" | "PAID" | "DRAFT">("UNPAID");
 
   // Edit Invoice Modal state
-  const [editingInvoice, setEditingInvoice] =
-    useState<InvoiceWithClient | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [editCode, setEditCode] = useState("");
-  const [editClientId, setEditClientId] = useState("");
-  const [editTitle, setEditTitle] = useState("");
+  const [editClient, setEditClient] = useState("");
   const [editAmount, setEditAmount] = useState("");
-  const [editCurrency, setEditCurrency] = useState<Currency>("LKR");
+  const [editCurrency, setEditCurrency] = useState("LKR");
   const [editDueDate, setEditDueDate] = useState("");
-  const [editStatus, setEditStatus] = useState<InvoiceStatus>("UNPAID");
-  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [editStatus, setEditStatus] = useState<"UNPAID" | "OVERDUE" | "PAID" | "DRAFT">("UNPAID");
 
   // Delete Confirm Modal state
-  const [deletingInvoice, setDeletingInvoice] =
-    useState<InvoiceWithClient | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState<Invoice | null>(null);
 
-  // Toast feedback state
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  // Expense Form state
+  const [showLogExpenseModal, setShowLogExpenseModal] = useState<boolean>(false);
+  const [expenseTitle, setExpenseTitle] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
 
-  const showToast = (
-    message: string,
-    type: "success" | "error" = "success",
-  ) => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3600);
-  };
-
-  // Check URL search parameters
-  const clientFilterParam = searchParams.get("client");
-  const isNewParam = searchParams.get("new");
-  const invoiceHighlightParam = searchParams.get("invoice");
-
-  useEffect(() => {
-    if (invoiceHighlightParam) {
-      setHighlightedInvoiceId(invoiceHighlightParam);
-      const timer = setTimeout(() => {
-        setHighlightedInvoiceId(null);
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [invoiceHighlightParam]);
-
-  useEffect(() => {
-    if (isNewParam === "1") {
-      setShowAddInvoiceModal(true);
-      if (clientFilterParam) {
-        setNewClientId(clientFilterParam);
-        const match = clients.find((c) => c.id === clientFilterParam);
-        if (match) setNewCurrency(match.currency);
-      }
-    }
-  }, [isNewParam, clientFilterParam, clients]);
-
-  // When opening Add Invoice modal, prefill the next code
-  const handleOpenAddModal = async () => {
-    try {
-      const code = await getNextInvoiceCode();
-      setNewCode(code);
-    } catch {
-      setNewCode(`INV-${new Date().getFullYear()}-001`);
-    }
-
-    if (clientFilterParam) {
-      setNewClientId(clientFilterParam);
-      const match = clients.find((c) => c.id === clientFilterParam);
-      if (match) setNewCurrency(match.currency);
-    } else if (clients.length > 0 && !newClientId) {
-      setNewClientId(clients[0].id);
-      setNewCurrency(clients[0].currency);
-    }
-
-    setShowAddInvoiceModal(true);
-  };
-
-  // Filter invoices according to selected client and tabs
-  const filteredInvoices = allInvoices.filter((inv) => {
-    if (clientFilterParam && inv.clientId !== clientFilterParam) {
-      return false;
-    }
+  const filteredInvoices = invoices.filter((inv) => {
     if (activeTab === "Drafts") return inv.status === "DRAFT";
     if (activeTab === "Overdue") return inv.status === "OVERDUE";
     if (activeTab === "Paid") return inv.status === "PAID";
     return true;
   });
-
-  const activeClientFilterObj = clientFilterParam
-    ? clients.find((c) => c.id === clientFilterParam)
-    : null;
-
-  // Compute live totals for metric cards
-  const primaryCurrency = clients[0]?.currency || "LKR";
-
-  const totalOutstandingCents = allInvoices.reduce((sum, inv) => {
-    if (inv.status !== "DRAFT") {
-      return sum + Math.max(0, inv.amountCents - inv.paidCents);
-    }
-    return sum;
-  }, 0);
-
-  const totalOverdueCents = allInvoices.reduce((sum, inv) => {
-    if (inv.status === "OVERDUE") {
-      return sum + Math.max(0, inv.amountCents - inv.paidCents);
-    }
-    return sum;
-  }, 0);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -192,7 +148,7 @@ function InvoicesContent() {
 
   const handleToggleSelect = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   };
 
@@ -201,207 +157,242 @@ function InvoicesContent() {
     filteredInvoices.every((inv) => selectedIds.includes(inv.id));
 
   // Quick Change Status
-  const handleChangeStatus = async (id: string, nextStatus: InvoiceStatus) => {
-    try {
-      await setInvoiceStatus(id, nextStatus);
-      setOpenMenuId(null);
-      showToast(`Invoice status updated to ${nextStatus}.`);
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String(err.message)
-          : "Failed to update status";
-      showToast(msg, "error");
-    }
+  const handleChangeStatus = (
+    id: string,
+    nextStatus: "OVERDUE" | "UNPAID" | "PAID" | "DRAFT"
+  ) => {
+    setInvoices((prev) =>
+      prev.map((inv) => {
+        if (inv.id === id) {
+          return {
+            ...inv,
+            status: nextStatus,
+            isOverdue: nextStatus === "OVERDUE",
+            dueSubtext:
+              nextStatus === "OVERDUE"
+                ? "Overdue"
+                : nextStatus === "UNPAID"
+                ? "Pending"
+                : undefined,
+          };
+        }
+        return inv;
+      })
+    );
+    setOpenMenuId(null);
   };
 
   // Open Edit Modal
-  const handleOpenEdit = (inv: InvoiceWithClient) => {
+  const handleOpenEdit = (inv: Invoice) => {
     setEditingInvoice(inv);
     setEditCode(inv.code);
-    setEditClientId(inv.clientId);
-    setEditTitle(inv.title || "");
-    setEditAmount(((inv.amountCents || 0) / 100).toFixed(2));
-    setEditCurrency(inv.currency);
-    setEditDueDate(inv.dueDate || "");
+    setEditClient(inv.client);
+    setEditAmount(inv.amount.replace(/[^0-9.]/g, ""));
+    setEditCurrency(inv.currency || "LKR");
+    setEditDueDate(inv.dueDate);
     setEditStatus(inv.status);
     setOpenMenuId(null);
   };
 
   // Save Edit Changes
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingInvoice) return;
 
-    setIsSubmittingEdit(true);
-    try {
-      const amountCents = parseAmountToCents(editAmount);
-      await updateInvoice(editingInvoice.id, {
-        code: editCode.trim(),
-        clientId: editClientId,
-        title: editTitle.trim() || undefined,
-        amountCents,
-        currency: editCurrency,
-        dueDate: editDueDate || null,
-        status: editStatus,
-      });
+    const formattedAmount = formatAmountWithCurrency(editAmount, editCurrency);
 
-      setEditingInvoice(null);
-      showToast("Invoice updated successfully!");
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String(err.message)
-          : "Failed to save invoice";
-      showToast(msg, "error");
-    } finally {
-      setIsSubmittingEdit(false);
-    }
+    setInvoices((prev) =>
+      prev.map((inv) => {
+        if (inv.id === editingInvoice.id) {
+          return {
+            ...inv,
+            code: editCode.trim() || inv.code,
+            client: editClient.trim() || inv.client,
+            amount: formattedAmount,
+            currency: editCurrency,
+            dueDate: editDueDate || inv.dueDate,
+            status: editStatus,
+            isOverdue: editStatus === "OVERDUE",
+            dueSubtext:
+              editStatus === "OVERDUE"
+                ? "Overdue"
+                : editStatus === "UNPAID"
+                ? "Pending"
+                : undefined,
+          };
+        }
+        return inv;
+      })
+    );
+
+    setEditingInvoice(null);
   };
 
   // Execute Delete
-  const confirmDelete = async () => {
-    if (!deletingInvoice) return;
-    try {
-      await deleteInvoice(deletingInvoice.id);
+  const confirmDelete = () => {
+    if (deletingInvoice) {
+      setInvoices((prev) => prev.filter((inv) => inv.id !== deletingInvoice.id));
       setSelectedIds((prev) => prev.filter((id) => id !== deletingInvoice.id));
-      showToast(`Invoice ${deletingInvoice.code} deleted.`);
       setDeletingInvoice(null);
       setOpenMenuId(null);
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String(err.message)
-          : "Failed to delete invoice";
-      showToast(msg, "error");
     }
   };
 
   // Add Invoice Form Submit
-  const handleAddInvoiceSubmit = async (e: React.FormEvent) => {
+  const handleAddInvoiceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClientId) {
-      showToast("Please select a client", "error");
-      return;
+
+    const formattedAmount = formatAmountWithCurrency(newAmount, newCurrency);
+
+    let formattedDate = newDueDate;
+    if (newDueDate) {
+      try {
+        const d = new Date(newDueDate);
+        formattedDate = d.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      } catch {
+        formattedDate = newDueDate;
+      }
+    } else {
+      formattedDate = newStatus === "DRAFT" ? "Not Set" : "Pending";
     }
 
-    setIsSubmittingNew(true);
-    try {
-      const amountCents = parseAmountToCents(newAmount);
-      const today = new Date().toISOString().split("T")[0];
+    const createdInvoice: Invoice = {
+      id: Date.now().toString(),
+      code: newCode.trim() || `INV-2023-0${invoices.length + 90}`,
+      client: newClient.trim() || "New Client",
+      amount: formattedAmount,
+      currency: newCurrency,
+      dueDate: formattedDate,
+      dueSubtext:
+        newStatus === "OVERDUE" ? "Overdue" : newStatus === "UNPAID" ? "Pending" : undefined,
+      isOverdue: newStatus === "OVERDUE",
+      isDraftCode: newStatus === "DRAFT" && newCode.toLowerCase() === "draft",
+      status: newStatus,
+    };
 
-      const created = await createInvoice({
-        code: newCode.trim() || undefined,
-        clientId: newClientId,
-        title: newTitle.trim() || undefined,
-        amountCents,
-        currency: newCurrency,
-        issueDate: today,
-        dueDate: newDueDate || null,
-        status: newStatus,
-      });
+    setInvoices([createdInvoice, ...invoices]);
+    setShowAddInvoiceModal(false);
 
-      setShowAddInvoiceModal(false);
-      setNewTitle("");
-      setNewAmount("");
-      setNewDueDate("");
-      setNewStatus("UNPAID");
-      showToast(`Invoice ${created.code} created!`);
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String(err.message)
-          : "Failed to create invoice";
-      showToast(msg, "error");
-    } finally {
-      setIsSubmittingNew(false);
-    }
+    setNewCode(`INV-2023-0${invoices.length + 92}`);
+    setNewClient("");
+    setNewAmount("");
+    setNewDueDate("");
+    setNewStatus("UNPAID");
   };
 
   return (
-    <div className="workspace-page motion-page">
-      {/* Toast Notification */}
-      <MotionPresence>
-        {notification && (
-          <MotionSurface
-            kind="toast"
-            className={`fixed top-14 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
-              notification.type === "error"
-                ? "bg-rose-950 border-rose-800 text-rose-100"
-                : "bg-neutral-900 border-neutral-700 text-white"
-            }`}
-          >
-            {notification.type === "error" ? (
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-            ) : (
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            )}
-            <span>{notification.message}</span>
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
+    <div className="w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
       {/* Top Header */}
-      <PageHeader
-        title="Invoices"
-        description="Manage, issue, and track your client billing operations."
-      >
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+        <div>
+          <h1 className="font-serif-heading text-4xl md:text-[46px] font-normal tracking-tight text-neutral-900 leading-tight">
+            Invoices
+          </h1>
+          <p className="text-neutral-500 text-sm md:text-[15px] mt-1.5 font-normal">
+            Manage and track your billing operations.
+          </p>
+        </div>
+
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
-          <Button variant="primary" type="button" onClick={handleOpenAddModal}>
+          <button
+            type="button"
+            onClick={() => setShowAddInvoiceModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-xl text-neutral-800 text-[13px] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-neutral-50 transition-all cursor-pointer"
+          >
             <Plus className="w-4 h-4 text-neutral-700" strokeWidth={2.2} />
-            <span>New Invoice</span>
-          </Button>
+            <span>Add New Invoice</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowLogExpenseModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-xl text-neutral-800 text-[13px] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-neutral-50 transition-all cursor-pointer"
+          >
+            <Receipt className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
+            <span>Log Expense</span>
+          </button>
         </div>
-      </PageHeader>
+      </div>
 
       {/* Metrics Cards & Filters Row */}
-      <div className="flex flex-col gap-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-          <MetricCard
-            label="Total Outstanding"
-            value={formatCents(totalOutstandingCents, primaryCurrency)}
-            footer="awaiting payment"
-          />
-          <MetricCard
-            label="Overdue"
-            value={formatCents(totalOverdueCents, primaryCurrency)}
-            tone="warning"
-            footer="past the due date"
-          />
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 mb-8">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-4 flex-1">
+          {/* Total Outstanding Card */}
+          <div className="relative overflow-hidden w-full sm:w-[260px] bg-white rounded-2xl border border-neutral-200/80 px-5 py-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+            <div
+              className="absolute -top-6 -right-6 w-32 h-32 rounded-full pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.02) 60%, transparent 75%)",
+              }}
+            />
+            <span className="block text-[11px] font-bold tracking-wider text-neutral-500 uppercase mb-2">
+              Total Outstanding
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl md:text-[28px] font-bold text-neutral-900 tracking-tight leading-none">
+                Rs. 124,500
+              </span>
+              <span className="text-[11px] font-semibold text-neutral-400 uppercase">
+                LKR
+              </span>
+            </div>
+          </div>
+
+          {/* Overdue Card */}
+          <div className="relative overflow-hidden w-full sm:w-[260px] bg-white rounded-2xl border border-neutral-200/80 px-5 py-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+            <div
+              className="absolute -top-6 -right-6 w-32 h-32 rounded-full pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.02) 60%, transparent 75%)",
+              }}
+            />
+            <span className="block text-[11px] font-bold tracking-wider text-neutral-500 uppercase mb-2">
+              Overdue
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl md:text-[28px] font-bold text-[#DC2626] tracking-tight leading-none">
+                Rs. 18,200
+              </span>
+              <span className="text-[11px] font-semibold text-neutral-400 uppercase">
+                LKR
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Filters and Active Client Chip */}
-        <div className="flex flex-wrap items-center gap-2 self-start">
-          {activeClientFilterObj && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#f3efff] border border-[#e5dcfc] text-[#7c3aed] text-xs font-semibold rounded-xl">
-              <span>Client: {activeClientFilterObj.name}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                onClick={() => router.push("/invoices")}
-
-                title="Clear filter"
-              >
-                <X className="w-3.5 h-3.5" />
-              </Button>
-            </div>
+        {/* Tab Filters */}
+        <div className="bg-[#EDEDF0]/70 p-1 rounded-2xl flex items-center gap-1 border border-neutral-200/50 self-start lg:self-center">
+          {(["All Invoices", "Drafts", "Overdue", "Paid"] as FilterTab[]).map(
+            (tab) => {
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded-xl text-xs font-medium transition-all duration-150 cursor-pointer ${
+                    isActive
+                      ? "bg-white text-neutral-900 font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.08)] border border-neutral-200/60"
+                      : "text-neutral-500 hover:text-neutral-800 hover:bg-neutral-200/40"
+                  }`}
+                >
+                  {tab}
+                </button>
+              );
+            }
           )}
-
-          <SegmentedControl
-            value={activeTab}
-            onChange={setActiveTab}
-            label="Invoice status"
-            options={(
-              ["All Invoices", "Drafts", "Overdue", "Paid"] as FilterTab[]
-            ).map((value) => ({ value, label: value }))}
-          />
         </div>
       </div>
 
       {/* Invoices Table Container */}
-      <div className="ui-card overflow-visible">
+      <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.02)] overflow-visible min-h-[360px]">
         <div className="overflow-x-auto overflow-y-visible">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -415,57 +406,49 @@ function InvoicesContent() {
                     aria-label="Select all invoices"
                   />
                 </th>
-                <th className="py-4 px-4 font-bold">Invoice / Client</th>
+                <th className="py-4 px-4 font-bold">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 uppercase font-bold tracking-wider hover:text-neutral-700 transition-colors"
+                  >
+                    <span>Invoice / Client</span>
+                    <ArrowDown className="w-3.5 h-3.5 text-neutral-500" />
+                  </button>
+                </th>
                 <th className="py-4 px-4 font-bold">Amount</th>
                 <th className="py-4 px-4 font-bold">Due Date</th>
                 <th className="py-4 px-4 font-bold">Status</th>
                 <th className="py-4 pr-6 pl-4 text-right w-12">
-                  <span className="sr-only">Actions</span>
+                  <button
+                    type="button"
+                    className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                    aria-label="More options"
+                  >
+                    <MoreHorizontal className="w-4 h-4 inline-block" />
+                  </button>
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100/80">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-0 text-center">
-                    <EmptyState
-                      title={
-                        allInvoices.length === 0
-                          ? "No invoices yet"
-                          : "No invoices found"
-                      }
-                      description={
-                        allInvoices.length === 0
-                          ? "Create your first invoice to track client billings, payments, and cashflow."
-                          : "No invoices matched the selected filter."
-                      }
-                      icon={<Receipt />}
-                    >
-                      {allInvoices.length === 0 && (
-                        <Button
-                          variant="primary"
-                          onClick={handleOpenAddModal}
-                          className="mt-4"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>New Invoice</span>
-                        </Button>
-                      )}
-                    </EmptyState>
+                  <td
+                    colSpan={6}
+                    className="py-12 text-center text-sm text-neutral-400"
+                  >
+                    No invoices found in this category.
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((inv) => {
+                filteredInvoices.map((inv, index) => {
                   const isSelected = selectedIds.includes(inv.id);
                   const isMenuOpen = openMenuId === inv.id;
-                  const isHighlighted = highlightedInvoiceId === inv.id;
+                  const isNearBottom = index >= filteredInvoices.length - 2 && filteredInvoices.length > 2;
 
                   return (
                     <tr
                       key={inv.id}
-                      className={`group hover:bg-[#FAFAFB] transition-colors relative ${
-                        isHighlighted ? "bg-purple-100/60" : ""
-                      }`}
+                      className="group hover:bg-[#FAFAFB] transition-colors relative"
                     >
                       {/* Checkbox */}
                       <td className="py-4.5 pl-6 pr-3 w-10">
@@ -481,38 +464,31 @@ function InvoicesContent() {
                       {/* Invoice Code & Client */}
                       <td className="py-4.5 px-4">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-neutral-900 leading-tight font-semibold font-mono">
+                          <span
+                            className={`text-sm text-neutral-900 leading-tight ${
+                              inv.isDraftCode
+                                ? "font-normal italic"
+                                : "font-semibold"
+                            }`}
+                          >
                             {inv.code}
                           </span>
-                          {inv.status === "OVERDUE" && (
+                          {inv.isOverdue && (
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
                             </span>
                           )}
                         </div>
-                        <div className="mt-0.5">
-                          <Button
-                            variant="ghost"
-                            type="button"
-                            onClick={() =>
-                              router.push(`/clients?client=${inv.clientId}`)
-                            }
-                          >
-                            {inv.clientName}
-                          </Button>
-                          {inv.title && (
-                            <span className="text-[11px] text-neutral-400 block truncate max-w-xs">
-                              {inv.title}
-                            </span>
-                          )}
+                        <div className="text-xs text-neutral-400 mt-1 font-normal">
+                          {inv.client}
                         </div>
                       </td>
 
                       {/* Amount */}
                       <td className="py-4.5 px-4">
                         <div className="text-sm font-semibold text-neutral-900 leading-tight">
-                          {formatCents(inv.amountCents, inv.currency)}
+                          {inv.amount}
                         </div>
                         <div className="text-[11px] font-medium text-neutral-400 mt-1 uppercase">
                           {inv.currency}
@@ -523,101 +499,178 @@ function InvoicesContent() {
                       <td className="py-4.5 px-4">
                         <div
                           className={`text-sm leading-tight ${
-                            inv.status === "OVERDUE"
+                            inv.isOverdue
                               ? "font-semibold text-[#DC2626]"
                               : inv.status === "DRAFT"
-                                ? "text-neutral-500 italic font-normal"
-                                : "text-neutral-800 font-medium"
+                              ? "text-neutral-500 italic font-normal"
+                              : "text-neutral-800 font-medium"
                           }`}
                         >
-                          {formatDateDisplay(inv.dueDate)}
+                          {inv.dueDate}
+                        </div>
+                        {inv.dueSubtext && (
+                          <div
+                            className={`text-xs mt-1 ${
+                              inv.isOverdue
+                                ? "text-red-500 font-medium"
+                                : "text-neutral-400 font-normal"
+                            }`}
+                          >
+                            {inv.dueSubtext}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status Badge */}
+                      <td className="py-4.5 px-4">
+                        <div className="flex items-center gap-3">
+                          {inv.status === "OVERDUE" && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider uppercase bg-[#FEE2E2]/70 text-[#DC2626] border border-red-200/50">
+                              OVERDUE
+                            </span>
+                          )}
+
+                          {/* UNPAID with amber / warm orange theme */}
+                          {inv.status === "UNPAID" && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider uppercase bg-amber-50 text-amber-700 border border-amber-200/80">
+                              UNPAID
+                            </span>
+                          )}
+
+                          {inv.status === "PAID" && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider uppercase bg-[#DCFCE7]/70 text-emerald-700 border border-emerald-200/60">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>PAID</span>
+                            </span>
+                          )}
+
+                          {inv.status === "DRAFT" && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider uppercase bg-white text-neutral-600 border border-neutral-300">
+                              DRAFT
+                            </span>
+                          )}
                         </div>
                       </td>
 
-                      {/* Status Dropdown/Pill */}
-                      <td className="py-4.5 px-4">
-                        <span
-                          className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            inv.status === "PAID"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : inv.status === "OVERDUE"
-                                ? "bg-rose-100 text-rose-800 font-bold"
-                                : inv.status === "DRAFT"
-                                  ? "bg-neutral-100 text-neutral-600"
-                                  : "bg-blue-100 text-blue-800"
-                          }`}
-                        >
-                          {inv.status}
-                        </span>
-                      </td>
-
-                      {/* Actions Menu */}
+                      {/* Row Actions: 3 Dots Menu */}
                       <td className="py-4.5 pr-6 pl-4 text-right relative">
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <button
                           type="button"
                           onClick={() =>
                             setOpenMenuId(isMenuOpen ? null : inv.id)
                           }
-
-                          aria-label="Actions"
+                          className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                            isMenuOpen
+                              ? "bg-neutral-100 text-neutral-900 shadow-xs"
+                              : "text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100/70"
+                          }`}
+                          aria-label={`Options for invoice ${inv.code}`}
                         >
                           <MoreHorizontal className="w-4 h-4" />
-                        </Button>
+                        </button>
 
+                        {/* Dropdown Menu */}
                         {isMenuOpen && (
-                          <div className="absolute right-6 top-10 z-40 bg-white rounded-xl shadow-xl border border-neutral-200 py-1.5 w-44 text-xs font-medium text-neutral-700 text-left">
-                            <Button
-                              variant="menu"
-                              onClick={() => handleOpenEdit(inv)}
-                              className="w-full"
-                            >
-                              <Pencil className="w-3.5 h-3.5 text-neutral-400" />
-                              <span>Edit Invoice</span>
-                            </Button>
+                          <>
+                            {/* Backdrop to close on click outside */}
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setOpenMenuId(null)}
+                            />
 
-                            <div className="my-1 border-t border-neutral-100" />
-                            <div className="px-3 py-1 text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
-                              Change Status
-                            </div>
-                            {(
-                              [
-                                "UNPAID",
-                                "PAID",
-                                "OVERDUE",
-                                "DRAFT",
-                              ] as InvoiceStatus[]
-                            ).map((s) => (
+                            <div
+                              className={`absolute right-6 w-52 bg-white rounded-2xl shadow-xl border border-neutral-200/80 py-2 z-40 text-left text-xs animate-in fade-in zoom-in-95 duration-100 ${
+                                isNearBottom ? "bottom-full mb-2" : "top-full mt-1"
+                              }`}
+                            >
+                              {/* Edit Action */}
                               <button
-                                key={s}
-                                onClick={() => handleChangeStatus(inv.id, s)}
-                                className={`w-full px-3.5 py-1.5 hover:bg-neutral-50 flex items-center justify-between cursor-pointer ${
-                                  inv.status === s
-                                    ? "font-bold text-[#7c3aed]"
-                                    : ""
-                                }`}
+                                type="button"
+                                onClick={() => handleOpenEdit(inv)}
+                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 transition-colors font-medium cursor-pointer"
                               >
-                                <span>{s}</span>
-                                {inv.status === s && (
-                                  <CheckCircle2 className="w-3 h-3 text-[#7c3aed]" />
+                                <Pencil className="w-3.5 h-3.5 text-neutral-500" />
+                                <span>Edit Invoice</span>
+                              </button>
+
+                              {/* Status Subheading */}
+                              <div className="my-1 border-t border-neutral-100" />
+                              <div className="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                                Change Status
+                              </div>
+
+                              {/* Status Options */}
+                              <button
+                                type="button"
+                                onClick={() => handleChangeStatus(inv.id, "PAID")}
+                                className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-emerald-50/60 hover:text-emerald-800 transition-colors cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                  <span>Mark as Paid</span>
+                                </div>
+                                {inv.status === "PAID" && (
+                                  <span className="text-[10px] text-emerald-600 font-semibold">Active</span>
                                 )}
                               </button>
-                            ))}
 
-                            <div className="my-1 border-t border-neutral-100" />
-                            <Button
-                              variant="danger"
-                              onClick={() => {
-                                setDeletingInvoice(inv);
-                                setOpenMenuId(null);
-                              }}
-                              className="w-full"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                              <span>Delete Invoice</span>
-                            </Button>
-                          </div>
+                              <button
+                                type="button"
+                                onClick={() => handleChangeStatus(inv.id, "UNPAID")}
+                                className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-amber-50/60 hover:text-amber-800 transition-colors cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                  <span>Mark as Unpaid</span>
+                                </div>
+                                {inv.status === "UNPAID" && (
+                                  <span className="text-[10px] text-amber-600 font-semibold">Active</span>
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleChangeStatus(inv.id, "OVERDUE")}
+                                className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-red-50/60 hover:text-red-800 transition-colors cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                                  <span>Mark as Overdue</span>
+                                </div>
+                                {inv.status === "OVERDUE" && (
+                                  <span className="text-[10px] text-red-600 font-semibold">Active</span>
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleChangeStatus(inv.id, "DRAFT")}
+                                className="w-full px-3.5 py-1.5 flex items-center justify-between text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 transition-colors cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-neutral-400" />
+                                  <span>Mark as Draft</span>
+                                </div>
+                                {inv.status === "DRAFT" && (
+                                  <span className="text-[10px] text-neutral-500 font-semibold">Active</span>
+                                )}
+                              </button>
+
+                              {/* Delete Option */}
+                              <div className="my-1 border-t border-neutral-100" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeletingInvoice(inv);
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 hover:bg-red-50/80 font-medium transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                <span>Delete Invoice</span>
+                              </button>
+                            </div>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -627,449 +680,469 @@ function InvoicesContent() {
             </tbody>
           </table>
         </div>
+
+        {/* Table Footer & Pagination */}
+        <div className="px-6 py-4 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+          <div>
+            Showing 1-{filteredInvoices.length} of 124 invoices
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="p-1 rounded-md text-neutral-400 hover:text-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage(1)}
+              className={`w-7 h-7 rounded-lg text-xs font-semibold flex items-center justify-center transition-all ${
+                currentPage === 1
+                  ? "bg-[#EDE9FE] text-[#7C3AED]"
+                  : "text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              1
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage(2)}
+              className={`w-7 h-7 rounded-lg text-xs font-medium flex items-center justify-center transition-all ${
+                currentPage === 2
+                  ? "bg-[#EDE9FE] text-[#7C3AED] font-semibold"
+                  : "text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              2
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage(3)}
+              className={`w-7 h-7 rounded-lg text-xs font-medium flex items-center justify-center transition-all ${
+                currentPage === 3
+                  ? "bg-[#EDE9FE] text-[#7C3AED] font-semibold"
+                  : "text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              3
+            </button>
+
+            <span className="text-neutral-400 px-1 text-xs">...</span>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="p-1 rounded-md text-neutral-500 hover:text-neutral-800 transition-colors"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Add Invoice Modal */}
-      <MotionPresence>
-        {showAddInvoiceModal && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface
-              onDismiss={() => setShowAddInvoiceModal(false)}
-              kind="panel"
-              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#f3efff] text-[#7c3aed] flex items-center justify-center">
-                    <Receipt className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-neutral-900">
-                      Create New Invoice
-                    </h3>
-                    <p className="text-xs text-neutral-400">
-                      Record a billable invoice against an existing client.
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowAddInvoiceModal(false)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-
-              {clients.length === 0 ? (
-                <div className="p-6 text-center space-y-4">
-                  <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-                    <Building className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-semibold text-neutral-900">
-                    No Clients Found
-                  </h4>
-                  <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                    Invoices must be associated with an existing client. Please
-                    add a client before creating an invoice.
-                  </p>
-                  <div className="pt-2">
-                    <Link
-                      href="/clients"
-                      onClick={() => setShowAddInvoiceModal(false)}
-                      className="ui-button ui-button--primary"
-                    >
-                      <span>Go to Clients</span>
-                      <span>→</span>
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <form
-                  onSubmit={handleAddInvoiceSubmit}
-                  className="p-6 space-y-4 text-xs font-medium text-neutral-700"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                        Invoice Code *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newCode}
-                        onChange={(e) => setNewCode(e.target.value)}
-                        placeholder="INV-2026-001"
-                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                        Target Client *
-                      </label>
-                      <select
-                        required
-                        value={newClientId}
-                        onChange={(e) => {
-                          const cid = e.target.value;
-                          setNewClientId(cid);
-                          const chosen = clients.find((c) => c.id === cid);
-                          if (chosen) setNewCurrency(chosen.currency);
-                        }}
-                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
-                      >
-                        <option value="">Select a client...</option>
-                        {clients.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.currency})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      Deliverable Description / Title
-                    </label>
-                    <input
-                      type="text"
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
-                      placeholder="e.g. Phase 1 Architecture & Implementation"
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                    <div className="sm:col-span-2">
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                        Amount *
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        required
-                        value={newAmount}
-                        onChange={(e) => setNewAmount(e.target.value)}
-                        placeholder="12500.00"
-                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                        Currency
-                      </label>
-                      <select
-                        value={newCurrency}
-                        onChange={(e) =>
-                          setNewCurrency(e.target.value as Currency)
-                        }
-                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
-                      >
-                        <option value="LKR">LKR (Rs.)</option>
-                        <option value="USD">USD ($)</option>
-                        <option value="EUR">EUR (€)</option>
-                        <option value="GBP">GBP (£)</option>
-                        <option value="CAD">CAD (CA$)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                        Due Date
-                      </label>
-                      <input
-                        type="date"
-                        value={newDueDate}
-                        onChange={(e) => setNewDueDate(e.target.value)}
-                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                        Status
-                      </label>
-                      <select
-                        value={newStatus}
-                        onChange={(e) =>
-                          setNewStatus(e.target.value as InvoiceStatus)
-                        }
-                        className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
-                      >
-                        <option value="UNPAID">UNPAID (Pending)</option>
-                        <option value="PAID">PAID</option>
-                        <option value="OVERDUE">OVERDUE</option>
-                        <option value="DRAFT">DRAFT</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      onClick={() => setShowAddInvoiceModal(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="primary"
-                      type="submit"
-                      disabled={isSubmittingNew}
-                    >
-                      {isSubmittingNew ? "Saving..." : "Create Invoice"}
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </MotionSurface>
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
       {/* Edit Invoice Modal */}
-      <MotionPresence>
-        {editingInvoice && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface
-              onDismiss={() => setEditingInvoice(null)}
-              kind="panel"
-              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#f3efff] text-[#7c3aed] flex items-center justify-center">
-                    <Pencil className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-neutral-900">
-                      Edit Invoice
-                    </h3>
-                    <p className="text-xs text-neutral-400">
-                      Modify details for {editingInvoice.code}.
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setEditingInvoice(null)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+      {editingInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
+            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900">
+                  Edit Invoice {editingInvoice.code}
+                </h3>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Update invoice specifications, currency, status, and client details.
+                </p>
               </div>
-
-              <form
-                onSubmit={handleEditSubmit}
-                className="p-6 space-y-4 text-xs font-medium text-neutral-700"
+              <button
+                type="button"
+                onClick={() => setEditingInvoice(null)}
+                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      Invoice Code
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={editCode}
-                      onChange={(e) => setEditCode(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 font-mono"
-                    />
-                  </div>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      Client
-                    </label>
-                    <select
-                      required
-                      value={editClientId}
-                      onChange={(e) => setEditClientId(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
-                    >
-                      {clients.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            <form onSubmit={handleEditSubmit} className="mt-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Invoice Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Deliverable Title
+                    Client Name
                   </label>
                   <input
                     type="text"
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
+                    required
+                    value={editClient}
+                    onChange={(e) => setEditClient(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Amount
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                    placeholder="12500.00"
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      Amount
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      required
-                      value={editAmount}
-                      onChange={(e) => setEditAmount(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      Currency
-                    </label>
-                    <select
-                      value={editCurrency}
-                      onChange={(e) =>
-                        setEditCurrency(e.target.value as Currency)
-                      }
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
-                    >
-                      <option value="LKR">LKR (Rs.)</option>
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                      <option value="CAD">CAD (CA$)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      Due Date
-                    </label>
-                    <input
-                      type="date"
-                      value={editDueDate}
-                      onChange={(e) => setEditDueDate(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                      Status
-                    </label>
-                    <select
-                      value={editStatus}
-                      onChange={(e) =>
-                        setEditStatus(e.target.value as InvoiceStatus)
-                      }
-                      className="ui-field w-full px-3.5 border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40 cursor-pointer"
-                    >
-                      <option value="UNPAID">UNPAID</option>
-                      <option value="OVERDUE">OVERDUE</option>
-                      <option value="PAID">PAID</option>
-                      <option value="DRAFT">DRAFT</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={() => setEditingInvoice(null)}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Currency
+                  </label>
+                  <select
+                    value={editCurrency}
+                    onChange={(e) => setEditCurrency(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
                   >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    disabled={isSubmittingEdit}
-                  >
-                    {isSubmittingEdit ? "Updating..." : "Save Changes"}
-                  </Button>
+                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                    <option value="USD">USD ($ US Dollar)</option>
+                    <option value="EUR">EUR (€ Euro)</option>
+                    <option value="GBP">GBP (£ British Pound)</option>
+                    <option value="CAD">CAD ($ Canadian Dollar)</option>
+                  </select>
                 </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
-      {/* Delete Confirmation Modal */}
-      <MotionPresence>
-        {deletingInvoice && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface
-              onDismiss={() => setDeletingInvoice(null)}
-              kind="panel"
-              className="bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-neutral-200 p-6 text-center"
-            >
-              <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3.5">
-                <Trash2 className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-semibold text-neutral-900">
-                Delete Invoice?
-              </h3>
-              <p className="text-xs text-neutral-500 mt-1">
-                Are you sure you want to delete invoice{" "}
-                <strong className="text-neutral-900">
-                  {deletingInvoice.code}
-                </strong>{" "}
-                for {deletingInvoice.clientName}? This action cannot be undone.
-              </p>
-              <div className="flex justify-center gap-3 mt-6">
-                <Button
-                  variant="ghost"
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Due Date
+                  </label>
+                  <input
+                    type="text"
+                    value={editDueDate}
+                    onChange={(e) => setEditDueDate(e.target.value)}
+                    placeholder="e.g. Oct 28, 2023"
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Status
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) =>
+                      setEditStatus(e.target.value as "UNPAID" | "OVERDUE" | "PAID" | "DRAFT")
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                  >
+                    <option value="UNPAID">UNPAID</option>
+                    <option value="OVERDUE">OVERDUE</option>
+                    <option value="PAID">PAID</option>
+                    <option value="DRAFT">DRAFT</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                <button
                   type="button"
-                  onClick={() => setDeletingInvoice(null)}
+                  onClick={() => setEditingInvoice(null)}
+                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
-                </Button>
-                <Button variant="danger" type="button" onClick={confirmDelete}>
-                  Delete
-                </Button>
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Save Changes
+                </button>
               </div>
-            </MotionSurface>
-          </MotionSurface>
-        )}
-      </MotionPresence>
-    </div>
-  );
-}
-
-export default function InvoicesPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="w-full max-w-[1280px] mx-auto px-8 py-8 animate-pulse space-y-6">
-          <div className="h-10 w-48 bg-neutral-200 rounded-xl" />
-          <div className="h-40 bg-neutral-200 rounded-2xl" />
-          <div className="h-96 bg-neutral-200 rounded-3xl" />
+            </form>
+          </div>
         </div>
-      }
-    >
-      <InvoicesContent />
-    </Suspense>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
+            <div className="flex items-center gap-3 text-red-600 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-neutral-900">
+                  Delete Invoice {deletingInvoice.code}?
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-neutral-600 mt-2">
+              Are you sure you want to permanently delete the invoice for{" "}
+              <strong className="text-neutral-900">{deletingInvoice.client}</strong> valued at{" "}
+              <strong className="text-neutral-900">{deletingInvoice.amount}</strong>?
+            </p>
+
+            <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => setDeletingInvoice(null)}
+                className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Delete Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Invoice Modal */}
+      {showAddInvoiceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
+            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900">
+                  Add New Invoice
+                </h3>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Enter the invoice details to create a new billing record.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddInvoiceModal(false)}
+                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddInvoiceSubmit} className="mt-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Invoice Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newCode}
+                    onChange={(e) => setNewCode(e.target.value)}
+                    placeholder="INV-2023-091"
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Client Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newClient}
+                    onChange={(e) => setNewClient(e.target.value)}
+                    placeholder="e.g. Acme Corporation"
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Amount
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={newAmount}
+                    onChange={(e) => setNewAmount(e.target.value)}
+                    placeholder="12500.00"
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Currency
+                  </label>
+                  <select
+                    value={newCurrency}
+                    onChange={(e) => setNewCurrency(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                  >
+                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                    <option value="USD">USD ($ US Dollar)</option>
+                    <option value="EUR">EUR (€ Euro)</option>
+                    <option value="GBP">GBP (£ British Pound)</option>
+                    <option value="CAD">CAD ($ Canadian Dollar)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                    Status
+                  </label>
+                  <select
+                    value={newStatus}
+                    onChange={(e) =>
+                      setNewStatus(e.target.value as "UNPAID" | "OVERDUE" | "PAID" | "DRAFT")
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                  >
+                    <option value="UNPAID">UNPAID (Pending)</option>
+                    <option value="OVERDUE">OVERDUE</option>
+                    <option value="PAID">PAID</option>
+                    <option value="DRAFT">DRAFT</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddInvoiceModal(false)}
+                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Create Invoice
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Log Expense Modal */}
+      {showLogExpenseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
+            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+              <h3 className="text-lg font-semibold text-neutral-900">
+                Log New Expense
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowLogExpenseModal(false)}
+                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setShowLogExpenseModal(false);
+                setExpenseTitle("");
+                setExpenseAmount("");
+              }}
+              className="mt-4 space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  Expense Description
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={expenseTitle}
+                  onChange={(e) => setExpenseTitle(e.target.value)}
+                  placeholder="e.g. AWS Cloud Hosting"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  Amount (LKR / Rs.)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={expenseAmount}
+                  onChange={(e) => setExpenseAmount(e.target.value)}
+                  placeholder="45000.00"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setShowLogExpenseModal(false)}
+                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Log Expense
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
