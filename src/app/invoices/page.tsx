@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   Plus,
-  Receipt,
   ArrowDown,
   MoreHorizontal,
   CheckCircle2,
@@ -12,7 +11,11 @@ import {
   Pencil,
   Trash2,
   X,
+  UserPlus,
+  Users,
+  Sparkles,
 } from "lucide-react";
+import { useClients } from "@/lib/data/DataProvider";
 import "./invoices.css";
 
 interface Invoice {
@@ -100,11 +103,24 @@ const initialInvoices: Invoice[] = [
 type FilterTab = "All Invoices" | "Drafts" | "Overdue" | "Paid";
 
 export default function InvoicesPage() {
-    const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
+  const { clients, createClient } = useClients();
+
+  const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Notifications / Toast
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3600);
+  };
 
   // Add Invoice Modal state
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState<boolean>(false);
@@ -114,6 +130,14 @@ export default function InvoicesPage() {
   const [newCurrency, setNewCurrency] = useState("LKR");
   const [newDueDate, setNewDueDate] = useState("");
   const [newStatus, setNewStatus] = useState<"UNPAID" | "OVERDUE" | "PAID" | "DRAFT">("UNPAID");
+
+  // Client Selection / Creation Mode
+  const [clientMode, setClientMode] = useState<"select" | "new">("select");
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientContact, setNewClientContact] = useState("");
+  const [newClientCategory, setNewClientCategory] = useState("Enterprise");
 
   // Edit Invoice Modal state
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
@@ -126,11 +150,6 @@ export default function InvoicesPage() {
 
   // Delete Confirm Modal state
   const [deletingInvoice, setDeletingInvoice] = useState<Invoice | null>(null);
-
-  // Expense Form state
-  const [showLogExpenseModal, setShowLogExpenseModal] = useState<boolean>(false);
-  const [expenseTitle, setExpenseTitle] = useState("");
-  const [expenseAmount, setExpenseAmount] = useState("");
 
   const filteredInvoices = invoices.filter((inv) => {
     if (activeTab === "Drafts") return inv.status === "DRAFT";
@@ -240,8 +259,44 @@ export default function InvoicesPage() {
   };
 
   // Add Invoice Form Submit
-  const handleAddInvoiceSubmit = (e: React.FormEvent) => {
+  const handleAddInvoiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    let finalClientName = newClient.trim();
+
+    if (clientMode === "new") {
+      if (!newClientName.trim()) {
+        alert("Please enter a client name.");
+        return;
+      }
+      const emailToUse =
+        newClientEmail.trim() ||
+        `billing@${newClientName.trim().toLowerCase().replace(/[^a-z0-9]/g, "") || "client"}.com`;
+
+      try {
+        const createdClient = await createClient({
+          name: newClientName.trim(),
+          category: newClientCategory || "Enterprise",
+          contactPerson: newClientContact.trim() || newClientName.trim(),
+          email: emailToUse,
+          currency: (newCurrency as "USD" | "LKR" | "EUR") || "LKR",
+        });
+        finalClientName = createdClient.name;
+        showToast(
+          `Invoice created and "${createdClient.name}" added to Clients page!`,
+        );
+      } catch (err: unknown) {
+        console.error("Failed to create client:", err);
+        finalClientName = newClientName.trim();
+        showToast(`Invoice created for "${finalClientName}"`);
+      }
+    } else {
+      if (!finalClientName) {
+        alert("Please select a client from the list or switch to 'Add New Client'.");
+        return;
+      }
+      showToast(`Invoice created for "${finalClientName}"!`);
+    }
 
     const formattedAmount = formatAmountWithCurrency(newAmount, newCurrency);
 
@@ -264,7 +319,7 @@ export default function InvoicesPage() {
     const createdInvoice: Invoice = {
       id: Date.now().toString(),
       code: newCode.trim() || `INV-2023-0${invoices.length + 90}`,
-      client: newClient.trim() || "New Client",
+      client: finalClientName,
       amount: formattedAmount,
       currency: newCurrency,
       dueDate: formattedDate,
@@ -280,13 +335,36 @@ export default function InvoicesPage() {
 
     setNewCode(`INV-2023-0${invoices.length + 92}`);
     setNewClient("");
+    setSelectedClientId("");
+    setNewClientName("");
+    setNewClientEmail("");
+    setNewClientContact("");
     setNewAmount("");
     setNewDueDate("");
     setNewStatus("UNPAID");
+    setClientMode("select");
   };
 
   return (
     <div className="w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
+      {/* Toast Notification */}
+      {notification && (
+        <div
+          className={`fixed top-14 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+            notification.type === "error"
+              ? "bg-rose-950 border-rose-800 text-rose-100"
+              : "bg-neutral-900 border-neutral-700 text-white"
+          }`}
+        >
+          {notification.type === "error" ? (
+            <span className="w-2 h-2 rounded-full bg-rose-400" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          )}
+          <span>{notification.message}</span>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
         <div>
@@ -307,15 +385,6 @@ export default function InvoicesPage() {
           >
             <Plus className="w-4 h-4 text-neutral-700" strokeWidth={2.2} />
             <span>Add New Invoice</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowLogExpenseModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-xl text-neutral-800 text-[13px] font-medium shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-neutral-50 transition-all cursor-pointer"
-          >
-            <Receipt className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
-            <span>Log Expense</span>
           </button>
         </div>
       </div>
@@ -942,34 +1011,153 @@ export default function InvoicesPage() {
             </div>
 
             <form onSubmit={handleAddInvoiceSubmit} className="mt-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Invoice Number
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                  Invoice Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newCode}
+                  onChange={(e) => setNewCode(e.target.value)}
+                  placeholder="INV-2023-091"
+                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                />
+              </div>
+
+              {/* Client Selection / Creation Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+                    Client
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={newCode}
-                    onChange={(e) => setNewCode(e.target.value)}
-                    placeholder="INV-2023-091"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
+                  <div className="client-selector-toggle">
+                    <button
+                      type="button"
+                      onClick={() => setClientMode("select")}
+                      className={`client-selector-btn ${clientMode === "select" ? "client-selector-btn-active" : ""}`}
+                    >
+                      <Users className="w-3.5 h-3.5 inline mr-1" />
+                      Select from Clients
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setClientMode("new")}
+                      className={`client-selector-btn ${clientMode === "new" ? "client-selector-btn-active" : ""}`}
+                    >
+                      <UserPlus className="w-3.5 h-3.5 inline mr-1" />
+                      Add New Client
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
-                    Client Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newClient}
-                    onChange={(e) => setNewClient(e.target.value)}
-                    placeholder="e.g. Acme Corporation"
-                    className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
-                </div>
+                {clientMode === "select" ? (
+                  <div>
+                    <select
+                      value={selectedClientId}
+                      onChange={(e) => {
+                        const cId = e.target.value;
+                        setSelectedClientId(cId);
+                        const found = clients.find((c) => c.id === cId);
+                        if (found) {
+                          setNewClient(found.name);
+                          if (found.currency) setNewCurrency(found.currency);
+                        } else {
+                          setNewClient("");
+                        }
+                      }}
+                      className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                    >
+                      <option value="">-- Choose a client from Client Page --</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.category ? `(${c.category})` : ""} {c.email ? `• ${c.email}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {clients.length === 0 ? (
+                      <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                        No clients in directory yet. Switch to &ldquo;Add New Client&rdquo; above.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-neutral-400 mt-1">
+                        Select an existing client registered on your Clients page.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="client-new-card space-y-3">
+                    <div className="client-sync-badge">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span>This new client will automatically update on your Clients page</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">
+                          Client / Company Name *
+                        </label>
+                        <input
+                          type="text"
+                          required={clientMode === "new"}
+                          value={newClientName}
+                          onChange={(e) => {
+                            setNewClientName(e.target.value);
+                            setNewClient(e.target.value);
+                          }}
+                          placeholder="e.g. Acme Corporation"
+                          className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          required={clientMode === "new"}
+                          value={newClientEmail}
+                          onChange={(e) => setNewClientEmail(e.target.value)}
+                          placeholder="e.g. billing@acme.com"
+                          className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">
+                          Contact Person
+                        </label>
+                        <input
+                          type="text"
+                          value={newClientContact}
+                          onChange={(e) => setNewClientContact(e.target.value)}
+                          placeholder="e.g. John Doe (Optional)"
+                          className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-500 mb-1">
+                          Category
+                        </label>
+                        <select
+                          value={newClientCategory}
+                          onChange={(e) => setNewClientCategory(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 text-sm text-neutral-900 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+                        >
+                          <option value="Enterprise">Enterprise</option>
+                          <option value="Corporate">Corporate</option>
+                          <option value="Small Business">Small Business</option>
+                          <option value="Startup">Startup</option>
+                          <option value="Retainer">Retainer</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1051,81 +1239,6 @@ export default function InvoicesPage() {
                   className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                   Create Invoice
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Log Expense Modal */}
-      {showLogExpenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-              <h3 className="text-lg font-semibold text-neutral-900">
-                Log New Expense
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowLogExpenseModal(false)}
-                className="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setShowLogExpenseModal(false);
-                setExpenseTitle("");
-                setExpenseAmount("");
-              }}
-              className="mt-4 space-y-4"
-            >
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
-                  Expense Description
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={expenseTitle}
-                  onChange={(e) => setExpenseTitle(e.target.value)}
-                  placeholder="e.g. AWS Cloud Hosting"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
-                  Amount (LKR / Rs.)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                  placeholder="45000.00"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                <button
-                  type="button"
-                  onClick={() => setShowLogExpenseModal(false)}
-                  className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  Log Expense
                 </button>
               </div>
             </form>

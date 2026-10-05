@@ -42,8 +42,87 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | null>(null);
 
+const defaultFallbackClients: ClientWithStats[] = [
+  {
+    id: "cli-globex",
+    name: "Globex Corporation",
+    category: "Enterprise",
+    contactPerson: "Hank Scorpio",
+    contactRole: "Director",
+    email: "hank@globex.com",
+    phone: "+1 (555) 234-5678",
+    currency: "LKR",
+    driveUrl: null,
+    hasQuickBill: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    totalBilledCents: 1245000,
+    totalPaidCents: 0,
+    outstandingBalanceCents: 1245000,
+    invoicesCount: 1,
+    recentInvoices: [],
+  },
+  {
+    id: "cli-initech",
+    name: "Initech LLC",
+    category: "Corporate",
+    contactPerson: "Peter Gibbons",
+    contactRole: "Lead Consultant",
+    email: "peter@initech.com",
+    phone: "+1 (555) 345-6789",
+    currency: "LKR",
+    driveUrl: null,
+    hasQuickBill: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    totalBilledCents: 420050,
+    totalPaidCents: 0,
+    outstandingBalanceCents: 420050,
+    invoicesCount: 1,
+    recentInvoices: [],
+  },
+  {
+    id: "cli-stark",
+    name: "Stark Industries",
+    category: "Enterprise",
+    contactPerson: "Tony Stark",
+    contactRole: "CEO",
+    email: "tony@starkindustries.com",
+    phone: "+1 (555) 999-0000",
+    currency: "LKR",
+    driveUrl: null,
+    hasQuickBill: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    totalBilledCents: 8500000,
+    totalPaidCents: 8500000,
+    outstandingBalanceCents: 0,
+    invoicesCount: 1,
+    recentInvoices: [],
+  },
+  {
+    id: "cli-wayne",
+    name: "Wayne Enterprises",
+    category: "Corporate",
+    contactPerson: "Bruce Wayne",
+    contactRole: "Managing Director",
+    email: "bruce@wayneenterprises.com",
+    phone: "+1 (555) 123-4567",
+    currency: "LKR",
+    driveUrl: null,
+    hasQuickBill: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    totalBilledCents: 150000,
+    totalPaidCents: 0,
+    outstandingBalanceCents: 150000,
+    invoicesCount: 1,
+    recentInvoices: [],
+  },
+];
+
 // In-memory fallback repository when running outside Electron
-let memoryClients: ClientWithStats[] = [];
+let memoryClients: ClientWithStats[] = [...defaultFallbackClients];
 let memoryInvoices: InvoiceWithClient[] = [];
 let memorySettings: AppSettings = {
   id: "default",
@@ -100,6 +179,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           if (stored) {
             try {
               memorySettings = { ...memorySettings, ...JSON.parse(stored) };
+            } catch {
+              // ignore
+            }
+          }
+          const storedClients = localStorage.getItem("billflow_memory_clients");
+          if (storedClients) {
+            try {
+              const parsed = JSON.parse(storedClients);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                memoryClients = parsed;
+              }
             } catch {
               // ignore
             }
@@ -166,6 +256,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         recentInvoices: [],
       };
       memoryClients = [newClient, ...memoryClients];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_clients", JSON.stringify(memoryClients));
+        } catch {
+          // ignore
+        }
+      }
       await refresh();
       return newClient;
     }
@@ -181,6 +278,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Cannot delete client with linked invoices.");
       }
       memoryClients = memoryClients.filter((c) => c.id !== id);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("billflow_memory_clients", JSON.stringify(memoryClients));
+        } catch {
+          // ignore
+        }
+      }
       await refresh();
     }
   };
