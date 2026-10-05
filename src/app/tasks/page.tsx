@@ -10,7 +10,7 @@ import {
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -31,6 +31,11 @@ import {
   TaskPriority,
   TaskCategory,
 } from "@/types/tasks";
+
+import { useData } from "@/lib/data/DataProvider";
+import type { TaskPatchInput } from "@/types/workflow";
+import TaskTiming from "@/components/TaskTiming";
+import Link from "next/link";
 
 // Team member profiles for assignees
 const teamMembers = [
@@ -59,9 +64,6 @@ const teamMembers = [
     textColor: "text-content-amber-700",
   },
 ];
-
-// Initial dataset starts blank
-const initialTasks: TaskItem[] = [];
 
 const columnDefinitions: {
   id: TaskStatus;
@@ -99,7 +101,10 @@ export default function TasksPage() {
   const router = useRouter();
 
   // State
-  const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
+  const { tasks, workflow, clients, vendors, settings, isElectron, isLoading, error } = useData();
+  const [saving, setSaving] = useState(false);
+  const draftId = useRef<string | null>(null);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
@@ -110,8 +115,9 @@ export default function TasksPage() {
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedTaskForDetail, setSelectedTaskForDetail] =
-    useState<TaskItem | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const selectedTaskForDetail = tasks.find(task => task.id === selectedTaskId) || null;
+  const setSelectedTaskForDetail = (task: TaskItem | null) => { setSubtaskTitle(""); setSelectedTaskId(task?.id || null); };
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Form State for New Task
@@ -122,17 +128,25 @@ export default function TasksPage() {
   const [newCategory, setNewCategory] = useState<TaskCategory>("Development");
   const [newAssigneeName, setNewAssigneeName] = useState(teamMembers[0].name);
   const [newDueDate, setNewDueDate] = useState("");
-  const [newClientName, setNewClientName] = useState("Nexus Tech");
+  const [newClientName, setNewClientName] = useState("");
   const [newIsOutsourced, setNewIsOutsourced] = useState(false);
   const [newOutsourcedVendor, setNewOutsourcedVendor] =
-    useState("DevOps Nexus");
-  const [newOutsourceBudget, setNewOutsourceBudget] = useState("1500");
+    useState("");
+  const [newOutsourceBudget, setNewOutsourceBudget] = useState("");
 
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
+  };
+
+  const saveTask = async (id: string, patch: TaskPatchInput) => {
+    if (saving) return false;
+    setSaving(true);
+    try { await workflow.tasks.update(id, patch); return true; }
+    catch (error) { showToast(error instanceof Error ? error.message : "Could not save task."); return false; }
+    finally { setSaving(false); }
   };
 
   // Filtered Tasks
@@ -205,14 +219,7 @@ export default function TasksPage() {
     const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
     if (!taskId) return;
 
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: targetStatus } : t)),
-    );
-
-    const task = tasks.find((t) => t.id === taskId);
-    showToast(
-      `Moved "${task?.title.slice(0, 28)}..." to ${targetStatus.replace("-", " ")}`,
-    );
+    void saveTask(taskId, { status: targetStatus });
     setDraggedTaskId(null);
   };
 
@@ -220,52 +227,41 @@ export default function TasksPage() {
   const handleOutsourceTask = (task: TaskItem) => {
     showToast(`Redirecting to Outsourcing for "${task.title.slice(0, 24)}..."`);
     // Passes task context in query parameters for the Outsourcing page to prepopulate voucher modal
-    router.push(
-      `/outsourcing?action=create-voucher&taskId=${task.id}&taskTitle=${encodeURIComponent(
-        task.title,
-      )}&vendor=${encodeURIComponent(task.outsourcedVendor || "DevOps Nexus")}&budget=${task.outsourceBudget || 1500}`,
-    );
+    const params = new URLSearchParams({ action: "create-voucher", taskId: task.id, taskTitle: task.title, scope: task.description, invoiceId: task.invoiceId || "", clientId: task.clientId || "", clientName: task.clientName || "", deliveryUrl: task.deliveryUrl || "", currency: task.currency || "LKR", vendor: task.outsourcedVendor || "", budget: String(task.outsourceBudget || "") });
+    router.push(`/outsourcing?${params}`);
   };
 
   // Create Task Submission
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || saving) return;
+    setSaving(true);
 
     const assignee =
       teamMembers.find((m) => m.name === newAssigneeName) || teamMembers[0];
 
-    const newTask: TaskItem = {
-      id: `task-${Date.now()}`,
+    const newTask = {
+      id: draftId.current || (draftId.current = crypto.randomUUID()),
       title: newTitle.trim(),
       description: newDescription.trim() || "No detailed description provided.",
       status: newStatus,
       priority: newPriority,
       category: newCategory,
       assignee,
-      dueDate: newDueDate || "Oct 15, 2026",
-      clientName: newClientName,
+      dueDate: newDueDate,
+      clientId: newClientName || null,
+      currency: clients.find(client => client.id === newClientName)?.currency || settings?.defaultCurrency || "LKR",
       isOutsourced: newIsOutsourced,
       outsourcedVendor: newIsOutsourced ? newOutsourcedVendor : undefined,
-      outsourceBudget: newIsOutsourced
-        ? parseFloat(newOutsourceBudget) || 1000
+      outsourceBudgetCents: newIsOutsourced
+        ? Math.round(Number(newOutsourceBudget) * 100)
         : undefined,
-      subtasks: [
-        {
-          id: `st-${Date.now()}-1`,
-          title: "Initial scope alignment",
-          completed: false,
-        },
-        {
-          id: `st-${Date.now()}-2`,
-          title: "Review deliverable checkpoint",
-          completed: false,
-        },
-      ],
-      createdAt: new Date().toISOString().split("T")[0],
+      subtasks: [],
     };
 
-    setTasks([newTask, ...tasks]);
+    try { await workflow.tasks.create(newTask); draftId.current = null; }
+    catch (error) { showToast(error instanceof Error ? error.message : "Could not create task."); return; }
+    finally { setSaving(false); }
     setIsAddModalOpen(false);
 
     // Reset Form
@@ -277,34 +273,21 @@ export default function TasksPage() {
 
   // Toggle Subtask Completion in Detail Modal
   const handleToggleSubtask = (taskId: string, subtaskId: string) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const updatedSubtasks = t.subtasks.map((st) =>
-            st.id === subtaskId ? { ...st, completed: !st.completed } : st,
-          );
-          const updated = { ...t, subtasks: updatedSubtasks };
-          if (selectedTaskForDetail?.id === taskId) {
-            setSelectedTaskForDetail(updated);
-          }
-          return updated;
-        }
-        return t;
-      }),
-    );
+    const task = tasks.find(t => t.id === taskId);
+    if (task) void saveTask(taskId, { subtasks: task.subtasks.map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st) });
   };
-
-  // Delete Task
-  const handleDeleteTask = (taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    if (selectedTaskForDetail?.id === taskId) {
-      setSelectedTaskForDetail(null);
-    }
-    showToast("Task removed");
+  const handleDeleteTask = async (taskId: string) => {
+    if (saving) return;
+    setSaving(true);
+    try { await workflow.tasks.remove(taskId); setSelectedTaskForDetail(null); showToast("Task removed"); }
+    catch (error) { showToast(error instanceof Error ? error.message : "Could not delete task."); }
+    finally { setSaving(false); }
   };
 
   return (
     <div className="workspace-page motion-page">
+      {error && <p role="alert" className="ui-card p-4 text-content-red-700">{error}</p>}
+      {!isLoading && !isElectron && <p className="ui-card p-4">Open the desktop app to save tasks and linked work.</p>}
       {/* Toast Alert */}
       <MotionPresence>
         {toastMessage && (
@@ -551,6 +534,7 @@ export default function TasksPage() {
                       setIsAddModalOpen(true);
                     }}
 
+                    disabled={!isElectron || isLoading || saving}
                     title={`Add task to ${col.title}`}
                   >
                     <Plus className="w-4 h-4" />
@@ -564,6 +548,7 @@ export default function TasksPage() {
                       <Button
                         variant="ghost"
                         size="small"
+                        disabled={!isElectron || isLoading || saving}
                         onClick={() => {
                           setNewStatus(col.id);
                           setIsAddModalOpen(true);
@@ -583,7 +568,7 @@ export default function TasksPage() {
                       return (
                         <div
                           key={task.id}
-                          draggable
+                          draggable={!saving}
                           onDragStart={(e) => handleDragStart(e, task.id)}
                           onClick={() => setSelectedTaskForDetail(task)}
                           className={`motion-card group relative bg-surface rounded-xl p-4 border border-line-neutral-200/80 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.06),0px_1px_0px_0px_rgba(25,28,33,0.02)] hover:border-line-neutral-300 hover:shadow-[0px_4px_8px_-2px_rgba(0,0,0,0.08)] transition-all cursor-grab active:cursor-grabbing ${
@@ -996,12 +981,8 @@ export default function TasksPage() {
                       onChange={(e) => setNewClientName(e.target.value)}
                       className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
                     >
-                      <option value="Nexus Tech">Nexus Tech</option>
-                      <option value="Apex Architecture">
-                        Apex Architecture
-                      </option>
-                      <option value="Vanguard Media">Vanguard Media</option>
-                      <option value="Internal">Internal</option>
+                      <option value="">No client / Internal</option>
+                      {clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}
                     </select>
                   </div>
 
@@ -1010,7 +991,7 @@ export default function TasksPage() {
                       Due Date
                     </label>
                     <input
-                      type="text"
+                      type="date"
                       value={newDueDate}
                       onChange={(e) => setNewDueDate(e.target.value)}
                       placeholder="e.g. Oct 12, 2026"
@@ -1047,21 +1028,14 @@ export default function TasksPage() {
                           }
                           className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
                         >
-                          <option value="Studio ArchiType">
-                            Studio ArchiType (UI/UX)
-                          </option>
-                          <option value="DevOps Nexus">
-                            DevOps Nexus (Infra)
-                          </option>
-                          <option value="ClearCopy Legal">
-                            ClearCopy Legal (Contracts)
-                          </option>
+                          <option value="">Select a vendor</option>
+                          {vendors.map(vendor => <option key={vendor.id} value={vendor.name}>{vendor.name}</option>)}
                         </select>
                       </div>
 
                       <div>
                         <label className="block text-xs font-medium text-content-neutral-700 mb-1">
-                          Estimated Budget ($ USD)
+                          Estimated Budget ({clients.find(client => client.id === newClientName)?.currency || settings?.defaultCurrency || "LKR"})
                         </label>
                         <input
                           type="number"
@@ -1069,7 +1043,7 @@ export default function TasksPage() {
                           onChange={(e) =>
                             setNewOutsourceBudget(e.target.value)
                           }
-                          placeholder="1500"
+                          placeholder="0"
                           className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
                         />
                       </div>
@@ -1086,7 +1060,7 @@ export default function TasksPage() {
                   >
                     Cancel
                   </Button>
-                  <Button variant="primary" type="submit">
+                  <Button variant="primary" type="submit" disabled={saving}>
                     Create Deliverable
                   </Button>
                 </div>
@@ -1154,9 +1128,14 @@ export default function TasksPage() {
                   <h4 className="text-xs font-semibold text-content-neutral-400 uppercase tracking-wider mb-2">
                     Description
                   </h4>
-                  <p className="text-sm text-content-neutral-700 leading-relaxed bg-surface-light p-3.5 rounded-xl border border-line-neutral-200/60">
-                    {selectedTaskForDetail.description}
-                  </p>
+                  <label className="block text-sm">Title<input key={`${selectedTaskForDetail.id}-title`} aria-label="Task title" className="ui-field w-full" defaultValue={selectedTaskForDetail.title} disabled={saving} onBlur={e => { if (e.target.value.trim() && e.target.value !== selectedTaskForDetail.title) void saveTask(selectedTaskForDetail.id, { title: e.target.value }); }} /></label>
+                  <textarea key={`${selectedTaskForDetail.id}-description`} aria-label="Task description" className="ui-field ui-textarea w-full mt-3" defaultValue={selectedTaskForDetail.description} disabled={saving} onBlur={e => { if (e.target.value !== selectedTaskForDetail.description) void saveTask(selectedTaskForDetail.id, { description: e.target.value }); }} />
+                  <div className="flex gap-4 mt-3 text-sm">
+                    {selectedTaskForDetail.invoiceId && <Link href={`/invoices?invoice=${encodeURIComponent(selectedTaskForDetail.invoiceId)}`}>Open {selectedTaskForDetail.invoiceCode || "invoice"}</Link>}
+                    {selectedTaskForDetail.clientId && <Link href={`/clients?client=${encodeURIComponent(selectedTaskForDetail.clientId)}`}>Open client</Link>}
+                    {selectedTaskForDetail.deliveryUrl && <a href={selectedTaskForDetail.deliveryUrl} target="_blank" rel="noreferrer">Open delivery link</a>}
+                  </div>
+                  <TaskTiming task={selectedTaskForDetail} />
                 </div>
 
                 {/* Subtasks Checklist */}
@@ -1192,12 +1171,18 @@ export default function TasksPage() {
                           type="checkbox"
                           checked={st.completed}
                           onChange={() => {}}
+                          disabled={saving}
                           className="w-4 h-4 rounded text-content-emerald-600 focus:ring-line-emerald-500"
                         />
-                        <span className="text-sm font-normal">{st.title}</span>
+                        <span className="text-sm font-normal flex-1">{st.title}</span>
+                        <Button size="icon" disabled={saving} aria-label={`Delete subtask ${st.title}`} onClick={e => { e.stopPropagation(); void saveTask(selectedTaskForDetail.id, { subtasks: selectedTaskForDetail.subtasks.filter(item => item.id !== st.id) }); }}><Trash2 className="w-4 h-4" /></Button>
                       </div>
                     ))}
                   </div>
+                  <form className="flex gap-2 mt-3" onSubmit={e => { e.preventDefault(); if (subtaskTitle.trim()) { void saveTask(selectedTaskForDetail.id, { subtasks: [...selectedTaskForDetail.subtasks, { id: crypto.randomUUID(), title: subtaskTitle.trim(), completed: false }] }).then(saved => { if (saved) setSubtaskTitle(""); }); } }}>
+                    <input aria-label="New subtask" className="ui-field flex-1" value={subtaskTitle} onChange={e => setSubtaskTitle(e.target.value)} placeholder="Add a subtask" />
+                    <Button type="submit" disabled={saving || !subtaskTitle.trim()}>Add</Button>
+                  </form>
                 </div>
 
                 {/* Subcontractor Outsourcing Box */}
@@ -1214,7 +1199,7 @@ export default function TasksPage() {
                       </h5>
                       <p className="text-xs text-content-neutral-600 mt-0.5">
                         {selectedTaskForDetail.isOutsourced
-                          ? `Budget allocated: $${selectedTaskForDetail.outsourceBudget?.toLocaleString() || "1,500"}. Open Outsourcing view to generate payout voucher.`
+                          ? `Budget: ${selectedTaskForDetail.currency || "LKR"} ${selectedTaskForDetail.outsourceBudget?.toLocaleString() || "Not set"}. Open Outsourcing to agree the contractor fee.`
                           : "Delegate this task to an external specialist or engineering agency."}
                       </p>
                     </div>
@@ -1239,20 +1224,8 @@ export default function TasksPage() {
                     <span className="text-content-neutral-400 block mb-1">Status</span>
                     <select
                       value={selectedTaskForDetail.status}
-                      onChange={(e) => {
-                        const newStat = e.target.value as TaskStatus;
-                        setTasks((prev) =>
-                          prev.map((t) =>
-                            t.id === selectedTaskForDetail.id
-                              ? { ...t, status: newStat }
-                              : t,
-                          ),
-                        );
-                        setSelectedTaskForDetail({
-                          ...selectedTaskForDetail,
-                          status: newStat,
-                        });
-                      }}
+                      disabled={saving}
+                      onChange={(e) => void saveTask(selectedTaskForDetail.id, { status: e.target.value as TaskStatus })}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     >
                       <option value="todo">To Do</option>
@@ -1293,6 +1266,7 @@ export default function TasksPage() {
               <div className="px-6 py-4 bg-surface-neutral-50 border-t border-line-neutral-100 flex items-center justify-between">
                 <Button
                   variant="danger"
+                  disabled={saving}
                   onClick={() => handleDeleteTask(selectedTaskForDetail.id)}
                 >
                   <Trash2 className="w-3.5 h-3.5" />

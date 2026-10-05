@@ -160,3 +160,18 @@ Acceptance means records and links survive an app restart, not just that a toast
 ## Brand identity
 
 Use Lahiru's BillFlow V1 logo exports as the current brand identity. Original assets and usage notes are in `assets/brand/`; generated assets are in `public/brand/` and `build/`. Use the colored mark on light surfaces, the white mark on dark surfaces, and the app-shaped icon for desktop/browser icons. Preserve the supplied artwork and use `npm run brand:generate` to regenerate the required sizes and formats.
+
+## Desktop persistence and current implementation gaps
+
+All workflow business records must survive page navigation and an app restart through the **existing SQLite database**. Do not assume a page is persistent because it has a creation dialog or success toast.
+
+- Use the existing flow: page → `src/lib/data/DataProvider.tsx` → `window.billflow` in `electron/preload.ts` → validated Electron IPC → Drizzle/`better-sqlite3` in `electron/db/`. Keep database and filesystem access in the main process.
+- The desktop database is `billflow.db` under Electron's `app.getPath("userData")`. Extend `electron/db/schema.ts` and add versioned migrations under `drizzle/`; update validation, shared types, preload/API types, IPC registration and DataProvider together. Do not create a second disconnected database.
+- Store money as integer minor units with an explicit currency. Use stable IDs and foreign keys for invoice/items/payments/tasks/vendors/work orders/expenses. Related writes must be transactional; repeated submissions and automatic task creation must be idempotent at the database level.
+- Persist attachment metadata in SQLite and copy receipt files into an app-managed userData directory. A filename, boolean, original external file path, or temporary preview is insufficient. Files must reopen after restart and travel with complete backups/restores.
+- Record individual payments rather than using a status toggle to invent the amount received. Compute paid totals, advance eligibility and remaining balances consistently. Invoice edits must preserve actual recorded payments and issued client/item/business details.
+- Keep component state for transient UI. Browser preview storage is not desktop SQLite persistence and must not be used as evidence that the desktop demo is complete. Appearance's existing local preference file and widget UI preferences can stay separate from business records.
+
+**Audited baseline, October 6, 2026:** fetched `main` at `54f7649` has SQLite-backed Clients, basic Invoices, Settings and Vendors. Tasks, Catalog and Expenses currently use page-local state. Invoice items, individual payments, receipts, advance-paid/task-generation behavior and automatic invoice PDF export are not implemented. Outsourcing prefill is navigation context, not a persisted task/invoice relationship. Backup currently omits Vendors; financial views still contain sample/estimated values. These are dated findings, not permanent limitations: recheck the implementation before making changes or reporting readiness.
+
+Read [the workflow readiness audit](WORKFLOW_AUDIT.md) for page-specific gaps, evidence, data-model requirements, implementation order and restart acceptance checks. For October 10, first complete itemized invoice/PDF → recorded advance/receipt → persistent linked tasks → delivery → final payment; then complete the linked outsourcing branch and truthful expense/profit views. Keep the demo's financial result consistent with actual stored records throughout.

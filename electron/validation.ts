@@ -1,3 +1,4 @@
+import path from "path";
 import { z } from "zod";
 
 export const newClientSchema = z.object({
@@ -68,6 +69,7 @@ export const updateSettingsSchema = z.object({
   defaultNotes: z.string().trim().max(1000).nullable().optional(),
   dateFormat: z.enum(["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"]).optional(),
   currencyDisplay: z.enum(["symbol", "code"]).optional(),
+  pdfExportDirectory: z.string().max(4096).refine(value => path.isAbsolute(value), "Choose an absolute export folder").nullable().optional(),
 });
 
 export const newVendorSchema = z.object({

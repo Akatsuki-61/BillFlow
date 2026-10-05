@@ -4,6 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { getDb } from "../db";
 import { clients, invoices, settings } from "../db/schema";
 import { newInvoiceSchema, invoicePatchSchema } from "../validation";
+import { getOrCreateSettings } from "./settings";
 import { AppError, formatError } from "./errors";
 import {
   InvoiceWithClient,
@@ -76,8 +77,8 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
     ...r.invoice,
     currency: r.invoice.currency as Currency,
     status: r.invoice.status as InvoiceStatus,
-    clientName: r.clientName || "Unknown Client",
-    clientEmail: r.clientEmail || undefined,
+    clientName: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).name : r.clientName || "Unknown Client",
+    clientEmail: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).email : r.clientEmail || undefined,
   }));
 }
 
@@ -116,6 +117,9 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
 
       const today = new Date().toISOString().split("T")[0];
       const issueDate = validated.issueDate || today;
+      const profile = getOrCreateSettings();
+      const defaultDue = new Date(`${issueDate}T00:00:00Z`);
+      defaultDue.setUTCDate(defaultDue.getUTCDate() + profile.defaultDueDays);
       const paidCents = validated.status === "PAID" ? validated.amountCents : 0;
 
       db.insert(invoices)
@@ -124,10 +128,14 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
           code,
           clientId: validated.clientId,
           title: validated.title || null,
+          clientSnapshot: JSON.stringify({ name: client.name, email: client.email, contactPerson: client.contactPerson, phone: client.phone, driveUrl: client.driveUrl }),
+          businessSnapshot: JSON.stringify(profile),
+          deliveryUrl: client.driveUrl,
+          notes: profile.defaultNotes,
           amountCents: validated.amountCents,
           currency: validated.currency,
           issueDate,
-          dueDate: validated.dueDate || null,
+          dueDate: validated.dueDate === undefined ? defaultDue.toISOString().slice(0, 10) : validated.dueDate,
           status: validated.status,
           paidCents,
         })

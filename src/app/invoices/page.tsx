@@ -23,7 +23,7 @@ import {
   Building,
   AlertCircle,
 } from "lucide-react";
-import { useInvoices, useClients } from "@/lib/data/DataProvider";
+import { useInvoices, useClients, useSettings } from "@/lib/data/DataProvider";
 import {
   formatCents,
   formatDateDisplay,
@@ -51,6 +51,7 @@ function InvoicesContent() {
   } = useInvoices();
 
   const { clients } = useClients();
+  const { settings } = useSettings();
 
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -133,6 +134,9 @@ function InvoicesContent() {
 
   // When opening Add Invoice modal, prefill the next code
   const handleOpenAddModal = async () => {
+    setNewCurrency(settings?.defaultCurrency || "LKR");
+    const due = new Date(); due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
+    setNewDueDate(due.toISOString().slice(0, 10));
     try {
       const code = await getNextInvoiceCode();
       setNewCode(code);
@@ -221,7 +225,7 @@ function InvoicesContent() {
   const handleOpenEdit = (inv: InvoiceWithClient) => {
     setEditingInvoice(inv);
     setEditCode(inv.code);
-    setEditClientId(inv.clientId);
+    setEditClientId(inv.clientId || "");
     setEditTitle(inv.title || "");
     setEditAmount(((inv.amountCents || 0) / 100).toFixed(2));
     setEditCurrency(inv.currency);

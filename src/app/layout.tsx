@@ -6,6 +6,7 @@ import {
   Inter,
   Newsreader,
 } from "next/font/google";
+import AdvanceTrackingPrompt from "@/components/AdvanceTrackingPrompt";
 import Sidebar from "@/components/Sidebar";
 import TitleBar from "@/components/TitleBar";
 import { NavProvider } from "@/context/NavContext";
@@ -68,6 +69,7 @@ export default function RootLayout({
         <ThemeProvider>
           <NavProvider>
             <DataProvider>
+              <AdvanceTrackingPrompt />
               <WidgetProvider>
                 <TitleBar />
                 <div className="flex flex-1 min-h-0 overflow-hidden">

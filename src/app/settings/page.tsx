@@ -26,14 +26,19 @@ import {
   Mail,
   Phone,
 } from "lucide-react";
-import { useSettings } from "@/lib/data/DataProvider";
+import { useSettings, useData } from "@/lib/data/DataProvider";
 import type { UpdateSettingsInput, ExportDataPayload } from "@/types/settings";
 import { useTheme } from "@/context/ThemeContext";
+import { useSearchParams } from "next/navigation";
 import type { Currency } from "@/types/billing";
 
 type SettingsTab = "profile" | "invoices" | "data" | "appearance";
 
 function SettingsContent() {
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const initialTab: SettingsTab = ["profile", "invoices", "data", "appearance"].includes(requestedTab || "") ? requestedTab as SettingsTab : "profile";
+  const { workflow, isElectron, error: dataError } = useData();
   const { preference, setPreference, ready } = useTheme();
   const {
     settings,
@@ -46,7 +51,9 @@ function SettingsContent() {
     resetData,
   } = useSettings();
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  const [previousRequestedTab, setPreviousRequestedTab] = useState(requestedTab);
+  if (previousRequestedTab !== requestedTab) { setPreviousRequestedTab(requestedTab); setActiveTab(initialTab); }
   const [dbPath, setDbPath] = useState<string>("");
   const [copiedPath, setCopiedPath] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -73,6 +80,7 @@ function SettingsContent() {
     defaultNotes: "",
     dateFormat: "YYYY-MM-DD",
     currencyDisplay: "symbol",
+    pdfExportDirectory: null,
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -112,6 +120,7 @@ function SettingsContent() {
         defaultNotes: settings.defaultNotes || "",
         dateFormat: settings.dateFormat || "YYYY-MM-DD",
         currencyDisplay: settings.currencyDisplay || "symbol",
+        pdfExportDirectory: settings.pdfExportDirectory || null,
       });
     }
   }
@@ -143,7 +152,8 @@ function SettingsContent() {
       formState.defaultTaxRate !== settings.defaultTaxRate ||
       (formState.defaultNotes ?? "") !== (settings.defaultNotes ?? "") ||
       formState.dateFormat !== settings.dateFormat ||
-      formState.currencyDisplay !== settings.currencyDisplay
+      formState.currencyDisplay !== settings.currencyDisplay ||
+      (formState.pdfExportDirectory || null) !== (settings.pdfExportDirectory || null)
     );
   }, [formState, settings]);
 
@@ -208,7 +218,7 @@ function SettingsContent() {
   const handleExportJson = async () => {
     try {
       const payload = await exportData();
-      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(payload, null, 2))}`;
+      const jsonString = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: "application/json" }));
       const downloadAnchor = document.createElement("a");
       const dateTag = new Date().toISOString().split("T")[0];
       downloadAnchor.setAttribute("href", jsonString);
@@ -219,6 +229,7 @@ function SettingsContent() {
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
+      setTimeout(() => URL.revokeObjectURL(jsonString), 1000);
       showToast("Backup saved to your computer.", "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to export data.";
@@ -230,6 +241,8 @@ function SettingsContent() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setParsedImport(null);
+    if (file.size > 150 * 1024 * 1024) { setImportError("Backup must be smaller than 150 MB."); return; }
     setImportFile(file);
     setImportError(null);
 
@@ -240,6 +253,7 @@ function SettingsContent() {
         if (!parsed || typeof parsed !== "object") {
           throw new Error("Invalid backup file format.");
         }
+        if (parsed.version !== "2" || !parsed.records || !Array.isArray(parsed.files)) throw new Error("Choose a complete version 2 workflow backup.");
         if (!Array.isArray(parsed.clients) || !Array.isArray(parsed.invoices)) {
           throw new Error("Backup file does not contain clients or invoices.");
         }
@@ -280,7 +294,7 @@ function SettingsContent() {
     setIsResetting(true);
     try {
       await resetData();
-      showToast("All data cleared. Starting fresh.", "success");
+      showToast("Business records and managed receipts cleared. Profile and appearance kept.", "success");
       setIsResetModalOpen(false);
       setResetConfirmation("");
     } catch (err: unknown) {
@@ -312,6 +326,7 @@ function SettingsContent() {
 
   return (
     <div className="workspace-page motion-page max-w-none">
+      {dataError && <p role="alert" className="ui-card p-4 text-content-red-700">{dataError}</p>}
       {/* Toast Notification */}
       <MotionPresence>
         {notification && (
@@ -685,6 +700,18 @@ function SettingsContent() {
             {/* TAB 2: INVOICES */}
             {activeTab === "invoices" && (
               <div className="space-y-6">
+                <div className="ui-card p-6 space-y-3">
+                  <h2 className="text-sm font-semibold">Invoice PDF folder</h2>
+                  <p className="text-sm text-content-neutral-600">{formState.pdfExportDirectory || "Downloads (default)"}</p>
+                  <div className="flex gap-3">
+                    <Button disabled={!isElectron || isSaving} onClick={async () => {
+                      try { const folder = await workflow.files.selectPdfDirectory(); if (folder) setFormState(previous => ({ ...previous, pdfExportDirectory: folder })); }
+                      catch (error) { showToast(error instanceof Error ? error.message : "Could not select folder", "error"); }
+                    }}><FolderOpen className="w-4 h-4" />Choose folder</Button>
+                    <Button disabled={isSaving || !formState.pdfExportDirectory} onClick={() => setFormState(previous => ({ ...previous, pdfExportDirectory: null }))}>Use Downloads</Button>
+                  </div>
+                  <p className="text-xs text-content-neutral-500">Save changes to apply this folder to invoice exports.</p>
+                </div>
                 {/* Currency & Payment Due */}
                 <div className="ui-card p-6 space-y-4">
                   <div>
@@ -949,8 +976,8 @@ function SettingsContent() {
                           Download Backup File
                         </div>
                         <p className="text-xs text-content-neutral-500 mt-1 leading-relaxed">
-                          Saves all your clients, invoices, and profile settings
-                          into a single backup file.
+                          Saves all workflow records, profile settings and receipt
+                          files into one complete backup.
                         </p>
                       </div>
                       <Button
@@ -971,8 +998,8 @@ function SettingsContent() {
                           Restore from Backup
                         </div>
                         <p className="text-xs text-content-neutral-500 mt-1 leading-relaxed">
-                          Upload a previously saved backup file to restore your
-                          clients and invoices.
+                          Replace business records and profile settings with a
+                          complete backup, including managed receipts.
                         </p>
                       </div>
                       <Button
@@ -1004,8 +1031,8 @@ function SettingsContent() {
                         Start Over (Clear Data)
                       </h2>
                       <p className="text-xs text-content-rose-700 mt-0.5 leading-relaxed">
-                        Need a blank slate? This deletes all clients and
-                        invoices created so far.
+                        Need a blank slate? This deletes all
+                        business records and managed receipts. Profile and appearance settings are kept.
                       </p>
                     </div>
                   </div>
@@ -1067,6 +1094,7 @@ function SettingsContent() {
                               dateFormat: settings.dateFormat || "YYYY-MM-DD",
                               currencyDisplay:
                                 settings.currencyDisplay || "symbol",
+                              pdfExportDirectory: settings.pdfExportDirectory || null,
                             });
                             setFormErrors({});
                           }
@@ -1106,8 +1134,8 @@ function SettingsContent() {
                   Restore Data from Backup
                 </h3>
                 <p className="text-xs text-content-neutral-500 mt-1">
-                  Select a backup file from your computer to restore your
-                  clients and invoices.
+                  Select a complete backup. Restoring replaces all business records
+                  and profile settings with the backup contents.
                 </p>
               </div>
 
@@ -1192,7 +1220,7 @@ function SettingsContent() {
                     Clear all records?
                   </h3>
                   <p className="text-xs text-content-rose-700 mt-1 leading-relaxed">
-                    This will delete all clients and invoices. This cannot be
+                    This will delete all business records and managed receipts. Profile and appearance settings are kept. This cannot be
                     undone.
                   </p>
                 </div>
@@ -1231,7 +1259,7 @@ function SettingsContent() {
                   }
                   onClick={handleConfirmReset}
                 >
-                  {isResetting ? "Clearing..." : "Yes, Clear Everything"}
+                  {isResetting ? "Clearing..." : "Clear Business Data"}
                 </Button>
               </div>
             </MotionSurface>

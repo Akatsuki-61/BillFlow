@@ -2,7 +2,7 @@
 
 import { readBrowserPreferences } from "./browserStorage";
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import type {
   ClientWithStats,
   NewClientInput,
@@ -29,7 +29,14 @@ import type {
   AnalyticsMonthlyTrend,
 } from "@/types/analytics";
 
+import type { TaskItem } from "@/types/tasks";
+import type { WorkflowAPI, TrackingOffer } from "@/types/workflow";
+
 interface DataContextType {
+  tasks: TaskItem[];
+  trackingOffers: TrackingOffer[];
+  workflow: WorkflowAPI;
+
   clients: ClientWithStats[];
   invoices: InvoiceWithClient[];
   vendors: VendorItem[];
@@ -110,6 +117,9 @@ async function loadBrowserSnapshot() {
 }
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
+  const snapshotRequest = useRef(0);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [trackingOffers, setTrackingOffers] = useState<TrackingOffer[]>([]);
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [invoices, setInvoices] = useState<InvoiceWithClient[]>([]);
   const [vendors, setVendors] = useState<VendorItem[]>([]);
@@ -125,20 +135,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const loadSnapshot = useCallback(async () => {
     if (checkIsElectron() && window.billflow) {
-      const [clients, invoices, dashboard, settings, vendors] = await Promise.all([
+      const [clients, invoices, dashboard, settings, vendors, tasks, trackingOffers] = await Promise.all([
         window.billflow.clients.list(),
         window.billflow.invoices.list(),
         window.billflow.dashboard.summary(),
         window.billflow.settings.get(),
         window.billflow.vendors.list(),
+        window.billflow.tasks.list(),
+        window.billflow.tracking.pending(),
       ]);
-      return { clients, invoices, dashboard, settings, vendors, isElectron: true };
+      return { clients, invoices, dashboard, settings, vendors, tasks, trackingOffers, isElectron: true };
     }
-    return { ...await loadBrowserSnapshot(), isElectron: false };
+    return { ...await loadBrowserSnapshot(), tasks: [] as TaskItem[], trackingOffers: [] as TrackingOffer[], isElectron: false };
   }, [checkIsElectron]);
 
-  const refresh = useCallback(() => loadSnapshot().then((snapshot) => {
+  const refresh = useCallback(() => {
+    const request = ++snapshotRequest.current;
+    return loadSnapshot().then((snapshot) => {
+    if (request !== snapshotRequest.current) return;
     setIsElectron(snapshot.isElectron);
+    setTasks(snapshot.tasks);
+    setTrackingOffers(snapshot.trackingOffers);
     setClients(snapshot.clients);
     setInvoices(snapshot.invoices);
     setVendors(snapshot.vendors);
@@ -146,10 +163,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setDashboard(snapshot.dashboard);
     setError(null);
   }).catch((err: unknown) => {
+    if (request !== snapshotRequest.current) return;
     console.error("Failed to load billflow data:", err);
     const message = err instanceof Error ? err.message : "Failed to load data";
     setError(message);
-  }).finally(() => setIsLoading(false)), [loadSnapshot]);
+  }).finally(() => { if (request === snapshotRequest.current) setIsLoading(false); });
+  }, [loadSnapshot]);
 
   useEffect(() => {
     refresh();
@@ -574,6 +593,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [checkIsElectron]);
 
+  const requireDesktop = () => {
+    if (!checkIsElectron() || !window.billflow) throw new Error("Open the BillFlow desktop app to save workflow records.");
+    return window.billflow;
+  };
+  const workflow: WorkflowAPI = {
+    tasks: {
+      list: async () => requireDesktop().tasks.list(),
+      create: async input => { const result = await requireDesktop().tasks.create(input); await refresh(); return result; },
+      update: async (id, patch) => { const result = await requireDesktop().tasks.update(id, patch); await refresh(); return result; },
+      remove: async id => { await requireDesktop().tasks.remove(id); await refresh(); },
+      history: async id => requireDesktop().tasks.history(id),
+    },
+    tracking: {
+      pending: async () => requireDesktop().tracking.pending(),
+      decide: async (id, choice) => { const result = await requireDesktop().tracking.decide(id, choice); await refresh(); return result; },
+    },
+    attachments: {
+      list: async owner => requireDesktop().attachments.list(owner),
+      select: async (owner, requestId) => { const result = await requireDesktop().attachments.select(owner, requestId); await refresh(); return result; },
+      open: async id => requireDesktop().attachments.open(id),
+    },
+    files: {
+      selectPdfDirectory: async () => requireDesktop().files.selectPdfDirectory(),
+      openInvoicePdf: async (id, reveal) => requireDesktop().files.openInvoicePdf(id, reveal),
+    },
+  };
+
   const activeCurrency: Currency = useMemo(() => {
     return getActiveInvoiceCurrency(
       invoices,
@@ -584,6 +630,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   return (
     <DataContext.Provider
       value={{
+        tasks,
+        trackingOffers,
+        workflow,
         clients,
         invoices,
         vendors,

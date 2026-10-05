@@ -45,13 +45,23 @@ export interface NewClientInput {
   driveUrl?: string;
 }
 
-export type InvoiceStatus = "DRAFT" | "UNPAID" | "PAID" | "OVERDUE";
+export type InvoiceStatus = "DRAFT" | "UNPAID" | "ADVANCE_PAID" | "PAID" | "OVERDUE";
 
 export interface Invoice {
   id: string;
   code: string;
-  clientId: string;
+  clientId: string | null;
   title?: string | null;
+  clientSnapshot?: string | null;
+  businessSnapshot?: string | null;
+  deliveryUrl?: string | null;
+  notes?: string | null;
+  discountCents?: number;
+  taxCents?: number;
+  advanceCents?: number;
+  trackingEligibleAt?: string | null;
+  trackingChoice?: "yes" | "no" | null;
+  trackingDecidedAt?: string | null;
   amountCents: number;
   currency: Currency;
   issueDate: string;

@@ -12,11 +12,7 @@ export class AppError extends Error {
 
 export function formatError(err: unknown) {
   if (err instanceof AppError) {
-    return {
-      code: err.code,
-      message: err.message,
-      fieldErrors: err.fieldErrors,
-    };
+    return err;
   }
   if (err && typeof err === "object" && "issues" in err) {
     // Zod error
@@ -26,14 +22,9 @@ export function formatError(err: unknown) {
       const field = issue.path.join(".");
       if (field) fieldErrors[field] = issue.message;
     }
-    return {
-      code: "VALIDATION_ERROR",
-      message: issues[0]?.message || "Validation failed",
-      fieldErrors,
-    };
+    return new AppError("VALIDATION_ERROR", issues[0]?.message || "Validation failed", fieldErrors);
   }
-  return {
-    code: "INTERNAL_ERROR",
-    message: err instanceof Error ? err.message : String(err),
-  };
+  // Electron serializes an Error's message across invoke(); thrown plain objects
+  // otherwise lose the actionable validation/storage message in the renderer.
+  return new AppError("INTERNAL_ERROR", err instanceof Error ? err.message : String(err));
 }

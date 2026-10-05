@@ -22,6 +22,8 @@ import type { AnalyticsSummaryPayload } from "../src/types/analytics";
 
 import type { ThemePreference } from "../src/lib/theme";
 
+import type { TaskCreateInput, TaskPatchInput, AttachmentOwner } from "../src/types/workflow";
+
 contextBridge.exposeInMainWorld("billflow", {
   isElectron: true,
   platform: process.platform,
@@ -79,6 +81,26 @@ contextBridge.exposeInMainWorld("billflow", {
     import: (payload: ExportDataPayload): Promise<{ success: boolean; importedClients: number; importedInvoices: number }> =>
       ipcRenderer.invoke("settings:import", payload),
     reset: (): Promise<{ success: boolean }> => ipcRenderer.invoke("settings:reset"),
+  },
+  tasks: {
+    list: () => ipcRenderer.invoke("tasks:list"),
+    create: (input: TaskCreateInput) => ipcRenderer.invoke("tasks:create", input),
+    update: (id: string, patch: TaskPatchInput) => ipcRenderer.invoke("tasks:update", id, patch),
+    remove: (id: string) => ipcRenderer.invoke("tasks:remove", id),
+    history: (id: string) => ipcRenderer.invoke("tasks:history", id),
+  },
+  tracking: {
+    pending: () => ipcRenderer.invoke("tracking:pending"),
+    decide: (invoiceId: string, choice: "yes" | "no") => ipcRenderer.invoke("tracking:decide", invoiceId, choice),
+  },
+  attachments: {
+    list: (owner: AttachmentOwner) => ipcRenderer.invoke("attachments:list", owner),
+    select: (owner: AttachmentOwner, requestId: string) => ipcRenderer.invoke("attachments:select", owner, requestId),
+    open: (id: string) => ipcRenderer.invoke("attachments:open", id),
+  },
+  files: {
+    selectPdfDirectory: () => ipcRenderer.invoke("files:selectPdfDirectory"),
+    openInvoicePdf: (id: string, reveal?: boolean) => ipcRenderer.invoke("files:openInvoicePdf", id, reveal),
   },
   onDataChanged: (callback: () => void) => {
     const handler = () => callback();

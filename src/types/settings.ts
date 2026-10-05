@@ -21,6 +21,7 @@ export interface AppSettings {
   defaultNotes?: string | null;
   dateFormat: DateFormat;
   currencyDisplay: CurrencyDisplayMode;
+  pdfExportDirectory?: string | null;
   updatedAt: string;
 }
 
@@ -32,4 +33,7 @@ export interface ExportDataPayload {
   settings: AppSettings;
   clients: unknown[];
   invoices: unknown[];
+  records?: Record<string, Array<Record<string, string | number | null>>>;
+  files?: Array<{ storedName: string; sha256: string; base64: string }>;
+
 }
