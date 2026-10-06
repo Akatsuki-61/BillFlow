@@ -615,13 +615,13 @@ export default function ExpensesPage() {
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Amount *
                     </label>
-                    <div className="flex gap-1.5">
+                    <div className="flex items-center gap-2">
                       <select
                         value={formData.currency}
                         onChange={(e) =>
                           setFormData({ ...formData, currency: e.target.value as Currency })
                         }
-                        className="ui-field w-24 border border-line-neutral-200 font-mono focus:outline-none focus:ring-2 focus:ring-accent/40"
+                        className="ui-field h-10 w-28 shrink-0 pl-3 pr-8 border border-line-neutral-200 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-accent/40"
                       >
                         <option value="LKR">LKR</option>
                         <option value="USD">USD</option>
@@ -638,7 +638,7 @@ export default function ExpensesPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, amount: e.target.value })
                         }
-                        className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono"
+                        className="ui-field h-10 flex-1 px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono"
                       />
                     </div>
                   </div>

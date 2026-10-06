@@ -87,6 +87,26 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
         }
       })();
     }
+
+    // Pre-0005 reconciliation: If migration 0005 (1791234000000) has NOT been recorded in __drizzle_migrations,
+    // ensure any leftover pre-0005 dev `expenses` table won't collide with CREATE TABLE expenses in 0005.
+    const has0005 = sqlite.prepare("SELECT 1 FROM __drizzle_migrations WHERE created_at = 1791234000000").get();
+    if (!has0005) {
+      sqlite.exec("DROP TABLE IF EXISTS expenses");
+    }
+
+    // Pre-0006 reconciliation: If migration 0006 (1791240000000) has NOT been recorded in __drizzle_migrations,
+    // but expenses table already has merchant/deductible/created_at columns from dev, mark 0006 as reconciled.
+    const has0006 = sqlite.prepare("SELECT 1 FROM __drizzle_migrations WHERE created_at = 1791240000000").get();
+    if (!has0006) {
+      const hasExpensesTable = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='expenses'").get();
+      if (hasExpensesTable) {
+        const expenseCols = (sqlite.prepare("PRAGMA table_info(expenses)").all() as Array<{ name: string }>).map(c => c.name);
+        if (expenseCols.includes("merchant") && expenseCols.includes("deductible") && expenseCols.includes("created_at")) {
+          sqlite.prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)").run("reconciled", 1791240000000);
+        }
+      }
+    }
   }
 
   // Older Sandika profiles store decimal text. Reject unsafe values before
@@ -100,21 +120,6 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
           throw new Error(`Catalog item ${row.id} has an invalid price; database upgrade was stopped.`);
         }
       }
-    }
-  }
-
-  // Ensure expenses table columns exist if created by earlier branch migrations
-  const hasExpensesTable = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='expenses'").get();
-  if (hasExpensesTable) {
-    const expenseCols = (sqlite.prepare("PRAGMA table_info(expenses)").all() as Array<{ name: string }>).map(c => c.name);
-    if (!expenseCols.includes("merchant")) {
-      sqlite.exec('ALTER TABLE "expenses" ADD COLUMN "merchant" text DEFAULT \'\' NOT NULL');
-    }
-    if (!expenseCols.includes("deductible")) {
-      sqlite.exec('ALTER TABLE "expenses" ADD COLUMN "deductible" integer DEFAULT 1 NOT NULL');
-    }
-    if (!expenseCols.includes("created_at")) {
-      sqlite.exec('ALTER TABLE "expenses" ADD COLUMN "created_at" text DEFAULT (CURRENT_TIMESTAMP) NOT NULL');
     }
   }
   const db = drizzle(sqlite, { schema });
