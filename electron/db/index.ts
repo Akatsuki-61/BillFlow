@@ -6,6 +6,11 @@ import path from "path";
 import fs from "fs";
 import * as schema from "./schema";
 import { catalogPriceSchema } from "../validation";
+import { isDemoMode } from "../demo";
+
+// Financial integrity: automatic business sample seeding is strictly disabled
+// outside an explicit demo mode (isDemoMode()). The SQLite database always starts
+// with a clean state containing zero synthetic clients, invoices, vendors, or tasks.
 
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let sqliteInstance: Database.Database | null = null;
@@ -124,6 +129,16 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
   }
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: folder });
+
+  // Ensure work_orders has notes column even on databases migrating between intermediate revisions
+  const hasWorkOrders = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='work_orders'").get();
+  if (hasWorkOrders) {
+    const woColumns = (sqlite.prepare("PRAGMA table_info(work_orders)").all() as Array<{ name: string }>).map(c => c.name);
+    if (!woColumns.includes("notes")) {
+      sqlite.exec('ALTER TABLE "work_orders" ADD COLUMN "notes" text');
+    }
+  }
+
   if ((sqlite.pragma("foreign_key_check") as unknown[]).length) {
     throw new Error("Database relationships failed validation after migration.");
   }

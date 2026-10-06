@@ -1,17 +1,31 @@
 import { ipcMain } from "electron";
 import { getDb } from "../db";
-import { clients, vendors } from "../db/schema";
+import { clients, vendors, tasks } from "../db/schema";
 import { formatError } from "./errors";
 import { listInvoicesWithClient } from "./invoices";
 import { AnalyticsSummaryPayload } from "../../src/types/analytics";
 
 export type { AnalyticsSummaryPayload };
 
-export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
+/**
+ * Computes analytics and executive dashboard summary from live SQLite database records.
+ * Follows strict financial integrity:
+ * - Aggregates actual invoices, clients, vendors, and background tasks.
+ * - Recognizes recorded advance payments (paidCents) without fabricating revenue.
+ * - Computes realized hourly rate strictly from task active milliseconds.
+ * - Computes runway from actual collections divided by vendor payables burn rate.
+ * - Returns clean 0s when records are empty, avoiding synthetic estimates or hardcoded multipliers.
+ */
+export function getAnalyticsSummary(
+  period?: string,
+  currency?: string,
+  accountingMethod: "accrual" | "cash" = "accrual",
+): AnalyticsSummaryPayload {
   const db = getDb();
   const allClients = db.select().from(clients).all();
   const allInvoices = listInvoicesWithClient();
   const allVendors = db.select().from(vendors).all();
+  const allTasks = db.select().from(tasks).all();
 
   // Filter invoices if period specified
   const now = new Date();
@@ -19,6 +33,13 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
   const currentMonth = now.getMonth();
 
   const filteredInvoices = allInvoices.filter((inv) => {
+    // Explicit currency filter
+    if (currency && currency !== "all" && currency !== "ALL") {
+      if (inv.currency && inv.currency.toUpperCase() !== currency.toUpperCase()) {
+        return false;
+      }
+    }
+
     if (!period || period === "all" || period === "all-time") return true;
     if (!inv.issueDate) return true;
     const invDate = new Date(inv.issueDate);
@@ -54,10 +75,13 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
   for (const inv of activeInvoices) {
     if (inv.status !== "DRAFT") {
       totalRevenueCents += inv.amountCents;
+      // Real recorded collection: paidCents if tracked, or total if status is PAID
+      const collected = inv.paidCents ?? (inv.status === "PAID" ? inv.amountCents : 0);
+      paidCents += collected;
       if (inv.status === "PAID") {
-        paidCents += inv.amountCents;
+        // fully settled
       } else {
-        const unpaid = Math.max(0, inv.amountCents - (inv.paidCents || 0));
+        const unpaid = Math.max(0, inv.amountCents - collected);
         pendingReceivablesCents += unpaid;
         unpaidCount += 1;
         if (inv.status === "OVERDUE" || (inv.dueDate && inv.dueDate < todayStr)) {
@@ -70,24 +94,33 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
 
   // Total outsourced subcontractor costs from SQLite vendors table
   let totalOutsourcedCents = 0;
+  let paidCostCents = 0;
   for (const v of allVendors) {
     totalOutsourcedCents += v.balanceCents;
+    if (v.status === "PAID") {
+      paidCostCents += v.balanceCents;
+    }
   }
 
-  // Net Profit & Margins
-  const netProfitCents = Math.max(0, totalRevenueCents - totalOutsourcedCents);
+  // Preserved profit & losses:
+  // Accrual profit: Total Billed Revenue minus Committed Costs (can be negative on loss)
+  const accrualProfitCents = totalRevenueCents - totalOutsourcedCents;
+  // Cash profit: Collections minus Paid Costs (can be negative on loss)
+  const cashProfitCents = paidCents - paidCostCents;
+
+  // Selected view profit according to active accounting method
+  const netProfitCents = accountingMethod === "cash" ? cashProfitCents : accrualProfitCents;
+  const isLoss = netProfitCents < 0;
+
+  const baseForMargin = accountingMethod === "cash" ? paidCents : totalRevenueCents;
   const marginPct =
-    totalRevenueCents > 0
-      ? Math.round(
-          ((totalRevenueCents - Math.min(totalRevenueCents, totalOutsourcedCents)) /
-            totalRevenueCents) *
-            100,
-        )
-      : 100;
+    baseForMargin > 0
+      ? Math.round((netProfitCents / baseForMargin) * 100)
+      : 0;
 
   // Collection Ratio & Avg Ticket
   const paidRatioPct =
-    totalRevenueCents > 0 ? Math.round((paidCents / totalRevenueCents) * 100) : 100;
+    totalRevenueCents > 0 ? Math.round((paidCents / totalRevenueCents) * 100) : 0;
   const avgInvoiceCents =
     activeInvoices.length > 0
       ? Math.round(totalRevenueCents / activeInvoices.length)
@@ -117,16 +150,21 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
       ? Math.min(100, Math.round((topClientMaxBilled / totalRevenueCents) * 100))
       : 0;
 
-  // Realized hourly rate & Runway
+  // Realized hourly rate based on actual tracked active milliseconds in tasks
+  let totalActiveMs = 0;
+  for (const t of allTasks) {
+    totalActiveMs += t.activeMilliseconds || 0;
+  }
+  const totalHours = totalActiveMs / 3600000;
   const effectiveHourlyRate =
-    avgInvoiceCents > 0 ? Math.max(65, Math.round(avgInvoiceCents / 1600)) : 145;
+    totalHours > 0 ? Math.round((netProfitCents / 100) / totalHours) : 0;
 
-  const monthlyBurn = Math.max(100000, Math.round(totalOutsourcedCents / 3));
-  const availableLiquidity = paidCents + Math.round(pendingReceivablesCents * 0.75);
+  // Runway based on actual collected liquidity and average monthly burn
+  const monthlyBurn = Math.round(totalOutsourcedCents / 6);
   const cashflowRunwayMonths =
-    monthlyBurn > 0 && availableLiquidity > 0
-      ? Math.min(24, Math.max(1, Math.round(availableLiquidity / monthlyBurn)))
-      : 12;
+    monthlyBurn > 0 && paidCents > 0
+      ? Math.min(36, Math.max(1, Math.round(paidCents / monthlyBurn)))
+      : 0;
 
   // 6-Month rolling trend points
   const monthlyTrends: AnalyticsSummaryPayload["monthlyTrends"] = [];
@@ -140,7 +178,7 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
       revenueCents: 0,
       expensesCents: 0,
       profitCents: 0,
-      marginPct: 100,
+      marginPct: 0,
     });
   }
 
@@ -153,25 +191,38 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
     }
   }
 
-  const hasInvoices = allInvoices.length > 0;
-  const avgMonthlyOutsourced = hasInvoices
-    ? Math.round(totalOutsourcedCents / 6)
-    : 0;
+  for (const v of allVendors) {
+    const vDate = v.payoutDueDate || v.createdAt;
+    if (!vDate) continue;
+    const vKey = vDate.slice(0, 7);
+    const target = monthlyTrends.find((m) => m.key === vKey);
+    if (target) {
+      target.expensesCents += v.balanceCents;
+    }
+  }
 
   for (const m of monthlyTrends) {
-    m.expensesCents =
-      m.revenueCents > 0 ? avgMonthlyOutsourced + Math.round(m.revenueCents * 0.05) : 0;
-    m.profitCents = Math.max(0, m.revenueCents - m.expensesCents);
+    // Preserve monthly losses
+    m.profitCents = m.revenueCents - m.expensesCents;
     m.marginPct =
-      m.revenueCents > 0 ? Math.round((m.profitCents / m.revenueCents) * 100) : 100;
+      m.revenueCents > 0 ? Math.round((m.profitCents / m.revenueCents) * 100) : 0;
   }
 
   return {
     totalRevenueCents,
+    billedAmountCents: totalRevenueCents,
+    paidCents,
+    collectedCents: paidCents,
+    pendingReceivablesCents,
+    outstandingCents: pendingReceivablesCents,
     totalOutsourcedCents,
+    committedCostCents: totalOutsourcedCents,
+    paidCostCents,
+    accrualProfitCents,
+    cashProfitCents,
     netProfitCents,
     marginPct,
-    pendingReceivablesCents,
+    isLoss,
     unpaidCount,
     overdueCents,
     overdueCount,
@@ -184,15 +235,26 @@ export function getAnalyticsSummary(period?: string): AnalyticsSummaryPayload {
     effectiveHourlyRate,
     cashflowRunwayMonths,
     monthlyTrends,
+    currency: currency || "ALL",
+    period: period || "all",
+    accountingMethod,
   };
 }
 
 export function registerAnalyticsHandlers() {
-  ipcMain.handle("analytics:summary", async (_event, period?: string) => {
-    try {
-      return getAnalyticsSummary(period);
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+  ipcMain.handle(
+    "analytics:summary",
+    async (
+      _event,
+      period?: string,
+      currency?: string,
+      accountingMethod: "accrual" | "cash" = "accrual",
+    ) => {
+      try {
+        return getAnalyticsSummary(period, currency, accountingMethod);
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 }

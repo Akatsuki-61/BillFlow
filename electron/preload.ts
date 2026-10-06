@@ -22,6 +22,11 @@ import type {
   VendorItem,
   NewVendorInput,
   VendorPatchInput,
+  WorkOrderItem,
+  NewWorkOrderInput,
+  WorkOrderPatchInput,
+  ReviewWorkOrderInput,
+  RecordWorkOrderPayoutInput,
 } from "../src/types/outsourcing";
 import type { AnalyticsSummaryPayload } from "../src/types/analytics";
 
@@ -80,9 +85,33 @@ contextBridge.exposeInMainWorld("billflow", {
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("vendors:remove", id),
   },
+  workOrders: {
+    list: (filter?: { vendorId?: string; taskId?: string; invoiceId?: string }): Promise<WorkOrderItem[]> =>
+      ipcRenderer.invoke("workOrders:list", filter),
+    get: (id: string): Promise<WorkOrderItem> =>
+      ipcRenderer.invoke("workOrders:get", id),
+    create: (input: NewWorkOrderInput): Promise<WorkOrderItem> =>
+      ipcRenderer.invoke("workOrders:create", input),
+    update: (id: string, patch: WorkOrderPatchInput): Promise<WorkOrderItem> =>
+      ipcRenderer.invoke("workOrders:update", id, patch),
+    review: (input: ReviewWorkOrderInput): Promise<WorkOrderItem> =>
+      ipcRenderer.invoke("workOrders:review", input),
+    recordPayout: (input: RecordWorkOrderPayoutInput): Promise<WorkOrderItem> =>
+      ipcRenderer.invoke("workOrders:recordPayout", input),
+    removePayout: (workOrderId: string): Promise<WorkOrderItem> =>
+      ipcRenderer.invoke("workOrders:removePayout", workOrderId),
+    setPayoutStatus: (id: string, status: "PENDING" | "PAID"): Promise<WorkOrderItem> =>
+      ipcRenderer.invoke("workOrders:setPayoutStatus", id, status),
+    remove: (id: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("workOrders:remove", id),
+  },
   analytics: {
-    summary: (period?: string): Promise<AnalyticsSummaryPayload> =>
-      ipcRenderer.invoke("analytics:summary", period),
+    summary: (
+      period?: string,
+      currency?: string,
+      accountingMethod?: "accrual" | "cash",
+    ): Promise<AnalyticsSummaryPayload> =>
+      ipcRenderer.invoke("analytics:summary", period, currency, accountingMethod),
   },
   catalog: {
     list: (): Promise<CatalogItem[]> => ipcRenderer.invoke("catalog:list"),

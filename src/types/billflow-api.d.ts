@@ -21,6 +21,11 @@ import type {
   VendorItem,
   NewVendorInput,
   VendorPatchInput,
+  WorkOrderItem,
+  NewWorkOrderInput,
+  WorkOrderPatchInput,
+  ReviewWorkOrderInput,
+  RecordWorkOrderPayoutInput,
 } from "./outsourcing";
 import type { AnalyticsSummaryPayload } from "./analytics";
 import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "./expenses";
@@ -59,6 +64,7 @@ export interface BillFlowAPI extends WorkflowAPI {
     exportPdf: (invoiceId: string) => Promise<{ success: boolean; filePath: string }>;
     remove: (id: string) => Promise<{ success: boolean }>;
   };
+  /** Reusable subcontractor directory management */
   vendors: {
     list: () => Promise<VendorItem[]>;
     create: (input: NewVendorInput) => Promise<VendorItem>;
@@ -66,8 +72,24 @@ export interface BillFlowAPI extends WorkflowAPI {
     setStatus: (id: string, status: "PENDING" | "PAID") => Promise<VendorItem>;
     remove: (id: string) => Promise<{ success: boolean }>;
   };
+  /** Per-job payable work orders linking vendors, sprint tasks, and client invoices */
+  workOrders: {
+    list: (filter?: { vendorId?: string; taskId?: string; invoiceId?: string }) => Promise<WorkOrderItem[]>;
+    get: (id: string) => Promise<WorkOrderItem>;
+    create: (input: NewWorkOrderInput) => Promise<WorkOrderItem>;
+    update: (id: string, patch: WorkOrderPatchInput) => Promise<WorkOrderItem>;
+    review: (input: ReviewWorkOrderInput) => Promise<WorkOrderItem>;
+    recordPayout: (input: RecordWorkOrderPayoutInput) => Promise<WorkOrderItem>;
+    removePayout: (workOrderId: string) => Promise<WorkOrderItem>;
+    setPayoutStatus: (id: string, status: "PENDING" | "PAID") => Promise<WorkOrderItem>;
+    remove: (id: string) => Promise<{ success: boolean }>;
+  };
   analytics: {
-    summary: (period?: string) => Promise<AnalyticsSummaryPayload>;
+    summary: (
+      period?: string,
+      currency?: string,
+      accountingMethod?: "accrual" | "cash",
+    ) => Promise<AnalyticsSummaryPayload>;
   };
   catalog: {
     list: () => Promise<CatalogItem[]>;

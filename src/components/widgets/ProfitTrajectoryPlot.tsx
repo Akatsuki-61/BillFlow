@@ -46,11 +46,10 @@ export function ProfitTrajectoryPlot({ months, metric, currency }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  const maximum = metric === "profit"
-    ? Math.max(0, ...months.map(month => month.profitCents)) || 500000
-    : 100;
+  const rawMaxProfit = Math.max(0, ...months.map(month => month.profitCents));
+  const maximum = metric === "profit" ? rawMaxProfit : 100;
   const format = (value: number) => metric === "profit" ? formatCents(value, currency) : `${value}%`;
-  const ticks = [maximum, maximum / 2, 0];
+  const ticks = maximum > 0 ? [maximum, Math.round(maximum / 2), 0] : [0, 0, 0];
   // Match SVG coordinates to actual pixels so text and circles never stretch.
   const left = Math.max(64, ...ticks.map(value => format(value).length * 7 + 16));
   const right = width - 24;
@@ -60,7 +59,7 @@ export function ProfitTrajectoryPlot({ months, metric, currency }: Props) {
     ...month,
     value: metric === "profit" ? month.profitCents : month.marginPct,
     x: left + (right - left) * (months.length > 1 ? index / (months.length - 1) : 0.5),
-    y: bottom - Math.min(1, Math.max(0, (metric === "profit" ? month.profitCents : month.marginPct) / maximum)) * (bottom - top),
+    y: bottom - (maximum > 0 ? Math.min(1, Math.max(0, (metric === "profit" ? month.profitCents : month.marginPct) / maximum)) : 0) * (bottom - top),
   }));
   const line = getSmoothPath(points);
   const last = points.at(-1);

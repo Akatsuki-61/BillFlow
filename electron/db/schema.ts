@@ -233,6 +233,7 @@ export const workOrders = sqliteTable("work_orders", {
   status: text("status").notNull().default("todo"),
   completedAt: text("completed_at"),
   deliveryUrl: text("delivery_url"),
+  notes: text("notes"),
 }, t => [check("work_order_amount", sql`${t.feeCents} >= 0`)]);
 
 export const vendorPayouts = sqliteTable("vendor_payouts", {

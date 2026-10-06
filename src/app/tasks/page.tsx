@@ -33,6 +33,7 @@ import {
 } from "@/types/tasks";
 
 import { useData } from "@/lib/data/DataProvider";
+import { getCurrencySymbol } from "@/lib/format";
 import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/TaskTiming";
 import Link from "next/link";
@@ -101,7 +102,7 @@ export default function TasksPage() {
   const router = useRouter();
 
   // State
-  const { tasks, workflow, clients, vendors, settings, isElectron, isLoading, error } = useData();
+  const { tasks, workflow, clients, vendors, settings, isElectron, isLoading, error, activeCurrency } = useData();
   const [saving, setSaving] = useState(false);
   const draftId = useRef<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -250,7 +251,7 @@ export default function TasksPage() {
       assignee,
       dueDate: newDueDate,
       clientId: newClientName || null,
-      currency: clients.find(client => client.id === newClientName)?.currency || settings?.defaultCurrency || "LKR",
+      currency: clients.find(client => client.id === newClientName)?.currency || settings?.defaultCurrency || activeCurrency || "LKR",
       isOutsourced: newIsOutsourced,
       outsourcedVendor: newIsOutsourced ? newOutsourcedVendor : undefined,
       outsourceBudgetCents: newIsOutsourced
@@ -342,6 +343,13 @@ export default function TasksPage() {
               },
             ]}
           />
+
+          <span
+            className="analytics-currency-badge"
+            title="System currency configured in Settings"
+          >
+            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
+          </span>
 
           {/* Create Task Button */}
           <Button
@@ -1035,7 +1043,7 @@ export default function TasksPage() {
 
                       <div>
                         <label className="block text-xs font-medium text-content-neutral-700 mb-1">
-                          Estimated Budget ({clients.find(client => client.id === newClientName)?.currency || settings?.defaultCurrency || "LKR"})
+                          Estimated Budget ({clients.find(client => client.id === newClientName)?.currency || settings?.defaultCurrency || activeCurrency || "LKR"})
                         </label>
                         <input
                           type="number"
@@ -1199,7 +1207,7 @@ export default function TasksPage() {
                       </h5>
                       <p className="text-xs text-content-neutral-600 mt-0.5">
                         {selectedTaskForDetail.isOutsourced
-                          ? `Budget: ${selectedTaskForDetail.currency || "LKR"} ${selectedTaskForDetail.outsourceBudget?.toLocaleString() || "Not set"}. Open Outsourcing to agree the contractor fee.`
+                          ? `Budget: ${selectedTaskForDetail.currency || activeCurrency || "LKR"} ${selectedTaskForDetail.outsourceBudget?.toLocaleString() || "Not set"}. Open Outsourcing to agree the contractor fee.`
                           : "Delegate this task to an external specialist or engineering agency."}
                       </p>
                     </div>

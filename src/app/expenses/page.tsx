@@ -33,7 +33,7 @@ import {
 import { useExpenses, useData } from "@/lib/data/DataProvider";
 import type { ExpenseItem } from "@/types/expenses";
 import type { Currency } from "@/types/billing";
-import { formatCents, formatDateDisplay } from "@/lib/format";
+import { formatCents, formatDateDisplay, getCurrencySymbol } from "@/lib/format";
 
 export default function ExpensesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All Categories");
@@ -234,7 +234,15 @@ export default function ExpensesPage() {
         title="Expenses"
         description="Manage and track your business expenditures in the SQLite ledger."
       >
+
         <div className="flex items-center gap-3">
+          <span
+            className="analytics-currency-badge"
+            title="System currency configured in Settings"
+          >
+            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
+          </span>
+
           <div className="relative">
             <select
               value={selectedCategory}

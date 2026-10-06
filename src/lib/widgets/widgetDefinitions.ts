@@ -88,7 +88,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   {
     id: "cashflow-runway",
     title: "Cashflow Runway",
-    description: "Estimated operational operating cushion at current monthly expenses",
+    description: "Operating cushion based on collected payments and contractor costs",
     category: "financial",
     size: "metric",
     defaultOnDashboard: false,

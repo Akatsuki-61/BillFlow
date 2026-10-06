@@ -207,4 +207,61 @@ export const expensePatchSchema = z.object({
   invoiceId: z.string().trim().nullable().optional(),
 });
 
+/**
+ * Validation schema for creating a new per-job payable work order.
+ * Validates relational foreign key links (vendor, task, invoice),
+ * non-negative contractor fee in minor currency units, and optional delivery links.
+ */
+export const newWorkOrderSchema = z.object({
+  id: z.string().optional(),
+  vendorId: z.string().trim().min(1, "Vendor ID is required"),
+  taskId: z.string().trim().min(1, "Task ID is required"),
+  invoiceId: z.string().trim().min(1, "Invoice ID is required"),
+  scope: z.string().trim().min(1, "Scope description cannot be blank").max(500),
+  feeCents: z.number().int().nonnegative("Contractor fee must be non-negative"),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("LKR"),
+  dueDate: z.string().trim().max(60).nullable().optional(),
+  status: z.enum(["todo", "in-progress", "review", "done"]).default("todo"),
+  deliveryUrl: z.string().trim().url("Please provide a valid delivery URL").nullable().optional().or(z.literal("")),
+  notes: z.string().trim().max(2000).nullable().optional(),
+});
+
+/**
+ * Validation schema for partial updates to an existing work order.
+ */
+export const workOrderPatchSchema = z.object({
+  vendorId: z.string().trim().min(1).optional(),
+  scope: z.string().trim().min(1).max(500).optional(),
+  feeCents: z.number().int().nonnegative().optional(),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  dueDate: z.string().trim().max(60).nullable().optional(),
+  status: z.enum(["todo", "in-progress", "review", "done"]).optional(),
+  deliveryUrl: z.string().trim().url("Please provide a valid delivery URL").nullable().optional().or(z.literal("")),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  completedAt: z.string().nullable().optional(),
+  payoutStatus: z.enum(["PENDING", "PAID"]).optional(),
+  updateTask: z.boolean().optional(),
+  taskStatus: z.enum(["todo", "in-progress", "review", "done"]).optional(),
+});
+
+/**
+ * Validation schema for reviewing contractor deliverable and syncing to original task.
+ */
+export const reviewWorkOrderSchema = z.object({
+  workOrderId: z.string().trim().min(1, "Work order ID is required"),
+  status: z.enum(["todo", "in-progress", "review", "done"]),
+  deliveryUrl: z.string().trim().url("Please provide a valid delivery URL").nullable().optional().or(z.literal("")),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  updateTask: z.boolean().default(true),
+});
+
+/**
+ * Validation schema for recording a vendor payout entry.
+ */
+export const recordWorkOrderPayoutSchema = z.object({
+  workOrderId: z.string().trim().min(1, "Work order ID is required"),
+  amountCents: z.number().int().positive("Payout amount must be positive").optional(),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  paidAt: z.string().trim().optional(),
+});
 

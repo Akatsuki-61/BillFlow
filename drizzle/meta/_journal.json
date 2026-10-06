@@ -47,8 +47,15 @@
     {
       "idx": 6,
       "version": "6",
+      "when": 1791235000000,
+      "tag": "0006_work_order_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
       "when": 1791240000000,
-      "tag": "0006_expenses_ledger",
+      "tag": "0007_expenses_ledger",
       "breakpoints": true
     }
   ]

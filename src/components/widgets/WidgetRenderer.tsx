@@ -130,7 +130,10 @@ export function WidgetRenderer({
     return formatCents(totalOutsourcedCents, activeCurrency);
   }, [totalOutsourcedCents, activeCurrency]);
 
-  // Aggregate metrics from live invoices
+  // Aggregate metrics from live invoices with strict financial integrity:
+  // - Supports ADVANCE_PAID records where paidCents reflects the recorded deposit.
+  // - Treats fully PAID invoices as 100% collected.
+  // - Never generates synthetic collections or fabricated revenue.
   const {
     totalRevenueCents,
     paidCount,
@@ -148,7 +151,7 @@ export function WidgetRenderer({
         paidCents: 0,
         pendingCents: 0,
         pendingCount: 0,
-        paidRatioPct: 100,
+        paidRatioPct: 0,
         avgInvoiceCents: 0,
         avgInvoiceStr: formatCents(0, activeCurrency),
       };
@@ -162,17 +165,20 @@ export function WidgetRenderer({
 
     filteredInvoices.forEach((inv) => {
       total += inv.amountCents;
+      // Real recorded collection: paidCents if tracked, or total if status is PAID
+      const collected = inv.paidCents ?? (inv.status === "PAID" ? inv.amountCents : 0);
+      paidAmt += collected;
       if (inv.status === "PAID") {
         paid += 1;
-        paidAmt += inv.amountCents;
       } else {
         pendingCnt += 1;
-        pendingAmt += inv.amountCents - (inv.paidCents || 0);
+        // Remaining uncollected amount on unpaid or advance-paid invoice
+        pendingAmt += Math.max(0, inv.amountCents - collected);
       }
     });
 
-    const ratio = total > 0 ? Math.round((paidAmt / total) * 100) : 100;
-    const avg = Math.round(total / filteredInvoices.length);
+    const ratio = total > 0 ? Math.round((paidAmt / total) * 100) : 0;
+    const avg = filteredInvoices.length > 0 ? Math.round(total / filteredInvoices.length) : 0;
 
     return {
       totalRevenueCents: total,
@@ -194,32 +200,35 @@ export function WidgetRenderer({
     return formatCents(pendingCents, activeCurrency);
   }, [pendingCents, activeCurrency]);
 
-  // Net Profit & Margins
+  // Net Profit & Margins:
+  // Preserves business losses when subcontractor payables exceed billed revenue.
+  // Never clamps to zero with Math.max, ensuring financial deficits are transparently reported.
   const netProfitCents = useMemo(() => {
-    return Math.max(0, totalRevenueCents - totalOutsourcedCents);
+    return totalRevenueCents - totalOutsourcedCents;
   }, [totalRevenueCents, totalOutsourcedCents]);
+
+  const isLoss = netProfitCents < 0;
 
   const netProfitStr = useMemo(() => {
     return formatCents(netProfitCents, activeCurrency);
   }, [netProfitCents, activeCurrency]);
 
   const marginPct = useMemo(() => {
-    if (totalRevenueCents <= 0) return 100;
-    const net = Math.max(0, totalRevenueCents - totalOutsourcedCents);
-    return Math.round((net / totalRevenueCents) * 100);
-  }, [totalRevenueCents, totalOutsourcedCents]);
+    if (totalRevenueCents <= 0) return 0;
+    return Math.round((netProfitCents / totalRevenueCents) * 100);
+  }, [totalRevenueCents, netProfitCents]);
 
-  // Operating Expenses (Outsourced costs + 5% software overhead)
+  // Operating Expenses (Actual outsourced contractor costs)
   const opexCents = useMemo(() => {
-    return totalOutsourcedCents + Math.round(totalRevenueCents * 0.05);
-  }, [totalOutsourcedCents, totalRevenueCents]);
+    return totalOutsourcedCents;
+  }, [totalOutsourcedCents]);
 
   const opexStr = useMemo(() => {
     return formatCents(opexCents, activeCurrency);
   }, [opexCents, activeCurrency]);
 
   const opexRatioPct = useMemo(() => {
-    if (totalRevenueCents <= 0) return 5;
+    if (totalRevenueCents <= 0) return 0;
     return Math.min(100, Math.round((opexCents / totalRevenueCents) * 100));
   }, [opexCents, totalRevenueCents]);
 
@@ -243,22 +252,32 @@ export function WidgetRenderer({
     );
   }, [topClient, totalRevenueCents]);
 
-  // Realized Hourly Yield
-  const effectiveHourlyRate = useMemo(() => {
-    if (avgInvoiceCents <= 0) return 145;
-    return Math.max(65, Math.round(avgInvoiceCents / 1600));
-  }, [avgInvoiceCents]);
-
-  // Cashflow Runway
-  const runwayMonths = useMemo(() => {
-    const monthlyBurn = Math.max(100000, Math.round(totalOutsourcedCents / 3));
-    const availableLiquidity = paidCents + Math.round(pendingCents * 0.75);
-    if (monthlyBurn <= 0 || availableLiquidity <= 0) return 12;
-    return Math.min(
-      24,
-      Math.max(1, Math.round(availableLiquidity / monthlyBurn)),
+  // Realized Hourly Yield:
+  // Derived strictly from actual active time tracked across tasks (tasks.activeMilliseconds).
+  // Formula: (Net Profit in Dollars) / (Total Active Tracked Hours).
+  // If no time has been tracked, yields 0 instead of assuming an arbitrary baseline.
+  const { effectiveHourlyRate, totalTrackedHours } = useMemo(() => {
+    const totalActiveMs = tasks.reduce(
+      (sum, t) => sum + (t.activeMilliseconds || 0),
+      0,
     );
-  }, [totalOutsourcedCents, paidCents, pendingCents]);
+    const hours = totalActiveMs / 3600000;
+    if (hours <= 0) {
+      return { effectiveHourlyRate: 0, totalTrackedHours: 0 };
+    }
+    const rate = Math.round((netProfitCents / 100) / hours);
+    return { effectiveHourlyRate: rate, totalTrackedHours: hours };
+  }, [tasks, netProfitCents]);
+
+  // Cashflow Runway:
+  // Derived strictly from actual collected liquidity (paidCents) divided by average monthly burn.
+  // Monthly burn is computed from actual outsourced contractor payables (totalOutsourcedCents / 6).
+  // Returns 0 months if no actual burn or collected cash exists.
+  const runwayMonths = useMemo(() => {
+    const monthlyBurn = Math.round(totalOutsourcedCents / 6);
+    if (monthlyBurn <= 0 || paidCents <= 0) return 0;
+    return Math.min(36, Math.max(1, Math.round(paidCents / monthlyBurn)));
+  }, [totalOutsourcedCents, paidCents]);
 
   // Overdue count and amount
   const overdueInvoices = useMemo(() => {
@@ -308,12 +327,12 @@ export function WidgetRenderer({
         revenueCents: 0,
         expensesCents: 0,
         profitCents: 0,
-        marginPct: 100,
+        marginPct: 0,
       });
     }
 
     invoices.forEach((inv) => {
-      if (!inv.issueDate) return;
+      if (!inv.issueDate || inv.status === "DRAFT") return;
       const invKey = inv.issueDate.slice(0, 7);
       const target = months.find((m) => m.key === invKey);
       if (target) {
@@ -321,24 +340,27 @@ export function WidgetRenderer({
       }
     });
 
-    const hasInvoices = invoices.length > 0;
-    const avgMonthlyOutsourced = hasInvoices
-      ? Math.round(totalOutsourcedCents / 6)
-      : 0;
+    vendors.forEach((v) => {
+      const vDate = v.payoutDueDate || v.createdAt;
+      if (!vDate) return;
+      const vKey = vDate.slice(0, 7);
+      const target = months.find((m) => m.key === vKey);
+      if (target) {
+        target.expensesCents += Math.round(v.currentBalance * 100);
+      }
+    });
 
     months.forEach((m) => {
-      m.expensesCents = m.revenueCents > 0
-        ? avgMonthlyOutsourced + Math.round(m.revenueCents * 0.05)
-        : 0;
-      m.profitCents = Math.max(0, m.revenueCents - m.expensesCents);
+      // Preserve losses in monthly trajectory: allow negative profit and negative margins
+      m.profitCents = m.revenueCents - m.expensesCents;
       m.marginPct =
         m.revenueCents > 0
           ? Math.round((m.profitCents / m.revenueCents) * 100)
-          : 100;
+          : 0;
     });
 
     return months;
-  }, [invoices, totalOutsourcedCents]);
+  }, [invoices, vendors]);
 
   const isCompact = displaySize === "compact";
 
@@ -411,19 +433,25 @@ export function WidgetRenderer({
           "Billed to date",
         );
 
-      // 2. Net Profit
+      // 2. Net Profit (or Net Loss if expenses exceed revenue)
       case "net-profit":
         return renderMetric(
-          "Net Profit & Margin",
+          isLoss ? "Net Loss & Margin" : "Net Profit & Margin",
           netProfitStr,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60">
-              <TrendingUp className="w-3 h-3" />
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                isLoss
+                  ? "bg-surface-amber-50 text-content-amber-800 border-line-amber-200/60"
+                  : "bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60"
+              }`}
+            >
+              <TrendingUp className={`w-3 h-3 ${isLoss ? "rotate-180" : ""}`} />
               {marginPct}% margin
             </span>
-            <span>net retained earnings</span>
+            <span>{isLoss ? "net deficit in period" : "net retained earnings"}</span>
           </>,
-          "accent",
+          isLoss ? "warning" : "accent",
           `${marginPct}% margin`,
         );
 
@@ -463,67 +491,87 @@ export function WidgetRenderer({
         );
 
       // 5. Outsourced Costs
-      case "outsourced-costs":
+      case "outsourced-costs": {
+        const hasVendors = vendors.length > 0;
         return renderMetric(
           "Subcontractor Costs",
-          outsourcedCostsStr,
+          hasVendors ? outsourcedCostsStr : `${formatCents(0, activeCurrency)}`,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                hasVendors
+                  ? "bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60"
+                  : "bg-surface-neutral-100 text-content-neutral-600 border-line-neutral-200"
+              }`}
+            >
               <GitFork className="w-3 h-3" />
-              {vendors.length} vendors
+              {hasVendors ? `${vendors.length} vendors` : "0 Recorded"}
             </span>
-            <span>active external contractors</span>
+            <span>{hasVendors ? "active external contractors" : "no subcontractor costs recorded"}</span>
           </>,
           "default",
-          `${vendors.length} contractors`,
+          hasVendors ? `${vendors.length} contractors` : "No contractor costs",
         );
+      }
 
       // 6. Operating Expenses
-      case "operating-expenses":
+      case "operating-expenses": {
+        const hasExpenses = opexCents > 0 || totalRevenueCents > 0;
         return renderMetric(
           "Operating Expenses",
-          opexStr,
+          hasExpenses ? opexStr : `${formatCents(0, activeCurrency)}`,
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-neutral-100 text-content-neutral-700 border-line-neutral-200/60">
-              {opexRatioPct}%
+              {hasExpenses ? `${opexRatioPct}%` : "No Data"}
             </span>
-            <span>software & contractor overhead</span>
+            <span>{hasExpenses ? "software & contractor overhead" : "no overhead or contractor payables"}</span>
           </>,
           "default",
-          "Software & tools",
+          hasExpenses ? "Software & tools" : "No expenses",
         );
+      }
 
       // 7. Paid Ratio
-      case "paid-ratio":
+      case "paid-ratio": {
+        const hasInvoices = totalRevenueCents > 0;
         return renderMetric(
           "Invoice Paid Ratio",
-          `${paidRatioPct}%`,
+          hasInvoices ? `${paidRatioPct}%` : "Unavailable",
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200/60">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                hasInvoices
+                  ? "bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200/60"
+                  : "bg-surface-neutral-100 text-content-neutral-600 border-line-neutral-200"
+              }`}
+            >
               <ShieldCheck className="w-3 h-3" />
-              {paidCount} of {filteredInvoices.length} paid
+              {hasInvoices ? `${paidCount} of ${filteredInvoices.length} paid` : "No Records"}
             </span>
-            <span>on-time collection rate</span>
+            <span>{hasInvoices ? "on-time collection rate" : "no billed invoices in period"}</span>
           </>,
-          "accent",
-          `${paidRatioPct}% on-time`,
+          hasInvoices ? "accent" : "default",
+          hasInvoices ? `${paidRatioPct}% on-time` : "Unavailable",
         );
+      }
 
       // 8. Average Invoice Value
-      case "average-invoice-value":
+      case "average-invoice-value": {
+        const hasInvoices = filteredInvoices.length > 0;
         return renderMetric(
           "Average Invoice Size",
-          avgInvoiceStr,
+          hasInvoices ? avgInvoiceStr : "Unavailable",
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-neutral-100 text-content-neutral-700 border-line-neutral-200/60">
               <DollarSign className="w-3 h-3" />
-              Average
+              {hasInvoices ? `${filteredInvoices.length} billed` : "0 Billed"}
             </span>
-            <span>ticket size per contract</span>
+            <span>{hasInvoices ? "ticket size per contract" : "no invoices in period"}</span>
           </>,
           "default",
-          "Average contract",
+          hasInvoices ? "Average contract" : "Unavailable",
         );
+      }
 
       // 9. Overdue Receivables
       case "overdue-receivables":
@@ -548,50 +596,105 @@ export function WidgetRenderer({
         );
 
       // 10. Cashflow Runway
-      case "cashflow-runway":
+      case "cashflow-runway": {
+        const hasReserve = paidCents > 0;
+        const hasOutflows = totalOutsourcedCents > 0;
+        const isRunwayCalculated = runwayMonths > 0 && hasOutflows && hasReserve;
+
+        let runwayDisplayValue = "Unavailable";
+        let runwayTag = "No Data";
+        let runwaySubtext = "requires collections & expenses";
+        let runwayCompactTag = "Unavailable";
+
+        if (isRunwayCalculated) {
+          runwayDisplayValue = `${runwayMonths} mo`;
+          runwayTag = runwayMonths >= 6 ? "Stable" : "Tight";
+          runwaySubtext = "operating cushion based on cash reserve";
+          runwayCompactTag = `${runwayMonths} mo runway`;
+        } else if (hasReserve && !hasOutflows) {
+          runwayDisplayValue = "Self-Funded";
+          runwayTag = "No Outflows";
+          runwaySubtext = "no ongoing contractor burn recorded";
+          runwayCompactTag = "Self-funded";
+        } else if (!hasReserve && hasOutflows) {
+          runwayDisplayValue = "0 mo";
+          runwayTag = "Deficit";
+          runwaySubtext = "outflows recorded without cash collections";
+          runwayCompactTag = "0 mo reserve";
+        }
+
         return renderMetric(
           "Cashflow Runway",
-          `${runwayMonths}+ mo`,
+          runwayDisplayValue,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200/60">
-              Stable
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                runwayMonths >= 6 && isRunwayCalculated
+                  ? "bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200/60"
+                  : isRunwayCalculated
+                    ? "bg-surface-amber-50 text-content-amber-800 border-line-amber-200/60"
+                    : hasReserve && !hasOutflows
+                      ? "bg-surface-blue-50 text-content-blue-700 border-line-blue-200/60"
+                      : "bg-surface-neutral-100 text-content-neutral-600 border-line-neutral-200"
+              }`}
+            >
+              {runwayTag}
             </span>
-            <span>operating cushion</span>
+            <span>{runwaySubtext}</span>
           </>,
-          "default",
-          "Stable cushion",
+          isRunwayCalculated ? "default" : "default",
+          runwayCompactTag,
         );
+      }
 
       // 11. Top Client Concentration
-      case "client-concentration":
+      case "client-concentration": {
+        const hasRevenue = totalRevenueCents > 0;
         return renderMetric(
           "Client Concentration",
-          `${topClientPct}%`,
+          hasRevenue ? `${topClientPct}%` : "Unavailable",
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-blue-50 text-content-blue-700 border-line-blue-200/60 truncate max-w-[120px]">
               <PieChart className="w-3 h-3 shrink-0" />
-              <span className="truncate">{topClient ? topClient.name : "Diversified"}</span>
+              <span className="truncate">{hasRevenue && topClient ? topClient.name : "No Data"}</span>
             </span>
-            <span>revenue concentration</span>
+            <span>{hasRevenue ? "revenue concentration" : "no revenue recorded"}</span>
           </>,
           "default",
-          `Top client ${topClientPct}%`,
+          hasRevenue ? `Top client ${topClientPct}%` : "No concentration",
         );
+      }
 
       // 12. Realized Hourly Yield
       case "effective-hourly-rate":
         return renderMetric(
           "Realized Hourly Yield",
-          `${getCurrencySymbol(activeCurrency)}${effectiveHourlyRate}/hr`,
+          totalTrackedHours > 0
+            ? `${getCurrencySymbol(activeCurrency)}${effectiveHourlyRate}/hr`
+            : "Unavailable",
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                totalTrackedHours > 0
+                  ? "bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60"
+                  : "bg-surface-neutral-100 text-content-neutral-600 border-line-neutral-200"
+              }`}
+            >
               <TrendingUp className="w-3 h-3" />
-              Target Met
+              {totalTrackedHours > 0
+                ? effectiveHourlyRate > 0
+                  ? "Tracked Rate"
+                  : "Break-even"
+                : "Time Untracked"}
             </span>
-            <span>effective sprint return</span>
+            <span>
+              {totalTrackedHours > 0
+                ? `based on ${totalTrackedHours < 1 ? "<1 hr" : Math.round(totalTrackedHours) + " hrs"} tracked`
+                : "track task hours to compute rate"}
+            </span>
           </>,
-          "accent",
-          "Sprint return",
+          totalTrackedHours > 0 ? "accent" : "default",
+          totalTrackedHours > 0 ? `${effectiveHourlyRate}/hr tracked` : "Untracked",
         );
 
       // 13. Revenue vs Expenses Paired Bar Chart
@@ -600,7 +703,7 @@ export function WidgetRenderer({
           0,
           ...monthlyStats.map((m) => Math.max(m.revenueCents, m.expensesCents)),
         );
-        const maxChartVal = rawMax > 0 ? rawMax : 500000; // Reference ceiling
+        const maxChartVal = rawMax;
         const topLabel = formatCents(maxChartVal, activeCurrency);
         const midLabel = formatCents(Math.round(maxChartVal / 2), activeCurrency);
 
@@ -617,7 +720,9 @@ export function WidgetRenderer({
                   </h3>
                   {!isCompact && (
                     <p className="analytics-creative-subtitle">
-                      6-month cashflow velocity and contractor payouts
+                      {rawMax > 0
+                        ? "6-month cashflow velocity and contractor payouts"
+                        : "No transaction records in this period"}
                     </p>
                   )}
                 </div>
@@ -671,11 +776,11 @@ export function WidgetRenderer({
                 {monthlyStats.map((m, i) => {
                   const cx = 82 + i * 78;
                   const revHeight =
-                    rawMax > 0 && m.revenueCents > 0
+                    maxChartVal > 0 && m.revenueCents > 0
                       ? Math.max(8, Math.round((m.revenueCents / maxChartVal) * 102))
                       : 4;
                   const expHeight =
-                    rawMax > 0 && m.expensesCents > 0
+                    maxChartVal > 0 && m.expensesCents > 0
                       ? Math.max(8, Math.round((m.expensesCents / maxChartVal) * 102))
                       : 4;
                   const revY = 135 - revHeight;
@@ -817,7 +922,10 @@ export function WidgetRenderer({
       case "collection-rate-gauge": {
         const radius = 40;
         const circumference = 2 * Math.PI * radius;
-        const strokeDashoffset = circumference * (1 - paidRatioPct / 100);
+        const hasInvoices = filteredInvoices.length > 0;
+        const strokeDashoffset = hasInvoices
+          ? circumference * (1 - paidRatioPct / 100)
+          : circumference;
 
         return (
           <div
@@ -829,8 +937,12 @@ export function WidgetRenderer({
               <h3 className="text-sm font-semibold text-content-neutral-900 tracking-tight">
                 Collection Gauge
               </h3>
-              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-surface-emerald-50 text-content-emerald-700 border border-line-emerald-200/60">
-                {paidRatioPct}% Collected
+              <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${
+                hasInvoices
+                  ? "bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200/60"
+                  : "bg-surface-neutral-100 text-content-neutral-600 border-line-neutral-200"
+              }`}>
+                {hasInvoices ? `${paidRatioPct}% Collected` : "No Invoices"}
               </span>
             </div>
 
@@ -871,25 +983,33 @@ export function WidgetRenderer({
                       isCompact ? "text-lg" : "text-2xl"
                     }`}
                   >
-                    {paidRatioPct}%
+                    {hasInvoices ? `${paidRatioPct}%` : "N/A"}
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="analytics-gauge-legend">
-              <span className="analytics-gauge-badge text-content-emerald-700">
-                <span className="w-2 h-2 rounded-full bg-surface-emerald-500" />
-                {paidCount} Paid
-              </span>
-              <span className="analytics-gauge-badge text-content-amber-700">
-                <span className="w-2 h-2 rounded-full bg-surface-amber-500" />
-                {pendingCount} Unpaid
-              </span>
-              {overdueInvoices.length > 0 && (
-                <span className="analytics-gauge-badge text-content-rose-700">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  {overdueInvoices.length} Overdue
+              {hasInvoices ? (
+                <>
+                  <span className="analytics-gauge-badge text-content-emerald-700">
+                    <span className="w-2 h-2 rounded-full bg-surface-emerald-500" />
+                    {paidCount} Paid
+                  </span>
+                  <span className="analytics-gauge-badge text-content-amber-700">
+                    <span className="w-2 h-2 rounded-full bg-surface-amber-500" />
+                    {pendingCount} Unpaid
+                  </span>
+                  {overdueInvoices.length > 0 && (
+                    <span className="analytics-gauge-badge text-content-rose-700">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" />
+                      {overdueInvoices.length} Overdue
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-[11px] text-content-neutral-400 text-center w-full">
+                  No billing records available in period
                 </span>
               )}
             </div>
@@ -919,8 +1039,12 @@ export function WidgetRenderer({
               </div>
 
               <div className="space-y-2">
-                {overdueInvoices.length === 0 ? (
+                {invoices.length === 0 ? (
                   <div className="py-6 text-center text-xs text-content-neutral-400">
+                    No invoices recorded.
+                  </div>
+                ) : overdueInvoices.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-content-neutral-500">
                     No overdue accounts. All settled.
                   </div>
                 ) : (
@@ -1077,9 +1201,24 @@ export function WidgetRenderer({
               </div>
 
               <div className="space-y-2">
-                {activeTasks.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-content-neutral-400">
-                    No active deliverables.
+                {tasks.length === 0 ? (
+                  <div className="py-6 px-3 text-center rounded-xl bg-surface-neutral-50/70 border border-dashed border-line-neutral-200">
+                    <Kanban className="w-5 h-5 text-content-neutral-400 mx-auto mb-1.5" />
+                    <p className="text-xs font-semibold text-content-neutral-700">
+                      No Tasks Recorded
+                    </p>
+                    <p className="text-[11px] text-content-neutral-500 mt-0.5">
+                      Deliverables appear here when created or tracked from an advance-paid invoice.
+                    </p>
+                  </div>
+                ) : activeTasks.length === 0 ? (
+                  <div className="py-6 px-3 text-center rounded-xl bg-surface-emerald-50/40 border border-line-emerald-200/60">
+                    <p className="text-xs font-semibold text-content-emerald-800">
+                      All Deliverables Completed
+                    </p>
+                    <p className="text-[11px] text-content-emerald-600 mt-0.5">
+                      {tasks.length} {tasks.length === 1 ? "task" : "tasks"} settled in done column.
+                    </p>
                   </div>
                 ) : (
                   activeTasks.slice(0, isCompact ? 2 : 3).map((t) => (
@@ -1113,12 +1252,18 @@ export function WidgetRenderer({
             </div>
 
             <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between text-xs text-content-neutral-500">
-              <span>{activeTasks.length} in sprint</span>
+              <span>
+                {tasks.length === 0
+                  ? "Unavailable · 0 tasks"
+                  : activeTasks.length === 0
+                    ? `${tasks.length} completed`
+                    : `${activeTasks.length} in sprint`}
+              </span>
               <Link
-                href="/outsourcing"
+                href="/tasks"
                 className="text-content-neutral-700 hover:text-content-neutral-900 font-medium text-[11px]"
               >
-                Payouts →
+                Board →
               </Link>
             </div>
           </div>
@@ -1153,10 +1298,19 @@ export function WidgetRenderer({
           : ""
       }`}
     >
-      {/* Edit Mode Quick Actions Toolbar */}
-      {isEditing && (
-        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 p-1 bg-surface/95 rounded-xl border border-line-neutral-200/90 shadow-md backdrop-blur-xs select-none">
-          {onMoveLeft && (
+      {/* Quick Actions Toolbar on Dashboard:
+          Displays on card hover (or persistently in Customize Layout mode).
+          Offers instant Remove from Dashboard (X), Resize toggle (Square vs Standard),
+          and directional reorder buttons (Move Left / Right). */}
+      {source === "dashboard" && (
+        <div
+          className={`absolute top-2 right-2 z-30 flex items-center gap-1 p-1 bg-surface/95 rounded-xl border border-line-neutral-200/90 shadow-md backdrop-blur-xs select-none transition-all duration-150 ${
+            isEditing
+              ? "opacity-100 ring-1 ring-line-purple-300"
+              : "opacity-0 group-hover:opacity-100"
+          }`}
+        >
+          {isEditing && onMoveLeft && (
             <button
               type="button"
               onClick={(e) => {
@@ -1170,7 +1324,7 @@ export function WidgetRenderer({
             </button>
           )}
 
-          {onMoveRight && (
+          {isEditing && onMoveRight && (
             <button
               type="button"
               onClick={(e) => {
