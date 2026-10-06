@@ -10,6 +10,8 @@ import type {
   CatalogItem,
   NewCatalogItemInput,
   CatalogItemPatchInput,
+  InvoicePayment,
+  RecordPaymentInput,
 } from "../src/types/billing";
 import type {
   AppSettings,
@@ -52,6 +54,12 @@ contextBridge.exposeInMainWorld("billflow", {
       ipcRenderer.invoke("invoices:update", id, patch),
     setStatus: (id: string, status: InvoiceStatus): Promise<InvoiceWithClient> =>
       ipcRenderer.invoke("invoices:setStatus", id, status),
+    recordPayment: (input: RecordPaymentInput): Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }> =>
+      ipcRenderer.invoke("invoices:recordPayment", input),
+    listPayments: (invoiceId: string): Promise<InvoicePayment[]> =>
+      ipcRenderer.invoke("invoices:listPayments", invoiceId),
+    exportPdf: (invoiceId: string): Promise<{ success: boolean; filePath: string }> =>
+      ipcRenderer.invoke("invoices:exportPdf", invoiceId),
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("invoices:remove", id),
   },

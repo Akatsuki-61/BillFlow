@@ -26,6 +26,14 @@ export const newClientSchema = z.object({
     .or(z.literal("")),
 });
 
+export const newInvoiceItemSchema = z.object({
+  id: z.string().optional(),
+  description: z.string().trim().min(1, "Description is required").max(500),
+  quantity: z.number().int().positive("Quantity must be positive").default(1),
+  unitPriceCents: z.number().int().nonnegative("Unit price must be non-negative"),
+  catalogId: z.string().nullable().optional(),
+});
+
 export const newInvoiceSchema = z.object({
   clientId: z.string().min(1).optional(),
   newClient: newClientSchema.optional(),
@@ -33,11 +41,17 @@ export const newInvoiceSchema = z.object({
   code: z.string().trim().min(1).max(40).optional(),
   catalogItemId: z.string().trim().nullable().optional(),
   title: z.string().trim().max(160).optional(),
+  items: z.array(newInvoiceItemSchema).optional(),
+  discountCents: z.number().int().nonnegative().optional().default(0),
+  taxCents: z.number().int().nonnegative().optional().default(0),
+  advanceCents: z.number().int().nonnegative().optional().default(0),
+  deliveryUrl: z.string().trim().url().nullable().optional().or(z.literal("")),
+  notes: z.string().trim().max(1000).nullable().optional(),
   amountCents: z.number().int().nonnegative("Amount must be positive"),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
   issueDate: z.string().optional(),
   dueDate: z.string().nullable().optional(),
-  status: z.enum(["DRAFT", "UNPAID", "PAID", "OVERDUE"]).default("UNPAID"),
+  status: z.enum(["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"]).default("UNPAID"),
 }).refine(input => Boolean(input.clientId) !== Boolean(input.newClient), "Select a client or provide new client details.");
 
 export const invoicePatchSchema = z.object({
@@ -45,10 +59,25 @@ export const invoicePatchSchema = z.object({
   clientId: z.string().min(1).optional(),
   catalogItemId: z.string().trim().nullable().optional(),
   title: z.string().trim().max(160).optional(),
+  items: z.array(newInvoiceItemSchema).optional(),
+  discountCents: z.number().int().nonnegative().optional(),
+  taxCents: z.number().int().nonnegative().optional(),
+  advanceCents: z.number().int().nonnegative().optional(),
+  deliveryUrl: z.string().trim().url().nullable().optional().or(z.literal("")),
+  notes: z.string().trim().max(1000).nullable().optional(),
   amountCents: z.number().int().nonnegative().optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
   dueDate: z.string().nullable().optional(),
-  status: z.enum(["DRAFT", "UNPAID", "PAID", "OVERDUE"]).optional(),
+  status: z.enum(["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"]).optional(),
+});
+
+export const recordPaymentSchema = z.object({
+  invoiceId: z.string().min(1),
+  amountCents: z.number().int().positive("Payment amount must be greater than 0"),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("LKR"),
+  receivedAt: z.string().optional(),
+  reference: z.string().trim().max(200).optional().default(""),
+  requestId: z.string().uuid().optional(),
 });
 
 export const catalogPriceSchema = z.string().trim().regex(/^\d+(?:\.\d{1,2})?$/, "Price must be a non-negative amount with up to two decimal places.").refine(value => Number.isSafeInteger(Math.round(Number(value) * 100)), "Price is too large.");

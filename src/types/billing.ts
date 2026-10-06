@@ -47,6 +47,43 @@ export interface NewClientInput {
 
 export type InvoiceStatus = "DRAFT" | "UNPAID" | "ADVANCE_PAID" | "PAID" | "OVERDUE";
 
+export interface InvoiceItem {
+  id: string;
+  invoiceId: string;
+  catalogId?: string | null;
+  description: string;
+  quantity: number;
+  unitPriceCents: number;
+  position: number;
+}
+
+export interface NewInvoiceItemInput {
+  id?: string;
+  catalogId?: string | null;
+  description: string;
+  quantity: number;
+  unitPriceCents: number;
+}
+
+export interface InvoicePayment {
+  id: string;
+  invoiceId: string;
+  amountCents: number;
+  currency: Currency;
+  receivedAt: string;
+  reference: string;
+  requestId: string;
+}
+
+export interface RecordPaymentInput {
+  invoiceId: string;
+  amountCents: number;
+  currency?: Currency;
+  receivedAt?: string;
+  reference?: string;
+  requestId?: string;
+}
+
 export interface Invoice {
   id: string;
   code: string;
@@ -69,6 +106,8 @@ export interface Invoice {
   dueDate?: string | null;
   status: InvoiceStatus;
   paidCents: number;
+  items?: InvoiceItem[];
+  payments?: InvoicePayment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -76,6 +115,8 @@ export interface Invoice {
 export interface InvoiceWithClient extends Invoice {
   clientName: string;
   clientEmail?: string;
+  items?: InvoiceItem[];
+  payments?: InvoicePayment[];
 }
 
 export interface NewInvoiceInput {
@@ -85,6 +126,12 @@ export interface NewInvoiceInput {
   code?: string;
   catalogItemId?: string | null;
   title?: string;
+  items?: NewInvoiceItemInput[];
+  discountCents?: number;
+  taxCents?: number;
+  advanceCents?: number;
+  deliveryUrl?: string | null;
+  notes?: string | null;
   amountCents: number;
   currency: Currency;
   issueDate?: string;
@@ -97,6 +144,12 @@ export interface InvoicePatchInput {
   clientId?: string;
   catalogItemId?: string | null;
   title?: string;
+  items?: NewInvoiceItemInput[];
+  discountCents?: number;
+  taxCents?: number;
+  advanceCents?: number;
+  deliveryUrl?: string | null;
+  notes?: string | null;
   amountCents?: number;
   currency?: Currency;
   dueDate?: string | null;
