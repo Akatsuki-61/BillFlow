@@ -43,6 +43,13 @@
       "when": 1791234000000,
       "tag": "0005_workflow_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791235000000,
+      "tag": "0006_work_order_notes",
+      "breakpoints": true
     }
   ]
 }

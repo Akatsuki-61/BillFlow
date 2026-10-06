@@ -15,6 +15,12 @@ import {
 } from "@/lib/widgets/widgetDefinitions";
 import { WidgetDisplaySize } from "@/types/widgets";
 
+// Action descriptor for interactive toast notifications (e.g., clickable "Undo" button)
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface WidgetContextType {
   dashboardWidgets: string[];
   analyticsWidgets: string[];
@@ -23,6 +29,9 @@ interface WidgetContextType {
   isDragging: boolean;
   draggedWidgetId: string | null;
   toastMessage: string | null;
+  toastAction: ToastAction | null;
+  canUndo: boolean;
+  undoDashboard: () => void;
   setIsDashboardEditing: (editing: boolean) => void;
   setDraggedWidgetId: (id: string | null) => void;
   setIsDragging: (dragging: boolean) => void;
@@ -39,7 +48,7 @@ interface WidgetContextType {
   toggleWidgetSize: (id: string) => void;
   reorderDashboardWidgets: (newOrder: string[]) => void;
   moveDashboardWidget: (fromIndex: number, toIndex: number) => void;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, action?: ToastAction) => void;
 }
 
 const WidgetContext = createContext<WidgetContextType | null>(null);
@@ -66,14 +75,41 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastAction, setToastAction] = useState<ToastAction | null>(null);
+
+  // History stack for dashboard layout operations (tracks up to 15 prior states for undo)
+  const [dashboardHistory, setDashboardHistory] = useState<string[][]>([]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
-  const showToast = useCallback((msg: string) => {
+  /**
+   * Dispatches an interactive toast notification with optional action button (e.g. Undo).
+   * Automatically clears itself after 4.5 seconds.
+   */
+  const showToast = useCallback((msg: string, action?: ToastAction) => {
     setToastMessage(msg);
+    setToastAction(action || null);
     setTimeout(() => {
       setToastMessage((curr) => (curr === msg ? null : curr));
-    }, 3200);
+      setToastAction((curr) => (curr === action ? null : curr));
+    }, 4500);
   }, []);
+
+  /**
+   * Reverts the most recent dashboard layout mutation (add, remove, drag-drop, or reorder).
+   * Restores previous widget ID array from the history stack.
+   */
+  const undoDashboard = useCallback(() => {
+    setDashboardHistory((history) => {
+      if (history.length === 0) return history;
+      const previousState = history[history.length - 1];
+      const newHistory = history.slice(0, history.length - 1);
+      setDashboardWidgets(previousState);
+      showToast("Reverted dashboard change");
+      return newHistory;
+    });
+  }, [showToast]);
+
+  const canUndo = dashboardHistory.length > 0;
 
   // Keep server and hydration output identical, then load browser preferences once.
   const hydrated = useSyncExternalStore(
@@ -145,6 +181,10 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
     }
   }, [widgetSizes, isInitialized]);
 
+  /**
+   * Adds a widget to the dashboard layout.
+   * Pushes current layout to history stack enabling one-click or Cmd+Z undo.
+   */
   const pinToDashboard = useCallback(
     (id: string) => {
       const meta = WIDGET_CATALOG.find((w) => w.id === id);
@@ -155,13 +195,22 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
           showToast(`"${title}" is already on your Dashboard`);
           return prev;
         }
-        showToast(`Added "${title}" to Dashboard`);
+        // Save snapshot before mutating
+        setDashboardHistory((hist) => [...hist.slice(-15), prev]);
+        showToast(`Added "${title}" to Dashboard`, {
+          label: "Undo",
+          onClick: undoDashboard,
+        });
         return [...prev, id];
       });
     },
-    [showToast],
+    [showToast, undoDashboard],
   );
 
+  /**
+   * Removes a widget from the dashboard.
+   * Pushes current layout to history stack so the removal can be immediately undone.
+   */
   const removeFromDashboard = useCallback(
     (id: string) => {
       const meta = WIDGET_CATALOG.find((w) => w.id === id);
@@ -169,11 +218,16 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
 
       setDashboardWidgets((prev) => {
         if (!prev.includes(id)) return prev;
-        showToast(`Removed "${title}" from Dashboard`);
+        // Save snapshot before mutating
+        setDashboardHistory((hist) => [...hist.slice(-15), prev]);
+        showToast(`Removed "${title}" from Dashboard`, {
+          label: "Undo",
+          onClick: undoDashboard,
+        });
         return prev.filter((item) => item !== id);
       });
     },
-    [showToast],
+    [showToast, undoDashboard],
   );
 
   const toggleDashboard = useCallback(
@@ -224,11 +278,17 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   }, [showToast]);
 
   const resetToDefaults = useCallback(() => {
-    setDashboardWidgets(DEFAULT_DASHBOARD_WIDGET_IDS);
+    setDashboardWidgets((prev) => {
+      setDashboardHistory((hist) => [...hist.slice(-15), prev]);
+      return DEFAULT_DASHBOARD_WIDGET_IDS;
+    });
     setAnalyticsWidgets(DEFAULT_ANALYTICS_WIDGET_IDS);
     setWidgetSizes({});
-    showToast("Widgets reset to default arrangement");
-  }, [showToast]);
+    showToast("Widgets reset to default arrangement", {
+      label: "Undo",
+      onClick: undoDashboard,
+    });
+  }, [showToast, undoDashboard]);
 
   const getWidgetSize = useCallback(
     (id: string): WidgetDisplaySize => {
@@ -260,10 +320,28 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
     [getWidgetSize, setWidgetSize],
   );
 
-  const reorderDashboardWidgets = useCallback((newOrder: string[]) => {
-    setDashboardWidgets(newOrder);
-  }, []);
+  /**
+   * Replaces dashboard widget order (e.g. from drag and drop operations).
+   * Pushes current arrangement to history stack before applying new order.
+   */
+  const reorderDashboardWidgets = useCallback(
+    (newOrder: string[]) => {
+      setDashboardWidgets((prev) => {
+        setDashboardHistory((hist) => [...hist.slice(-15), prev]);
+        showToast("Reordered widgets", {
+          label: "Undo",
+          onClick: undoDashboard,
+        });
+        return newOrder;
+      });
+    },
+    [showToast, undoDashboard],
+  );
 
+  /**
+   * Moves a widget from one index to another (e.g. via Move Left / Move Right buttons or drop).
+   * Pushes current snapshot to history stack so the drop or move is undoable.
+   */
   const moveDashboardWidget = useCallback(
     (fromIndex: number, toIndex: number) => {
       setDashboardWidgets((prev) => {
@@ -271,17 +349,29 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
           fromIndex < 0 ||
           fromIndex >= prev.length ||
           toIndex < 0 ||
-          toIndex >= prev.length
+          toIndex >= prev.length ||
+          fromIndex === toIndex
         ) {
           return prev;
         }
+        const movedId = prev[fromIndex];
+        const meta = WIDGET_CATALOG.find((w) => w.id === movedId);
+        const title = meta ? meta.title : "Widget";
+
+        // Snapshot current state for undo
+        setDashboardHistory((hist) => [...hist.slice(-15), prev]);
         const updated = [...prev];
         const [moved] = updated.splice(fromIndex, 1);
         updated.splice(toIndex, 0, moved);
+
+        showToast(`Moved "${title}"`, {
+          label: "Undo",
+          onClick: undoDashboard,
+        });
         return updated;
       });
     },
-    [],
+    [showToast, undoDashboard],
   );
 
   return (
@@ -294,6 +384,9 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
         isDragging,
         draggedWidgetId,
         toastMessage,
+        toastAction,
+        canUndo,
+        undoDashboard,
         setIsDashboardEditing,
         setDraggedWidgetId,
         setIsDragging,

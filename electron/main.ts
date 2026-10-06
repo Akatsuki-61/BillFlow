@@ -8,6 +8,7 @@ import { registerInvoiceHandlers } from "./ipc/invoices";
 import { registerDashboardHandlers } from "./ipc/dashboard";
 import { registerSettingsHandlers } from "./ipc/settings";
 import { registerVendorHandlers } from "./ipc/vendors";
+import { registerWorkOrderHandlers } from "./ipc/workOrders";
 import { registerAnalyticsHandlers } from "./ipc/analytics";
 
 import { registerTaskHandlers } from "./ipc/tasks";
@@ -176,6 +177,7 @@ app.whenReady().then(() => {
   registerThemeHandlers();
   registerSettingsHandlers(broadcastDataChanged);
   registerVendorHandlers(broadcastDataChanged);
+  registerWorkOrderHandlers(broadcastDataChanged);
   registerAnalyticsHandlers();
   registerCatalogHandlers(broadcastDataChanged);
   registerTaskHandlers(broadcastDataChanged);

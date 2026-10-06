@@ -31,6 +31,7 @@ import type { UpdateSettingsInput, ExportDataPayload } from "@/types/settings";
 import { useTheme } from "@/context/ThemeContext";
 import { useSearchParams } from "next/navigation";
 import type { Currency } from "@/types/billing";
+import { getCurrencySymbol } from "@/lib/format";
 
 type SettingsTab = "profile" | "invoices" | "data" | "appearance";
 
@@ -719,32 +720,50 @@ function SettingsContent() {
                       Currency & Payment Terms
                     </h2>
                     <p className="text-xs text-content-neutral-500 mt-0.5">
-                      Choose the default currency and payment timeline applied
-                      to new invoices.
+                      Configure your primary system currency and invoice payment timeline. Changes automatically apply across Dashboard, Invoices, Clients, Tasks, Outsourcing, Catalog, Expenses, and Analytics.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-content-neutral-700 mb-1">
-                        Default Currency
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-medium text-content-neutral-700">
+                          Default Currency
+                        </label>
+                        <span className="text-[11px] font-semibold text-accent">
+                          Active: {formState.defaultCurrency || "USD"} ({getCurrencySymbol(formState.defaultCurrency || "USD").trim()})
+                        </span>
+                      </div>
                       <select
                         value={formState.defaultCurrency || "USD"}
-                        onChange={(e) =>
-                          setFormState({
-                            ...formState,
-                            defaultCurrency: e.target.value as Currency,
-                          })
-                        }
+                        onChange={async (e) => {
+                          const newCurrency = e.target.value as Currency;
+                          setFormState((prev) => ({
+                            ...prev,
+                            defaultCurrency: newCurrency,
+                          }));
+                          try {
+                            await updateSettings({ defaultCurrency: newCurrency });
+                            showToast(
+                              `System currency updated to ${newCurrency} (${getCurrencySymbol(newCurrency).trim()}). All pages now use this currency.`,
+                              "success"
+                            );
+                          } catch (err: unknown) {
+                            const msg = err instanceof Error ? err.message : "Failed to update currency";
+                            showToast(msg, "error");
+                          }
+                        }}
                         className="ui-field w-full px-3.5 border border-line-neutral-200 focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-colors"
                       >
                         <option value="USD">USD ($ - US Dollar)</option>
                         <option value="EUR">EUR (€ - Euro)</option>
-                        <option value="LKR">LKR (Rs - Sri Lanka Rupee)</option>
+                        <option value="LKR">LKR (Rs. - Sri Lanka Rupee)</option>
                         <option value="GBP">GBP (£ - British Pound)</option>
-                        <option value="CAD">CAD ($ - Canadian Dollar)</option>
+                        <option value="CAD">CAD (CA$ - Canadian Dollar)</option>
                       </select>
+                      <p className="text-[11px] text-content-neutral-400 mt-1">
+                        Changing this setting automatically syncs currency type across all pages in BillFlow.
+                      </p>
                     </div>
 
                     <div>

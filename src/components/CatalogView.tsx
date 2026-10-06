@@ -23,7 +23,8 @@ import {
   FileText,
   CheckCircle2,
 } from "lucide-react";
-import { useCatalog, useClients, useInvoices } from "@/lib/data/DataProvider";
+import { useCatalog, useClients, useInvoices, useData } from "@/lib/data/DataProvider";
+import { getCurrencySymbol } from "@/lib/format";
 import type {
   CatalogItem,
   CatalogIconType,
@@ -76,6 +77,7 @@ export default function CatalogView() {
   } = useCatalog();
   const { clients } = useClients();
   const { createInvoice } = useInvoices();
+  const { activeCurrency, settings } = useData();
 
   const [saving,setSaving] = useState(false);
   const createRequest = useRef<string | null>(null);
@@ -108,7 +110,7 @@ export default function CatalogView() {
   const [quickInvoiceItem, setQuickInvoiceItem] = useState<CatalogItem | null>(null);
   const [invoiceClientId, setInvoiceClientId] = useState<string>("");
   const [invoiceAmount, setInvoiceAmount] = useState<string>("");
-  const [invoiceCurrency, setInvoiceCurrency] = useState<string>("LKR");
+  const [invoiceCurrency, setInvoiceCurrency] = useState<string>(settings?.defaultCurrency || activeCurrency || "LKR");
   const [invoiceDueDate, setInvoiceDueDate] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,7 +150,7 @@ export default function CatalogView() {
   const [newCategory, setNewCategory] = useState<"Development" | "Design" | "Consulting" | "Licensing">("Development");
   const [newSku, setNewSku] = useState("DEV-002");
   const [newPrice, setNewPrice] = useState("");
-  const [newCurrency, setNewCurrency] = useState("LKR");
+  const [newCurrency, setNewCurrency] = useState(settings?.defaultCurrency || activeCurrency || "LKR");
   const [newUnit, setNewUnit] = useState("/ Hourly");
   const [newDescription, setNewDescription] = useState("");
 
@@ -221,7 +223,7 @@ export default function CatalogView() {
     setNewSku(`SKU-0${catalogItems.length + 50}`);
     setNewPrice("");
     setNewDescription("");
-    setNewCurrency("LKR");
+    setNewCurrency(settings?.defaultCurrency || activeCurrency || "LKR");
   };
 
   const handleOpenEdit = (item: CatalogItem) => {
@@ -394,6 +396,13 @@ export default function CatalogView() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
+          <span
+            className="analytics-currency-badge"
+            title="System currency configured in Settings"
+          >
+            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
+          </span>
+
           <div className="inline-flex items-center shadow-[0_1px_2px_rgba(0,0,0,0.03)] rounded-xl">
             <button
               type="button"
@@ -932,7 +941,7 @@ export default function CatalogView() {
                   </label>
                   <select
                     value={newCurrency}
-                    onChange={(e) => setNewCurrency(e.target.value)}
+                    onChange={(e) => setNewCurrency(e.target.value as Currency)}
                     className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
                   >
                     <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>

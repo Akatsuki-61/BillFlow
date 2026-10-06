@@ -30,6 +30,8 @@ import {
   FileSpreadsheet,
   Receipt,
 } from "lucide-react";
+import { useActiveCurrency } from "@/lib/data/DataProvider";
+import { formatCurrencyAmount, getCurrencySymbol } from "@/lib/format";
 
 interface ExpenseItem {
   id: string;
@@ -56,6 +58,7 @@ interface ExpenseItem {
 const initialExpenses: ExpenseItem[] = [];
 
 export default function ExpensesPage() {
+  const { activeCurrency } = useActiveCurrency();
   const [expenses, setExpenses] = useState<ExpenseItem[]>(initialExpenses);
   const [selectedCategory, setSelectedCategory] =
     useState<string>("All Categories");
@@ -154,7 +157,7 @@ export default function ExpensesPage() {
       description: formData.description || "General operational expense",
       category: formData.category,
       amount: parsedAmount,
-      currency: "USD",
+      currency: activeCurrency,
       deductible: formData.deductible,
       hasReceipt: formData.receiptAttached,
       receiptName: formData.receiptAttached
@@ -169,12 +172,12 @@ export default function ExpensesPage() {
       description: "",
       category: "SOFTWARE",
       amount: "",
-      date: "2023-10-25",
+      date: new Date().toISOString().slice(0, 10),
       deductible: true,
       receiptAttached: true,
     });
     showToast(
-      `Logged expense of $${parsedAmount.toFixed(2)} for ${newExpense.merchant}!`,
+      `Logged expense of ${formatCurrencyAmount(parsedAmount, activeCurrency)} for ${newExpense.merchant}!`,
     );
   };
 
@@ -202,8 +205,15 @@ export default function ExpensesPage() {
         title="Expenses"
         description="Manage and track your business expenditures."
       >
-        {/* Right Controls: Category Dropdown & EXPORT PDF Button */}
+        {/* Right Controls: Currency Badge, Category Dropdown & EXPORT PDF Button */}
         <div className="flex items-center gap-3">
+          <span
+            className="analytics-currency-badge"
+            title="System currency configured in Settings"
+          >
+            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
+          </span>
+
           <div className="relative">
             <select
               value={selectedCategory}
@@ -243,12 +253,12 @@ export default function ExpensesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
           label="Total Expenses"
-          value={`$${totalExpensesAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+          value={formatCurrencyAmount(totalExpensesAmount, activeCurrency)}
           footer="logged business expenses"
         />
         <MetricCard
           label="Deductible"
-          value={`$${deductibleAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+          value={formatCurrencyAmount(deductibleAmount, activeCurrency)}
           footer={`${deductiblePercentage}% of total expenses`}
         />
         <MetricCard
@@ -365,7 +375,7 @@ export default function ExpensesPage() {
                       {/* Amount Column */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         <span className="font-bold text-sm text-content-neutral-900 font-mono">
-                          ${item.amount.toFixed(2)}
+                          {formatCurrencyAmount(item.amount, item.currency || activeCurrency)}
                         </span>
                       </td>
 
@@ -590,7 +600,7 @@ export default function ExpensesPage() {
 
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Amount (USD $) *
+                      Amount ({activeCurrency} {getCurrencySymbol(activeCurrency).trim()}) *
                     </label>
                     <input
                       type="number"

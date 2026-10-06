@@ -16,7 +16,7 @@ import type {
   InvoicePayment,
   RecordPaymentInput,
 } from "@/types/billing";
-import { getActiveInvoiceCurrency } from "@/lib/format";
+import { getActiveInvoiceCurrency, getSystemCurrency } from "@/lib/format";
 import type {
   AppSettings,
   UpdateSettingsInput,
@@ -26,6 +26,11 @@ import type {
   VendorItem,
   NewVendorInput,
   VendorPatchInput,
+  WorkOrderItem,
+  NewWorkOrderInput,
+  WorkOrderPatchInput,
+  ReviewWorkOrderInput,
+  RecordWorkOrderPayoutInput,
 } from "@/types/outsourcing";
 import type {
   AnalyticsSummaryPayload,
@@ -43,6 +48,7 @@ interface DataContextType {
   clients: ClientWithStats[];
   invoices: InvoiceWithClient[];
   vendors: VendorItem[];
+  workOrders: WorkOrderItem[];
   catalogItems: CatalogItem[];
   dashboard: DashboardSummary | null;
   settings: AppSettings | null;
@@ -70,7 +76,18 @@ interface DataContextType {
   updateVendor: (id: string, patch: VendorPatchInput) => Promise<VendorItem>;
   setVendorStatus: (id: string, status: "PENDING" | "PAID") => Promise<VendorItem>;
   deleteVendor: (id: string) => Promise<void>;
-  getAnalyticsSummary: (period?: string) => Promise<AnalyticsSummaryPayload>;
+  createWorkOrder: (input: NewWorkOrderInput) => Promise<WorkOrderItem>;
+  updateWorkOrder: (id: string, patch: WorkOrderPatchInput) => Promise<WorkOrderItem>;
+  reviewWorkOrder: (input: ReviewWorkOrderInput) => Promise<WorkOrderItem>;
+  recordWorkOrderPayout: (input: RecordWorkOrderPayoutInput) => Promise<WorkOrderItem>;
+  removeWorkOrderPayout: (workOrderId: string) => Promise<WorkOrderItem>;
+  setWorkOrderPayoutStatus: (id: string, status: "PENDING" | "PAID") => Promise<WorkOrderItem>;
+  deleteWorkOrder: (id: string) => Promise<void>;
+  getAnalyticsSummary: (
+    period?: string,
+    currency?: string,
+    accountingMethod?: "accrual" | "cash",
+  ) => Promise<AnalyticsSummaryPayload>;
   updateSettings: (patch: UpdateSettingsInput) => Promise<AppSettings>;
   getDbPath: () => Promise<string>;
   revealDbFile: () => Promise<void>;
@@ -81,12 +98,15 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | null>(null);
 
-// In-memory fallback repository when running outside Electron
+// In-memory fallback repository when running outside Electron.
+// Financial integrity guarantee: automatic business sample seeding is strictly disabled
+// outside an explicit demo mode (isDemoMode()). Memory collections initialize clean.
 let memoryCatalog: CatalogItem[] = [];
 let memoryClients: ClientWithStats[] = [];
 let memoryInvoices: InvoiceWithClient[] = [];
 const memoryPayments: InvoicePayment[] = [];
 let memoryVendors: VendorItem[] = [];
+let memoryWorkOrders: WorkOrderItem[] = [];
 let memorySettings: AppSettings = {
   id: "default",
   businessName: "",
@@ -139,6 +159,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [invoices, setInvoices] = useState<InvoiceWithClient[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [vendors, setVendors] = useState<VendorItem[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrderItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -151,7 +172,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const loadSnapshot = useCallback(async () => {
     if (checkIsElectron() && window.billflow) {
-      const [clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers] = await Promise.all([
+      const [clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, workOrdersList] = await Promise.all([
         window.billflow.clients.list(),
         window.billflow.invoices.list(),
         window.billflow.dashboard.summary(),
@@ -160,10 +181,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         window.billflow.catalog.list(),
         window.billflow.tasks.list(),
         window.billflow.tracking.pending(),
+        window.billflow.workOrders?.list().catch(() => [] as WorkOrderItem[]) ?? Promise.resolve([] as WorkOrderItem[]),
       ]);
-      return { clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, isElectron: true };
+      return { clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, workOrders: workOrdersList || [], isElectron: true };
     }
-    return { ...await loadBrowserSnapshot(), tasks: [] as TaskItem[], trackingOffers: [] as TrackingOffer[], isElectron: false };
+    return { ...await loadBrowserSnapshot(), tasks: [] as TaskItem[], trackingOffers: [] as TrackingOffer[], workOrders: memoryWorkOrders, isElectron: false };
   }, [checkIsElectron]);
 
   const refresh = useCallback(() => {
@@ -176,6 +198,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setClients(snapshot.clients);
     setInvoices(snapshot.invoices);
     setVendors(snapshot.vendors);
+    setWorkOrders(snapshot.workOrders || []);
     setCatalogItems(snapshot.catalogItems);
     setSettings(snapshot.settings);
     setDashboard(snapshot.dashboard);
@@ -637,88 +660,332 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const getAnalyticsSummary = useCallback(async (period?: string): Promise<AnalyticsSummaryPayload> => {
-    if (checkIsElectron() && window.billflow) {
-      return await window.billflow.analytics.summary(period);
+  /**
+   * Creates a new per-job payable work order.
+   * In Electron desktop mode, saves to SQLite `work_orders`, updates the linked task
+   * with outsourcing metadata, and increments the vendor balance.
+   */
+  const createWorkOrder = async (input: NewWorkOrderInput): Promise<WorkOrderItem> => {
+    if (checkIsElectron() && window.billflow?.workOrders) {
+      const created = await window.billflow.workOrders.create(input);
+      await refresh();
+      return created;
     } else {
-      let totalRevenueCents = 0;
-      let paidCents = 0;
-      let pendingReceivablesCents = 0;
-      let unpaidCount = 0;
-      let overdueCents = 0;
-      let overdueCount = 0;
-      const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
+      const id = input.id || `wo-${Date.now()}`;
+      const vendor = memoryVendors.find((v) => v.id === input.vendorId);
+      const invoice = memoryInvoices.find((i) => i.id === input.invoiceId);
+      const newWo: WorkOrderItem = {
+        id,
+        vendorId: input.vendorId,
+        taskId: input.taskId,
+        invoiceId: input.invoiceId,
+        scope: input.scope,
+        feeCents: input.feeCents,
+        currency: input.currency,
+        dueDate: input.dueDate || null,
+        status: input.status || "todo",
+        deliveryUrl: input.deliveryUrl || null,
+        vendorName: vendor?.name || "Contractor",
+        vendorService: vendor?.service,
+        vendorEmail: vendor?.email,
+        vendorPhone: vendor?.phone,
+        vendorIconType: vendor?.iconType,
+        invoiceCode: invoice?.code || "INV-000",
+        clientId: invoice?.clientId || null,
+        clientName: invoice?.clientName || "Client",
+        payoutStatus: "PENDING",
+      };
+      memoryWorkOrders = [newWo, ...memoryWorkOrders];
+      await refresh();
+      return newWo;
+    }
+  };
 
-      for (const inv of memoryInvoices) {
-        if (inv.status !== "DRAFT") {
-          totalRevenueCents += inv.amountCents;
-          if (inv.status === "PAID") {
-            paidCents += inv.amountCents;
-          } else {
-            const unpaid = Math.max(0, inv.amountCents - (inv.paidCents || 0));
-            pendingReceivablesCents += unpaid;
-            unpaidCount += 1;
-            if (inv.status === "OVERDUE" || (inv.dueDate && inv.dueDate < todayStr)) {
-              overdueCents += unpaid;
-              overdueCount += 1;
+  /**
+   * Updates an existing work order.
+   */
+  const updateWorkOrder = async (id: string, patch: WorkOrderPatchInput): Promise<WorkOrderItem> => {
+    if (checkIsElectron() && window.billflow?.workOrders) {
+      const updated = await window.billflow.workOrders.update(id, patch);
+      await refresh();
+      return updated;
+    } else {
+      const idx = memoryWorkOrders.findIndex((w) => w.id === id);
+      if (idx === -1) throw new Error("Work order not found");
+      const existing = memoryWorkOrders[idx];
+      const updated: WorkOrderItem = {
+        ...existing,
+        ...patch,
+        completedAt: patch.status === "done" && !existing.completedAt ? new Date().toISOString() : existing.completedAt,
+      };
+      memoryWorkOrders[idx] = updated;
+      await refresh();
+      return updated;
+    }
+  };
+
+  /**
+   * Reviews contractor deliverable, saves deliverable URL & notes, and updates the original task after review.
+   */
+  const reviewWorkOrder = async (input: ReviewWorkOrderInput): Promise<WorkOrderItem> => {
+    if (checkIsElectron() && window.billflow?.workOrders) {
+      const updated = await window.billflow.workOrders.review(input);
+      await refresh();
+      return updated;
+    } else {
+      const updated = await updateWorkOrder(input.workOrderId, {
+        status: input.status,
+        deliveryUrl: input.deliveryUrl,
+        notes: input.notes,
+        updateTask: input.updateTask,
+        taskStatus: input.status,
+      });
+      return updated;
+    }
+  };
+
+  /**
+   * Explicitly records a vendor payout entry in SQLite `vendor_payouts`.
+   * Separate from contractor work progress.
+   */
+  const recordWorkOrderPayout = async (input: RecordWorkOrderPayoutInput): Promise<WorkOrderItem> => {
+    if (checkIsElectron() && window.billflow?.workOrders) {
+      const updated = await window.billflow.workOrders.recordPayout(input);
+      await refresh();
+      return updated;
+    } else {
+      const wo = memoryWorkOrders.find((w) => w.id === input.workOrderId);
+      if (!wo) throw new Error("Work order not found");
+      const updated: WorkOrderItem = {
+        ...wo,
+        payoutStatus: "PAID",
+        payoutId: `payout-${Date.now()}`,
+        paidAt: input.paidAt || new Date().toISOString(),
+        payoutAmountCents: input.amountCents ?? wo.feeCents,
+      };
+      const idx = memoryWorkOrders.findIndex((w) => w.id === input.workOrderId);
+      memoryWorkOrders[idx] = updated;
+      await refresh();
+      return updated;
+    }
+  };
+
+  /**
+   * Removes a vendor payout entry, reverting payout status to PENDING
+   * without affecting contractor work status.
+   */
+  const removeWorkOrderPayout = async (workOrderId: string): Promise<WorkOrderItem> => {
+    if (checkIsElectron() && window.billflow?.workOrders) {
+      const updated = await window.billflow.workOrders.removePayout(workOrderId);
+      await refresh();
+      return updated;
+    } else {
+      const wo = memoryWorkOrders.find((w) => w.id === workOrderId);
+      if (!wo) throw new Error("Work order not found");
+      const updated: WorkOrderItem = {
+        ...wo,
+        payoutStatus: "PENDING",
+        payoutId: null,
+        paidAt: null,
+      };
+      const idx = memoryWorkOrders.findIndex((w) => w.id === workOrderId);
+      memoryWorkOrders[idx] = updated;
+      await refresh();
+      return updated;
+    }
+  };
+
+  /**
+   * Toggles settlement payout status between PENDING and PAID.
+   * Automatically creates or removes records in `vendor_payouts`.
+   */
+  const setWorkOrderPayoutStatus = async (id: string, status: "PENDING" | "PAID"): Promise<WorkOrderItem> => {
+    if (status === "PAID") {
+      return recordWorkOrderPayout({ workOrderId: id });
+    } else {
+      return removeWorkOrderPayout(id);
+    }
+  };
+
+  /**
+   * Deletes a work order and unlinks outsourcing info from the associated task.
+   */
+  const deleteWorkOrder = async (id: string): Promise<void> => {
+    if (checkIsElectron() && window.billflow?.workOrders) {
+      await window.billflow.workOrders.remove(id);
+      await refresh();
+    } else {
+      memoryWorkOrders = memoryWorkOrders.filter((w) => w.id !== id);
+      await refresh();
+    }
+  };
+
+  const getAnalyticsSummary = useCallback(
+    async (
+      period?: string,
+      currency?: string,
+      accountingMethod: "accrual" | "cash" = "accrual",
+    ): Promise<AnalyticsSummaryPayload> => {
+      if (checkIsElectron() && window.billflow) {
+        return await window.billflow.analytics.summary(period, currency, accountingMethod);
+      } else {
+        let totalRevenueCents = 0;
+        let paidCents = 0;
+        let pendingReceivablesCents = 0;
+        let unpaidCount = 0;
+        let overdueCents = 0;
+        let overdueCount = 0;
+        const now = new Date();
+        const todayStr = now.toISOString().split("T")[0];
+
+        const targetInvoices = memoryInvoices.filter((inv) => {
+          if (currency && currency !== "all" && currency !== "ALL") {
+            if (inv.currency && inv.currency.toUpperCase() !== currency.toUpperCase()) {
+              return false;
+            }
+          }
+          return true;
+        });
+
+        for (const inv of targetInvoices) {
+          if (inv.status !== "DRAFT") {
+            totalRevenueCents += inv.amountCents;
+            const collected = inv.paidCents ?? (inv.status === "PAID" ? inv.amountCents : 0);
+            paidCents += collected;
+            if (inv.status === "PAID") {
+              // fully settled
+            } else {
+              const unpaid = Math.max(0, inv.amountCents - collected);
+              pendingReceivablesCents += unpaid;
+              unpaidCount += 1;
+              if (inv.status === "OVERDUE" || (inv.dueDate && inv.dueDate < todayStr)) {
+                overdueCents += unpaid;
+                overdueCount += 1;
+              }
             }
           }
         }
+
+        let totalOutsourcedCents = 0;
+        let paidCostCents = 0;
+        for (const v of memoryVendors) {
+          const balance = (Number(v.currentBalance) || 0) * 100;
+          totalOutsourcedCents += balance;
+          if (v.status === "PAID") {
+            paidCostCents += balance;
+          }
+        }
+
+        // Preserve losses (no Math.max(0, ...))
+        const accrualProfitCents = totalRevenueCents - totalOutsourcedCents;
+        const cashProfitCents = paidCents - paidCostCents;
+        const netProfitCents = accountingMethod === "cash" ? cashProfitCents : accrualProfitCents;
+        const isLoss = netProfitCents < 0;
+
+        const baseForMargin = accountingMethod === "cash" ? paidCents : totalRevenueCents;
+        const marginPct = baseForMargin > 0 ? Math.round((netProfitCents / baseForMargin) * 100) : 0;
+        const paidRatioPct = totalRevenueCents > 0 ? Math.round((paidCents / totalRevenueCents) * 100) : 0;
+        const avgInvoiceCents = targetInvoices.length > 0 ? Math.round(totalRevenueCents / targetInvoices.length) : 0;
+
+        let topClientName = "Diversified";
+        let topClientMaxBilled = 0;
+        const clientBilledMap = new Map<string, number>();
+        for (const inv of targetInvoices) {
+          if (inv.status !== "DRAFT") {
+            const prev = clientBilledMap.get(inv.clientName) || 0;
+            clientBilledMap.set(inv.clientName, prev + inv.amountCents);
+          }
+        }
+        for (const [name, billed] of clientBilledMap.entries()) {
+          if (billed > topClientMaxBilled) {
+            topClientMaxBilled = billed;
+            topClientName = name;
+          }
+        }
+        const topClientPct = totalRevenueCents > 0 ? Math.min(100, Math.round((topClientMaxBilled / totalRevenueCents) * 100)) : 0;
+
+        const totalActiveMs = tasks.reduce((sum, t) => sum + (t.activeMilliseconds || 0), 0);
+        const totalHours = totalActiveMs / 3600000;
+        const effectiveHourlyRate = totalHours > 0 ? Math.round((netProfitCents / 100) / totalHours) : 0;
+
+        const monthlyBurn = Math.round(totalOutsourcedCents / 6);
+        const cashflowRunwayMonths = monthlyBurn > 0 && paidCents > 0 ? Math.min(36, Math.max(1, Math.round(paidCents / monthlyBurn))) : 0;
+
+        const monthlyTrends: AnalyticsMonthlyTrend[] = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          const label = d.toLocaleString("default", { month: "short" });
+          monthlyTrends.push({
+            key,
+            label,
+            revenueCents: 0,
+            expensesCents: 0,
+            profitCents: 0,
+            marginPct: 0,
+          });
+        }
+
+        for (const inv of targetInvoices) {
+          if (!inv.issueDate || inv.status === "DRAFT") continue;
+          const invKey = inv.issueDate.slice(0, 7);
+          const target = monthlyTrends.find((m) => m.key === invKey);
+          if (target) {
+            target.revenueCents += inv.amountCents;
+          }
+        }
+
+        for (const v of memoryVendors) {
+          const vDate = v.payoutDueDate || v.createdAt;
+          if (!vDate) continue;
+          const vKey = vDate.slice(0, 7);
+          const target = monthlyTrends.find((m) => m.key === vKey);
+          if (target) {
+            target.expensesCents += (Number(v.currentBalance) || 0) * 100;
+          }
+        }
+
+        for (const m of monthlyTrends) {
+          // Preserve losses across months
+          m.profitCents = m.revenueCents - m.expensesCents;
+          m.marginPct = m.revenueCents > 0 ? Math.round((m.profitCents / m.revenueCents) * 100) : 0;
+        }
+
+        return {
+          totalRevenueCents,
+          billedAmountCents: totalRevenueCents,
+          paidCents,
+          collectedCents: paidCents,
+          pendingReceivablesCents,
+          outstandingCents: pendingReceivablesCents,
+          totalOutsourcedCents,
+          committedCostCents: totalOutsourcedCents,
+          paidCostCents,
+          accrualProfitCents,
+          cashProfitCents,
+          netProfitCents,
+          marginPct,
+          isLoss,
+          unpaidCount,
+          overdueCents,
+          overdueCount,
+          paidRatioPct,
+          avgInvoiceCents,
+          activeClientsCount: memoryClients.length,
+          vendorsCount: memoryVendors.length,
+          topClientName,
+          topClientPct,
+          effectiveHourlyRate,
+          cashflowRunwayMonths,
+          monthlyTrends,
+          currency: currency || "ALL",
+          period: period || "all",
+          accountingMethod,
+        };
       }
-
-      let totalOutsourcedCents = 0;
-      for (const v of memoryVendors) {
-        totalOutsourcedCents += v.currentBalance * 100;
-      }
-
-      const netProfitCents = Math.max(0, totalRevenueCents - totalOutsourcedCents);
-      const marginPct = totalRevenueCents > 0 ? Math.round((netProfitCents / totalRevenueCents) * 100) : 100;
-      const paidRatioPct = totalRevenueCents > 0 ? Math.round((paidCents / totalRevenueCents) * 100) : 100;
-      const avgInvoiceCents = memoryInvoices.length > 0 ? Math.round(totalRevenueCents / memoryInvoices.length) : 0;
-      const topClientName = memoryClients[0]?.name || "N/A";
-      const topClientPct = totalRevenueCents > 0 ? 35 : 0;
-      const effectiveHourlyRate = avgInvoiceCents > 0 ? Math.max(65, Math.round(avgInvoiceCents / 1600)) : 145;
-      const monthlyBurn = Math.max(100000, Math.round(totalOutsourcedCents / 3));
-      const availableLiquidity = paidCents + Math.round(pendingReceivablesCents * 0.75);
-      const cashflowRunwayMonths = monthlyBurn > 0 ? Math.min(24, Math.max(1, Math.round(availableLiquidity / monthlyBurn))) : 12;
-
-      const monthlyTrends: AnalyticsMonthlyTrend[] = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        const label = d.toLocaleString("default", { month: "short" });
-        monthlyTrends.push({
-          key,
-          label,
-          revenueCents: 0,
-          expensesCents: Math.round(totalOutsourcedCents / 6),
-          profitCents: 0,
-          marginPct: 100,
-        });
-      }
-
-      return {
-        totalRevenueCents,
-        totalOutsourcedCents,
-        netProfitCents,
-        marginPct,
-        pendingReceivablesCents,
-        unpaidCount,
-        overdueCents,
-        overdueCount,
-        paidRatioPct,
-        avgInvoiceCents,
-        activeClientsCount: memoryClients.length,
-        vendorsCount: memoryVendors.length,
-        topClientName,
-        topClientPct,
-        effectiveHourlyRate,
-        cashflowRunwayMonths,
-        monthlyTrends,
-      };
-    }
-  }, [checkIsElectron]);
+    },
+    [checkIsElectron, tasks],
+  );
 
   const requireDesktop = () => {
     if (!checkIsElectron() || !window.billflow) throw new Error("Open the BillFlow desktop app to save workflow records.");
@@ -748,11 +1015,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   const activeCurrency: Currency = useMemo(() => {
-    return getActiveInvoiceCurrency(
+    return getSystemCurrency(
+      settings?.defaultCurrency,
       invoices,
-      (settings?.defaultCurrency as Currency) || "USD",
+      "USD",
     );
-  }, [invoices, settings]);
+  }, [settings?.defaultCurrency, invoices]);
 
   return (
     <DataContext.Provider
@@ -763,6 +1031,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         clients,
         invoices,
         vendors,
+        workOrders,
         catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems,
         dashboard,
         settings,
@@ -786,6 +1055,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updateVendor,
         setVendorStatus,
         deleteVendor,
+        createWorkOrder,
+        updateWorkOrder,
+        reviewWorkOrder,
+        recordWorkOrderPayout,
+        removeWorkOrderPayout,
+        setWorkOrderPayoutStatus,
+        deleteWorkOrder,
         getAnalyticsSummary,
         updateSettings,
         getDbPath,
@@ -915,9 +1191,47 @@ export function useVendors() {
   };
 }
 
-export function useAnalyticsSummary(period?: string) {
-  const { getAnalyticsSummary, clients, invoices, vendors } = useData();
-  const query = useMemo(() => ({ period, clients, invoices, vendors }), [period, clients, invoices, vendors]);
+export function useWorkOrders() {
+  const {
+    workOrders,
+    isLoading,
+    error,
+    createWorkOrder,
+    updateWorkOrder,
+    reviewWorkOrder,
+    recordWorkOrderPayout,
+    removeWorkOrderPayout,
+    setWorkOrderPayoutStatus,
+    deleteWorkOrder,
+    refresh,
+  } = useData();
+
+  return {
+    workOrders,
+    isLoading,
+    error,
+    createWorkOrder,
+    updateWorkOrder,
+    reviewWorkOrder,
+    recordWorkOrderPayout,
+    removeWorkOrderPayout,
+    setWorkOrderPayoutStatus,
+    deleteWorkOrder,
+    refresh,
+  };
+}
+
+export function useAnalyticsSummary(
+  period?: string,
+  currency?: string,
+  accountingMethod?: "accrual" | "cash",
+) {
+  const { getAnalyticsSummary, clients, invoices, vendors, activeCurrency } = useData();
+  const effectiveCurrency = currency ?? activeCurrency;
+  const query = useMemo(
+    () => ({ period, currency: effectiveCurrency, accountingMethod, clients, invoices, vendors }),
+    [period, effectiveCurrency, accountingMethod, clients, invoices, vendors]
+  );
   const [result, setResult] = useState<{
     query: typeof query;
     data: AnalyticsSummaryPayload | null;
@@ -926,7 +1240,7 @@ export function useAnalyticsSummary(period?: string) {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchSummary = useCallback((isCurrent: () => boolean = () => true) =>
-    getAnalyticsSummary(query.period).then((data) => {
+    getAnalyticsSummary(query.period, query.currency, query.accountingMethod).then((data) => {
       if (isCurrent()) setResult({ query, data, error: null });
     }).catch((err: unknown) => {
       if (isCurrent()) {

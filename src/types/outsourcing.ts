@@ -89,3 +89,85 @@ export interface VendorPatchInput {
   payoutDueDate?: string | null;
   notes?: string | null;
 }
+
+/**
+ * Per-job payable work order entity stored in SQLite `work_orders` table.
+ * Links an agreed contractor scope, fee, and deadline to a specific vendor,
+ * sprint deliverable task, and parent client invoice.
+ */
+export interface WorkOrderItem {
+  id: string;
+  vendorId: string;
+  taskId: string;
+  invoiceId: string;
+  scope: string;
+  feeCents: number;
+  currency: Currency;
+  dueDate?: string | null;
+  status: "todo" | "in-progress" | "review" | "done";
+  completedAt?: string | null;
+  deliveryUrl?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+
+  // Joined/hydrated fields for display:
+  vendorName?: string;
+  vendorService?: string;
+  vendorEmail?: string | null;
+  vendorPhone?: string | null;
+  vendorIconType?: "design" | "devops" | "legal" | "development";
+  taskTitle?: string;
+  invoiceCode?: string;
+  clientId?: string | null;
+  clientName?: string;
+  payoutStatus?: "PENDING" | "PAID";
+  payoutId?: string | null;
+  paidAt?: string | null;
+  payoutAmountCents?: number | null;
+}
+
+export interface NewWorkOrderInput {
+  id?: string;
+  vendorId: string;
+  taskId: string;
+  invoiceId: string;
+  scope: string;
+  feeCents: number;
+  currency: Currency;
+  dueDate?: string | null;
+  status?: "todo" | "in-progress" | "review" | "done";
+  deliveryUrl?: string | null;
+  notes?: string | null;
+}
+
+export interface WorkOrderPatchInput {
+  vendorId?: string;
+  scope?: string;
+  feeCents?: number;
+  currency?: Currency;
+  dueDate?: string | null;
+  status?: "todo" | "in-progress" | "review" | "done";
+  completedAt?: string | null;
+  deliveryUrl?: string | null;
+  notes?: string | null;
+  payoutStatus?: "PENDING" | "PAID";
+  updateTask?: boolean;
+  taskStatus?: "todo" | "in-progress" | "review" | "done";
+}
+
+/** Input for reviewing contractor deliverable and syncing to original task */
+export interface ReviewWorkOrderInput {
+  workOrderId: string;
+  status: "todo" | "in-progress" | "review" | "done";
+  deliveryUrl?: string | null;
+  notes?: string | null;
+  updateTask?: boolean;
+}
+
+/** Input for explicitly recording a vendor payout entry */
+export interface RecordWorkOrderPayoutInput {
+  workOrderId: string;
+  amountCents?: number;
+  currency?: Currency;
+  paidAt?: string;
+}

@@ -37,6 +37,7 @@ import {
   formatCents,
   formatDateDisplay,
   parseAmountToCents,
+  getCurrencySymbol,
 } from "@/lib/format";
 import type {
   InvoiceWithClient,
@@ -73,7 +74,7 @@ function InvoicesContent() {
   const { clients } = useClients();
   const { catalogItems } = useCatalog();
   const { settings } = useSettings();
-  const { workflow } = useData();
+  const { workflow, activeCurrency } = useData();
 
   const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
   const [clientName, setClientName] = useState("");
@@ -93,7 +94,9 @@ function InvoicesContent() {
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState<boolean>(false);
   const [newCode, setNewCode] = useState("");
   const [newClientId, setNewClientId] = useState("");
-  const [newCurrency, setNewCurrency] = useState<Currency>("LKR");
+  const [newCurrency, setNewCurrency] = useState<Currency>(
+    settings?.defaultCurrency || activeCurrency || "USD",
+  );
   const [newDueDate, setNewDueDate] = useState("");
   const [newStatus, setNewStatus] = useState<InvoiceStatus>("UNPAID");
   const [newLineItems, setNewLineItems] = useState<LineItemDraft[]>([
@@ -215,7 +218,7 @@ function InvoicesContent() {
   const handleOpenAddModal = async () => {
     requestId.current = null;
     setClientMode(clients.length ? "existing" : "new");
-    setNewCurrency(settings?.defaultCurrency || "LKR");
+    setNewCurrency(settings?.defaultCurrency || activeCurrency || "USD");
     const due = new Date();
     due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
     setNewDueDate(due.toISOString().slice(0, 10));
@@ -267,7 +270,7 @@ function InvoicesContent() {
     : null;
 
   // Compute live totals for metric cards
-  const primaryCurrency = clients[0]?.currency || "LKR";
+  const primaryCurrency = activeCurrency || settings?.defaultCurrency || clients[0]?.currency || "USD";
 
   const totalOutstandingCents = allInvoices.reduce((sum, inv) => {
     if (inv.status !== "DRAFT") {
@@ -677,6 +680,12 @@ function InvoicesContent() {
         description="Manage itemized billing, advance deposits, vector PDF exports, and payments."
       >
         <div className="flex items-center gap-3">
+          <span
+            className="analytics-currency-badge"
+            title="System currency configured in Settings"
+          >
+            Currency: {primaryCurrency} ({getCurrencySymbol(primaryCurrency).trim()})
+          </span>
           <Button variant="primary" type="button" onClick={handleOpenAddModal}>
             <Plus className="w-4 h-4 text-content-neutral-700" strokeWidth={2.2} />
             <span>New Invoice</span>
