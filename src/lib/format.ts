@@ -19,6 +19,12 @@ export const getCurrencySymbol = (currency: string): string => {
 export const formatCents = (cents: number, currency: string = "USD"): string => {
   const symbol = getCurrencySymbol(currency);
   const amount = (cents || 0) / 100;
+  if (amount < 0) {
+    return `-${symbol}${Math.abs(amount).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
   return `${symbol}${amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -46,6 +52,21 @@ export const getActiveInvoiceCurrency = (
     return timeB - timeA;
   });
   return (sorted[0]?.currency as Currency) || (fallbackCurrency as Currency) || "USD";
+};
+
+/**
+ * Returns the effective system currency chosen by the user in Settings.
+ * Prioritizes user's explicit defaultCurrency setting, then latest invoice currency, then USD fallback.
+ */
+export const getSystemCurrency = (
+  settingsCurrency?: string | null,
+  invoices?: Array<{ currency?: string; updatedAt?: string; createdAt?: string; issueDate?: string }>,
+  fallbackCurrency: string = "USD"
+): Currency => {
+  if (settingsCurrency && settingsCurrency.trim() !== "") {
+    return settingsCurrency as Currency;
+  }
+  return getActiveInvoiceCurrency(invoices, fallbackCurrency);
 };
 
 export const parseAmountToCents = (val: string | number): number => {

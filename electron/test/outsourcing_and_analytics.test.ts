@@ -3,13 +3,27 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { initDatabase, closeDatabaseForTesting, getDb } from "../db";
-import { clients, invoices, vendors } from "../db/schema";
+import { clients, invoices, vendors, tasks, workOrders, vendorPayouts, attachments } from "../db/schema";
 import { listVendors } from "../ipc/vendors";
+import {
+  listWorkOrders,
+  getWorkOrder,
+  createWorkOrder,
+  updateWorkOrder,
+  reviewWorkOrder,
+  recordWorkOrderPayout,
+  removeWorkOrderPayout,
+} from "../ipc/workOrders";
 import { getAnalyticsSummary } from "../ipc/analytics";
-import { newVendorSchema } from "../validation";
+import {
+  newVendorSchema,
+  reviewWorkOrderSchema,
+  recordWorkOrderPayoutSchema,
+} from "../validation";
 import { eq } from "drizzle-orm";
 import {
   getActiveInvoiceCurrency,
+  getSystemCurrency,
   formatCents,
   formatCurrencyAmount,
   getCurrencySymbol,
@@ -361,9 +375,78 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(summary.overdueCents).toBe(250000); // $2,500 overdue
       expect(summary.overdueCount).toBe(1);
       expect(summary.avgInvoiceCents).toBe(500000); // (2500 + 7500) / 2 = $5,000
-      expect(summary.effectiveHourlyRate).toBeGreaterThan(0);
-      expect(summary.cashflowRunwayMonths).toBeGreaterThan(0);
+      // Without tracked task hours, hourly rate is truthfully 0 (no synthetic 145/hr fallback)
+      expect(summary.effectiveHourlyRate).toBe(0);
+      // Actual runway: $7,500 paid / ($1,500 vendor cost / 6 months burn = $250/mo) = 30 months
+      expect(summary.cashflowRunwayMonths).toBe(30);
       expect(summary.monthlyTrends.length).toBe(6);
+
+      // Now insert a task with tracked active hours (2.0 hours = 7,200,000 ms)
+      db.insert(tasks).values({
+        id: "task-test-hourly",
+        title: "Penetration Testing Review",
+        status: "in-progress",
+        priority: "medium",
+        category: "Development",
+        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
+        createdAt: "2026-10-01",
+        updatedAt: "2026-10-01",
+        activeMilliseconds: 7200000,
+      }).run();
+
+      const summaryWithHours = getAnalyticsSummary();
+      // Net profit = $10,000 revenue - $1,500 vendor = $8,500 net profit
+      // Realized hourly rate = $8,500 / 2 hours = $4,250/hr
+      expect(summaryWithHours.effectiveHourlyRate).toBe(4250);
+    });
+
+    it("enforces financial integrity: truthful zero metrics on empty states and correct collection on ADVANCE_PAID", () => {
+      const db = getDb();
+      db.delete(invoices).run();
+      db.delete(vendors).run();
+      db.delete(clients).run();
+      db.delete(tasks).run();
+
+      // 1. Completely empty database -> all ratios and derived metrics are truthfully 0 (not 100% or synthetic defaults)
+      const emptySummary = getAnalyticsSummary();
+      expect(emptySummary.totalRevenueCents).toBe(0);
+      expect(emptySummary.totalOutsourcedCents).toBe(0);
+      expect(emptySummary.netProfitCents).toBe(0);
+      expect(emptySummary.marginPct).toBe(0); // 0%, never 100%
+      expect(emptySummary.paidRatioPct).toBe(0); // 0%, never 100%
+      expect(emptySummary.effectiveHourlyRate).toBe(0); // 0, never synthetic 145
+      expect(emptySummary.cashflowRunwayMonths).toBe(0); // 0, never synthetic 12
+      expect(emptySummary.topClientPct).toBe(0);
+
+      // 2. Invoice with ADVANCE_PAID status
+      const clientId = "cli-adv-test";
+      db.insert(clients).values({
+        id: clientId,
+        name: "Acme Logistics",
+        contactPerson: "Alice",
+        email: "alice@acme.io",
+        currency: "LKR",
+        hasQuickBill: true,
+      }).run();
+
+      // Total 90,000 LKR invoice with 45,000 LKR advance recorded
+      db.insert(invoices).values({
+        id: "inv-adv-1",
+        code: "INV-2026-ADV",
+        clientId,
+        amountCents: 9000000, // 90,000.00
+        paidCents: 4500000, // 45,000.00 advance received
+        currency: "LKR",
+        issueDate: "2026-10-06",
+        status: "ADVANCE_PAID",
+      }).run();
+
+      const advanceSummary = getAnalyticsSummary();
+      expect(advanceSummary.totalRevenueCents).toBe(9000000);
+      expect(advanceSummary.paidCents).toBe(4500000); // Actually counted in paidCents
+      expect(advanceSummary.pendingReceivablesCents).toBe(4500000); // 45,000 remaining due
+      expect(advanceSummary.paidRatioPct).toBe(50); // 50% collected
+      expect(advanceSummary.unpaidCount).toBe(1); // 1 invoice with remaining balance
     });
 
     it("dynamically recalculates metrics when outsourcing vendors change", () => {
@@ -510,6 +593,505 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(activeCurrency).toBe("CAD");
       expect(getCurrencySymbol(activeCurrency)).toBe("CA$");
       expect(formatCents(500000, activeCurrency)).toBe("CA$5,000.00");
+    });
+
+    it("links user settings defaultCurrency across the system and allows user to choose currency", () => {
+      const sampleInvoices = [
+        { currency: "USD", updatedAt: "2026-10-01T00:00:00.000Z" },
+      ];
+
+      // 1. When user chooses LKR in Settings, system currency becomes LKR
+      let systemCurrency = getSystemCurrency("LKR", sampleInvoices);
+      expect(systemCurrency).toBe("LKR");
+      expect(getCurrencySymbol(systemCurrency)).toBe("Rs. ");
+      expect(formatCents(9000000, systemCurrency)).toBe("Rs. 90,000.00");
+
+      // 2. When user switches currency in Settings to EUR, system currency becomes EUR
+      systemCurrency = getSystemCurrency("EUR", sampleInvoices);
+      expect(systemCurrency).toBe("EUR");
+      expect(getCurrencySymbol(systemCurrency)).toBe("€");
+      expect(formatCents(250000, systemCurrency)).toBe("€2,500.00");
+
+      // 3. When user switches currency in Settings to GBP, system currency becomes GBP
+      systemCurrency = getSystemCurrency("GBP", sampleInvoices);
+      expect(systemCurrency).toBe("GBP");
+      expect(getCurrencySymbol(systemCurrency)).toBe("£");
+      expect(formatCents(120000, systemCurrency)).toBe("£1,200.00");
+
+      // 4. When user switches currency in Settings to CAD, system currency becomes CAD
+      systemCurrency = getSystemCurrency("CAD", sampleInvoices);
+      expect(systemCurrency).toBe("CAD");
+      expect(getCurrencySymbol(systemCurrency)).toBe("CA$");
+      expect(formatCents(340000, systemCurrency)).toBe("CA$3,400.00");
+
+      // 5. When user switches currency in Settings to USD, system currency becomes USD
+      systemCurrency = getSystemCurrency("USD", sampleInvoices);
+      expect(systemCurrency).toBe("USD");
+      expect(getCurrencySymbol(systemCurrency)).toBe("$");
+      expect(formatCents(500000, systemCurrency)).toBe("$5,000.00");
+
+      // 6. When settings currency is absent, it gracefully falls back to active invoice currency
+      const fallbackFromInvoices = getSystemCurrency(null, sampleInvoices);
+      expect(fallbackFromInvoices).toBe("USD");
+    });
+  });
+
+  describe("Outsourcing: Completion, Delivery and Payouts Separately", () => {
+    it("validates review inputs and payout recording schemas strictly", () => {
+      // 1. Valid review input
+      const validReview = reviewWorkOrderSchema.safeParse({
+        workOrderId: "wo-rev-1",
+        status: "done",
+        deliveryUrl: "https://github.com/Chethaka/client-website",
+        notes: "Frontend components verified against design specs.",
+        updateTask: true,
+      });
+      expect(validReview.success).toBe(true);
+
+      // 2. Reject invalid delivery URL format
+      const invalidUrl = reviewWorkOrderSchema.safeParse({
+        workOrderId: "wo-rev-1",
+        status: "done",
+        deliveryUrl: "not-a-valid-url-format",
+      });
+      expect(invalidUrl.success).toBe(false);
+
+      // 3. Reject notes exceeding 2000 characters
+      const oversizedNotes = reviewWorkOrderSchema.safeParse({
+        workOrderId: "wo-rev-1",
+        status: "review",
+        notes: "a".repeat(2001),
+      });
+      expect(oversizedNotes.success).toBe(false);
+
+      // 4. Valid payout recording input
+      const validPayout = recordWorkOrderPayoutSchema.safeParse({
+        workOrderId: "wo-payout-1",
+        amountCents: 3000000,
+        currency: "LKR",
+        paidAt: "2026-10-06T12:00:00.000Z",
+      });
+      expect(validPayout.success).toBe(true);
+
+      // 5. Reject non-positive payout amount
+      const zeroPayout = recordWorkOrderPayoutSchema.safeParse({
+        workOrderId: "wo-payout-1",
+        amountCents: 0,
+        currency: "LKR",
+      });
+      expect(zeroPayout.success).toBe(false);
+    });
+
+    it("tracks contractor work completion completely separately from payout entries", () => {
+      const db = getDb();
+      db.delete(workOrders).run();
+      db.delete(vendorPayouts).run();
+      db.delete(tasks).run();
+      db.delete(invoices).run();
+      db.delete(vendors).run();
+      db.delete(clients).run();
+
+      // Seed client, invoice, task, and vendor
+      const clientId = "cli-sep-1";
+      db.insert(clients).values({
+        id: clientId,
+        name: "Lanka Digital Media",
+        contactPerson: "Nimal Perera",
+        email: "nimal@lankamedia.lk",
+        currency: "LKR",
+      }).run();
+
+      const invoiceId = "inv-sep-1";
+      db.insert(invoices).values({
+        id: invoiceId,
+        code: "INV-2026-001",
+        clientId,
+        amountCents: 9000000, // 90,000 LKR
+        currency: "LKR",
+        issueDate: "2026-10-06",
+        status: "ADVANCE_PAID",
+        paidCents: 4500000,
+      }).run();
+
+      const taskId = "task-sep-1";
+      db.insert(tasks).values({
+        id: taskId,
+        title: "Business website development",
+        clientId,
+        clientName: "Lanka Digital Media",
+        invoiceId,
+        status: "todo",
+        priority: "high",
+        category: "Development",
+        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }).run();
+
+      const vendorId = "vnd-sep-1";
+      db.insert(vendors).values({
+        id: vendorId,
+        name: "Kasun Silva",
+        service: "Frontend Web Development",
+        email: "kasun@webcraft.lk",
+        balanceCents: 0,
+        status: "PENDING",
+        iconType: "development",
+      }).run();
+
+      // 1. Create work order: initially "todo" and payoutStatus is "PENDING"
+      const createdWo = createWorkOrder({
+        vendorId,
+        taskId,
+        invoiceId,
+        scope: "Implement responsive layout and contact forms",
+        feeCents: 3000000, // 30,000 LKR
+        currency: "LKR",
+        dueDate: "2026-10-15",
+        status: "todo",
+      });
+
+      expect(createdWo.status).toBe("todo");
+      expect(createdWo.payoutStatus).toBe("PENDING");
+      expect(createdWo.payoutId).toBeNull();
+      expect(createdWo.deliveryUrl).toBeNull();
+      expect(createdWo.notes).toBeNull();
+
+      // 2. Contractor starts work: status -> "in-progress"
+      const inProgressWo = updateWorkOrder(createdWo.id, { status: "in-progress" });
+      expect(inProgressWo.status).toBe("in-progress");
+      expect(inProgressWo.payoutStatus).toBe("PENDING"); // Still unpaid
+
+      // 3. Contractor submits deliverable for review: status -> "review"
+      const reviewWo = updateWorkOrder(createdWo.id, {
+        status: "review",
+        deliveryUrl: "https://staging.lankamedia.lk",
+        notes: "Staging build ready for client review.",
+      });
+      expect(reviewWo.status).toBe("review");
+      expect(reviewWo.deliveryUrl).toBe("https://staging.lankamedia.lk");
+      expect(reviewWo.notes).toBe("Staging build ready for client review.");
+      expect(reviewWo.payoutStatus).toBe("PENDING"); // Still unpaid
+
+      // 4. Chethaka approves work: status -> "done"
+      const doneWo = updateWorkOrder(createdWo.id, { status: "done" });
+      expect(doneWo.status).toBe("done");
+      expect(doneWo.completedAt).toBeDefined();
+      // Crucial test: Completing contractor work MUST NOT automatically settle payout!
+      expect(doneWo.payoutStatus).toBe("PENDING");
+      expect(doneWo.payoutId).toBeNull();
+
+      // Check SQLite table directly: no vendor payout records exist
+      const existingPayouts = db.select().from(vendorPayouts).where(eq(vendorPayouts.workOrderId, createdWo.id)).all();
+      expect(existingPayouts.length).toBe(0);
+    });
+
+    it("reviews contractor work, retains delivered URL/notes, and synchronizes the original task", () => {
+      const db = getDb();
+      db.delete(workOrders).run();
+      db.delete(vendorPayouts).run();
+      db.delete(tasks).run();
+      db.delete(invoices).run();
+      db.delete(vendors).run();
+      db.delete(clients).run();
+
+      const clientId = "cli-rev-1";
+      db.insert(clients).values({
+        id: clientId,
+        name: "Apex Consulting",
+        contactPerson: "Kamal Gunaratne",
+        email: "kamal@apex.lk",
+        currency: "LKR",
+      }).run();
+
+      const invoiceId = "inv-rev-1";
+      db.insert(invoices).values({
+        id: invoiceId,
+        code: "INV-2026-002",
+        clientId,
+        amountCents: 8000000,
+        currency: "LKR",
+        issueDate: "2026-10-06",
+        status: "ADVANCE_PAID",
+      }).run();
+
+      const taskId = "task-rev-1";
+      db.insert(tasks).values({
+        id: taskId,
+        title: "Frontend Development Retainer",
+        clientId,
+        clientName: "Apex Consulting",
+        invoiceId,
+        status: "in-progress",
+        priority: "medium",
+        category: "Development",
+        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }).run();
+
+      const vendorId = "vnd-rev-1";
+      db.insert(vendors).values({
+        id: vendorId,
+        name: "DevStudio Lanka",
+        service: "Web Engineering",
+        balanceCents: 0,
+        status: "PENDING",
+      }).run();
+
+      const wo = createWorkOrder({
+        vendorId,
+        taskId,
+        invoiceId,
+        scope: "Build responsive pages",
+        feeCents: 2500000,
+        currency: "LKR",
+        status: "in-progress",
+      });
+
+      // Call reviewWorkOrder with updateTask: true
+      const deliverableUrl = "https://github.com/apex-consulting/web-build";
+      const reviewNotes = "Approved PR #14 with verified unit tests and responsive layout.";
+      const reviewedWo = reviewWorkOrder({
+        workOrderId: wo.id,
+        status: "done",
+        deliveryUrl: deliverableUrl,
+        notes: reviewNotes,
+        updateTask: true,
+      });
+
+      // 1. Verify work order retained deliverable URL and notes
+      expect(reviewedWo.status).toBe("done");
+      expect(reviewedWo.deliveryUrl).toBe(deliverableUrl);
+      expect(reviewedWo.notes).toBe(reviewNotes);
+      expect(reviewedWo.completedAt).toBeDefined();
+
+      // 2. Verify original task was updated with delivery URL, status done, and completedAt timestamp
+      const originalTask = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+      expect(originalTask).toBeDefined();
+      expect(originalTask?.status).toBe("done");
+      expect(originalTask?.deliveryUrl).toBe(deliverableUrl);
+      expect(originalTask?.completedAt).toBeDefined();
+    });
+
+    it("records contractor payout independently and manages receipt attachment lifecycle", () => {
+      const db = getDb();
+      db.delete(workOrders).run();
+      db.delete(vendorPayouts).run();
+      db.delete(attachments).run();
+      db.delete(tasks).run();
+      db.delete(invoices).run();
+      db.delete(vendors).run();
+      db.delete(clients).run();
+
+      const clientId = "cli-pay-1";
+      db.insert(clients).values({
+        id: clientId,
+        name: "FinTech Ventures",
+        contactPerson: "Dilshan Silva",
+        email: "dilshan@fintech.lk",
+        currency: "LKR",
+      }).run();
+
+      const invoiceId = "inv-pay-1";
+      db.insert(invoices).values({
+        id: invoiceId,
+        code: "INV-2026-003",
+        clientId,
+        amountCents: 5000000,
+        currency: "LKR",
+        issueDate: "2026-10-06",
+        status: "PAID",
+      }).run();
+
+      const taskId = "task-pay-1";
+      db.insert(tasks).values({
+        id: taskId,
+        title: "API Integration Module",
+        clientId,
+        invoiceId,
+        status: "done",
+        priority: "medium",
+        category: "Development",
+        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }).run();
+
+      const vendorId = "vnd-pay-1";
+      db.insert(vendors).values({
+        id: vendorId,
+        name: "CloudForge Labs",
+        service: "Backend Systems",
+        balanceCents: 0,
+        status: "PENDING",
+      }).run();
+
+      // Create completed work order
+      const wo = createWorkOrder({
+        vendorId,
+        taskId,
+        invoiceId,
+        scope: "API endpoints integration",
+        feeCents: 2000000, // 20,000 LKR
+        currency: "LKR",
+        status: "done",
+        deliveryUrl: "https://api.fintech.lk/v1",
+        notes: "All endpoints passing integration tests.",
+      });
+
+      expect(wo.status).toBe("done");
+      expect(wo.payoutStatus).toBe("PENDING");
+
+      // 1. Record vendor payout entry
+      const paidAtTimestamp = "2026-10-06T14:30:00.000Z";
+      const paidWo = recordWorkOrderPayout({
+        workOrderId: wo.id,
+        amountCents: 2000000,
+        currency: "LKR",
+        paidAt: paidAtTimestamp,
+      });
+
+      expect(paidWo.payoutStatus).toBe("PAID");
+      expect(paidWo.payoutId).toBeDefined();
+      expect(paidWo.paidAt).toBe(paidAtTimestamp);
+      expect(paidWo.payoutAmountCents).toBe(2000000);
+      // Contractor work status remains "done" (paying contractor does not alter deliverable state)
+      expect(paidWo.status).toBe("done");
+      expect(paidWo.deliveryUrl).toBe("https://api.fintech.lk/v1");
+
+      // 2. Attach payment confirmation receipt slip to the payout
+      const payoutId = paidWo.payoutId!;
+      db.insert(attachments).values({
+        id: "att-slip-101",
+        payoutId,
+        originalName: "bank_slip_oct6.pdf",
+        storedName: "stored_bank_slip.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 102400,
+        sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        createdAt: new Date().toISOString(),
+      }).run();
+
+      const attachedReceipts = db.select().from(attachments).where(eq(attachments.payoutId, payoutId)).all();
+      expect(attachedReceipts.length).toBe(1);
+      expect(attachedReceipts[0].originalName).toBe("bank_slip_oct6.pdf");
+
+      // 3. Remove payout entry: reverts payoutStatus to PENDING and cleans up receipt attachments
+      const revertedWo = removeWorkOrderPayout(wo.id);
+      expect(revertedWo.payoutStatus).toBe("PENDING");
+      expect(revertedWo.payoutId).toBeNull();
+      // Work order contractor progress, deliverable URL, and notes are completely retained
+      expect(revertedWo.status).toBe("done");
+      expect(revertedWo.deliveryUrl).toBe("https://api.fintech.lk/v1");
+      expect(revertedWo.notes).toBe("All endpoints passing integration tests.");
+
+      // Check SQLite table: receipt attachment was cleanly removed
+      const remainingReceipts = db.select().from(attachments).where(eq(attachments.payoutId, payoutId)).all();
+      expect(remainingReceipts.length).toBe(0);
+    });
+
+    it("persists deliverable URL, review notes, and independent payout state across database restart", () => {
+      const db = getDb();
+      db.delete(workOrders).run();
+      db.delete(vendorPayouts).run();
+      db.delete(tasks).run();
+      db.delete(invoices).run();
+      db.delete(vendors).run();
+      db.delete(clients).run();
+
+      const clientId = "cli-rst-1";
+      db.insert(clients).values({
+        id: clientId,
+        name: "Colombo Cloud Tech",
+        contactPerson: "Kavinda Fernando",
+        email: "kavinda@colombocloud.lk",
+        currency: "LKR",
+      }).run();
+
+      const invoiceId = "inv-rst-1";
+      db.insert(invoices).values({
+        id: invoiceId,
+        code: "INV-2026-RST",
+        clientId,
+        amountCents: 10000000,
+        currency: "LKR",
+        issueDate: "2026-10-06",
+        status: "ADVANCE_PAID",
+      }).run();
+
+      const taskId = "task-rst-1";
+      db.insert(tasks).values({
+        id: taskId,
+        title: "Docker & CI/CD Pipeline Setup",
+        clientId,
+        invoiceId,
+        status: "in-progress",
+        priority: "high",
+        category: "Development",
+        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }).run();
+
+      const vendorId = "vnd-rst-1";
+      db.insert(vendors).values({
+        id: vendorId,
+        name: "DevOps Global",
+        service: "Infrastructure Automation",
+        balanceCents: 0,
+        status: "PENDING",
+      }).run();
+
+      const createdWo = createWorkOrder({
+        vendorId,
+        taskId,
+        invoiceId,
+        scope: "GitHub Actions workflow and docker-compose configurations",
+        feeCents: 3500000,
+        currency: "LKR",
+        status: "in-progress",
+      });
+
+      // Review work order and update task
+      reviewWorkOrder({
+        workOrderId: createdWo.id,
+        status: "done",
+        deliveryUrl: "https://github.com/Chethaka/devops-pipeline",
+        notes: "Pipelines green. Automated deployment tested on staging.",
+        updateTask: true,
+      });
+
+      // Record payout
+      recordWorkOrderPayout({
+        workOrderId: createdWo.id,
+        amountCents: 3500000,
+        currency: "LKR",
+        paidAt: "2026-10-06T16:00:00.000Z",
+      });
+
+      // --- SIMULATE APP RESTART ---
+      closeDatabaseForTesting();
+      initDatabase(testDbPath);
+
+      // Re-query database after simulated restart
+      const restoredWo = getWorkOrder(createdWo.id);
+      expect(restoredWo).toBeDefined();
+      expect(restoredWo?.status).toBe("done");
+      expect(restoredWo?.deliveryUrl).toBe("https://github.com/Chethaka/devops-pipeline");
+      expect(restoredWo?.notes).toBe("Pipelines green. Automated deployment tested on staging.");
+      expect(restoredWo?.payoutStatus).toBe("PAID");
+      expect(restoredWo?.payoutAmountCents).toBe(3500000);
+      expect(restoredWo?.vendorName).toBe("DevOps Global");
+      expect(restoredWo?.taskTitle).toBe("Docker & CI/CD Pipeline Setup");
+
+      // Verify task in SQLite also retained its delivery URL and done status across restart
+      const reloadedDb = getDb();
+      const restoredTask = reloadedDb.select().from(tasks).where(eq(tasks.id, taskId)).get();
+      expect(restoredTask).toBeDefined();
+      expect(restoredTask?.status).toBe("done");
+      expect(restoredTask?.deliveryUrl).toBe("https://github.com/Chethaka/devops-pipeline");
+      expect(restoredTask?.completedAt).toBeDefined();
     });
   });
 });

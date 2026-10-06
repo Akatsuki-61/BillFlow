@@ -469,3 +469,71 @@
   align-items: center;
   font-size: 12px;
 }
+
+/* Contractor Work Status Pills */
+.wo-status-pill {
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid transparent;
+  transition: all 150ms ease;
+}
+
+.wo-status-pill.status-todo {
+  color: var(--theme-content-neutral-700);
+  background-color: var(--theme-surface-neutral-100);
+  border-color: var(--theme-line-neutral-200);
+}
+
+.wo-status-pill.status-in-progress {
+  color: var(--theme-content-blue-700);
+  background-color: var(--theme-surface-blue-50);
+  border-color: var(--theme-line-blue-200);
+}
+
+.wo-status-pill.status-review {
+  color: var(--theme-content-amber-800);
+  background-color: var(--theme-surface-amber-50);
+  border-color: var(--theme-line-amber-200);
+}
+
+.wo-status-pill.status-done {
+  color: var(--theme-content-emerald-800);
+  background-color: var(--theme-surface-emerald-50);
+  border-color: var(--theme-line-emerald-200);
+}
+
+/* Review Dialog and Deliverables Box */
+.deliverable-review-box {
+  padding: 0.875rem;
+  background-color: var(--theme-surface-neutral-50);
+  border: 1px solid var(--theme-line-neutral-200);
+  border-radius: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Payout Receipt Attachment List */
+.payout-receipt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.payout-receipt-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background-color: var(--theme-surface);
+  border: 1px solid var(--theme-line-neutral-200);
+  font-size: 11.5px;
+}

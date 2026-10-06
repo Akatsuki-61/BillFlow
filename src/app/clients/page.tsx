@@ -23,20 +23,21 @@ import {
   ArrowRight,
   Receipt,
 } from "lucide-react";
-import { useClients, useInvoices } from "@/lib/data/DataProvider";
+import { useClients, useInvoices, useData } from "@/lib/data/DataProvider";
 import {
   formatCents,
   formatDateDisplay,
   parseAmountToCents,
   getCurrencySymbol,
 } from "@/lib/format";
-import type { ClientWithStats } from "@/types/billing";
+import type { ClientWithStats, Currency } from "@/types/billing";
 
 function ClientsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { clients, isLoading, createClient, deleteClient } = useClients();
   const { createInvoice, invoices: allInvoices } = useInvoices();
+  const { activeCurrency, settings } = useData();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const targetClientId = searchParams.get("client");
@@ -70,7 +71,7 @@ function ClientsContent() {
     contactRole: "",
     email: "",
     phone: "",
-    currency: "USD" as "USD" | "LKR" | "EUR",
+    currency: (settings?.defaultCurrency || activeCurrency || "USD") as Currency,
     driveUrl: "",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -129,7 +130,7 @@ function ClientsContent() {
         contactRole: "",
         email: "",
         phone: "",
-        currency: "USD",
+        currency: (settings?.defaultCurrency || activeCurrency || "USD") as Currency,
         driveUrl: "",
       });
       showToast(`Client "${created.name}" added successfully!`);
@@ -230,21 +231,29 @@ function ClientsContent() {
         title="Clients"
         description="Manage your client relationships, contracts, and ledger balance."
       >
-        <Button
-          variant="primary"
-          onClick={() => {
-            setFormErrors({});
-            setIsAddModalOpen(true);
-          }}
-        >
-          <div className="w-4 h-4 flex items-center justify-center">
-            <UserPlus
-              className="w-4 h-4 text-content-neutral-700 transition-transform duration-200 ease-out group-hover:scale-105 group-hover:-translate-y-px group-hover:text-accent"
-              strokeWidth={2}
-            />
-          </div>
-          <span>Add Client</span>
-        </Button>
+        <div className="flex items-center gap-3">
+          <span
+            className="analytics-currency-badge"
+            title="System currency configured in Settings"
+          >
+            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
+          </span>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setFormErrors({});
+              setIsAddModalOpen(true);
+            }}
+          >
+            <div className="w-4 h-4 flex items-center justify-center">
+              <UserPlus
+                className="w-4 h-4 text-content-neutral-700 transition-transform duration-200 ease-out group-hover:scale-105 group-hover:-translate-y-px group-hover:text-accent"
+                strokeWidth={2}
+              />
+            </div>
+            <span>Add Client</span>
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Client Cards Grid */}
@@ -565,14 +574,16 @@ function ClientsContent() {
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          currency: e.target.value as "USD" | "LKR" | "EUR",
+                          currency: e.target.value as Currency,
                         })
                       }
                       className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     >
-                      <option value="USD">USD ($)</option>
-                      <option value="LKR">LKR (Rs.)</option>
-                      <option value="EUR">EUR (€)</option>
+                      <option value="USD">USD ($ - US Dollar)</option>
+                      <option value="EUR">EUR (€ - Euro)</option>
+                      <option value="LKR">LKR (Rs. - Sri Lanka Rupee)</option>
+                      <option value="GBP">GBP (£ - British Pound)</option>
+                      <option value="CAD">CAD (CA$ - Canadian Dollar)</option>
                     </select>
                   </div>
                 </div>
