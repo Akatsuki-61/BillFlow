@@ -1,17 +1,21 @@
 import { ipcMain } from "electron";
 import crypto from "crypto";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc } from "drizzle-orm";
 import { getDb } from "../db";
-import { clients, invoices, settings, catalogItems } from "../db/schema";
-import { newInvoiceSchema, invoicePatchSchema } from "../validation";
+import { clients, invoices, settings, catalogItems, catalogServices, invoiceItems, invoicePayments } from "../db/schema";
+import { newInvoiceSchema, invoicePatchSchema, recordPaymentSchema } from "../validation";
 import { getOrCreateSettings } from "./settings";
 import { AppError, formatError } from "./errors";
+import { saveInvoicePdf } from "./files";
+import { generateInvoicePdfBuffer } from "../pdf-generator";
 import {
   InvoiceWithClient,
   NewInvoiceInput,
   InvoicePatchInput,
   InvoiceStatus,
   Currency,
+  RecordPaymentInput,
+  InvoicePayment,
 } from "../../src/types/billing";
 
 export function getNextInvoiceCode(): string {
@@ -73,13 +77,80 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
     ? allInvoices.filter((r) => r.invoice.clientId === clientId)
     : allInvoices;
 
-  return filtered.map((r) => ({
-    ...r.invoice,
-    currency: r.invoice.currency as Currency,
-    status: r.invoice.status as InvoiceStatus,
-    clientName: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).name : r.clientName || "Unknown Client",
-    clientEmail: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).email : r.clientEmail || undefined,
-  }));
+  return filtered.map((r) => {
+    const items = db
+      .select()
+      .from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, r.invoice.id))
+      .orderBy(asc(invoiceItems.position))
+      .all();
+
+    const payments = db
+      .select()
+      .from(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, r.invoice.id))
+      .orderBy(asc(invoicePayments.receivedAt))
+      .all()
+      .map((p) => ({
+        ...p,
+        currency: p.currency as Currency,
+      }));
+
+    return {
+      ...r.invoice,
+      currency: r.invoice.currency as Currency,
+      status: r.invoice.status as InvoiceStatus,
+      clientName: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).name : r.clientName || "Unknown Client",
+      clientEmail: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).email : r.clientEmail || undefined,
+      items,
+      payments,
+    };
+  });
+}
+
+export async function exportInvoicePdf(invoiceId: string): Promise<string> {
+  const db = getDb();
+  const invoice = db.select().from(invoices).where(eq(invoices.id, invoiceId)).get();
+  if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
+
+  const client = invoice.clientId
+    ? db.select().from(clients).where(eq(clients.id, invoice.clientId)).get()
+    : undefined;
+  const clientSnapshot = invoice.clientSnapshot
+    ? JSON.parse(invoice.clientSnapshot)
+    : { name: client?.name || "Client", email: client?.email };
+
+  const profile = getOrCreateSettings();
+  const items = db
+    .select()
+    .from(invoiceItems)
+    .where(eq(invoiceItems.invoiceId, invoiceId))
+    .orderBy(asc(invoiceItems.position))
+    .all();
+
+  const pdfBuffer = await generateInvoicePdfBuffer({
+    code: invoice.code,
+    issueDate: invoice.issueDate,
+    dueDate: invoice.dueDate,
+    currency: invoice.currency,
+    status: invoice.status,
+    items: items.map((i) => ({
+      description: i.description,
+      quantity: i.quantity,
+      unitPriceCents: i.unitPriceCents,
+    })),
+    discountCents: invoice.discountCents,
+    taxCents: invoice.taxCents,
+    advanceCents: invoice.advanceCents,
+    amountCents: invoice.amountCents,
+    paidCents: invoice.paidCents,
+    deliveryUrl: invoice.deliveryUrl,
+    notes: invoice.notes,
+    client: clientSnapshot,
+    business: profile,
+  });
+
+  return saveInvoicePdf(invoiceId, pdfBuffer);
 }
 
 export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
@@ -88,15 +159,19 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
   const requestHash = crypto.createHash("sha256").update(JSON.stringify(details)).digest("hex");
   const id = requestId || crypto.randomUUID();
   const db = getDb();
-  db.transaction(tx => {
+
+  db.transaction((tx) => {
     const existing = tx.select().from(invoices).where(eq(invoices.id, id)).get();
     if (existing) {
-      if (existing.requestHash !== requestHash) throw new AppError("CONFLICT", "This invoice request was already used with different details.");
+      if (existing.requestHash !== requestHash) {
+        throw new AppError("CONFLICT", "This invoice request was already used with different details.");
+      }
       return;
     }
     if (value.catalogItemId && !tx.select().from(catalogItems).where(eq(catalogItems.id, value.catalogItemId)).get()) {
       throw new AppError("NOT_FOUND", "The selected Catalog item no longer exists.");
     }
+
     let clientId = value.clientId;
     let client: typeof clients.$inferSelect | undefined;
     if (value.newClient) {
@@ -119,6 +194,12 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
     defaultDue.setUTCDate(defaultDue.getUTCDate() + profile.defaultDueDays);
     const dueDate = value.dueDate === undefined ? defaultDue.toISOString().slice(0, 10) : value.dueDate;
 
+    const discountCents = value.discountCents || 0;
+    const taxCents = value.taxCents || 0;
+    const advanceCents = value.advanceCents || 0;
+    const deliveryUrl = value.deliveryUrl || client?.driveUrl || null;
+    const notes = value.notes || profile.defaultNotes || null;
+
     tx.insert(invoices).values({
       id,
       requestHash,
@@ -126,13 +207,21 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
       clientId: clientId || null,
       catalogItemId: value.catalogItemId || null,
       title: value.title || null,
-      clientSnapshot: client ? JSON.stringify({ name: client.name, email: client.email, contactPerson: client.contactPerson, phone: client.phone, driveUrl: client.driveUrl }) : null,
+      clientSnapshot: client
+        ? JSON.stringify({
+            name: client.name,
+            email: client.email,
+            contactPerson: client.contactPerson,
+            phone: client.phone,
+            driveUrl: client.driveUrl,
+          })
+        : null,
       businessSnapshot: JSON.stringify(profile),
-      deliveryUrl: client?.driveUrl || null,
-      notes: profile.defaultNotes || null,
-      discountCents: 0,
-      taxCents: 0,
-      advanceCents: 0,
+      deliveryUrl,
+      notes,
+      discountCents,
+      taxCents,
+      advanceCents,
       amountCents: value.amountCents,
       currency: value.currency,
       issueDate,
@@ -140,8 +229,135 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
       status: value.status || "UNPAID",
       paidCents: value.status === "PAID" ? value.amountCents : 0,
     }).run();
+
+    // Persist line items
+    if (value.items && value.items.length > 0) {
+      for (let i = 0; i < value.items.length; i++) {
+        const item = value.items[i];
+        const validService = item.catalogId
+          ? tx.select().from(catalogServices).where(eq(catalogServices.id, item.catalogId)).get()
+          : undefined;
+        tx.insert(invoiceItems).values({
+          id: item.id || crypto.randomUUID(),
+          invoiceId: id,
+          catalogId: validService ? item.catalogId : null,
+          description: item.description,
+          quantity: item.quantity || 1,
+          unitPriceCents: item.unitPriceCents,
+          position: i,
+        }).run();
+      }
+    } else if (value.title) {
+      // Default line item if title was supplied without items array
+      const validService = value.catalogItemId
+        ? tx.select().from(catalogServices).where(eq(catalogServices.id, value.catalogItemId)).get()
+        : undefined;
+      tx.insert(invoiceItems).values({
+        id: crypto.randomUUID(),
+        invoiceId: id,
+        catalogId: validService ? value.catalogItemId : null,
+        description: value.title,
+        quantity: 1,
+        unitPriceCents: value.amountCents,
+        position: 0,
+      }).run();
+    }
   });
-  return listInvoicesWithClient().find(row => row.id === id)!;
+
+  // Attempt auto-exporting PDF after invoice is created
+  exportInvoicePdf(id).catch((err) => {
+    if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+      console.warn(`[Invoice] Automatic PDF export for ${id} deferred:`, err.message);
+    }
+  });
+
+  return listInvoicesWithClient().find((row) => row.id === id)!;
+}
+
+export function recordPayment(input: RecordPaymentInput): { payment: InvoicePayment; invoice: InvoiceWithClient } {
+  const value = recordPaymentSchema.parse(input);
+  const db = getDb();
+  const paymentId = value.requestId || crypto.randomUUID();
+
+  let createdPayment: InvoicePayment | undefined;
+
+  db.transaction((tx) => {
+    const invoice = tx.select().from(invoices).where(eq(invoices.id, value.invoiceId)).get();
+    if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
+
+    const now = new Date().toISOString();
+    const receivedAt = value.receivedAt || now;
+
+    tx.insert(invoicePayments).values({
+      id: paymentId,
+      invoiceId: invoice.id,
+      amountCents: value.amountCents,
+      currency: value.currency || invoice.currency,
+      receivedAt,
+      reference: value.reference || "",
+      requestId: paymentId,
+    }).run();
+
+    // Calculate total received payments
+    const allPayments = tx
+      .select()
+      .from(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, invoice.id))
+      .all();
+    const totalPaidCents = allPayments.reduce((sum, p) => sum + p.amountCents, 0);
+
+    let nextStatus: InvoiceStatus = invoice.status as InvoiceStatus;
+    if (totalPaidCents >= invoice.amountCents) {
+      nextStatus = "PAID";
+    } else if (invoice.advanceCents > 0 && totalPaidCents >= invoice.advanceCents) {
+      nextStatus = "ADVANCE_PAID";
+    } else if (totalPaidCents > 0 && invoice.status === "DRAFT") {
+      nextStatus = "UNPAID";
+    }
+
+    tx.update(invoices)
+      .set({
+        paidCents: totalPaidCents,
+        status: nextStatus,
+        updatedAt: now,
+      })
+      .where(eq(invoices.id, invoice.id))
+      .run();
+
+    createdPayment = {
+      id: paymentId,
+      invoiceId: invoice.id,
+      amountCents: value.amountCents,
+      currency: (value.currency || invoice.currency) as Currency,
+      receivedAt,
+      reference: value.reference || "",
+      requestId: paymentId,
+    };
+  });
+
+  // Re-export PDF with updated payment details
+  exportInvoicePdf(value.invoiceId).catch((err) => {
+    if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+      console.warn(`[Invoice] PDF re-export after payment for ${value.invoiceId} deferred:`, err.message);
+    }
+  });
+
+  const updatedInvoice = listInvoicesWithClient().find((row) => row.id === value.invoiceId)!;
+  return { payment: createdPayment!, invoice: updatedInvoice };
+}
+
+export function listPayments(invoiceId: string): InvoicePayment[] {
+  const db = getDb();
+  return db
+    .select()
+    .from(invoicePayments)
+    .where(eq(invoicePayments.invoiceId, invoiceId))
+    .orderBy(asc(invoicePayments.receivedAt))
+    .all()
+    .map((p) => ({
+      ...p,
+      currency: p.currency as Currency,
+    }));
 }
 
 export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
@@ -185,23 +401,50 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
 
         const newStatus = validated.status ?? existing.status;
         const newAmount = validated.amountCents ?? existing.amountCents;
-        const newPaid = newStatus === "PAID" ? newAmount : 0;
+        const newPaid = newStatus === "PAID" ? newAmount : existing.paidCents;
 
-        db.update(invoices)
-          .set({
-            code: validated.code ?? existing.code,
-            clientId: validated.clientId ?? existing.clientId,
-            catalogItemId: validated.catalogItemId !== undefined ? validated.catalogItemId : existing.catalogItemId,
-            title: validated.title !== undefined ? validated.title : existing.title,
-            amountCents: newAmount,
-            currency: validated.currency ?? existing.currency,
-            dueDate: validated.dueDate !== undefined ? validated.dueDate : existing.dueDate,
-            status: newStatus,
-            paidCents: newPaid,
-            updatedAt: new Date().toISOString(),
-          })
-          .where(eq(invoices.id, id))
-          .run();
+        db.transaction((tx) => {
+          tx.update(invoices)
+            .set({
+              code: validated.code ?? existing.code,
+              clientId: validated.clientId ?? existing.clientId,
+              catalogItemId: validated.catalogItemId !== undefined ? validated.catalogItemId : existing.catalogItemId,
+              title: validated.title !== undefined ? validated.title : existing.title,
+              discountCents: validated.discountCents !== undefined ? validated.discountCents : existing.discountCents,
+              taxCents: validated.taxCents !== undefined ? validated.taxCents : existing.taxCents,
+              advanceCents: validated.advanceCents !== undefined ? validated.advanceCents : existing.advanceCents,
+              deliveryUrl: validated.deliveryUrl !== undefined ? validated.deliveryUrl : existing.deliveryUrl,
+              notes: validated.notes !== undefined ? validated.notes : existing.notes,
+              amountCents: newAmount,
+              currency: validated.currency ?? existing.currency,
+              dueDate: validated.dueDate !== undefined ? validated.dueDate : existing.dueDate,
+              status: newStatus,
+              paidCents: newPaid,
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(invoices.id, id))
+            .run();
+
+          if (validated.items) {
+            tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id)).run();
+            for (let i = 0; i < validated.items.length; i++) {
+              const item = validated.items[i];
+              tx.insert(invoiceItems).values({
+                id: item.id || crypto.randomUUID(),
+                invoiceId: id,
+                catalogId: item.catalogId || null,
+                description: item.description,
+                quantity: item.quantity || 1,
+                unitPriceCents: item.unitPriceCents,
+                position: i,
+              }).run();
+            }
+          }
+        });
+
+        exportInvoicePdf(id).catch((err) => {
+          console.warn(`[Invoice] Re-export PDF after update for ${id} deferred:`, err.message);
+        });
 
         broadcastDataChanged();
         const all = listInvoicesWithClient();
@@ -222,7 +465,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
           throw new AppError("NOT_FOUND", "Invoice not found.");
         }
 
-        const paidCents = status === "PAID" ? existing.amountCents : 0;
+        const paidCents = status === "PAID" ? existing.amountCents : existing.paidCents;
 
         db.update(invoices)
           .set({
@@ -248,6 +491,33 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
       db.delete(invoices).where(eq(invoices.id, id)).run();
       broadcastDataChanged();
       return { success: true };
+    } catch (err) {
+      throw formatError(err);
+    }
+  });
+
+  ipcMain.handle("invoices:recordPayment", async (_event, input: RecordPaymentInput) => {
+    try {
+      const result = recordPayment(input);
+      broadcastDataChanged();
+      return result;
+    } catch (err) {
+      throw formatError(err);
+    }
+  });
+
+  ipcMain.handle("invoices:listPayments", async (_event, invoiceId: string) => {
+    try {
+      return listPayments(invoiceId);
+    } catch (err) {
+      throw formatError(err);
+    }
+  });
+
+  ipcMain.handle("invoices:exportPdf", async (_event, invoiceId: string) => {
+    try {
+      const filePath = await exportInvoicePdf(invoiceId);
+      return filePath;
     } catch (err) {
       throw formatError(err);
     }

@@ -9,6 +9,8 @@ import type {
   CatalogItem,
   NewCatalogItemInput,
   CatalogItemPatchInput,
+  InvoicePayment,
+  RecordPaymentInput,
 } from "./billing";
 import type {
   AppSettings,
@@ -45,6 +47,9 @@ export interface BillFlowAPI extends WorkflowAPI {
     create: (input: NewInvoiceInput) => Promise<InvoiceWithClient>;
     update: (id: string, patch: InvoicePatchInput) => Promise<InvoiceWithClient>;
     setStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
+    recordPayment: (input: RecordPaymentInput) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
+    listPayments: (invoiceId: string) => Promise<InvoicePayment[]>;
+    exportPdf: (invoiceId: string) => Promise<{ success: boolean; filePath: string }>;
     remove: (id: string) => Promise<{ success: boolean }>;
   };
   vendors: {

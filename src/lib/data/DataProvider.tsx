@@ -13,6 +13,8 @@ import type {
   DashboardSummary,
   Currency,
   CatalogItem, NewCatalogItemInput, CatalogItemPatchInput,
+  InvoicePayment,
+  RecordPaymentInput,
 } from "@/types/billing";
 import { getActiveInvoiceCurrency } from "@/lib/format";
 import type {
@@ -54,6 +56,10 @@ interface DataContextType {
   createInvoice: (input: NewInvoiceInput) => Promise<InvoiceWithClient>;
   updateInvoice: (id: string, patch: InvoicePatchInput) => Promise<InvoiceWithClient>;
   setInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
+  recordPayment: (input: RecordPaymentInput) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
+  listPayments: (invoiceId: string) => Promise<InvoicePayment[]>;
+  exportInvoicePdf: (invoiceId: string) => Promise<{ success: boolean; filePath: string }>;
+  openInvoicePdf: (invoiceId: string, reveal?: boolean) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
   getNextInvoiceCode: () => Promise<string>;
   createCatalogItem: (input: NewCatalogItemInput) => Promise<CatalogItem>;
@@ -79,6 +85,7 @@ const DataContext = createContext<DataContextType | null>(null);
 let memoryCatalog: CatalogItem[] = [];
 let memoryClients: ClientWithStats[] = [];
 let memoryInvoices: InvoiceWithClient[] = [];
+const memoryPayments: InvoicePayment[] = [];
 let memoryVendors: VendorItem[] = [];
 let memorySettings: AppSettings = {
   id: "default",
@@ -258,6 +265,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         catalogItemId: input.catalogItemId || null,
         title: input.title || null,
         amountCents: input.amountCents,
+        discountCents: input.discountCents ?? 0,
+        taxCents: input.taxCents ?? 0,
+        advanceCents: input.advanceCents ?? 0,
+        deliveryUrl: input.deliveryUrl || null,
+        notes: input.notes || null,
         currency: input.currency,
         issueDate: input.issueDate || today,
         dueDate: input.dueDate || null,
@@ -267,6 +279,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
         clientName: client?.name || "Unknown Client",
         clientEmail: client?.email,
+        items: input.items ? input.items.map((it, idx) => ({
+          id: it.id || `item-${Date.now()}-${idx}`,
+          invoiceId: id,
+          catalogId: it.catalogId || null,
+          description: it.description,
+          quantity: it.quantity,
+          unitPriceCents: it.unitPriceCents,
+          position: idx,
+        })) : [],
+        payments: [],
       };
       memoryInvoices = [newInv, ...memoryInvoices];
       await refresh();
@@ -286,9 +308,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const target = memoryInvoices[idx];
       const newStatus = patch.status ?? target.status;
       const newAmount = patch.amountCents ?? target.amountCents;
+      const updatedItems = patch.items
+        ? patch.items.map((it, idx) => ({
+            id: it.id || `item-${Date.now()}-${idx}`,
+            invoiceId: id,
+            catalogId: it.catalogId || null,
+            description: it.description,
+            quantity: it.quantity,
+            unitPriceCents: it.unitPriceCents,
+            position: idx,
+          }))
+        : target.items;
       const updated: InvoiceWithClient = {
         ...target,
         ...patch,
+        items: updatedItems,
         amountCents: newAmount,
         status: newStatus,
         paidCents: newStatus === "PAID" ? newAmount : 0,
@@ -309,6 +343,65 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       return updated;
     } else {
       return updateInvoice(id, { status });
+    }
+  };
+
+  const recordPayment = async (input: RecordPaymentInput): Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }> => {
+    if (checkIsElectron() && window.billflow) {
+      const result = await window.billflow.invoices.recordPayment(input);
+      await refresh();
+      return result;
+    } else {
+      const inv = memoryInvoices.find((i) => i.id === input.invoiceId);
+      if (!inv) throw new Error("Invoice not found");
+      const payment: InvoicePayment = {
+        id: `pay-${Date.now()}`,
+        invoiceId: input.invoiceId,
+        amountCents: input.amountCents,
+        currency: input.currency || inv.currency,
+        receivedAt: input.receivedAt || new Date().toISOString(),
+        reference: input.reference || "",
+        requestId: input.requestId || `req-${Date.now()}`,
+      };
+      memoryPayments.push(payment);
+      const totalPaid = memoryPayments
+        .filter((p) => p.invoiceId === input.invoiceId)
+        .reduce((sum, p) => sum + p.amountCents, 0);
+      let newStatus: InvoiceStatus = inv.status;
+      if (totalPaid >= inv.amountCents) {
+        newStatus = "PAID";
+      } else if (inv.advanceCents && totalPaid >= inv.advanceCents) {
+        newStatus = "ADVANCE_PAID";
+      }
+      const updated: InvoiceWithClient = {
+        ...inv,
+        paidCents: totalPaid,
+        status: newStatus,
+        payments: [...(inv.payments || []), payment],
+      };
+      memoryInvoices = memoryInvoices.map((i) => (i.id === inv.id ? updated : i));
+      await refresh();
+      return { invoice: updated, payment };
+    }
+  };
+
+  const listPayments = async (invoiceId: string): Promise<InvoicePayment[]> => {
+    if (checkIsElectron() && window.billflow) {
+      return await window.billflow.invoices.listPayments(invoiceId);
+    }
+    return memoryPayments.filter((p) => p.invoiceId === invoiceId);
+  };
+
+  const exportInvoicePdf = async (invoiceId: string): Promise<{ success: boolean; filePath: string }> => {
+    if (checkIsElectron() && window.billflow) {
+      return await window.billflow.invoices.exportPdf(invoiceId);
+    }
+    return { success: true, filePath: "invoice.pdf" };
+  };
+
+  const openInvoicePdf = async (invoiceId: string, reveal?: boolean): Promise<void> => {
+    if (checkIsElectron() && window.billflow) {
+      await window.billflow.files.openInvoicePdf(invoiceId, reveal);
     }
   };
 
@@ -683,6 +776,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         createInvoice,
         updateInvoice,
         setInvoiceStatus,
+        recordPayment,
+        listPayments,
+        exportInvoicePdf,
+        openInvoicePdf,
         deleteInvoice,
         getNextInvoiceCode,
         createVendor,
@@ -730,6 +827,10 @@ export function useInvoices(filter?: { clientId?: string }) {
     createInvoice,
     updateInvoice,
     setInvoiceStatus,
+    recordPayment,
+    listPayments,
+    exportInvoicePdf,
+    openInvoicePdf,
     deleteInvoice,
     getNextInvoiceCode,
     refresh,
@@ -748,6 +849,10 @@ export function useInvoices(filter?: { clientId?: string }) {
     createInvoice,
     updateInvoice,
     setInvoiceStatus,
+    recordPayment,
+    listPayments,
+    exportInvoicePdf,
+    openInvoicePdf,
     deleteInvoice,
     getNextInvoiceCode,
     refresh,
