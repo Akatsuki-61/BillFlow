@@ -102,6 +102,21 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
       }
     }
   }
+
+  // Ensure expenses table columns exist if created by earlier branch migrations
+  const hasExpensesTable = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='expenses'").get();
+  if (hasExpensesTable) {
+    const expenseCols = (sqlite.prepare("PRAGMA table_info(expenses)").all() as Array<{ name: string }>).map(c => c.name);
+    if (!expenseCols.includes("merchant")) {
+      sqlite.exec('ALTER TABLE "expenses" ADD COLUMN "merchant" text DEFAULT \'\' NOT NULL');
+    }
+    if (!expenseCols.includes("deductible")) {
+      sqlite.exec('ALTER TABLE "expenses" ADD COLUMN "deductible" integer DEFAULT 1 NOT NULL');
+    }
+    if (!expenseCols.includes("created_at")) {
+      sqlite.exec('ALTER TABLE "expenses" ADD COLUMN "created_at" text DEFAULT (CURRENT_TIMESTAMP) NOT NULL');
+    }
+  }
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: folder });
   if ((sqlite.pragma("foreign_key_check") as unknown[]).length) {

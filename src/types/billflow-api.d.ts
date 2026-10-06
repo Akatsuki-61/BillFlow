@@ -23,6 +23,7 @@ import type {
   VendorPatchInput,
 } from "./outsourcing";
 import type { AnalyticsSummaryPayload } from "./analytics";
+import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "./expenses";
 
 import type { ThemePreference } from "../lib/theme";
 
@@ -34,6 +35,12 @@ export interface BillFlowAPI extends WorkflowAPI {
   theme: {
     initialPreference: ThemePreference;
     setPreference: (preference: ThemePreference) => Promise<void>;
+  };
+  expenses: {
+    list: (filter?: { category?: string; invoiceId?: string }) => Promise<ExpenseItem[]>;
+    create: (input: NewExpenseInput) => Promise<ExpenseItem>;
+    update: (id: string, patch: ExpensePatchInput) => Promise<ExpenseItem>;
+    remove: (id: string) => Promise<{ success: boolean }>;
   };
   clients: {
     list: () => Promise<ClientWithStats[]>;

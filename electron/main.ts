@@ -12,6 +12,7 @@ import { registerAnalyticsHandlers } from "./ipc/analytics";
 
 import { registerTaskHandlers } from "./ipc/tasks";
 import { registerFileHandlers } from "./ipc/files";
+import { registerExpenseHandlers } from "./ipc/expenses";
 
 import { registerThemeHandlers, windowThemeColors } from "./theme";
 import { registerCatalogHandlers } from "./ipc/catalog";
@@ -180,6 +181,7 @@ app.whenReady().then(() => {
   registerCatalogHandlers(broadcastDataChanged);
   registerTaskHandlers(broadcastDataChanged);
   registerFileHandlers(broadcastDataChanged);
+  registerExpenseHandlers(broadcastDataChanged);
 
   // Register production static file protocol
   const outDir = app.isPackaged

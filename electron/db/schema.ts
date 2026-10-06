@@ -211,11 +211,14 @@ export const taskHistory = sqliteTable("task_history", {
 export const expenses = sqliteTable("expenses", {
   id: text("id").primaryKey(),
   invoiceId: text("invoice_id").references(() => invoices.id, { onDelete: "restrict" }),
-  description: text("description").notNull(),
+  merchant: text("merchant").notNull().default(""),
+  description: text("description").notNull().default(""),
   category: text("category").notNull(),
   amountCents: integer("amount_cents").notNull(),
-  currency: text("currency").notNull(),
+  currency: text("currency").notNull().default("USD"),
   incurredAt: text("incurred_at").notNull(),
+  deductible: integer("deductible", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
 }, t => [check("expense_amount", sql`${t.amountCents} >= 0`)]);
 
 export const workOrders = sqliteTable("work_orders", {

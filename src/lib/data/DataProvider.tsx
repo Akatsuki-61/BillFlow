@@ -33,7 +33,8 @@ import type {
 } from "@/types/analytics";
 
 import type { TaskItem } from "@/types/tasks";
-import type { WorkflowAPI, TrackingOffer } from "@/types/workflow";
+import type { WorkflowAPI, TrackingOffer, AttachmentItem } from "@/types/workflow";
+import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "@/types/expenses";
 
 interface DataContextType {
   tasks: TaskItem[];
@@ -43,6 +44,7 @@ interface DataContextType {
   clients: ClientWithStats[];
   invoices: InvoiceWithClient[];
   vendors: VendorItem[];
+  expenses: ExpenseItem[];
   catalogItems: CatalogItem[];
   dashboard: DashboardSummary | null;
   settings: AppSettings | null;
@@ -70,6 +72,10 @@ interface DataContextType {
   updateVendor: (id: string, patch: VendorPatchInput) => Promise<VendorItem>;
   setVendorStatus: (id: string, status: "PENDING" | "PAID") => Promise<VendorItem>;
   deleteVendor: (id: string) => Promise<void>;
+  createExpense: (input: NewExpenseInput) => Promise<ExpenseItem>;
+  updateExpense: (id: string, patch: ExpensePatchInput) => Promise<ExpenseItem>;
+  deleteExpense: (id: string) => Promise<void>;
+  attachExpenseReceipt: (expenseId: string, requestId: string) => Promise<AttachmentItem | null>;
   getAnalyticsSummary: (period?: string) => Promise<AnalyticsSummaryPayload>;
   updateSettings: (patch: UpdateSettingsInput) => Promise<AppSettings>;
   getDbPath: () => Promise<string>;
@@ -87,6 +93,7 @@ let memoryClients: ClientWithStats[] = [];
 let memoryInvoices: InvoiceWithClient[] = [];
 const memoryPayments: InvoicePayment[] = [];
 let memoryVendors: VendorItem[] = [];
+let memoryExpenses: ExpenseItem[] = [];
 let memorySettings: AppSettings = {
   id: "default",
   businessName: "",
@@ -119,6 +126,7 @@ async function loadBrowserSnapshot() {
     clients: [...memoryClients],
     invoices: [...memoryInvoices],
     vendors: [...memoryVendors],
+    expenses: [...memoryExpenses],
     catalogItems: [...memoryCatalog],
     settings: { ...memorySettings },
     dashboard: {
@@ -139,6 +147,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [invoices, setInvoices] = useState<InvoiceWithClient[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [vendors, setVendors] = useState<VendorItem[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -151,7 +160,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const loadSnapshot = useCallback(async () => {
     if (checkIsElectron() && window.billflow) {
-      const [clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers] = await Promise.all([
+      const [clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expenses] = await Promise.all([
         window.billflow.clients.list(),
         window.billflow.invoices.list(),
         window.billflow.dashboard.summary(),
@@ -160,8 +169,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         window.billflow.catalog.list(),
         window.billflow.tasks.list(),
         window.billflow.tracking.pending(),
+        window.billflow.expenses ? window.billflow.expenses.list() : Promise.resolve([]),
       ]);
-      return { clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, isElectron: true };
+      return { clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expenses, isElectron: true };
     }
     return { ...await loadBrowserSnapshot(), tasks: [] as TaskItem[], trackingOffers: [] as TrackingOffer[], isElectron: false };
   }, [checkIsElectron]);
@@ -176,6 +186,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setClients(snapshot.clients);
     setInvoices(snapshot.invoices);
     setVendors(snapshot.vendors);
+    setExpenses(snapshot.expenses || []);
     setCatalogItems(snapshot.catalogItems);
     setSettings(snapshot.settings);
     setDashboard(snapshot.dashboard);
@@ -720,6 +731,65 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [checkIsElectron]);
 
+  const createExpense = async (input: NewExpenseInput): Promise<ExpenseItem> => {
+    if (checkIsElectron() && window.billflow?.expenses) {
+      const created = await window.billflow.expenses.create(input);
+      await refresh();
+      return created;
+    } else {
+      const id = input.requestId || `exp-${Date.now()}`;
+      const newExp: ExpenseItem = {
+        id,
+        invoiceId: input.invoiceId || null,
+        merchant: input.merchant,
+        description: input.description || "",
+        category: input.category,
+        amountCents: input.amountCents,
+        currency: input.currency || "USD",
+        incurredAt: input.incurredAt,
+        deductible: input.deductible !== undefined ? input.deductible : true,
+        createdAt: new Date().toISOString(),
+        attachments: [],
+      };
+      memoryExpenses = [newExp, ...memoryExpenses];
+      await refresh();
+      return newExp;
+    }
+  };
+
+  const updateExpense = async (id: string, patch: ExpensePatchInput): Promise<ExpenseItem> => {
+    if (checkIsElectron() && window.billflow?.expenses) {
+      const updated = await window.billflow.expenses.update(id, patch);
+      await refresh();
+      return updated;
+    } else {
+      memoryExpenses = memoryExpenses.map((exp) => (exp.id === id ? { ...exp, ...patch } : exp));
+      const found = memoryExpenses.find((exp) => exp.id === id);
+      if (!found) throw new Error("Expense not found");
+      await refresh();
+      return found;
+    }
+  };
+
+  const deleteExpense = async (id: string): Promise<void> => {
+    if (checkIsElectron() && window.billflow?.expenses) {
+      await window.billflow.expenses.remove(id);
+      await refresh();
+    } else {
+      memoryExpenses = memoryExpenses.filter((exp) => exp.id !== id);
+      await refresh();
+    }
+  };
+
+  const attachExpenseReceipt = async (expenseId: string, requestId: string): Promise<AttachmentItem | null> => {
+    if (checkIsElectron() && window.billflow?.attachments) {
+      const item = await window.billflow.attachments.select({ type: "expense", id: expenseId }, requestId);
+      await refresh();
+      return item;
+    }
+    return null;
+  };
+
   const requireDesktop = () => {
     if (!checkIsElectron() || !window.billflow) throw new Error("Open the BillFlow desktop app to save workflow records.");
     return window.billflow;
@@ -763,6 +833,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         clients,
         invoices,
         vendors,
+        expenses,
         catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems,
         dashboard,
         settings,
@@ -786,6 +857,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updateVendor,
         setVendorStatus,
         deleteVendor,
+        createExpense,
+        updateExpense,
+        deleteExpense,
+        attachExpenseReceipt,
         getAnalyticsSummary,
         updateSettings,
         getDbPath,
@@ -956,4 +1031,13 @@ export function useAnalyticsSummary(period?: string) {
 export function useCatalog() {
   const { catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems, isLoading, isElectron, error } = useData();
   return { catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems, isLoading, isElectron, error };
+}
+
+export function useExpenses(filter?: { category?: string }) {
+  const { expenses, isLoading, error, createExpense, updateExpense, deleteExpense, attachExpenseReceipt, refresh } = useData();
+  const filteredExpenses = useMemo(() => {
+    if (!filter?.category || filter.category === "All Categories") return expenses;
+    return expenses.filter(e => e.category === filter.category);
+  }, [expenses, filter?.category]);
+  return { expenses: filteredExpenses, allExpenses: expenses, isLoading, error, createExpense, updateExpense, deleteExpense, attachExpenseReceipt, refresh };
 }

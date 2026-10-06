@@ -36,6 +36,12 @@ contextBridge.exposeInMainWorld("billflow", {
     initialPreference: ipcRenderer.sendSync("theme:initial") as ThemePreference,
     setPreference: (preference: ThemePreference): Promise<void> => ipcRenderer.invoke("theme:set", preference),
   },
+  expenses: {
+    list: (filter?: { category?: string; invoiceId?: string }) => ipcRenderer.invoke("expenses:list", filter),
+    create: (input: any) => ipcRenderer.invoke("expenses:create", input),
+    update: (id: string, patch: any) => ipcRenderer.invoke("expenses:update", id, patch),
+    remove: (id: string) => ipcRenderer.invoke("expenses:remove", id),
+  },
   clients: {
     list: (): Promise<ClientWithStats[]> => ipcRenderer.invoke("clients:list"),
     get: (id: string): Promise<ClientWithStats> => ipcRenderer.invoke("clients:get", id),
