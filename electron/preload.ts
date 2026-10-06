@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   ClientWithStats,
   NewClientInput,
+  ClientPatchInput,
   InvoiceWithClient,
   NewInvoiceInput,
   InvoicePatchInput,
@@ -52,6 +53,8 @@ contextBridge.exposeInMainWorld("billflow", {
     get: (id: string): Promise<ClientWithStats> => ipcRenderer.invoke("clients:get", id),
     create: (input: NewClientInput): Promise<ClientWithStats> =>
       ipcRenderer.invoke("clients:create", input),
+    update: (id: string, patch: ClientPatchInput): Promise<ClientWithStats> =>
+      ipcRenderer.invoke("clients:update", id, patch),
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("clients:remove", id),
   },

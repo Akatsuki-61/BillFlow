@@ -6,6 +6,7 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import type {
   ClientWithStats,
   NewClientInput,
+  ClientPatchInput,
   InvoiceWithClient,
   NewInvoiceInput,
   InvoicePatchInput,
@@ -60,6 +61,7 @@ interface DataContextType {
   error: string | null;
   refresh: () => Promise<void>;
   createClient: (input: NewClientInput) => Promise<ClientWithStats>;
+  updateClient: (id: string, patch: ClientPatchInput) => Promise<ClientWithStats>;
   deleteClient: (id: string) => Promise<void>;
   createInvoice: (input: NewInvoiceInput) => Promise<InvoiceWithClient>;
   updateInvoice: (id: string, patch: InvoicePatchInput) => Promise<InvoiceWithClient>;
@@ -264,6 +266,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       memoryClients = [newClient, ...memoryClients];
       await refresh();
       return newClient;
+    }
+  };
+
+  const updateClient = async (id: string, patch: ClientPatchInput): Promise<ClientWithStats> => {
+    if (checkIsElectron() && window.billflow) {
+      const updated = await window.billflow.clients.update(id, patch);
+      await refresh();
+      return updated;
+    } else {
+      const idx = memoryClients.findIndex((c) => c.id === id);
+      if (idx === -1) throw new Error("Client not found");
+      const existing = memoryClients[idx];
+      const updated: ClientWithStats = {
+        ...existing,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      memoryClients[idx] = updated;
+      await refresh();
+      return updated;
     }
   };
 
@@ -1112,6 +1134,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         error,
         refresh,
         createClient,
+        updateClient,
         deleteClient,
         createInvoice,
         updateInvoice,
@@ -1165,8 +1188,8 @@ export function useActiveCurrency() {
 }
 
 export function useClients() {
-  const { clients, isLoading, error, createClient, deleteClient, refresh } = useData();
-  return { clients, isLoading, error, createClient, deleteClient, refresh };
+  const { clients, isLoading, error, createClient, updateClient, deleteClient, refresh } = useData();
+  return { clients, isLoading, error, createClient, updateClient, deleteClient, refresh };
 }
 
 export function useInvoices(filter?: { clientId?: string }) {

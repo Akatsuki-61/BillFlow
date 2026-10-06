@@ -26,6 +26,34 @@ export const newClientSchema = z.object({
     .or(z.literal("")),
 });
 
+export const clientPatchSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Client name cannot be blank or whitespace only")
+    .max(120)
+    .optional(),
+  category: z.string().trim().min(1).max(40).optional(),
+  contactPerson: z.string().trim().max(120).optional(),
+  contactRole: z.string().trim().max(80).nullable().optional(),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email cannot be blank or whitespace only")
+    .refine((val) => val.includes("@"), "Email must contain an '@' sign")
+    .pipe(z.string().email("Please provide a valid email address"))
+    .optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  driveUrl: z
+    .string()
+    .trim()
+    .url("Please provide a valid URL")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+});
+
 export const newInvoiceItemSchema = z.object({
   id: z.string().optional(),
   description: z.string().trim().min(1, "Description is required").max(500),

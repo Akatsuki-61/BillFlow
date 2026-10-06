@@ -1,6 +1,7 @@
 import type {
   ClientWithStats,
   NewClientInput,
+  ClientPatchInput,
   InvoiceWithClient,
   NewInvoiceInput,
   InvoicePatchInput,
@@ -51,6 +52,7 @@ export interface BillFlowAPI extends WorkflowAPI {
     list: () => Promise<ClientWithStats[]>;
     get: (id: string) => Promise<ClientWithStats>;
     create: (input: NewClientInput) => Promise<ClientWithStats>;
+    update: (id: string, patch: ClientPatchInput) => Promise<ClientWithStats>;
     remove: (id: string) => Promise<{ success: boolean }>;
   };
   invoices: {

@@ -22,6 +22,7 @@ import {
   Plus,
   ArrowRight,
   Receipt,
+  Edit3,
 } from "lucide-react";
 import { useClients, useInvoices, useData } from "@/lib/data/DataProvider";
 import {
@@ -35,7 +36,7 @@ import type { ClientWithStats, Currency } from "@/types/billing";
 function ClientsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { clients, isLoading, createClient, deleteClient } = useClients();
+  const { clients, isLoading, createClient, updateClient, deleteClient } = useClients();
   const { createInvoice, invoices: allInvoices } = useInvoices();
   const { activeCurrency, settings } = useData();
 
@@ -76,6 +77,21 @@ function ClientsContent() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmittingClient, setIsSubmittingClient] = useState(false);
+
+  // Edit Client Form State
+  const [editingClient, setEditingClient] = useState<ClientWithStats | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    category: "Enterprise",
+    contactPerson: "",
+    contactRole: "",
+    email: "",
+    phone: "",
+    currency: (settings?.defaultCurrency || activeCurrency || "USD") as Currency,
+    driveUrl: "",
+  });
+  const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Quick Bill Form State
   const [quickBillTitle, setQuickBillTitle] = useState(
@@ -142,6 +158,65 @@ function ClientsContent() {
       showToast(msg, "error");
     } finally {
       setIsSubmittingClient(false);
+    }
+  };
+
+  const handleOpenEditModal = (client: ClientWithStats) => {
+    setEditFormErrors({});
+    setEditFormData({
+      name: client.name,
+      category: client.category,
+      contactPerson: client.contactPerson || "",
+      contactRole: client.contactRole || "",
+      email: client.email,
+      phone: client.phone || "",
+      currency: client.currency,
+      driveUrl: client.driveUrl || "",
+    });
+    setEditingClient(client);
+  };
+
+  const handleUpdateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClient) return;
+    setEditFormErrors({});
+
+    const errors: Record<string, string> = {};
+    if (!editFormData.name.trim()) errors.name = "Client name is required";
+    if (!editFormData.email.trim()) {
+      errors.email = "Email is required";
+    } else if (!editFormData.email.includes("@")) {
+      errors.email = "Please enter a valid email address";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      return;
+    }
+
+    setIsSubmittingEdit(true);
+    try {
+      const updated = await updateClient(editingClient.id, {
+        name: editFormData.name.trim(),
+        category: editFormData.category,
+        contactPerson: editFormData.contactPerson.trim() || editFormData.name.trim(),
+        contactRole: editFormData.contactRole.trim() || null,
+        email: editFormData.email.trim(),
+        phone: editFormData.phone.trim() || null,
+        currency: editFormData.currency,
+        driveUrl: editFormData.driveUrl.trim() || null,
+      });
+
+      setEditingClient(null);
+      showToast(`Client "${updated.name}" updated successfully!`);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to update client";
+      showToast(msg, "error");
+    } finally {
+      setIsSubmittingEdit(false);
     }
   };
 
@@ -337,6 +412,17 @@ function ClientsContent() {
                       {/* Dropdown Menu */}
                       {activeMenuId === client.id && (
                         <div className="absolute right-0 top-8 z-30 bg-surface rounded-xl shadow-lg border border-line-neutral-200 py-1.5 w-44 text-xs font-medium text-content-neutral-700">
+                          <Button
+                            variant="menu"
+                            onClick={() => {
+                              handleOpenEditModal(client);
+                              setActiveMenuId(null);
+                            }}
+                            className="w-full"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-content-neutral-400" />
+                            <span>Edit Profile</span>
+                          </Button>
                           <Button
                             variant="menu"
                             onClick={() => {
@@ -697,6 +783,188 @@ function ClientsContent() {
                     disabled={isSubmittingClient}
                   >
                     {isSubmittingClient ? "Saving..." : "Save Client"}
+                  </Button>
+                </div>
+              </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
+
+      {/* Edit Client Modal */}
+      <MotionPresence>
+        {editingClient && (
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <MotionSurface onDismiss={() => setEditingClient(null)}
+              kind="panel"
+              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
+            >
+              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
+                    <Building className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-content-neutral-900">
+                      Edit Client Profile
+                    </h3>
+                    <p className="text-xs text-content-neutral-400">
+                      Update relationship details and default delivery location
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  aria-label="Close"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setEditingClient(null)}
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+
+              <form onSubmit={handleUpdateClient} className="p-6 space-y-4 text-xs font-medium text-content-neutral-700">
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                      Client Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editFormData.name}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      placeholder="e.g. Apex Architecture Ltd"
+                      className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 ${
+                        editFormErrors.name
+                          ? "border-line-rose-400 bg-surface-rose-50/20"
+                          : "border-line-neutral-200"
+                      }`}
+                    />
+                    {editFormErrors.name && (
+                      <span className="text-content-rose-600 text-[11px] mt-1 block">
+                        {editFormErrors.name}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                      Category
+                    </label>
+                    <select
+                      value={editFormData.category}
+                      onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    >
+                      <option value="Enterprise">Enterprise</option>
+                      <option value="Startup">Startup</option>
+                      <option value="Agency">Agency</option>
+                      <option value="SMB">SMB</option>
+                      <option value="Individual">Individual</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                      Contact Person
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.contactPerson}
+                      onChange={(e) => setEditFormData({ ...editFormData, contactPerson: e.target.value })}
+                      placeholder="e.g. Sarah Jenkins"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                      Contact Role
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.contactRole}
+                      onChange={(e) => setEditFormData({ ...editFormData, contactRole: e.target.value })}
+                      placeholder="e.g. Director / CEO"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                      Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editFormData.email}
+                      onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                      placeholder="sarah@apexarch.com"
+                      className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 ${
+                        editFormErrors.email
+                          ? "border-line-rose-400 bg-surface-rose-50/20"
+                          : "border-line-neutral-200"
+                      }`}
+                    />
+                    {editFormErrors.email && (
+                      <span className="text-content-rose-600 text-[11px] mt-1 block">
+                        {editFormErrors.email}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                      Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.phone}
+                      onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                      placeholder="+1 (555) 284-9102"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                    Default Delivery Location / Drive Folder Link
+                  </label>
+                  <input
+                    type="url"
+                    value={editFormData.driveUrl}
+                    onChange={(e) => setEditFormData({ ...editFormData, driveUrl: e.target.value })}
+                    placeholder="https://drive.google.com/drive/folders/..."
+                    className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                  />
+                  <p className="text-[11px] text-content-neutral-400 mt-1">
+                    Updates default delivery location for future invoices. Existing invoices preserve their historical delivery link and issued snapshot.
+                  </p>
+                </div>
+
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-line-neutral-100">
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => setEditingClient(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={isSubmittingEdit}
+                  >
+                    {isSubmittingEdit ? "Saving..." : "Update Client Profile"}
                   </Button>
                 </div>
               </form>
