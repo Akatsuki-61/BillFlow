@@ -47,7 +47,7 @@ import {
   useActiveCurrency,
   useData,
 } from "@/lib/data/DataProvider";
-import { formatCents, formatCurrencyAmount, getCurrencySymbol } from "@/lib/format";
+import { formatCents, formatCurrencyAmount } from "@/lib/format";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import type {
   VendorItem,
@@ -90,7 +90,6 @@ export default function OutsourcingView() {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const [isWorkOrderModalOpen, setIsWorkOrderModalOpen] = useState(false);
-  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
 
   // Review Contractor Deliverable Dialog states
   const [reviewingWorkOrder, setReviewingWorkOrder] = useState<WorkOrderItem | null>(null);
@@ -151,10 +150,6 @@ export default function OutsourcingView() {
   const [woNotes, setWoNotes] = useState("");
   const [woFormErrors, setWoFormErrors] = useState<Record<string, string>>({});
   const [isSubmittingWorkOrder, setIsSubmittingWorkOrder] = useState(false);
-
-  // Expense Form States
-  const [expenseTitle, setExpenseTitle] = useState("");
-  const [expenseAmount, setExpenseAmount] = useState("");
 
   // Toast notification state
   const [toastNotification, setToastNotification] = useState<{
@@ -600,19 +595,6 @@ export default function OutsourcingView() {
     }
   };
 
-  // Submit handler for logging a business expense
-  const handleLogExpense = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!expenseTitle.trim() || !expenseAmount.trim()) {
-      showToast("Please provide expense title and amount.", "error");
-      return;
-    }
-    showToast(`Expense "${expenseTitle}" logged successfully`);
-    setExpenseTitle("");
-    setExpenseAmount("");
-    setIsExpenseModalOpen(false);
-  };
-
   // Render vector icon based on vendor category
   const renderVendorIcon = (type?: VendorItem["iconType"]) => {
     switch (type) {
@@ -729,14 +711,6 @@ export default function OutsourcingView() {
         description="Separate reusable vendor profiles from per-job payable work orders linked to sprint tasks and client invoices."
       >
         <div className="outsourcing-header-actions">
-          {/* Active currency indicator */}
-          <span
-            className="outsourcing-currency-badge"
-            title="Viewing currency synced with your invoices"
-          >
-            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
-          </span>
-
           {/* New Work Order button (Primary) */}
           <Button
             variant="primary"
@@ -792,16 +766,6 @@ export default function OutsourcingView() {
               <span>Clients</span>
             </Button>
           </Link>
-
-          {/* Log Expense button */}
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={() => setIsExpenseModalOpen(true)}
-          >
-            <Receipt className="outsourcing-action-icon" />
-            <span>Log Expense</span>
-          </Button>
         </div>
       </PageHeader>
 
@@ -2208,69 +2172,6 @@ export default function OutsourcingView() {
                   </Button>
                   <Button variant="primary" type="submit" disabled={isSubmittingClient}>
                     {isSubmittingClient ? "Saving..." : "Save Client"}
-                  </Button>
-                </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
-      {/* Modal Dialog: Log Business Expense */}
-      <MotionPresence>
-        {isExpenseModalOpen && (
-          <MotionSurface kind="dialog" className="outsourcing-modal-overlay">
-            <MotionSurface
-              onDismiss={() => setIsExpenseModalOpen(false)}
-              kind="panel"
-              className="outsourcing-modal-panel voucher-panel"
-            >
-              <div className="outsourcing-modal-header">
-                <h3 className="outsourcing-modal-title">Log Business Expense</h3>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => setIsExpenseModalOpen(false)}
-                >
-                  <X className="text-sm" />
-                </Button>
-              </div>
-              <form onSubmit={handleLogExpense} className="p-6 space-y-3.5">
-                <div>
-                  <label className="block text-[11.5px] font-medium text-text-secondary mb-1">
-                    Expense Description
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Adobe Creative Cloud, Cloud Hosting"
-                    value={expenseTitle}
-                    onChange={(e) => setExpenseTitle(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11.5px] font-medium text-text-secondary mb-1">
-                    Amount ({getCurrencySymbol(activeCurrency).trim() || activeCurrency})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="54.99"
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                    className="ui-field w-full text-[12px] px-3 border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus font-mono"
-                  />
-                </div>
-                <div className="pt-2 flex justify-end gap-2">
-                  <Button variant="ghost" type="button" onClick={() => setIsExpenseModalOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary" type="submit">
-                    Log Expense
                   </Button>
                 </div>
               </form>
