@@ -171,7 +171,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   {
     id: "audience-growth-chart",
     title: "Delivered Solutions Reach",
-    description: "Monthly active engagement and throughput across client-delivered software & AI agents",
+    description: "Monthly realized cash collections and client deliverable value across solutions",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,

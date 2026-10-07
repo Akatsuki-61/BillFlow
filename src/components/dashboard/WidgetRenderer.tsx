@@ -1408,7 +1408,7 @@ export function WidgetRenderer({
                   </h3>
                   {!isCompact && (
                     <p className="analytics-creative-subtitle">
-                      Monthly active engagement and throughput across client-delivered software & AI agents
+                      Monthly realized cash collections and client deliverable value across solutions
                     </p>
                   )}
                 </div>

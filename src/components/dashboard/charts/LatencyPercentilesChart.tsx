@@ -1,42 +1,28 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { EChartsAreaChart, type ChartConfig } from "@/components/evilcharts/charts/echarts-area-chart";
 import { cn } from "@/lib/utils";
+import { useData } from "@/lib/data/DataProvider";
+import type { TaskItem } from "@/types/tasks";
 
-const SERIES = [
-  { key: "p99", label: "P99 Custom Software", color: "#D41F12", latest: 192 },
-  { key: "p95", label: "P95 AI Integrations", color: "#F37A00", latest: 96 },
-  { key: "p75", label: "P75 Full-Stack Web", color: "#62C9D4", latest: 48 },
-  { key: "p50", label: "P50 Consulting Sprints", color: "#007292", latest: 18 },
-] as const;
+function getTaskHours(t: TaskItem): number {
+  if (t.activeMilliseconds && t.activeMilliseconds > 0) {
+    return Math.max(0, Math.round((t.activeMilliseconds / 3600000) * 10) / 10);
+  }
+  if (t.completedAt && t.startedAt) {
+    const diff = (new Date(t.completedAt).getTime() - new Date(t.startedAt).getTime()) / 3600000;
+    if (!isNaN(diff) && diff > 0) return Math.round(diff * 10) / 10;
+  }
+  return 0;
+}
 
-const chartData = [
-  { milestone: "Sprint 01", p99: 184, p95: 92, p75: 44, p50: 18 },
-  { milestone: "Sprint 02", p99: 188, p95: 94, p75: 46, p50: 19 },
-  { milestone: "Sprint 03", p99: 176, p95: 88, p75: 42, p50: 17 },
-  { milestone: "Sprint 04", p99: 192, p95: 95, p75: 47, p50: 19 },
-  { milestone: "Sprint 05", p99: 204, p95: 98, p75: 48, p50: 20 },
-  { milestone: "Sprint 06", p99: 185, p95: 90, p75: 45, p50: 18 },
-  { milestone: "Sprint 07", p99: 178, p95: 87, p75: 43, p50: 17 },
-  { milestone: "Sprint 08", p99: 195, p95: 96, p75: 47, p50: 19 },
-  { milestone: "Sprint 09", p99: 208, p95: 102, p75: 49, p50: 20 },
-  { milestone: "Sprint 10", p99: 194, p95: 93, p75: 46, p50: 18 },
-  { milestone: "Sprint 11", p99: 201, p95: 97, p75: 48, p50: 19 },
-  { milestone: "Sprint 12", p99: 215, p95: 104, p75: 50, p50: 21 },
-  { milestone: "Sprint 13", p99: 228, p95: 110, p75: 52, p50: 21 },
-  { milestone: "Sprint 14", p99: 245, p95: 118, p75: 54, p50: 22 },
-  { milestone: "Sprint 15", p99: 232, p95: 112, p75: 53, p50: 21 },
-  { milestone: "Sprint 16", p99: 218, p95: 106, p75: 51, p50: 20 },
-  { milestone: "Sprint 17", p99: 205, p95: 100, p75: 49, p50: 20 },
-  { milestone: "Sprint 18", p99: 198, p95: 97, p75: 47, p50: 19 },
-  { milestone: "Sprint 19", p99: 190, p95: 93, p75: 45, p50: 18 },
-  { milestone: "Sprint 20", p99: 196, p95: 96, p75: 46, p50: 19 },
-  { milestone: "Sprint 21", p99: 202, p95: 99, p75: 48, p50: 19 },
-  { milestone: "Sprint 22", p99: 189, p95: 92, p75: 45, p50: 18 },
-  { milestone: "Sprint 23", p99: 185, p95: 90, p75: 44, p50: 17 },
-  { milestone: "Sprint 24", p99: 192, p95: 96, p75: 48, p50: 18 },
-];
+function calcPercentile(arr: number[], p: number): number {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = Math.ceil((p / 100) * sorted.length) - 1;
+  return Math.round((sorted[Math.max(0, Math.min(sorted.length - 1, idx))] || 0) * 10) / 10;
+}
 
 const chartConfig = {
   p99: { label: "P99 Custom Software", colors: { light: ["#f87171"], dark: ["#D41F12"] } },
@@ -46,12 +32,83 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function LatencyPercentilesChart() {
+  const { tasks } = useData();
   const [selected, setSelected] = useState<string | null>(null);
+
+  const { series, chartData, hasTrackedHours } = useMemo(() => {
+    const allHours = (tasks || []).map(getTaskHours);
+    const positiveHours = allHours.filter((h) => h > 0);
+
+    const devTasks = (tasks || []).filter(
+      (t) => t.category === "Development" || /web|software|site/i.test(t.title),
+    );
+    const aiTasks = (tasks || []).filter(
+      (t) => t.category === "Client Ops" || /ai|consulting|automation/i.test(t.title),
+    );
+    const webTasks = (tasks || []).filter(
+      (t) => t.category === "Design" || /design|frontend|web/i.test(t.title),
+    );
+
+    const devHours = devTasks.map(getTaskHours).filter((h) => h > 0);
+    const aiHours = aiTasks.map(getTaskHours).filter((h) => h > 0);
+    const webHours = webTasks.map(getTaskHours).filter((h) => h > 0);
+
+    const p99 = calcPercentile(devHours.length > 0 ? devHours : positiveHours, 99);
+    const p95 = calcPercentile(aiHours.length > 0 ? aiHours : positiveHours, 95);
+    const p75 = calcPercentile(webHours.length > 0 ? webHours : positiveHours, 75);
+    const p50 = calcPercentile(positiveHours, 50);
+
+    const seriesData = [
+      { key: "p99", label: "P99 Custom Software", color: "#D41F12", latest: p99 },
+      { key: "p95", label: "P95 AI Integrations", color: "#F37A00", latest: p95 },
+      { key: "p75", label: "P75 Full-Stack Web", color: "#62C9D4", latest: p75 },
+      { key: "p50", label: "P50 Consulting Sprints", color: "#007292", latest: p50 },
+    ] as const;
+
+    // Build 6 monthly/sprint milestone buckets
+    const milestones: Array<{
+      milestone: string;
+      key: string;
+      p99: number;
+      p95: number;
+      p75: number;
+      p50: number;
+    }> = [];
+
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const sprintLabel = `Sprint 0${6 - i}`;
+
+      const bucketTasks = (tasks || []).filter((t) => {
+        const dateStr = t.completedAt || t.createdAt;
+        return dateStr && dateStr.startsWith(key);
+      });
+
+      const bucketHours = bucketTasks.map(getTaskHours).filter((h) => h > 0);
+
+      milestones.push({
+        milestone: sprintLabel,
+        key,
+        p99: calcPercentile(bucketHours, 99),
+        p95: calcPercentile(bucketHours, 95),
+        p75: calcPercentile(bucketHours, 75),
+        p50: calcPercentile(bucketHours, 50),
+      });
+    }
+
+    return {
+      series: seriesData,
+      chartData: milestones,
+      hasTrackedHours: positiveHours.length > 0,
+    };
+  }, [tasks]);
 
   return (
     <div className="flex h-full w-full min-h-[300px] flex-col p-4">
       <div className="grid grid-cols-2 gap-y-2 sm:grid-cols-4 sm:gap-y-4">
-        {SERIES.map(({ key, label, color, latest }) => (
+        {series.map(({ key, label, color, latest }) => (
           <button
             key={key}
             type="button"
@@ -77,6 +134,13 @@ export function LatencyPercentilesChart() {
           </button>
         ))}
       </div>
+
+      {!hasTrackedHours && (
+        <div className="mt-3 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No task turnaround tracked yet. Hours are recorded automatically as tasks move through sprint.
+        </div>
+      )}
+
       <EChartsAreaChart
         data={chartData}
         config={chartConfig}

@@ -114,6 +114,7 @@ export interface BillFlowAPI extends WorkflowAPI {
     reset: () => Promise<{ success: boolean }>;
   };
   onDataChanged: (callback: () => void) => () => void;
+  onNavigate?: (callback: (route: string) => void) => () => void;
 }
 
 declare global {

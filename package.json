@@ -3,7 +3,7 @@
   "productName": "BillFlow",
   "version": "0.1.0",
   "description": "Local-first freelance invoicing and task execution workspace",
-  "author": "Group 61",
+  "author": "Akatsuki-61",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {

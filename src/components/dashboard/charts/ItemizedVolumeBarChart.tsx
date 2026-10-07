@@ -1,22 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { EChartsBarChart, type ChartConfig } from "@/components/evilcharts/charts/echarts-bar-chart";
-
-const data = [
-  { month: "January", web: 342, ai: 184 },
-  { month: "February", web: 486, ai: 291 },
-  { month: "March", web: 512, ai: 290 },
-  { month: "April", web: 629, ai: 391 },
-  { month: "May", web: 458, ai: 309 },
-  { month: "June", web: 781, ai: 449 },
-  { month: "July", web: 394, ai: 234 },
-  { month: "August", web: 825, ai: 517 },
-  { month: "September", web: 647, ai: 367 },
-  { month: "October", web: 532, ai: 357 },
-  { month: "November", web: 803, ai: 515 },
-  { month: "December", web: 871, ai: 549 },
-];
+import { useData } from "@/lib/data/DataProvider";
 
 const chartConfig = {
   web: {
@@ -36,10 +22,56 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function ItemizedVolumeBarChart() {
+  const { tasks } = useData();
+
+  const { chartData, hasData } = useMemo(() => {
+    const months: Array<{ month: string; key: string; web: number; ai: number }> = [];
+    const now = new Date();
+
+    // 6 rolling months
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const month = d.toLocaleString("default", { month: "long" });
+      months.push({ month, key, web: 0, ai: 0 });
+    }
+
+    let count = 0;
+    (tasks || []).forEach((t) => {
+      const timeStr = t.completedAt || t.createdAt;
+      if (!timeStr) return;
+      const key = timeStr.slice(0, 7);
+      const target = months.find((m) => m.key === key);
+      if (!target) return;
+
+      const isWeb = t.category === "Development" || /web|software|site|frontend|backend/i.test(t.title);
+      const isAi = t.category === "Client Ops" || t.category === "Design" || /ai|consulting|automation|agent/i.test(t.title);
+
+      if (isWeb) {
+        target.web += 1;
+        count += 1;
+      }
+      if (isAi) {
+        target.ai += 1;
+        count += 1;
+      }
+    });
+
+    return {
+      chartData: months.map(({ month, web, ai }) => ({ month, web, ai })),
+      hasData: count > 0,
+    };
+  }, [tasks]);
+
   return (
     <div className="flex h-full w-full min-h-[300px] flex-col p-4">
+      {!hasData && (
+        <div className="mb-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No contract deliverables recorded. Counts update as task items are logged and completed.
+        </div>
+      )}
       <EChartsBarChart
-        data={data}
+        data={chartData}
         config={chartConfig}
         className="h-full min-h-[240px] w-full"
         xDataKey="month"

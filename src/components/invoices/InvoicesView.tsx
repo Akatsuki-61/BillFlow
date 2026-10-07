@@ -185,7 +185,7 @@ export default function InvoicesView() {
   const [previousModalQueryKey, setPreviousModalQueryKey] = useState<string | null>(null);
   if (previousModalQueryKey !== modalQueryKey) {
     setPreviousModalQueryKey(modalQueryKey);
-    if (isNewParam === "1") {
+    if (isNewParam === "1" || isNewParam === "true") {
       setShowAddInvoiceModal(true);
       if (clientFilterParam) setNewClientId(clientFilterParam);
       if (linkedClient) {

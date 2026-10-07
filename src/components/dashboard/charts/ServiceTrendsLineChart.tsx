@@ -1,22 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { EChartsLineChart, type ChartConfig } from "@/components/evilcharts/charts/echarts-line-chart";
-
-const data = [
-  { month: "January", web: 340, ai: 180 },
-  { month: "February", web: 480, ai: 260 },
-  { month: "March", web: 510, ai: 290 },
-  { month: "April", web: 620, ai: 390 },
-  { month: "May", web: 460, ai: 310 },
-  { month: "June", web: 780, ai: 450 },
-  { month: "July", web: 590, ai: 380 },
-  { month: "August", web: 820, ai: 540 },
-  { month: "September", web: 650, ai: 420 },
-  { month: "October", web: 710, ai: 490 },
-  { month: "November", web: 800, ai: 520 },
-  { month: "December", web: 890, ai: 580 },
-];
+import { useData } from "@/lib/data/DataProvider";
 
 const chartConfig = {
   web: {
@@ -36,10 +22,79 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function ServiceTrendsLineChart() {
+  const { tasks, invoices } = useData();
+
+  const { chartData, hasData } = useMemo(() => {
+    const months: Array<{ month: string; key: string; web: number; ai: number }> = [];
+    const now = new Date();
+
+    // 6 rolling months
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const month = d.toLocaleString("default", { month: "long" });
+      months.push({ month, key, web: 0, ai: 0 });
+    }
+
+    let count = 0;
+
+    // Aggregate from tasks
+    (tasks || []).forEach((t) => {
+      const timeStr = t.completedAt || t.startedAt || t.createdAt;
+      if (!timeStr) return;
+      const key = timeStr.slice(0, 7);
+      const target = months.find((m) => m.key === key);
+      if (!target) return;
+
+      const isWeb = t.category === "Development" || /web|software|site|frontend|backend/i.test(t.title);
+      const isAi = t.category === "Client Ops" || t.category === "Design" || /ai|consulting|automation|agent/i.test(t.title);
+
+      if (isWeb) {
+        target.web += 1;
+        count += 1;
+      }
+      if (isAi) {
+        target.ai += 1;
+        count += 1;
+      }
+    });
+
+    // Also factor in non-draft invoices if tasks are not created yet
+    (invoices || []).forEach((inv) => {
+      if (inv.status === "DRAFT" || !inv.issueDate) return;
+      const key = inv.issueDate.slice(0, 7);
+      const target = months.find((m) => m.key === key);
+      if (!target) return;
+
+      const title = (inv.title || inv.clientName || "").toLowerCase();
+      const isWeb = /web|software|site/i.test(title);
+      const isAi = /ai|consulting|automation/i.test(title);
+
+      if (isWeb && target.web === 0) {
+        target.web += 1;
+        count += 1;
+      }
+      if (isAi && target.ai === 0) {
+        target.ai += 1;
+        count += 1;
+      }
+    });
+
+    return {
+      chartData: months.map(({ month, web, ai }) => ({ month, web, ai })),
+      hasData: count > 0,
+    };
+  }, [tasks, invoices]);
+
   return (
     <div className="flex h-full w-full min-h-[300px] flex-col p-4">
+      {!hasData && (
+        <div className="mb-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No service delivery volume recorded. Activity updates as client deliverables and invoices are added.
+        </div>
+      )}
       <EChartsLineChart
-        data={data}
+        data={chartData}
         config={chartConfig}
         className="h-full min-h-[240px] w-full"
         xDataKey="month"

@@ -17,6 +17,7 @@ import { registerExpenseHandlers } from "./ipc/expenses";
 
 import { registerThemeHandlers, windowThemeColors } from "./theme";
 import { registerCatalogHandlers } from "./ipc/catalog";
+import { setupAboutPanel, createApplicationMenu } from "./menu";
 
 const testProfile = process.env.BILLFLOW_USER_DATA;
 if (testProfile) {
@@ -217,6 +218,8 @@ app.whenReady().then(() => {
 
   createWindow();
   createTray();
+  setupAboutPanel();
+  createApplicationMenu(() => mainWindow);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

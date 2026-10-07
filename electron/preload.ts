@@ -172,4 +172,11 @@ contextBridge.exposeInMainWorld("billflow", {
       ipcRenderer.removeListener("data:changed", handler);
     };
   },
+  onNavigate: (callback: (route: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, route: string) => callback(route);
+    ipcRenderer.on("navigate-to", handler);
+    return () => {
+      ipcRenderer.removeListener("navigate-to", handler);
+    };
+  },
 });

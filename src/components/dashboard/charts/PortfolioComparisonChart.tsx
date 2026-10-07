@@ -1,54 +1,95 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { EChartsAreaChart, type ChartConfig } from "@/components/evilcharts/charts/echarts-area-chart";
-
-const SERIES = [
-  { key: "web", label: "Web & Custom Software", color: "#2563eb", pct: 14.2, delta: 4250.00 },
-  { key: "ai", label: "AI Consulting Retainers", color: "#10b981", pct: 28.6, delta: 6800.00 },
-] as const;
-
-const chartData = [
-  { date: "Oct 01", web: 48200, ai: 42100 },
-  { date: "Oct 02", web: 48900, ai: 42600 },
-  { date: "Oct 03", web: 49400, ai: 43200 },
-  { date: "Oct 04", web: 50100, ai: 43900 },
-  { date: "Oct 05", web: 50600, ai: 44500 },
-  { date: "Oct 06", web: 51200, ai: 45200 },
-  { date: "Oct 07", web: 51800, ai: 46000 },
-  { date: "Oct 08", web: 52100, ai: 46800 },
-  { date: "Oct 09", web: 52400, ai: 47600 },
-  { date: "Oct 10", web: 52800, ai: 48300 },
-  { date: "Oct 11", web: 53100, ai: 49100 },
-  { date: "Oct 12", web: 53500, ai: 49900 },
-  { date: "Oct 13", web: 53900, ai: 50700 },
-  { date: "Oct 14", web: 54200, ai: 51400 },
-  { date: "Oct 15", web: 54600, ai: 52100 },
-  { date: "Oct 16", web: 55100, ai: 52900 },
-  { date: "Oct 17", web: 55600, ai: 53700 },
-  { date: "Oct 18", web: 56000, ai: 54400 },
-  { date: "Oct 19", web: 56300, ai: 55000 },
-  { date: "Oct 20", web: 56700, ai: 55800 },
-  { date: "Oct 21", web: 57100, ai: 56500 },
-  { date: "Oct 22", web: 57400, ai: 57100 },
-  { date: "Oct 23", web: 57800, ai: 57800 },
-  { date: "Oct 24", web: 58100, ai: 58500 },
-  { date: "Oct 25", web: 58450, ai: 58900 },
-];
+import { useData, useActiveCurrency } from "@/lib/data/DataProvider";
+import { formatCents } from "@/lib/format";
 
 const chartConfig = {
   web: { label: "Web & Custom Software", colors: { light: ["#2563eb"], dark: ["#3b82f6"] } },
   ai: { label: "AI Consulting Retainers", colors: { light: ["#059669"], dark: ["#10b981"] } },
 } satisfies ChartConfig;
 
-const formatDelta = (value: number) =>
-  Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 export function PortfolioComparisonChart() {
+  const { invoices } = useData();
+  const { activeCurrency } = useActiveCurrency();
+
+  const { series, chartData, hasInvoices } = useMemo(() => {
+    let totalWebCents = 0;
+    let totalAiCents = 0;
+    const validInvoices = (invoices || []).filter((inv) => inv.status !== "DRAFT");
+
+    validInvoices.forEach((inv) => {
+      const text = `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
+      const isAi = /ai|consulting|automation|agent/i.test(text);
+      if (isAi) {
+        totalAiCents += inv.amountCents;
+      } else {
+        totalWebCents += inv.amountCents;
+      }
+    });
+
+    const totalPortfolioCents = totalWebCents + totalAiCents;
+    const webPct = totalPortfolioCents > 0 ? Math.round((totalWebCents / totalPortfolioCents) * 100) : 0;
+    const aiPct = totalPortfolioCents > 0 ? Math.round((totalAiCents / totalPortfolioCents) * 100) : 0;
+
+    const seriesData = [
+      {
+        key: "web",
+        label: "Web & Custom Software",
+        color: "#2563eb",
+        pct: webPct,
+        formattedTotal: formatCents(totalWebCents, activeCurrency),
+      },
+      {
+        key: "ai",
+        label: "AI Consulting Retainers",
+        color: "#10b981",
+        pct: aiPct,
+        formattedTotal: formatCents(totalAiCents, activeCurrency),
+      },
+    ] as const;
+
+    // 14-day timeline
+    const days: Array<{ date: string; key: string; web: number; ai: number }> = [];
+    const now = new Date();
+    const MS_PER_DAY = 86400000;
+
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * MS_PER_DAY);
+      const key = d.toISOString().split("T")[0];
+      const dateLabel = `${d.toLocaleString("default", { month: "short" })} ${String(d.getDate()).padStart(2, "0")}`;
+      days.push({ date: dateLabel, key, web: 0, ai: 0 });
+    }
+
+    validInvoices.forEach((inv) => {
+      if (!inv.issueDate) return;
+      const invDate = inv.issueDate.split("T")[0];
+      const target = days.find((d) => d.key === invDate);
+      if (!target) return;
+
+      const text = `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
+      const isAi = /ai|consulting|automation|agent/i.test(text);
+      const amtMajor = Math.round(inv.amountCents / 100);
+
+      if (isAi) {
+        target.ai += amtMajor;
+      } else {
+        target.web += amtMajor;
+      }
+    });
+
+    return {
+      series: seriesData,
+      chartData: days.map(({ date, web, ai }) => ({ date, web, ai })),
+      hasInvoices: validInvoices.length > 0,
+    };
+  }, [invoices, activeCurrency]);
+
   return (
     <div className="flex h-full w-full min-h-[300px] flex-col pt-4">
       <div className="grid grid-cols-2 gap-x-8 px-4">
-        {SERIES.map(({ key, label, color, pct, delta }) => (
+        {series.map(({ key, label, color, pct, formattedTotal }) => (
           <div key={key} className="flex flex-col gap-1">
             <div className="text-content-neutral-500 flex items-center gap-2 text-xs">
               <span
@@ -58,15 +99,20 @@ export function PortfolioComparisonChart() {
               {label}
             </div>
             <div className="text-content-neutral-900 text-xl font-semibold tracking-tight sm:text-2xl">
-              {pct > 0 ? "+" : "−"}
-              {Math.abs(pct).toFixed(1)}%
+              {pct}%
             </div>
-            <div className={`text-xs font-medium ${delta < 0 ? "text-content-rose-600" : "text-content-emerald-600"}`}>
-              {delta < 0 ? "−" : "+"}${formatDelta(delta)}
+            <div className="text-xs font-medium text-content-neutral-600">
+              {formattedTotal}
             </div>
           </div>
         ))}
       </div>
+
+      {!hasInvoices && (
+        <div className="mt-2 mx-4 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No service invoices recorded. Portfolio breakdown calculates from active client invoices.
+        </div>
+      )}
 
       <EChartsAreaChart
         data={chartData}
