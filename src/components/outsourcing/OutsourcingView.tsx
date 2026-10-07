@@ -48,6 +48,7 @@ import {
   useData,
 } from "@/lib/data/DataProvider";
 import { formatCents, formatCurrencyAmount, getCurrencySymbol } from "@/lib/format";
+import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import type {
   VendorItem,
   WorkOrderItem,
@@ -280,9 +281,10 @@ export default function OutsourcingView() {
 
   // Open review deliverable modal
   const handleOpenReviewModal = (wo: WorkOrderItem) => {
+    const resolved = resolveDeliveryUrl(wo, { tasks, invoices, clients });
     setReviewingWorkOrder(wo);
     setReviewStatus(wo.status || "todo");
-    setReviewDeliveryUrl(wo.deliveryUrl || "");
+    setReviewDeliveryUrl(wo.deliveryUrl || resolved.url || "");
     setReviewNotes(wo.notes || "");
     setReviewUpdateTask(true);
   };
@@ -970,18 +972,22 @@ export default function OutsourcingView() {
                             <span>Due: {wo.dueDate}</span>
                           </span>
                         )}
-                        {wo.deliveryUrl && (
-                          <a
-                            href={wo.deliveryUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-accent hover:underline font-medium"
-                          >
-                            <Link2 className="w-3 h-3" />
-                            <span>Deliverable Link</span>
-                            <ExternalLink className="w-2.5 h-2.5 opacity-70" />
-                          </a>
-                        )}
+                        {(() => {
+                          const resolved = resolveDeliveryUrl(wo, { tasks, invoices, clients });
+                          if (!resolved.hasLink) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => openExternalLink(resolved.formattedUrl, e)}
+                              className="inline-flex items-center gap-1 text-accent hover:underline font-medium text-xs bg-transparent border-0 p-0 cursor-pointer"
+                              title={`${resolved.label}: ${resolved.url}`}
+                            >
+                              <Link2 className="w-3 h-3" />
+                              <span>{resolved.label}</span>
+                              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                            </button>
+                          );
+                        })()}
                         {wo.notes && (
                           <span className="text-content-neutral-600 truncate max-w-xs" title={wo.notes}>
                             Note: {wo.notes}
@@ -1237,20 +1243,24 @@ export default function OutsourcingView() {
                           </span>
                         </div>
                       )}
-                      {selectedWorkOrder.deliveryUrl && (
-                        <div className="flex justify-between items-center text-xs pt-1 border-t border-line-neutral-200">
-                          <span className="text-content-neutral-500">Deliverable Location</span>
-                          <a
-                            href={selectedWorkOrder.deliveryUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-accent hover:underline inline-flex items-center gap-1 font-medium"
-                          >
-                            <span>Open URL</span>
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        </div>
-                      )}
+                      {(() => {
+                        const resolved = resolveDeliveryUrl(selectedWorkOrder, { tasks, invoices, clients });
+                        if (!resolved.hasLink) return null;
+                        return (
+                          <div className="flex justify-between items-center text-xs pt-1 border-t border-line-neutral-200">
+                            <span className="text-content-neutral-500">{resolved.label}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => openExternalLink(resolved.formattedUrl, e)}
+                              className="text-accent hover:underline inline-flex items-center gap-1 font-medium bg-transparent border-0 p-0 cursor-pointer"
+                              title={resolved.url}
+                            >
+                              <span>Open URL</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Contractor Work Status & Deliverable Details */}

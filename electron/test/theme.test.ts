@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import path from "path";
 
 const mocks = vi.hoisted(() => {
   const mainFrame = {};
@@ -58,8 +59,8 @@ describe("desktop appearance", () => {
   it("atomically persists a changed preference and updates the window", async () => {
     const theme = await setup();
     theme.set({ sender: mocks.sender, senderFrame: mocks.mainFrame }, "light");
-    expect(mocks.write).toHaveBeenCalledWith("/test/userData/appearance.json.tmp", '"light"', "utf8");
-    expect(mocks.rename).toHaveBeenCalledWith("/test/userData/appearance.json.tmp", "/test/userData/appearance.json");
+    expect(mocks.write).toHaveBeenCalledWith(path.join("/test/userData", "appearance.json.tmp"), '"light"', "utf8");
+    expect(mocks.rename).toHaveBeenCalledWith(path.join("/test/userData", "appearance.json.tmp"), path.join("/test/userData", "appearance.json"));
     expect(mocks.nativeTheme.themeSource).toBe("light");
     expect(mocks.background).toHaveBeenCalledWith("#faf9f5");
   });

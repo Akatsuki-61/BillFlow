@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   ClientWithStats,
   NewClientInput,
+  ClientPatchInput,
   InvoiceWithClient,
   NewInvoiceInput,
   InvoicePatchInput,
@@ -33,6 +34,7 @@ import type { AnalyticsSummaryPayload } from "../src/types/analytics";
 import type { ThemePreference } from "../src/lib/theme";
 
 import type { TaskCreateInput, TaskPatchInput, AttachmentOwner } from "../src/types/workflow";
+import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "../src/types/expenses";
 
 contextBridge.exposeInMainWorld("billflow", {
   isElectron: true,
@@ -41,11 +43,19 @@ contextBridge.exposeInMainWorld("billflow", {
     initialPreference: ipcRenderer.sendSync("theme:initial") as ThemePreference,
     setPreference: (preference: ThemePreference): Promise<void> => ipcRenderer.invoke("theme:set", preference),
   },
+  expenses: {
+    list: (filter?: { category?: string; invoiceId?: string }): Promise<ExpenseItem[]> => ipcRenderer.invoke("expenses:list", filter),
+    create: (input: NewExpenseInput): Promise<ExpenseItem> => ipcRenderer.invoke("expenses:create", input),
+    update: (id: string, patch: ExpensePatchInput): Promise<ExpenseItem> => ipcRenderer.invoke("expenses:update", id, patch),
+    remove: (id: string): Promise<{ success: boolean }> => ipcRenderer.invoke("expenses:remove", id),
+  },
   clients: {
     list: (): Promise<ClientWithStats[]> => ipcRenderer.invoke("clients:list"),
     get: (id: string): Promise<ClientWithStats> => ipcRenderer.invoke("clients:get", id),
     create: (input: NewClientInput): Promise<ClientWithStats> =>
       ipcRenderer.invoke("clients:create", input),
+    update: (id: string, patch: ClientPatchInput): Promise<ClientWithStats> =>
+      ipcRenderer.invoke("clients:update", id, patch),
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("clients:remove", id),
   },

@@ -45,6 +45,17 @@ export interface NewClientInput {
   driveUrl?: string;
 }
 
+export interface ClientPatchInput {
+  name?: string;
+  category?: string;
+  contactPerson?: string;
+  contactRole?: string | null;
+  email?: string;
+  phone?: string | null;
+  currency?: Currency;
+  driveUrl?: string | null;
+}
+
 export type InvoiceStatus = "DRAFT" | "UNPAID" | "ADVANCE_PAID" | "PAID" | "OVERDUE";
 
 export interface InvoiceItem {

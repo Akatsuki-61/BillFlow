@@ -181,6 +181,38 @@ describe("managed files and complete backups", () => {
     expect(() => saveInvoicePdf("invoice", bytes)).toThrow("missing");
     expect(getDb().select().from(invoices).all()).toHaveLength(1);
   });
+
+  it("edits client profiles while preserving existing invoice clientSnapshots and delivery URLs", () => {
+    invoiceFixture();
+    const db = getDb();
+    
+    // Update client profile details and default delivery driveUrl
+    db.update(clients)
+      .set({
+        name: "Updated Client Name",
+        email: "updated@example.com",
+        driveUrl: "https://drive.google.com/folder-v2",
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(clients.id, "client"))
+      .run();
+
+    restart();
+
+    // Verify client profile has updated
+    const updatedClient = getDb().select().from(clients).where(eq(clients.id, "client")).get();
+    expect(updatedClient).toMatchObject({
+      name: "Updated Client Name",
+      email: "updated@example.com",
+      driveUrl: "https://drive.google.com/folder-v2",
+    });
+
+    // Verify existing invoice retains its original issued clientSnapshot and delivery details
+    const existingInvoice = getDb().select().from(invoices).where(eq(invoices.id, "invoice")).get();
+    expect(existingInvoice?.clientSnapshot).toContain("Issued client");
+    const snapshot = JSON.parse(existingInvoice?.clientSnapshot || "{}");
+    expect(snapshot.driveUrl).toBe("https://example.com/issued");
+  });
 });
 
 it("migrates a populated pre-workflow database while preserving client/invoice/vendor records", () => {

@@ -3,9 +3,9 @@ import crypto from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { clients, invoices } from "../db/schema";
-import { newClientSchema } from "../validation";
+import { newClientSchema, clientPatchSchema } from "../validation";
 import { AppError, formatError } from "./errors";
-import { ClientWithStats, NewClientInput } from "../../src/types/billing";
+import { ClientWithStats, NewClientInput, ClientPatchInput } from "../../src/types/billing";
 
 export function listClientsWithStats(): ClientWithStats[] {
   const db = getDb();
@@ -92,6 +92,39 @@ export function registerClientHandlers(broadcastDataChanged: () => void) {
       broadcastDataChanged();
       const created = listClientsWithStats().find((c) => c.id === id);
       return created!;
+    } catch (err) {
+      throw formatError(err);
+    }
+  });
+
+  ipcMain.handle("clients:update", async (_event, id: string, patch: ClientPatchInput) => {
+    try {
+      const validated = clientPatchSchema.parse(patch);
+      const db = getDb();
+
+      const existing = db.select().from(clients).where(eq(clients.id, id)).get();
+      if (!existing) {
+        throw new AppError("NOT_FOUND", "Client not found");
+      }
+
+      db.update(clients)
+        .set({
+          ...(validated.name !== undefined && { name: validated.name }),
+          ...(validated.category !== undefined && { category: validated.category }),
+          ...(validated.contactPerson !== undefined && { contactPerson: validated.contactPerson }),
+          ...(validated.contactRole !== undefined && { contactRole: validated.contactRole }),
+          ...(validated.email !== undefined && { email: validated.email }),
+          ...(validated.phone !== undefined && { phone: validated.phone }),
+          ...(validated.currency !== undefined && { currency: validated.currency }),
+          ...(validated.driveUrl !== undefined && { driveUrl: validated.driveUrl }),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(clients.id, id))
+        .run();
+
+      broadcastDataChanged();
+      const updated = listClientsWithStats().find((c) => c.id === id);
+      return updated!;
     } catch (err) {
       throw formatError(err);
     }

@@ -26,6 +26,34 @@ export const newClientSchema = z.object({
     .or(z.literal("")),
 });
 
+export const clientPatchSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Client name cannot be blank or whitespace only")
+    .max(120)
+    .optional(),
+  category: z.string().trim().min(1).max(40).optional(),
+  contactPerson: z.string().trim().max(120).optional(),
+  contactRole: z.string().trim().max(80).nullable().optional(),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email cannot be blank or whitespace only")
+    .refine((val) => val.includes("@"), "Email must contain an '@' sign")
+    .pipe(z.string().email("Please provide a valid email address"))
+    .optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  driveUrl: z
+    .string()
+    .trim()
+    .url("Please provide a valid URL")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+});
+
 export const newInvoiceItemSchema = z.object({
   id: z.string().optional(),
   description: z.string().trim().min(1, "Description is required").max(500),
@@ -182,6 +210,29 @@ export const vendorPatchSchema = z.object({
   linkedClientName: z.string().trim().max(120).nullable().optional(),
   payoutDueDate: z.string().trim().max(60).nullable().optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
+});
+
+export const newExpenseSchema = z.object({
+  requestId: z.string().uuid().optional(),
+  merchant: z.string().trim().min(1, "Merchant or payee is required").max(120),
+  description: z.string().trim().max(1000).optional().default(""),
+  category: z.string().trim().min(1, "Category is required").max(80),
+  amountCents: z.number().int().positive("Amount must be positive"),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
+  incurredAt: z.string().trim().min(1, "Incurred date is required"),
+  deductible: z.boolean().optional().default(true),
+  invoiceId: z.string().trim().nullable().optional(),
+});
+
+export const expensePatchSchema = z.object({
+  merchant: z.string().trim().min(1).max(120).optional(),
+  description: z.string().trim().max(1000).optional(),
+  category: z.string().trim().min(1).max(80).optional(),
+  amountCents: z.number().int().positive().optional(),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  incurredAt: z.string().trim().min(1).optional(),
+  deductible: z.boolean().optional(),
+  invoiceId: z.string().trim().nullable().optional(),
 });
 
 /**

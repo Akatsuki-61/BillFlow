@@ -22,6 +22,7 @@ import {
   ChevronDown,
   X,
   ExternalLink,
+  Link2,
   CheckSquare,
   Trash2,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import { getCurrencySymbol } from "@/lib/format";
 import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/TaskTiming";
 import Link from "next/link";
+import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 
 // Team member profiles for assignees
 const teamMembers = [
@@ -102,7 +104,7 @@ export default function TasksPage() {
   const router = useRouter();
 
   // State
-  const { tasks, workflow, clients, vendors, settings, isElectron, isLoading, error, activeCurrency } = useData();
+  const { tasks, invoices, workflow, clients, vendors, settings, isElectron, isLoading, error, activeCurrency } = useData();
   const [saving, setSaving] = useState(false);
   const draftId = useRef<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -227,8 +229,9 @@ export default function TasksPage() {
   // Outsource navigation handler
   const handleOutsourceTask = (task: TaskItem) => {
     showToast(`Redirecting to Outsourcing for "${task.title.slice(0, 24)}..."`);
+    const resolved = resolveDeliveryUrl(task, { invoices, clients });
     // Passes task context in query parameters for the Outsourcing page to prepopulate voucher modal
-    const params = new URLSearchParams({ action: "create-voucher", taskId: task.id, taskTitle: task.title, scope: task.description, invoiceId: task.invoiceId || "", clientId: task.clientId || "", clientName: task.clientName || "", deliveryUrl: task.deliveryUrl || "", currency: task.currency || "LKR", vendor: task.outsourcedVendor || "", budget: String(task.outsourceBudget || "") });
+    const params = new URLSearchParams({ action: "create-voucher", taskId: task.id, taskTitle: task.title, scope: task.description, invoiceId: task.invoiceId || "", clientId: task.clientId || "", clientName: task.clientName || "", deliveryUrl: resolved.url || "", currency: task.currency || "LKR", vendor: task.outsourcedVendor || "", budget: String(task.outsourceBudget || "") });
     router.push(`/outsourcing?${params}`);
   };
 
@@ -672,30 +675,47 @@ export default function TasksPage() {
                               </span>
                             </div>
 
-                            {/* Direct Outsource Task Button (User Requirement) */}
-                            <Button
-                              variant="secondary"
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOutsourceTask(task);
-                              }}
-
-                              title={
-                                task.isOutsourced
-                                  ? `Outsourced to ${task.outsourcedVendor || "Vendor"}. Click to view or create voucher.`
-                                  : "Outsource this task to external subcontractor"
-                              }
-                            >
-                              <GitFork
-                                className={`w-3 h-3 transition-transform duration-200 group-hover/outsource:rotate-6 ${
-                                  task.isOutsourced ? "text-accent" : ""
-                                }`}
-                              />
-                              <span className="text-[11px]">
-                                {task.isOutsourced ? "Outsourced" : "Outsource"}
-                              </span>
-                            </Button>
+                            {/* Direct Outsource Task & Delivery Buttons */}
+                            <div className="flex items-center gap-1.5">
+                              {(() => {
+                                const resolved = resolveDeliveryUrl(task, { invoices, clients });
+                                if (!resolved.hasLink) return null;
+                                return (
+                                  <Button
+                                    variant="ghost"
+                                    size="small"
+                                    onClick={(e) => openExternalLink(resolved.formattedUrl, e)}
+                                    title={`${resolved.label}: ${resolved.url}`}
+                                    className="text-[11px] text-accent flex items-center gap-1"
+                                  >
+                                    <Link2 className="w-3 h-3" />
+                                    <span className="truncate max-w-[80px]">{resolved.label}</span>
+                                  </Button>
+                                );
+                              })()}
+                              <Button
+                                variant="secondary"
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOutsourceTask(task);
+                                }}
+                                title={
+                                  task.isOutsourced
+                                    ? `Outsourced to ${task.outsourcedVendor || "Vendor"}. Click to view or create voucher.`
+                                    : "Outsource this task to external subcontractor"
+                                }
+                              >
+                                <GitFork
+                                  className={`w-3 h-3 transition-transform duration-200 group-hover/outsource:rotate-6 ${
+                                    task.isOutsourced ? "text-accent" : ""
+                                  }`}
+                                />
+                                <span className="text-[11px]">
+                                  {task.isOutsourced ? "Outsourced" : "Outsource"}
+                                </span>
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -1141,7 +1161,23 @@ export default function TasksPage() {
                   <div className="flex gap-4 mt-3 text-sm">
                     {selectedTaskForDetail.invoiceId && <Link href={`/invoices?invoice=${encodeURIComponent(selectedTaskForDetail.invoiceId)}`}>Open {selectedTaskForDetail.invoiceCode || "invoice"}</Link>}
                     {selectedTaskForDetail.clientId && <Link href={`/clients?client=${encodeURIComponent(selectedTaskForDetail.clientId)}`}>Open client</Link>}
-                    {selectedTaskForDetail.deliveryUrl && <a href={selectedTaskForDetail.deliveryUrl} target="_blank" rel="noreferrer">Open delivery link</a>}
+                    {(() => {
+                      const resolved = resolveDeliveryUrl(selectedTaskForDetail, { invoices, clients });
+                      if (!resolved.hasLink) return null;
+                      return (
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          type="button"
+                          onClick={(e) => openExternalLink(resolved.formattedUrl, e)}
+                          className="inline-flex items-center gap-1.5 text-xs text-accent font-semibold"
+                          title={`${resolved.label}: ${resolved.url}`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{resolved.label}</span>
+                        </Button>
+                      );
+                    })()}
                   </div>
                   <TaskTiming task={selectedTaskForDetail} />
                 </div>

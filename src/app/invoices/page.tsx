@@ -39,6 +39,7 @@ import {
   parseAmountToCents,
   getCurrencySymbol,
 } from "@/lib/format";
+import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import type {
   InvoiceWithClient,
   InvoiceStatus,
@@ -851,20 +852,23 @@ function InvoicesContent() {
                             {inv.clientName}
                           </Button>
                         </div>
-                        {inv.deliveryUrl && (
-                          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-accent">
-                            <ExternalLink className="w-3 h-3" />
-                            <a
-                              href={inv.deliveryUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="hover:underline truncate max-w-[180px]"
-                              title={inv.deliveryUrl}
-                            >
-                              Delivery Link
-                            </a>
-                          </div>
-                        )}
+                        {(() => {
+                          const resolved = resolveDeliveryUrl(inv, { clients });
+                          if (!resolved.hasLink) return null;
+                          return (
+                            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-accent">
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                              <button
+                                type="button"
+                                onClick={(e) => openExternalLink(resolved.formattedUrl, e)}
+                                className="hover:underline truncate max-w-[180px] text-left text-accent font-medium bg-transparent border-0 p-0 cursor-pointer"
+                                title={`${resolved.label}: ${resolved.url}`}
+                              >
+                                {resolved.label}
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Services & Deliverables */}
