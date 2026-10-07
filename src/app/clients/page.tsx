@@ -31,6 +31,7 @@ import {
   parseAmountToCents,
   getCurrencySymbol,
 } from "@/lib/format";
+import { openExternalLink } from "@/lib/deliveryUrl";
 import type { ClientWithStats, Currency } from "@/types/billing";
 
 function ClientsContent() {
@@ -448,15 +449,17 @@ function ClientsContent() {
                             <span>New Invoice</span>
                           </Button>
                           {client.driveUrl && (
-                            <a
-                              href={client.driveUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full px-3.5 py-2 text-left hover:bg-surface-neutral-50 flex items-center gap-2 text-content-neutral-700"
+                            <Button
+                              variant="menu"
+                              onClick={(e) => {
+                                openExternalLink(client.driveUrl, e);
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full text-left"
                             >
                               <ExternalLink className="w-3.5 h-3.5 text-content-neutral-400" />
                               <span>Open Drive Folder</span>
-                            </a>
+                            </Button>
                           )}
                           <div className="my-1 border-t border-line-neutral-100" />
                           <Button
@@ -1061,15 +1064,14 @@ function ClientsContent() {
                     </div>
                   </div>
                   {selectedClientForHistory.driveUrl && (
-                    <a
-                      href={selectedClientForHistory.driveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-accent font-semibold hover:underline"
+                    <button
+                      type="button"
+                      onClick={(e) => openExternalLink(selectedClientForHistory.driveUrl, e)}
+                      className="inline-flex items-center gap-1.5 text-xs text-accent font-semibold hover:underline bg-transparent border-0 p-0 cursor-pointer"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Drive Folder</span>
-                    </a>
+                    </button>
                   )}
                 </div>
 
