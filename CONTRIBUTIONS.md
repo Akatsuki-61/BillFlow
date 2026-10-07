@@ -116,9 +116,17 @@ This document records the individual module ownership, development timeline, and
 
 ## Test & Build Verification
 
-The integrated system is tested and verified through automated test suites:
+The integrated system is tested and verified through automated test suites and production packaging:
 - **Test Framework:** Vitest runner (`vitest run`).
 - **Total Test Suites:** 12 files passed.
 - **Total Unit & Integration Tests:** 86 tests passed.
 - **Type Checking:** `npx tsc --noEmit` compiles cleanly with zero errors.
 - **Linter:** `npm run lint` passes cleanly with zero errors.
+- **Desktop Packaging:**
+  - macOS Apple Silicon (M1+): `release/BillFlow-0.1.0-arm64.dmg` verified and built.
+  - macOS Intel: `release/BillFlow-0.1.0.dmg` verified and built.
+  - Windows: NSIS installer configuration verified (`npm run dist:win`).
+
+For developer setup, code guidelines, and contribution workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For the product overview and freelance workflow specification, see [README.md](README.md).
+
