@@ -1,41 +1,70 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { EChartsAreaChart, type ChartConfig } from "@/components/evilcharts/charts/echarts-area-chart";
-
-const chartData = [
-  { date: "Jan 1", actual: 240, target: 125 },
-  { date: "Jan 8", actual: 240, target: 125 },
-  { date: "Jan 15", actual: 175, target: 200 },
-  { date: "Jan 22", actual: 175, target: 200 },
-  { date: "Feb 1", actual: 175, target: 200 },
-  { date: "Feb 8", actual: 260, target: 125 },
-  { date: "Feb 15", actual: 260, target: 125 },
-  { date: "Feb 22", actual: 260, target: 125 },
-  { date: "Mar 1", actual: 260, target: 190 },
-  { date: "Mar 8", actual: 335, target: 190 },
-  { date: "Mar 15", actual: 335, target: 190 },
-  { date: "Mar 22", actual: 335, target: 390 },
-  { date: "Apr 1", actual: 335, target: 390 },
-  { date: "Apr 8", actual: 335, target: 390 },
-  { date: "Apr 15", actual: 190, target: 390 },
-  { date: "Apr 22", actual: 215, target: 305 },
-  { date: "May 1", actual: 215, target: 305 },
-  { date: "May 8", actual: 215, target: 175 },
-  { date: "May 15", actual: 215, target: 175 },
-  { date: "May 22", actual: 275, target: 175 },
-  { date: "Jun 1", actual: 275, target: 245 },
-];
+import { useData } from "@/lib/data/DataProvider";
 
 const chartConfig = {
   actual: { label: "Actual", colors: { light: ["#18181b"], dark: ["#f4f4f5"] } },
   target: { label: "Target", colors: { light: ["#a1a1aa"], dark: ["#71717a"] } },
 } satisfies ChartConfig;
 
-const LATEST = chartData[chartData.length - 1];
-const DELTA = ((LATEST.actual - LATEST.target) / LATEST.target) * 100;
-
 export function GrowthBenchmarkChart() {
+  const { tasks } = useData();
+
+  const { chartData, latestActual, deltaPct, hasTrackedHours } = useMemo(() => {
+    const weeklyData: Array<{ date: string; actual: number; target: number }> = [];
+    const now = new Date();
+    const MS_PER_DAY = 86400000;
+    const MS_PER_WEEK = MS_PER_DAY * 7;
+    const WEEK_TARGET_HOURS = 40;
+
+    // Generate last 8 weeks
+    for (let i = 7; i >= 0; i--) {
+      const weekStart = new Date(now.getTime() - (i + 1) * MS_PER_WEEK);
+      const weekEnd = new Date(now.getTime() - i * MS_PER_WEEK);
+
+      const label = `${weekEnd.toLocaleString("default", { month: "short" })} ${weekEnd.getDate()}`;
+
+      // Sum task hours within this window
+      let weekHours = 0;
+      (tasks || []).forEach((t) => {
+        const timeStr = t.completedAt || t.startedAt || t.createdAt;
+        if (!timeStr) return;
+        const taskTime = new Date(timeStr).getTime();
+        if (taskTime >= weekStart.getTime() && taskTime <= weekEnd.getTime()) {
+          let ms = t.activeMilliseconds || 0;
+          if (t.activeSince) {
+            const elapsed = now.getTime() - new Date(t.activeSince).getTime();
+            if (!isNaN(elapsed) && elapsed > 0) ms += elapsed;
+          }
+          weekHours += ms / 3600000;
+        }
+      });
+
+      weeklyData.push({
+        date: label,
+        actual: Math.round(weekHours * 10) / 10,
+        target: WEEK_TARGET_HOURS,
+      });
+    }
+
+    const latest = weeklyData[weeklyData.length - 1];
+    const totalActual = weeklyData.reduce((s, w) => s + w.actual, 0);
+
+    let delta = 0;
+    if (latest.target > 0) {
+      delta = Math.round(((latest.actual - latest.target) / latest.target) * 100);
+    }
+
+    return {
+      chartData: weeklyData,
+      latestActual: latest.actual,
+      deltaPct: delta,
+      hasTrackedHours: totalActual > 0,
+    };
+  }, [tasks]);
+
   return (
     <div className="flex h-full w-full min-h-[300px] flex-col p-4">
       <div className="flex items-start justify-between gap-4">
@@ -43,10 +72,20 @@ export function GrowthBenchmarkChart() {
           <span className="text-content-neutral-500 text-xs">Weekly Billable Sprints</span>
           <div className="flex items-baseline gap-2">
             <span className="text-content-neutral-900 text-2xl font-semibold tracking-tight sm:text-3xl">
-              {LATEST.actual}h
+              {latestActual}h
             </span>
-            <span className="text-sm font-medium text-content-emerald-600">
-              +{DELTA.toFixed(1)}% vs target
+            <span
+              className={`text-sm font-medium ${
+                hasTrackedHours && deltaPct >= 0
+                  ? "text-content-emerald-600"
+                  : hasTrackedHours
+                    ? "text-content-amber-600"
+                    : "text-content-neutral-400"
+              }`}
+            >
+              {hasTrackedHours
+                ? `${deltaPct >= 0 ? "+" : ""}${deltaPct}% vs target`
+                : "No tracked sprint hours"}
             </span>
           </div>
         </div>
@@ -70,10 +109,16 @@ export function GrowthBenchmarkChart() {
                 strokeDasharray="4 3"
               />
             </svg>
-            Target
+            Target (40h/wk)
           </div>
         </div>
       </div>
+
+      {!hasTrackedHours && (
+        <div className="mt-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No weekly sprint hours recorded yet. Tracked hours update as tasks are worked on.
+        </div>
+      )}
 
       <EChartsAreaChart
         data={chartData}
@@ -85,7 +130,6 @@ export function GrowthBenchmarkChart() {
         <EChartsAreaChart.Grid />
         <EChartsAreaChart.XAxis
           dataKey="date"
-          tickFormatter={(value) => (value.split(" ")[1] === "1" ? value.split(" ")[0] : "")}
         />
         <EChartsAreaChart.YAxis />
         <EChartsAreaChart.Tooltip />

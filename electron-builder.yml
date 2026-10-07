@@ -1,5 +1,6 @@
 appId: com.billflow.desktop
 productName: BillFlow
+copyright: "Copyright © 2026 Akatsuki-61"
 directories:
   output: release
   buildResources: build
@@ -13,6 +14,8 @@ asarUnpack:
 extraResources:
   - from: build/icon.png
     to: brand/icon.png
+  - from: public/brand/logo-white.png
+    to: brand/logo-white.png
   - from: build/tray
     to: brand/tray
   - from: drizzle

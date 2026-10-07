@@ -30,7 +30,7 @@ This document records the individual module ownership, development timeline, and
   - Built SQLite migration pipelines and fallback in-memory data providers (`src/lib/data/DataProvider.tsx`).
 - **Billing & Invoicing Workflow:**
   - Implemented itemized invoice line items, advance payment tracking (50% deposit state), and payment receipt records.
-  - Built vector PDF invoice generation using PDFKit in Electron (`electron/pdf-generator.ts`).
+  - Built vector PDF invoice generation using `pdf-lib` in Electron (`electron/pdf-generator.ts`).
 - **Task Tracking & Kanban Board:**
   - Built the sprint Kanban board (`/tasks`) with To Do, In Progress, Review, and Done statuses.
   - Implemented the automatic advance tracking prompt with 5-second countdown to convert paid invoices into sprint tasks.
@@ -75,7 +75,7 @@ This document records the individual module ownership, development timeline, and
 **Primary Branch:** `Sandika`
 
 - **Service Catalog Management:**
-  - Developed the reusable service and product catalog (`src/app/catalog/page.tsx`, `src/components/CatalogView.tsx`).
+  - Developed the reusable service and product catalog (`src/app/catalog/page.tsx`, `src/components/catalog/CatalogView.tsx`).
   - Supported hourly, flat-rate, and milestone-based pricing units.
 - **Bulk Import Engine:**
   - Implemented CSV and Excel bulk import functionality for catalog items (`src/lib/catalog-import.ts`).
@@ -116,9 +116,17 @@ This document records the individual module ownership, development timeline, and
 
 ## Test & Build Verification
 
-The integrated system is tested and verified through automated test suites:
+The integrated system is tested and verified through automated test suites and production packaging:
 - **Test Framework:** Vitest runner (`vitest run`).
 - **Total Test Suites:** 12 files passed.
 - **Total Unit & Integration Tests:** 86 tests passed.
 - **Type Checking:** `npx tsc --noEmit` compiles cleanly with zero errors.
 - **Linter:** `npm run lint` passes cleanly with zero errors.
+- **Desktop Packaging:**
+  - macOS Apple Silicon (M1+): `release/BillFlow-0.1.0-arm64.dmg` verified and built.
+  - macOS Intel: `release/BillFlow-0.1.0.dmg` verified and built.
+  - Windows: NSIS installer configuration verified (`npm run dist:win`).
+
+For developer setup, code guidelines, and contribution workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For the product overview and freelance workflow specification, see [README.md](README.md).
+

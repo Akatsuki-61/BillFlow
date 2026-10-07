@@ -46,6 +46,7 @@ next-env.d.ts
 *.db-shm
 
 # documentation
+docs/
 /docs/
 WORKFLOW_AUDIT.md
 DEMO_BLOCKERS.md

@@ -25,7 +25,6 @@ import {
   Activity,
   Sparkles,
   Target,
-  Users,
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/Workspace";
 import {
@@ -1393,22 +1392,22 @@ export function WidgetRenderer({
           </div>
         );
 
-      // 22. Delivered Solutions Reach Chart
+      // 22. Delivered Solutions Financial Growth Chart
       case "audience-growth-chart":
         return (
           <div className="analytics-creative-chart-card">
             <div className="analytics-creative-header">
               <div className="analytics-creative-title-group">
                 <div className="analytics-creative-icon-box">
-                  <Users className="w-4 h-4 text-content-purple-600" />
+                  <DollarSign className="w-4 h-4 text-content-purple-600" />
                 </div>
                 <div>
                   <h3 className="analytics-creative-title">
-                    Delivered Solutions Reach
+                    Delivered Solutions Financial Growth
                   </h3>
                   {!isCompact && (
                     <p className="analytics-creative-subtitle">
-                      Monthly active engagement and throughput across client-delivered software & AI agents
+                      Monthly realized collections, operating costs, and net profit across client solutions
                     </p>
                   )}
                 </div>
