@@ -21,8 +21,7 @@
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
-    "dist:mac:arm64": "npm run build && electron-builder --mac --arm64",
-    "postinstall": "electron-builder install-app-deps"
+    "dist:mac:arm64": "npm run build && electron-builder --mac --arm64"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.3.1",
