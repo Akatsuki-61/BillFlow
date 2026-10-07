@@ -76,7 +76,7 @@ Review accurate financial summaries with no artificial zero-clamping or syntheti
 | **Styling & Motion** | Tailwind CSS v4, Motion | Newsreader serif + Inter typography, layered neutral shadows. |
 | **Database & ORM** | SQLite 3 via `better-sqlite3`, Drizzle ORM | WAL mode, foreign key cascades, versioned schema migrations. |
 | **Analytics & Charts** | Apache ECharts 6 | Freelance turnaround velocity, retainer yields, capacity benchmarks. |
-| **Document Engine** | PDFKit & `pdf-lib` | Offline vector PDF invoice generation with embedded layouts. |
+| **Document Engine** | `pdf-lib` | Offline vector PDF invoice generation with embedded layouts. |
 | **Test Suite** | Vitest | 12 test suites, 86 unit and integration test assertions. |
 
 ### Architecture Overview
@@ -193,6 +193,51 @@ All application data is stored locally:
 - **Receipt Attachments**: Copied into `userData/attachments/` with secure UUID naming.
 - **Invoice PDFs**: Automatically exported to your configured folder (defaults to Downloads).
 - **Appearance Settings**: Persisted in `appearance.json` (`Light`, `Dark`, or `System`).
+
+---
+
+## Development & Contributing
+
+Guidelines for team members and contributors collaborating on BillFlow:
+
+### Branching Strategy
+
+| Branch | Focus Area & Primary Contributor |
+| :--- | :--- |
+| `main` | Production-ready releases. Protected branch. |
+| `Nipun` | Architecture, Electron shell, database, invoicing, PDF export, analytics, tasks. |
+| `Lahiru` | Navigation shell, clients directory, delivery link resolution, expenses ledger. |
+| `Binuka` | Outsourcing work orders, contractor payouts, currency synchronization. |
+| `Sandika` | Service catalog, CSV/Excel import, invoice styling reconciliation. |
+
+> **Rule**: Never push directly to `main`. Always work on your assigned branch or a dedicated feature branch and test thoroughly before merging.
+
+### Commit Conventions
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat:` new feature or user-facing capability
+- `fix:` bug fix or calculation correction
+- `refactor:` internal restructuring with no functional change
+- `docs:` documentation updates
+- `test:` test coverage additions
+
+### Core Engineering Principles
+
+1. **Local-First SQLite Persistence**: All business data (clients, invoices, line items, payments, tasks, vendors, work orders, expenses) persists to `billflow.db` via Electron IPC and Drizzle ORM. Never store core business data in `localStorage` or component state alone.
+2. **Financial Integrity**: Store currency amounts as integer minor units (`amountCents`) with an explicit currency code (`USD`, `LKR`, `EUR`). Never sum across differing currencies. Fully preserve business losses and negative margins.
+3. **Zero Synthetic Seeding**: The database launches clean. Never auto-seed fake records or mock tasks on startup outside of an explicit demo flag (`BILLFLOW_DEMO_MODE=1`).
+
+### Pre-Commit Checklist
+
+Run the verification suite before committing:
+
+```bash
+npx tsc --noEmit    # Type checking
+npm run lint        # Code style & linting
+npm test            # 86 unit and integration tests
+```
+
+For the complete contribution guide, local environment configuration, and PR workflow, read **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ---
 

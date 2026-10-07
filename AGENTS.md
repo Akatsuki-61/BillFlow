@@ -154,6 +154,9 @@ Acceptance means records and links survive an app restart, not just that a toast
 - Preserve the invoice's issued client details, line items, and agreed prices when a reusable client profile or catalog service later changes.
 - Keep the app local-first. Persist the records and attachments needed for the desktop demonstration; an in-memory preview alone does not complete the workflow.
 - Keep both light and dark mode working, including new dialogs and controls. Appearance settings belong under **Settings → Appearance**.
+- For development conventions, branching strategy (`main`, `Nipun`, `Lahiru`, `Binuka`, `Sandika`), and pre-commit test checklists, see [CONTRIBUTING.md](CONTRIBUTING.md).
+- For module ownership breakdown, team responsibilities, and merged sprint timelines, see [CONTRIBUTIONS.md](CONTRIBUTIONS.md).
+- For product overview, tech stack details, and packaging commands, see [README.md](README.md).
 - For the upcoming demo, prioritize completing the connected direct-work loop over unrelated features or visual-only placeholders. Additional invoice templates and the reverse **task first → create invoice** workflow are future work, not prerequisites for this first loop.
 - Do not treat this document as an instruction to implement every feature in every task. Use it as shared product context, implement the assigned scope, and report missing connections honestly.
 

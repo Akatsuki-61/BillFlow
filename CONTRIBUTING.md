@@ -116,7 +116,7 @@ All 86 tests must pass and compiler/linter output must be clean.
 
 - **macOS (Apple Silicon / M1+):**
   ```bash
-  npm run build && npx electron-builder --mac --arm64
+  npm run dist:mac:arm64
   ```
   Generates `release/BillFlow-0.1.0-arm64.dmg`.
 
@@ -135,6 +135,7 @@ All 86 tests must pass and compiler/linter output must be clean.
 
 ## Getting Help
 
+- Review [README.md](README.md) for the product overview, installation instructions, and architectural layout.
 - Review [AGENTS.md](AGENTS.md) for the 10-step freelance workflow and system contracts.
 - Review [WORKFLOW_AUDIT.md](WORKFLOW_AUDIT.md) for database requirements and gap analysis.
 - Review [CONTRIBUTIONS.md](CONTRIBUTIONS.md) for team module ownership.
