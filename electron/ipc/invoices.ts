@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { eq, desc, asc } from "drizzle-orm";
 import { getDb } from "../db";
 import { clients, invoices, settings, catalogItems, catalogServices, invoiceItems, invoicePayments } from "../db/schema";
-import { newInvoiceSchema, invoicePatchSchema, recordPaymentSchema } from "../validation";
+import { newInvoiceSchema, invoicePatchSchema, recordPaymentSchema, promoteInvoiceClientSchema } from "../validation";
 import { getOrCreateSettings } from "./settings";
 import { AppError, formatError } from "./errors";
 import { saveInvoicePdf } from "./files";
@@ -174,15 +174,51 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
 
     let clientId = value.clientId;
     let client: typeof clients.$inferSelect | undefined;
+    let clientSnapshotStr: string | null = null;
+
     if (value.newClient) {
-      clientId = crypto.randomUUID();
-      tx.insert(clients).values({ id: clientId, ...value.newClient }).run();
-      client = tx.select().from(clients).where(eq(clients.id, clientId)).get();
+      if (value.saveAsPermanentClient !== false) {
+        clientId = crypto.randomUUID();
+        tx.insert(clients).values({ id: clientId, ...value.newClient }).run();
+        client = tx.select().from(clients).where(eq(clients.id, clientId)).get();
+        clientSnapshotStr = client
+          ? JSON.stringify({
+              name: client.name,
+              email: client.email,
+              contactPerson: client.contactPerson,
+              phone: client.phone,
+              driveUrl: client.driveUrl,
+              category: client.category,
+              currency: client.currency,
+            })
+          : null;
+      } else {
+        // Temporary client: keep clientId null, preserve details in clientSnapshot
+        clientId = undefined;
+        clientSnapshotStr = JSON.stringify({
+          name: value.newClient.name,
+          email: value.newClient.email,
+          contactPerson: value.newClient.contactPerson || value.newClient.name,
+          phone: value.newClient.phone || null,
+          driveUrl: value.newClient.driveUrl || null,
+          category: value.newClient.category || "Enterprise",
+          currency: value.newClient.currency || value.currency,
+        });
+      }
     } else if (clientId) {
       client = tx.select().from(clients).where(eq(clients.id, clientId)).get();
       if (!client) {
         throw new AppError("CLIENT_NOT_FOUND", "The specified client does not exist.");
       }
+      clientSnapshotStr = JSON.stringify({
+        name: client.name,
+        email: client.email,
+        contactPerson: client.contactPerson,
+        phone: client.phone,
+        driveUrl: client.driveUrl,
+        category: client.category,
+        currency: client.currency,
+      });
     } else {
       throw new AppError("CLIENT_NOT_FOUND", "The specified client does not exist.");
     }
@@ -197,7 +233,7 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
     const discountCents = value.discountCents || 0;
     const taxCents = value.taxCents || 0;
     const advanceCents = value.advanceCents || 0;
-    const deliveryUrl = value.deliveryUrl || client?.driveUrl || null;
+    const deliveryUrl = value.deliveryUrl || client?.driveUrl || (value.newClient?.driveUrl || null);
     const notes = value.notes || profile.defaultNotes || null;
 
     tx.insert(invoices).values({
@@ -207,15 +243,7 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
       clientId: clientId || null,
       catalogItemId: value.catalogItemId || null,
       title: value.title || null,
-      clientSnapshot: client
-        ? JSON.stringify({
-            name: client.name,
-            email: client.email,
-            contactPerson: client.contactPerson,
-            phone: client.phone,
-            driveUrl: client.driveUrl,
-          })
-        : null,
+      clientSnapshot: clientSnapshotStr,
       businessSnapshot: JSON.stringify(profile),
       deliveryUrl,
       notes,
@@ -360,10 +388,76 @@ export function listPayments(invoiceId: string): InvoicePayment[] {
     }));
 }
 
+export function promoteInvoiceClient(invoiceId: string): typeof clients.$inferSelect {
+  const db = getDb();
+  const invoice = db.select().from(invoices).where(eq(invoices.id, invoiceId)).get();
+  if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
+
+  if (invoice.clientId) {
+    const existing = db.select().from(clients).where(eq(clients.id, invoice.clientId)).get();
+    if (existing) return existing;
+  }
+
+  if (!invoice.clientSnapshot) {
+    throw new AppError("BAD_REQUEST", "Invoice does not contain client details to save.");
+  }
+
+  let snapshot: {
+    name: string;
+    email: string;
+    contactPerson?: string;
+    phone?: string;
+    driveUrl?: string;
+    category?: string;
+    currency?: Currency;
+  };
+  try {
+    snapshot = JSON.parse(invoice.clientSnapshot);
+  } catch {
+    throw new AppError("BAD_REQUEST", "Failed to parse stored client snapshot.");
+  }
+
+  const newClientId = crypto.randomUUID();
+  const newClientData = {
+    id: newClientId,
+    name: snapshot.name || "Client",
+    email: snapshot.email || "client@example.com",
+    contactPerson: snapshot.contactPerson || snapshot.name || "Client",
+    phone: snapshot.phone || null,
+    driveUrl: snapshot.driveUrl || invoice.deliveryUrl || null,
+    category: snapshot.category || "Enterprise",
+    currency: (snapshot.currency || invoice.currency || "USD") as Currency,
+  };
+
+  db.transaction((tx) => {
+    tx.insert(clients).values(newClientData).run();
+    tx.update(invoices)
+      .set({
+        clientId: newClientId,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(invoices.id, invoiceId))
+      .run();
+  });
+
+  return db.select().from(clients).where(eq(clients.id, newClientId)).get()!;
+}
+
 export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle("invoices:list", async (_event, filter?: { clientId?: string }) => {
     try {
       return listInvoicesWithClient(filter?.clientId);
+    } catch (err) {
+      throw formatError(err);
+    }
+  });
+
+  ipcMain.handle("invoices:promoteClient", async (_event, invoiceId: string) => {
+    try {
+      const validated = promoteInvoiceClientSchema.parse({ invoiceId });
+      const created = promoteInvoiceClient(validated.invoiceId);
+      broadcastDataChanged();
+      return created;
     } catch (err) {
       throw formatError(err);
     }

@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import { getDb } from "../db";
-import { clients, vendors, tasks } from "../db/schema";
+import { clients, vendors, tasks, expenses } from "../db/schema";
 import { formatError } from "./errors";
 import { listInvoicesWithClient } from "./invoices";
 import { AnalyticsSummaryPayload } from "../../src/types/analytics";
@@ -10,10 +10,11 @@ export type { AnalyticsSummaryPayload };
 /**
  * Computes analytics and executive dashboard summary from live SQLite database records.
  * Follows strict financial integrity:
- * - Aggregates actual invoices, clients, vendors, and background tasks.
+ * - Aggregates actual invoices, clients, vendors, background tasks, and general expenses.
  * - Recognizes recorded advance payments (paidCents) without fabricating revenue.
+ * - Deducts both outsourced contractor costs and general operating expenses.
  * - Computes realized hourly rate strictly from task active milliseconds.
- * - Computes runway from actual collections divided by vendor payables burn rate.
+ * - Computes runway from actual collections divided by operating burn rate.
  * - Returns clean 0s when records are empty, avoiding synthetic estimates or hardcoded multipliers.
  */
 export function getAnalyticsSummary(
@@ -26,6 +27,7 @@ export function getAnalyticsSummary(
   const allInvoices = listInvoicesWithClient();
   const allVendors = db.select().from(vendors).all();
   const allTasks = db.select().from(tasks).all();
+  const allExpenses = db.select().from(expenses).all();
 
   // Filter invoices if period specified
   const now = new Date();
@@ -102,11 +104,44 @@ export function getAnalyticsSummary(
     }
   }
 
+  // Filter general operational expenses from SQLite expenses table
+  const filteredExpenses = allExpenses.filter((e) => {
+    if (currency && currency !== "all" && currency !== "ALL") {
+      if (e.currency && e.currency.toUpperCase() !== currency.toUpperCase()) {
+        return false;
+      }
+    }
+    if (!period || period === "all" || period === "all-time") return true;
+    if (!e.incurredAt) return true;
+    const eDate = new Date(e.incurredAt);
+    if (isNaN(eDate.getTime())) return true;
+
+    if (period === "year") {
+      return eDate.getFullYear() === currentYear;
+    }
+    if (period === "month") {
+      return (
+        eDate.getFullYear() === currentYear &&
+        eDate.getMonth() === currentMonth
+      );
+    }
+    if (period === "quarter") {
+      const eQuarter = Math.floor(eDate.getMonth() / 3);
+      const currQuarter = Math.floor(currentMonth / 3);
+      return eDate.getFullYear() === currentYear && eQuarter === currQuarter;
+    }
+    return true;
+  });
+
+  const generalExpensesCents = filteredExpenses.reduce((sum, e) => sum + e.amountCents, 0);
+  const totalOperatingCostsCents = totalOutsourcedCents + generalExpensesCents;
+  const paidOperatingCostsCents = paidCostCents + generalExpensesCents;
+
   // Preserved profit & losses:
-  // Accrual profit: Total Billed Revenue minus Committed Costs (can be negative on loss)
-  const accrualProfitCents = totalRevenueCents - totalOutsourcedCents;
-  // Cash profit: Collections minus Paid Costs (can be negative on loss)
-  const cashProfitCents = paidCents - paidCostCents;
+  // Accrual profit: Total Billed Revenue minus Total Operating Costs (can be negative on loss)
+  const accrualProfitCents = totalRevenueCents - totalOperatingCostsCents;
+  // Cash profit: Collections minus Paid Operating Costs (can be negative on loss)
+  const cashProfitCents = paidCents - paidOperatingCostsCents;
 
   // Selected view profit according to active accounting method
   const netProfitCents = accountingMethod === "cash" ? cashProfitCents : accrualProfitCents;
@@ -159,8 +194,8 @@ export function getAnalyticsSummary(
   const effectiveHourlyRate =
     totalHours > 0 ? Math.round((netProfitCents / 100) / totalHours) : 0;
 
-  // Runway based on actual collected liquidity and average monthly burn
-  const monthlyBurn = Math.round(totalOutsourcedCents / 6);
+  // Runway based on actual collected liquidity and average monthly operating burn
+  const monthlyBurn = Math.round(totalOperatingCostsCents / 6);
   const cashflowRunwayMonths =
     monthlyBurn > 0 && paidCents > 0
       ? Math.min(36, Math.max(1, Math.round(paidCents / monthlyBurn)))
@@ -184,6 +219,9 @@ export function getAnalyticsSummary(
 
   for (const inv of allInvoices) {
     if (!inv.issueDate || inv.status === "DRAFT") continue;
+    if (currency && currency !== "all" && currency !== "ALL") {
+      if (inv.currency && inv.currency.toUpperCase() !== currency.toUpperCase()) continue;
+    }
     const invKey = inv.issueDate.slice(0, 7);
     const target = monthlyTrends.find((m) => m.key === invKey);
     if (target) {
@@ -198,6 +236,18 @@ export function getAnalyticsSummary(
     const target = monthlyTrends.find((m) => m.key === vKey);
     if (target) {
       target.expensesCents += v.balanceCents;
+    }
+  }
+
+  for (const e of allExpenses) {
+    if (!e.incurredAt) continue;
+    if (currency && currency !== "all" && currency !== "ALL") {
+      if (e.currency && e.currency.toUpperCase() !== currency.toUpperCase()) continue;
+    }
+    const eKey = e.incurredAt.slice(0, 7);
+    const target = monthlyTrends.find((m) => m.key === eKey);
+    if (target) {
+      target.expensesCents += e.amountCents;
     }
   }
 
@@ -218,6 +268,8 @@ export function getAnalyticsSummary(
     totalOutsourcedCents,
     committedCostCents: totalOutsourcedCents,
     paidCostCents,
+    generalExpensesCents,
+    totalOperatingCostsCents,
     accrualProfitCents,
     cashProfitCents,
     netProfitCents,

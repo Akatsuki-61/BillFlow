@@ -60,6 +60,7 @@ export interface BillFlowAPI extends WorkflowAPI {
     nextCode: () => Promise<string>;
     create: (input: NewInvoiceInput) => Promise<InvoiceWithClient>;
     update: (id: string, patch: InvoicePatchInput) => Promise<InvoiceWithClient>;
+    promoteClient: (invoiceId: string) => Promise<ClientWithStats>;
     setStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
     recordPayment: (input: RecordPaymentInput) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
     listPayments: (invoiceId: string) => Promise<InvoicePayment[]>;

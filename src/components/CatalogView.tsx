@@ -24,7 +24,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useCatalog, useClients, useInvoices, useData } from "@/lib/data/DataProvider";
-import { getCurrencySymbol } from "@/lib/format";
+import { Button, PageHeader } from "@/components/ui/Workspace";
 import type {
   CatalogItem,
   CatalogIconType,
@@ -364,7 +364,7 @@ export default function CatalogView() {
   };
 
   return (
-    <div className="w-full max-w-[1280px] mx-auto px-8 py-8 md:px-12 md:py-10 font-sans">
+    <div className="workspace-page motion-page">
       {/* Toast Notification */}
       {notification && (
         <div
@@ -384,54 +384,44 @@ export default function CatalogView() {
       )}
 
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-        <div>
-          <h1 className="font-serif-heading text-4xl md:text-[46px] font-normal tracking-tight text-content-neutral-900 leading-tight">
-            Catalog
-          </h1>
-          <p className="text-content-neutral-500 text-sm md:text-[15px] mt-1.5 font-normal">
-            Manage standardized products, services, and pricing units.
-          </p>
-        </div>
-
-        {/* Action Buttons */}
+      <PageHeader
+        title="Catalog"
+        description="Manage standardized products, services, and pricing units."
+      >
         <div className="flex items-center gap-3">
-          <span
-            className="analytics-currency-badge"
-            title="System currency configured in Settings"
-          >
-            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
-          </span>
-
-          <div className="inline-flex items-center shadow-[0_1px_2px_rgba(0,0,0,0.03)] rounded-xl">
-            <button
-              type="button"
+          <div className="inline-flex items-center rounded-xl shadow-xs">
+            <Button
+              variant="secondary"
               onClick={() => setShowBulkImportModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-surface border border-line-neutral-200/90 hover:border-line-neutral-300 rounded-l-xl text-content-neutral-800 text-[13px] font-medium hover:bg-surface-neutral-50 transition-all cursor-pointer"
+              className="rounded-r-none border-r-0 gap-2"
             >
-              <Upload className="w-4 h-4 text-content-neutral-700" strokeWidth={1.8} />
+              <Upload className="w-4 h-4" strokeWidth={1.8} />
               <span>Bulk Import</span>
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
               onClick={() => setShowImportInfoModal(true)}
               title="Bulk Import File Format Guide (CSV & Excel)"
-              className="flex items-center justify-center px-2.5 py-2.5 bg-surface border-y border-r border-line-neutral-200/90 hover:border-line-neutral-300 rounded-r-xl text-content-neutral-500 hover:text-content-purple-600 hover:bg-surface-purple-50/50 transition-all cursor-pointer group"
+              className="rounded-l-none"
             >
-              <Info className="w-4 h-4 text-content-neutral-500 group-hover:text-content-purple-600 transition-colors" strokeWidth={2} />
-            </button>
+              <Info className="w-4 h-4" strokeWidth={2} />
+            </Button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {createRequest.current=null;setShowNewItemModal(true);}}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl text-[13px] font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
+          <Button
+            variant="primary"
+            onClick={() => {
+              createRequest.current = null;
+              setShowNewItemModal(true);
+            }}
+            className="gap-2"
           >
-            <Plus className="w-4 h-4 text-white" strokeWidth={2.4} />
+            <Plus className="w-4 h-4" strokeWidth={2.2} />
             <span>New Item</span>
-          </button>
+          </Button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Main Split Layout: Left Controls + Right Catalog Box */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

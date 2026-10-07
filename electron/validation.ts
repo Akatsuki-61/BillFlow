@@ -65,6 +65,7 @@ export const newInvoiceItemSchema = z.object({
 export const newInvoiceSchema = z.object({
   clientId: z.string().min(1).optional(),
   newClient: newClientSchema.optional(),
+  saveAsPermanentClient: z.boolean().optional().default(true),
   requestId: z.string().uuid().optional(),
   code: z.string().trim().min(1).max(40).optional(),
   catalogItemId: z.string().trim().nullable().optional(),
@@ -81,6 +82,10 @@ export const newInvoiceSchema = z.object({
   dueDate: z.string().nullable().optional(),
   status: z.enum(["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"]).default("UNPAID"),
 }).refine(input => Boolean(input.clientId) !== Boolean(input.newClient), "Select a client or provide new client details.");
+
+export const promoteInvoiceClientSchema = z.object({
+  invoiceId: z.string().min(1, "Invoice ID is required"),
+});
 
 export const invoicePatchSchema = z.object({
   code: z.string().trim().min(1).max(40).optional(),

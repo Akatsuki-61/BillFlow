@@ -75,7 +75,7 @@ export function WidgetRenderer({
   const { clients } = useClients();
   const { vendors } = useVendors();
   const { activeCurrency } = useActiveCurrency();
-  const { tasks } = useData();
+  const { tasks, expenses } = useData();
 
   const activeTasks = useMemo(() => {
     return tasks.filter((t) => t.status !== "done");
@@ -201,11 +201,67 @@ export function WidgetRenderer({
   }, [pendingCents, activeCurrency]);
 
   // Net Profit & Margins:
-  // Preserves business losses when subcontractor payables exceed billed revenue.
+  // Filter general operational expenses according to selected period and active currency
+  const filteredExpenses = useMemo(() => {
+    if (!expenses) return [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    return expenses.filter((e) => {
+      if (activeCurrency && e.currency && e.currency.toUpperCase() !== activeCurrency.toUpperCase()) {
+        return false;
+      }
+      if (!period || period === "all") return true;
+      if (!e.incurredAt) return true;
+      const eDate = new Date(e.incurredAt);
+      if (isNaN(eDate.getTime())) return true;
+
+      if (period === "year") {
+        return eDate.getFullYear() === currentYear;
+      }
+      if (period === "month") {
+        return (
+          eDate.getFullYear() === currentYear &&
+          eDate.getMonth() === currentMonth
+        );
+      }
+      if (period === "quarter") {
+        const eQuarter = Math.floor(eDate.getMonth() / 3);
+        const currQuarter = Math.floor(currentMonth / 3);
+        return (
+          eDate.getFullYear() === currentYear &&
+          eQuarter === currQuarter
+        );
+      }
+      return true;
+    });
+  }, [expenses, period, activeCurrency]);
+
+  const generalExpensesCents = useMemo(() => {
+    return filteredExpenses.reduce((sum, e) => sum + (e.amountCents || 0), 0);
+  }, [filteredExpenses]);
+
+  // Operating Expenses (Contractor payables + General operational expenses)
+  const opexCents = useMemo(() => {
+    return totalOutsourcedCents + generalExpensesCents;
+  }, [totalOutsourcedCents, generalExpensesCents]);
+
+  const opexStr = useMemo(() => {
+    return formatCents(opexCents, activeCurrency);
+  }, [opexCents, activeCurrency]);
+
+  const opexRatioPct = useMemo(() => {
+    if (totalRevenueCents <= 0) return 0;
+    return Math.min(100, Math.round((opexCents / totalRevenueCents) * 100));
+  }, [opexCents, totalRevenueCents]);
+
+  // Net Profit & Margins:
+  // Preserves business losses when operating costs exceed billed revenue.
   // Never clamps to zero with Math.max, ensuring financial deficits are transparently reported.
   const netProfitCents = useMemo(() => {
-    return totalRevenueCents - totalOutsourcedCents;
-  }, [totalRevenueCents, totalOutsourcedCents]);
+    return totalRevenueCents - opexCents;
+  }, [totalRevenueCents, opexCents]);
 
   const isLoss = netProfitCents < 0;
 
@@ -217,20 +273,6 @@ export function WidgetRenderer({
     if (totalRevenueCents <= 0) return 0;
     return Math.round((netProfitCents / totalRevenueCents) * 100);
   }, [totalRevenueCents, netProfitCents]);
-
-  // Operating Expenses (Actual outsourced contractor costs)
-  const opexCents = useMemo(() => {
-    return totalOutsourcedCents;
-  }, [totalOutsourcedCents]);
-
-  const opexStr = useMemo(() => {
-    return formatCents(opexCents, activeCurrency);
-  }, [opexCents, activeCurrency]);
-
-  const opexRatioPct = useMemo(() => {
-    if (totalRevenueCents <= 0) return 0;
-    return Math.min(100, Math.round((opexCents / totalRevenueCents) * 100));
-  }, [opexCents, totalRevenueCents]);
 
   // Active Clients count
   const activeClientsCount = dashboard?.activeClients ?? clients.length;

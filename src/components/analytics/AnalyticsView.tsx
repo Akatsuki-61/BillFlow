@@ -23,8 +23,6 @@ import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
 import { useWidgetContext } from "@/context/WidgetContext";
-import { useActiveCurrency } from "@/lib/data/DataProvider";
-import { getCurrencySymbol } from "@/lib/format";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { Timeframe } from "@/types/analytics";
 import "./analytics.css";
@@ -49,8 +47,6 @@ export default function AnalyticsView() {
     toastMessage,
     showToast,
   } = useWidgetContext();
-
-  const { activeCurrency } = useActiveCurrency();
 
   // Selected timeframe filter state: Month, Quarter, or Year
   const [timeframe, setTimeframe] = useState<Timeframe>("Quarter");
@@ -165,14 +161,6 @@ export default function AnalyticsView() {
         description="Executive financial intelligence and real-time operational analytics. Monitor cashflow velocity, profit margins, contractor allocations, and collection efficiency across billing cycles."
       >
         <div className="analytics-header-controls">
-          {/* Active invoice currency indicator */}
-          <span
-            className="analytics-currency-badge"
-            title="Viewing currency synced with your invoices"
-          >
-            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
-          </span>
-
           <SegmentedControl
             value={timeframe}
             onChange={setTimeframe}

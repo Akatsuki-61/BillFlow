@@ -308,12 +308,6 @@ function ClientsContent() {
         description="Manage your client relationships, contracts, and ledger balance."
       >
         <div className="flex items-center gap-3">
-          <span
-            className="analytics-currency-badge"
-            title="System currency configured in Settings"
-          >
-            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
-          </span>
           <Button
             variant="primary"
             onClick={() => {

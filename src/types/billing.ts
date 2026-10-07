@@ -133,6 +133,7 @@ export interface InvoiceWithClient extends Invoice {
 export interface NewInvoiceInput {
   clientId?: string;
   newClient?: NewClientInput;
+  saveAsPermanentClient?: boolean;
   requestId?: string;
   code?: string;
   catalogItemId?: string | null;

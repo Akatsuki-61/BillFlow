@@ -69,6 +69,12 @@ export interface AnalyticsSummaryPayload {
   /** Total actual paid contractor costs in cents */
   paidCostCents: number;
 
+  /** Total general business operating expenses in cents from the expenses ledger */
+  generalExpensesCents: number;
+
+  /** Total operating costs in cents (committed subcontractor costs + general expenses) */
+  totalOperatingCostsCents: number;
+
   /**
    * Accrual profit in cents: Billed Revenue minus Committed Contractor Costs.
    * Preserves business losses as negative integers (never clamped to zero).

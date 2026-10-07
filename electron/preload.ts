@@ -67,6 +67,8 @@ contextBridge.exposeInMainWorld("billflow", {
       ipcRenderer.invoke("invoices:create", input),
     update: (id: string, patch: InvoicePatchInput): Promise<InvoiceWithClient> =>
       ipcRenderer.invoke("invoices:update", id, patch),
+    promoteClient: (invoiceId: string): Promise<ClientWithStats> =>
+      ipcRenderer.invoke("invoices:promoteClient", invoiceId),
     setStatus: (id: string, status: InvoiceStatus): Promise<InvoiceWithClient> =>
       ipcRenderer.invoke("invoices:setStatus", id, status),
     recordPayment: (input: RecordPaymentInput): Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }> =>

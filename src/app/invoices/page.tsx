@@ -25,6 +25,7 @@ import {
   CreditCard,
   FolderOpen,
   Paperclip,
+  UserPlus,
 } from "lucide-react";
 import {
   useInvoices,
@@ -37,7 +38,6 @@ import {
   formatCents,
   formatDateDisplay,
   parseAmountToCents,
-  getCurrencySymbol,
 } from "@/lib/format";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import type {
@@ -65,6 +65,7 @@ function InvoicesContent() {
     invoices: allInvoices,
     createInvoice,
     updateInvoice,
+    promoteClient,
     setInvoiceStatus,
     recordPayment,
     openInvoicePdf,
@@ -82,6 +83,7 @@ function InvoicesContent() {
   const [clientEmail, setClientEmail] = useState("");
   const [clientContact, setClientContact] = useState("");
   const [clientCategory, setClientCategory] = useState("Enterprise");
+  const [saveAsPermanentClient, setSaveAsPermanentClient] = useState(true);
   const requestId = useRef<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
@@ -115,13 +117,16 @@ function InvoicesContent() {
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithClient | null>(null);
   const [editCode, setEditCode] = useState("");
   const [editClientId, setEditClientId] = useState("");
-  const [editTitle, setEditTitle] = useState("");
-  const [editAmount, setEditAmount] = useState("");
   const [editCurrency, setEditCurrency] = useState<Currency>("LKR");
   const [editDueDate, setEditDueDate] = useState("");
   const [editStatus, setEditStatus] = useState<InvoiceStatus>("UNPAID");
   const [editDeliveryUrl, setEditDeliveryUrl] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editLineItems, setEditLineItems] = useState<LineItemDraft[]>([]);
+  const [editDiscount, setEditDiscount] = useState("");
+  const [editTaxRate, setEditTaxRate] = useState("");
+  const [editRequireAdvance, setEditRequireAdvance] = useState(true);
+  const [editAdvancePercent, setEditAdvancePercent] = useState(50);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Delete Confirm Modal state
@@ -228,6 +233,7 @@ function InvoicesContent() {
     setNewTaxRate("");
     setRequireAdvance(true);
     setAdvancePercent(50);
+    setSaveAsPermanentClient(true);
     setNewDeliveryUrl("");
     setNewNotes("");
 
@@ -320,34 +326,171 @@ function InvoicesContent() {
     }
   };
 
+  const handlePromoteClient = async (inv: InvoiceWithClient) => {
+    try {
+      await promoteClient(inv.id);
+      setOpenMenuId(null);
+      showToast(`Saved "${inv.clientName}" to permanent clients directory.`);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String(err.message)
+          : "Failed to save client";
+      showToast(msg, "error");
+    }
+  };
+
   // Open Edit Modal
   const handleOpenEdit = (inv: InvoiceWithClient) => {
     setEditingInvoice(inv);
     setEditCode(inv.code);
     setEditClientId(inv.clientId || "");
-    setEditTitle(inv.title || "");
-    setEditAmount(((inv.amountCents || 0) / 100).toFixed(2));
     setEditCurrency(inv.currency);
     setEditDueDate(inv.dueDate || "");
     setEditStatus(inv.status);
     setEditDeliveryUrl(inv.deliveryUrl || "");
     setEditNotes(inv.notes || "");
+
+    const items: LineItemDraft[] =
+      inv.items && inv.items.length > 0
+        ? inv.items.map((it) => ({
+            id: it.id || String(Math.random()),
+            catalogId: it.catalogId || undefined,
+            description: it.description,
+            quantity: it.quantity,
+            unitPrice: (it.unitPriceCents / 100).toFixed(2),
+          }))
+        : [
+            {
+              id: "1",
+              description: inv.title || "Custom software freelancing work",
+              quantity: 1,
+              unitPrice: ((inv.amountCents || 0) / 100).toFixed(2),
+            },
+          ];
+    setEditLineItems(items);
+
+    setEditDiscount(inv.discountCents ? (inv.discountCents / 100).toFixed(2) : "");
+    const baseBeforeTax = Math.max(0, (inv.amountCents || 0) - (inv.taxCents || 0));
+    setEditTaxRate(
+      inv.taxCents && baseBeforeTax > 0
+        ? ((inv.taxCents / baseBeforeTax) * 100).toFixed(1)
+        : ""
+    );
+    if (inv.advanceCents && inv.advanceCents > 0) {
+      setEditRequireAdvance(true);
+      const pct = inv.amountCents > 0 ? Math.round((inv.advanceCents / inv.amountCents) * 100) : 50;
+      setEditAdvancePercent(pct);
+    } else {
+      setEditRequireAdvance(false);
+      setEditAdvancePercent(50);
+    }
+
     setOpenMenuId(null);
   };
+
+  const handleAddEditLineItem = () => {
+    setEditLineItems((prev) => [
+      ...prev,
+      { id: String(Date.now()), description: "", quantity: 1, unitPrice: "" },
+    ]);
+  };
+
+  const handleRemoveEditLineItem = (id: string) => {
+    setEditLineItems((prev) =>
+      prev.length > 1 ? prev.filter((it) => it.id !== id) : prev,
+    );
+  };
+
+  const handleUpdateEditLineItem = (id: string, updates: Partial<LineItemDraft>) => {
+    setEditLineItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, ...updates } : it)),
+    );
+  };
+
+  const handleEditCatalogSelect = (catalogId: string) => {
+    const item = catalogItems.find((ci) => ci.id === catalogId);
+    if (!item) return;
+    setEditLineItems((prev) => {
+      if (prev.length === 1 && !prev[0].description && !prev[0].unitPrice) {
+        return [
+          {
+            id: prev[0].id,
+            catalogId: item.id,
+            description: item.title,
+            quantity: 1,
+            unitPrice: item.price,
+          },
+        ];
+      }
+      return [
+        ...prev,
+        {
+          id: String(Date.now()),
+          catalogId: item.id,
+          description: item.title,
+          quantity: 1,
+          unitPrice: item.price,
+        },
+      ];
+    });
+    if (item.currency) {
+      setEditCurrency(item.currency);
+    }
+  };
+
+  // Math for Edit Invoice Modal
+  const editItemsSubtotal = editLineItems.reduce((sum, it) => {
+    const q = it.quantity > 0 ? it.quantity : 1;
+    const p = parseFloat(it.unitPrice) || 0;
+    return sum + q * p;
+  }, 0);
+  const editDiscountVal = parseFloat(editDiscount) || 0;
+  const editTaxableSubtotal = Math.max(0, editItemsSubtotal - editDiscountVal);
+  const editTaxVal = editTaxableSubtotal * ((parseFloat(editTaxRate) || 0) / 100);
+  const editCalculatedTotal = Math.max(0, editTaxableSubtotal + editTaxVal);
+  const editAdvanceAmountDue = editRequireAdvance
+    ? editCalculatedTotal * (editAdvancePercent / 100)
+    : 0;
+  const editBalanceAmountDue = editCalculatedTotal - editAdvanceAmountDue;
 
   // Save Edit Changes
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingInvoice) return;
 
+    const validItems = editLineItems.filter((it) => it.description.trim());
+    if (validItems.length === 0) {
+      showToast("Please specify at least one service deliverable", "error");
+      return;
+    }
+
     setIsSubmittingEdit(true);
     try {
-      const amountCents = parseAmountToCents(editAmount);
+      const itemsPayload = validItems.map((it) => ({
+        id: it.id && !it.id.includes(".") ? it.id : undefined,
+        catalogId: it.catalogId || undefined,
+        description: it.description.trim(),
+        quantity: it.quantity > 0 ? it.quantity : 1,
+        unitPriceCents: parseAmountToCents(it.unitPrice || "0"),
+      }));
+
+      const finalAmountCents = parseAmountToCents(editCalculatedTotal.toFixed(2));
+      const discountCents = parseAmountToCents(editDiscountVal.toFixed(2));
+      const taxCents = parseAmountToCents(editTaxVal.toFixed(2));
+      const advanceCents = editRequireAdvance
+        ? parseAmountToCents(editAdvanceAmountDue.toFixed(2))
+        : 0;
+
       await updateInvoice(editingInvoice.id, {
         code: editCode.trim(),
-        clientId: editClientId,
-        title: editTitle.trim() || undefined,
-        amountCents,
+        clientId: editClientId || undefined,
+        title: validItems[0]?.description || undefined,
+        items: itemsPayload,
+        amountCents: finalAmountCents,
+        discountCents,
+        taxCents,
+        advanceCents,
         currency: editCurrency,
         dueDate: editDueDate || null,
         status: editStatus,
@@ -356,7 +499,7 @@ function InvoicesContent() {
       });
 
       setEditingInvoice(null);
-      showToast("Invoice updated successfully!");
+      showToast(`Invoice ${editCode} updated successfully.`);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -496,6 +639,7 @@ function InvoicesContent() {
                 category: clientCategory,
                 driveUrl: newDeliveryUrl.trim() || undefined,
               },
+              saveAsPermanentClient,
             }
           : { clientId: newClientId }),
         code: newCode.trim() || undefined,
@@ -681,12 +825,6 @@ function InvoicesContent() {
         description="Manage itemized billing, advance deposits, vector PDF exports, and payments."
       >
         <div className="flex items-center gap-3">
-          <span
-            className="analytics-currency-badge"
-            title="System currency configured in Settings"
-          >
-            Currency: {primaryCurrency} ({getCurrencySymbol(primaryCurrency).trim()})
-          </span>
           <Button variant="primary" type="button" onClick={handleOpenAddModal}>
             <Plus className="w-4 h-4 text-content-neutral-700" strokeWidth={2.2} />
             <span>New Invoice</span>
@@ -840,17 +978,28 @@ function InvoicesContent() {
                             </span>
                           )}
                         </div>
-                        <div className="mt-0.5">
-                          <Button
-                            variant="ghost"
-                            type="button"
-                            onClick={() =>
-                              router.push(`/clients?client=${inv.clientId}`)
-                            }
-                            className="p-0 h-auto font-medium text-left"
-                          >
-                            {inv.clientName}
-                          </Button>
+                        <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          {inv.clientId ? (
+                            <Button
+                              variant="ghost"
+                              type="button"
+                              onClick={() =>
+                                router.push(`/clients?client=${inv.clientId}`)
+                              }
+                              className="p-0 h-auto font-medium text-left"
+                            >
+                              {inv.clientName}
+                            </Button>
+                          ) : (
+                            <>
+                              <span className="font-medium text-content-neutral-900 text-sm">
+                                {inv.clientName}
+                              </span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-neutral-100 text-content-neutral-600 border border-line-neutral-200">
+                                Temporary Client
+                              </span>
+                            </>
+                          )}
                         </div>
                         {(() => {
                           const resolved = resolveDeliveryUrl(inv, { clients });
@@ -1030,6 +1179,17 @@ function InvoicesContent() {
 
                             <div className="my-1 border-t border-line-neutral-100" />
 
+                            {!inv.clientId && (
+                              <button
+                                type="button"
+                                onClick={() => handlePromoteClient(inv)}
+                                className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer text-accent font-semibold"
+                              >
+                                <UserPlus className="w-3.5 h-3.5 text-accent" />
+                                <span>Save as Permanent Client</span>
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => handleOpenEdit(inv)}
@@ -1207,6 +1367,16 @@ function InvoicesContent() {
                           <option key={value}>{value}</option>
                         ))}
                       </select>
+                    </label>
+
+                    <label className="col-span-2 flex items-center gap-2 pt-1 text-xs text-content-neutral-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveAsPermanentClient}
+                        onChange={(e) => setSaveAsPermanentClient(e.target.checked)}
+                        className="w-4 h-4 rounded border-line-neutral-300 text-accent focus:ring-accent/20 cursor-pointer accent-neutral-900"
+                      />
+                      <span>Save to permanent clients directory (uncheck for temporary one-off client)</span>
                     </label>
                   </div>
                 ) : (
@@ -1922,9 +2092,9 @@ function InvoicesContent() {
             <MotionSurface
               onDismiss={() => setEditingInvoice(null)}
               kind="panel"
-              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
+              className="bg-surface rounded-2xl w-full max-w-2xl shadow-2xl border border-line-neutral-200 overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50">
+              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50 shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
                     <Pencil className="w-4 h-4" />
@@ -1934,7 +2104,7 @@ function InvoicesContent() {
                       Edit Invoice
                     </h3>
                     <p className="text-xs text-content-neutral-400">
-                      Modify details for {editingInvoice.code}.
+                      Modify itemized deliverables, pricing, and terms for {editingInvoice.code}.
                     </p>
                   </div>
                 </div>
@@ -1950,9 +2120,10 @@ function InvoicesContent() {
 
               <form
                 onSubmit={handleEditSubmit}
-                className="p-6 space-y-4 text-xs font-medium text-content-neutral-700"
+                className="p-6 space-y-4 text-xs font-medium text-content-neutral-700 overflow-y-auto"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Invoice Code & Client & Currency */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Invoice Code *
@@ -1972,47 +2143,46 @@ function InvoicesContent() {
                     </label>
                     <select
                       value={editClientId}
-                      onChange={(e) => setEditClientId(e.target.value)}
+                      onChange={(e) => {
+                        const cid = e.target.value;
+                        setEditClientId(cid);
+                        const chosen = clients.find((c) => c.id === cid);
+                        if (chosen) {
+                          setEditCurrency(chosen.currency);
+                          if (chosen.driveUrl) setEditDeliveryUrl(chosen.driveUrl);
+                        }
+                      }}
                       className="ui-field w-full cursor-pointer"
                     >
-                      <option value="">Select a client...</option>
+                      <option value="">(Temporary / Unlinked Client)</option>
                       {clients.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.name}
+                          {c.name} ({c.currency})
                         </option>
                       ))}
                     </select>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Description / Scope
-                  </label>
-                  <input
-                    type="text"
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="ui-field w-full"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                      Amount ({editCurrency}) *
+                      Currency
                     </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      required
-                      value={editAmount}
-                      onChange={(e) => setEditAmount(e.target.value)}
-                      className="ui-field w-full"
-                    />
+                    <select
+                      value={editCurrency}
+                      onChange={(e) => setEditCurrency(e.target.value as Currency)}
+                      className="ui-field w-full cursor-pointer"
+                    >
+                      <option value="LKR">LKR (Rs.)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="CAD">CAD (CA$)</option>
+                    </select>
                   </div>
+                </div>
 
+                {/* Due Date & Status */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Due Date
@@ -2024,22 +2194,314 @@ function InvoicesContent() {
                       className="ui-field w-full cursor-pointer"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Status
+                    </label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value as InvoiceStatus)}
+                      className="ui-field w-full cursor-pointer"
+                    >
+                      <option value="DRAFT">DRAFT</option>
+                      <option value="UNPAID">UNPAID</option>
+                      <option value="ADVANCE_PAID">ADVANCE_PAID</option>
+                      <option value="PAID">PAID</option>
+                      <option value="OVERDUE">OVERDUE</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Delivery URL
+                {/* Itemized Services / Deliverables */}
+                <div className="space-y-2.5 pt-2 border-t border-line-neutral-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-content-neutral-700">
+                        Itemized Services & Deliverables *
+                      </h4>
+                      <p className="text-[11px] text-content-neutral-400">
+                        Modify line items, quantities, or prices.
+                      </p>
+                    </div>
+
+                    {catalogItems.length > 0 && (
+                      <div className="w-52">
+                        <select
+                          className="ui-field w-full text-xs"
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleEditCatalogSelect(e.target.value);
+                              e.target.value = "";
+                            }
+                          }}
+                        >
+                          <option value="" disabled>
+                            + Add from Catalog...
+                          </option>
+                          {catalogItems.map((ci) => (
+                            <option key={ci.id} value={ci.id}>
+                              {ci.title} ({ci.currency} {ci.price})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {editLineItems.map((item, index) => {
+                      const q = item.quantity > 0 ? item.quantity : 1;
+                      const p = parseFloat(item.unitPrice) || 0;
+                      const lineTotal = q * p;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-2 p-2.5 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/50"
+                        >
+                          <span className="text-[11px] font-bold text-content-neutral-400 w-4">
+                            {index + 1}.
+                          </span>
+
+                          <input
+                            type="text"
+                            required
+                            placeholder="Deliverable description"
+                            value={item.description}
+                            onChange={(e) =>
+                              handleUpdateEditLineItem(item.id, {
+                                description: e.target.value,
+                              })
+                            }
+                            className="ui-field flex-1"
+                          />
+
+                          <div className="w-20">
+                            <input
+                              type="number"
+                              min="1"
+                              required
+                              placeholder="Qty"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleUpdateEditLineItem(item.id, {
+                                  quantity: parseInt(e.target.value, 10) || 1,
+                                })
+                              }
+                              className="ui-field w-full text-center"
+                            />
+                          </div>
+
+                          <div className="w-28">
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              required
+                              placeholder="Unit Price"
+                              value={item.unitPrice}
+                              onChange={(e) =>
+                                handleUpdateEditLineItem(item.id, {
+                                  unitPrice: e.target.value,
+                                })
+                              }
+                              className="ui-field w-full"
+                            />
+                          </div>
+
+                          <div className="w-24 text-right font-semibold text-content-neutral-800 text-xs">
+                            {formatCents(Math.round(lineTotal * 100), editCurrency)}
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            type="button"
+                            disabled={editLineItems.length <= 1}
+                            onClick={() => handleRemoveEditLineItem(item.id)}
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={handleAddEditLineItem}
+                    className="text-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Another Deliverable</span>
+                  </Button>
+                </div>
+
+                {/* Delivery Link */}
+                <div className="space-y-1.5 pt-2 border-t border-line-neutral-100">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500">
+                    Delivery Location URL (Google Drive, GitHub repo, or Staging URL)
                   </label>
                   <input
                     type="url"
                     value={editDeliveryUrl}
                     onChange={(e) => setEditDeliveryUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="ui-field w-full font-mono"
+                    placeholder="https://drive.google.com/drive/folders/... or https://github.com/..."
+                    className="ui-field w-full font-mono text-xs"
                   />
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100">
+                {/* Financial Summary & Advance Requirement Box */}
+                <div className="p-4 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/80 space-y-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="space-y-1">
+                      <span className="text-[11px] uppercase font-bold text-content-neutral-500">
+                        Discount ({editCurrency})
+                      </span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        placeholder="0"
+                        value={editDiscount}
+                        onChange={(e) => setEditDiscount(e.target.value)}
+                        className="ui-field w-full"
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-[11px] uppercase font-bold text-content-neutral-500">
+                        Tax Rate (%)
+                      </span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        placeholder="0"
+                        value={editTaxRate}
+                        onChange={(e) => setEditTaxRate(e.target.value)}
+                        className="ui-field w-full"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="pt-2 border-t border-line-neutral-200/60 space-y-1.5 text-xs">
+                    <div className="flex justify-between text-content-neutral-600">
+                      <span>Services Subtotal:</span>
+                      <span>
+                        {formatCents(Math.round(editItemsSubtotal * 100), editCurrency)}
+                      </span>
+                    </div>
+
+                    {editDiscountVal > 0 && (
+                      <div className="flex justify-between text-content-emerald-700 font-medium">
+                        <span>Discount:</span>
+                        <span>
+                          -{formatCents(Math.round(editDiscountVal * 100), editCurrency)}
+                        </span>
+                      </div>
+                    )}
+
+                    {editTaxVal > 0 && (
+                      <div className="flex justify-between text-content-neutral-600">
+                        <span>Tax:</span>
+                        <span>
+                          +{formatCents(Math.round(editTaxVal * 100), editCurrency)}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between text-content-neutral-900 font-bold text-sm pt-1 border-t border-line-neutral-200">
+                      <span>Final Invoice Total:</span>
+                      <span>
+                        {formatCents(Math.round(editCalculatedTotal * 100), editCurrency)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Advance / Deposit Requirement */}
+                  <div className="pt-2 border-t border-line-neutral-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editRequireAdvance}
+                          onChange={(e) => setEditRequireAdvance(e.target.checked)}
+                          className="w-4 h-4 rounded border-line-neutral-300 text-accent focus:ring-accent/20 cursor-pointer accent-neutral-900"
+                        />
+                        <span className="text-xs font-semibold text-content-neutral-800">
+                          Require Upfront Advance / Deposit
+                        </span>
+                      </label>
+
+                      {editRequireAdvance && (
+                        <div className="flex items-center gap-1.5 text-xs text-content-neutral-600">
+                          <span>Deposit:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={editAdvancePercent}
+                            onChange={(e) =>
+                              setEditAdvancePercent(
+                                Math.min(100, Math.max(1, parseInt(e.target.value, 10) || 50))
+                              )
+                            }
+                            className="ui-field w-14 text-center py-1 px-1.5 text-xs font-semibold"
+                          />
+                          <span>%</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {editRequireAdvance && (
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-surface p-2.5 rounded-lg border border-line-neutral-200">
+                        <div>
+                          <div className="text-[10px] text-content-neutral-400 uppercase font-bold">
+                            Advance Required Now ({editAdvancePercent}%)
+                          </div>
+                          <div className="font-bold text-accent text-sm">
+                            {formatCents(
+                              Math.round(editAdvanceAmountDue * 100),
+                              editCurrency
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] text-content-neutral-400 uppercase font-bold">
+                            Remaining Balance
+                          </div>
+                          <div className="font-semibold text-content-neutral-800 text-sm">
+                            {formatCents(
+                              Math.round(editBalanceAmountDue * 100),
+                              editCurrency
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Job Notes */}
+                <div className="space-y-1.5 pt-2 border-t border-line-neutral-100">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500">
+                    Payment Instructions & Job Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="Bank account details, delivery scope, or client payment terms..."
+                    className="ui-field w-full text-xs"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100 shrink-0">
                   <Button
                     variant="ghost"
                     type="button"

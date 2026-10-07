@@ -65,6 +65,7 @@ interface DataContextType {
   deleteClient: (id: string) => Promise<void>;
   createInvoice: (input: NewInvoiceInput) => Promise<InvoiceWithClient>;
   updateInvoice: (id: string, patch: InvoicePatchInput) => Promise<InvoiceWithClient>;
+  promoteInvoiceClient: (invoiceId: string) => Promise<ClientWithStats>;
   setInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
   recordPayment: (input: RecordPaymentInput) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
   listPayments: (invoiceId: string) => Promise<InvoicePayment[]>;
@@ -389,6 +390,43 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       memoryInvoices[idx] = updated;
       await refresh();
       return updated;
+    }
+  };
+
+  const promoteInvoiceClient = async (invoiceId: string): Promise<ClientWithStats> => {
+    if (checkIsElectron() && window.billflow) {
+      const client = await window.billflow.invoices.promoteClient(invoiceId);
+      await refresh();
+      return client;
+    } else {
+      const inv = memoryInvoices.find((i) => i.id === invoiceId);
+      if (!inv) throw new Error("Invoice not found");
+      const clientName = inv.clientName || "Promoted Client";
+      const clientEmail = inv.clientEmail || "";
+      const id = `cli-${Date.now()}`;
+      const newClient: ClientWithStats = {
+        id,
+        name: clientName,
+        category: "Freelance",
+        contactPerson: clientName,
+        contactRole: null,
+        email: clientEmail,
+        phone: null,
+        currency: inv.currency,
+        driveUrl: inv.deliveryUrl || null,
+        hasQuickBill: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        totalBilledCents: inv.amountCents,
+        totalPaidCents: inv.paidCents,
+        outstandingBalanceCents: Math.max(0, inv.amountCents - inv.paidCents),
+        invoicesCount: 1,
+        recentInvoices: [],
+      };
+      memoryClients.push(newClient);
+      inv.clientId = id;
+      await refresh();
+      return newClient;
     }
   };
 
@@ -909,9 +947,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        const generalExpensesCents = memoryExpenses.reduce((sum, e) => sum + (e.amountCents || 0), 0);
+        const totalOperatingCostsCents = totalOutsourcedCents + generalExpensesCents;
+
         // Preserve losses (no Math.max(0, ...))
-        const accrualProfitCents = totalRevenueCents - totalOutsourcedCents;
-        const cashProfitCents = paidCents - paidCostCents;
+        const accrualProfitCents = totalRevenueCents - totalOperatingCostsCents;
+        const cashProfitCents = paidCents - (paidCostCents + generalExpensesCents);
         const netProfitCents = accountingMethod === "cash" ? cashProfitCents : accrualProfitCents;
         const isLoss = netProfitCents < 0;
 
@@ -941,7 +982,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const totalHours = totalActiveMs / 3600000;
         const effectiveHourlyRate = totalHours > 0 ? Math.round((netProfitCents / 100) / totalHours) : 0;
 
-        const monthlyBurn = Math.round(totalOutsourcedCents / 6);
+        const monthlyBurn = Math.round(totalOperatingCostsCents / 6);
         const cashflowRunwayMonths = monthlyBurn > 0 && paidCents > 0 ? Math.min(36, Math.max(1, Math.round(paidCents / monthlyBurn))) : 0;
 
         const monthlyTrends: AnalyticsMonthlyTrend[] = [];
@@ -978,6 +1019,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        for (const e of memoryExpenses) {
+          const eDate = e.incurredAt || e.createdAt;
+          if (!eDate) continue;
+          const eKey = eDate.slice(0, 7);
+          const target = monthlyTrends.find((m) => m.key === eKey);
+          if (target) {
+            target.expensesCents += e.amountCents || 0;
+          }
+        }
+
         for (const m of monthlyTrends) {
           // Preserve losses across months
           m.profitCents = m.revenueCents - m.expensesCents;
@@ -992,7 +1043,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           pendingReceivablesCents,
           outstandingCents: pendingReceivablesCents,
           totalOutsourcedCents,
-          committedCostCents: totalOutsourcedCents,
+          generalExpensesCents,
+          totalOperatingCostsCents,
+          committedCostCents: totalOperatingCostsCents,
           paidCostCents,
           accrualProfitCents,
           cashProfitCents,
@@ -1138,6 +1191,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         deleteClient,
         createInvoice,
         updateInvoice,
+        promoteInvoiceClient,
         setInvoiceStatus,
         recordPayment,
         listPayments,
@@ -1200,6 +1254,7 @@ export function useInvoices(filter?: { clientId?: string }) {
     error,
     createInvoice,
     updateInvoice,
+    promoteInvoiceClient,
     setInvoiceStatus,
     recordPayment,
     listPayments,
@@ -1222,6 +1277,8 @@ export function useInvoices(filter?: { clientId?: string }) {
     error,
     createInvoice,
     updateInvoice,
+    promoteInvoiceClient,
+    promoteClient: promoteInvoiceClient,
     setInvoiceStatus,
     recordPayment,
     listPayments,

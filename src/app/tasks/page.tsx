@@ -34,7 +34,6 @@ import {
 } from "@/types/tasks";
 
 import { useData } from "@/lib/data/DataProvider";
-import { getCurrencySymbol } from "@/lib/format";
 import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/TaskTiming";
 import Link from "next/link";
@@ -346,13 +345,6 @@ export default function TasksPage() {
               },
             ]}
           />
-
-          <span
-            className="analytics-currency-badge"
-            title="System currency configured in Settings"
-          >
-            Currency: {activeCurrency} ({getCurrencySymbol(activeCurrency).trim()})
-          </span>
 
           {/* Create Task Button */}
           <Button

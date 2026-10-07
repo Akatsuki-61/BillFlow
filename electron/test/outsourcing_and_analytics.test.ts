@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { initDatabase, closeDatabaseForTesting, getDb } from "../db";
-import { clients, invoices, vendors, tasks, workOrders, vendorPayouts, attachments } from "../db/schema";
+import { clients, invoices, vendors, tasks, workOrders, vendorPayouts, attachments, expenses } from "../db/schema";
 import { listVendors } from "../ipc/vendors";
 import {
   listWorkOrders,
@@ -1092,6 +1092,71 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(restoredTask?.status).toBe("done");
       expect(restoredTask?.deliveryUrl).toBe("https://github.com/Chethaka/devops-pipeline");
       expect(restoredTask?.completedAt).toBeDefined();
+    });
+
+    it("truthfully integrates general expenses alongside subcontractor costs into net profit and margins", () => {
+      const db = getDb();
+
+      // Clear any prior test entries
+      db.delete(workOrders).run();
+      db.delete(vendors).run();
+      db.delete(invoices).run();
+      db.delete(expenses).run();
+
+      // 1. Client Invoice: 90,000 LKR paid
+      db.insert(invoices).values({
+        id: "inv-demo-90k",
+        code: "INV-2026-001",
+        title: "Website & AI Consulting Sprint",
+        amountCents: 9000000,
+        paidCents: 9000000,
+        currency: "LKR",
+        issueDate: "2026-10-01",
+        status: "PAID",
+      }).run();
+
+      // 2. Subcontractor Vendor: 30,000 LKR paid
+      db.insert(vendors).values({
+        id: "ven-demo-30k",
+        name: "External Developer",
+        service: "Website Implementation",
+        balanceCents: 3000000,
+        status: "PAID",
+      }).run();
+
+      // 3. General Business Expense: 5,000 LKR (e.g. software/hosting)
+      db.insert(expenses).values({
+        id: "exp-demo-5k",
+        merchant: "Hosting & AI Tools",
+        description: "Cloud hosting and AI tokens",
+        category: "SOFTWARE",
+        amountCents: 500000,
+        currency: "LKR",
+        incurredAt: "2026-10-02",
+        deductible: true,
+      }).run();
+
+      const summary = getAnalyticsSummary("all", "LKR", "accrual");
+
+      // Billed: 90,000 LKR
+      expect(summary.totalRevenueCents).toBe(9000000);
+      // Subcontractor: 30,000 LKR
+      expect(summary.totalOutsourcedCents).toBe(3000000);
+      // General expenses: 5,000 LKR
+      expect(summary.generalExpensesCents).toBe(500000);
+      // Total operating costs: 35,000 LKR
+      expect(summary.totalOperatingCostsCents).toBe(3500000);
+      // Net Profit: 90,000 - 35,000 = 55,000 LKR (5,500,000 cents)
+      expect(summary.netProfitCents).toBe(5500000);
+      expect(summary.accrualProfitCents).toBe(5500000);
+      // Margin: 55,000 / 90,000 = 61%
+      expect(summary.marginPct).toBe(61);
+      expect(summary.isLoss).toBe(false);
+
+      // Verify cash mode also reflects 55,000 LKR
+      const cashSummary = getAnalyticsSummary("all", "LKR", "cash");
+      expect(cashSummary.netProfitCents).toBe(5500000);
+      expect(cashSummary.cashProfitCents).toBe(5500000);
     });
   });
 });
