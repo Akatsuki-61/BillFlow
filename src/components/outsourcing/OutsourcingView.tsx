@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
-  Building,
   CheckCircle2,
   Code2,
   Download,
@@ -21,9 +20,7 @@ import {
   Users,
   X,
   Check,
-  Briefcase,
   Calendar,
-  Layers,
   Sparkles,
   CheckCheck,
   Clock,
@@ -68,12 +65,9 @@ export default function OutsourcingView() {
   const {
     workOrders,
     createWorkOrder,
-    updateWorkOrder,
     reviewWorkOrder,
     recordWorkOrderPayout,
     removeWorkOrderPayout,
-    setWorkOrderPayoutStatus,
-    deleteWorkOrder,
   } = useWorkOrders();
   const { activeCurrency } = useActiveCurrency();
 
@@ -106,9 +100,9 @@ export default function OutsourcingView() {
 
   // Add Client Form States with explicit validation
   const [clientName, setClientName] = useState("");
-  const [clientCategory, setClientCategory] = useState("Enterprise");
+  const clientCategory = "Enterprise";
   const [clientContactPerson, setClientContactPerson] = useState("");
-  const [clientContactRole, setClientContactRole] = useState("");
+  const clientContactRole = "";
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientCurrency, setClientCurrency] = useState<Currency>(activeCurrency || "USD");
@@ -374,19 +368,7 @@ export default function OutsourcingView() {
     }
   };
 
-  // Toggle work order payout status
-  const handleToggleWorkOrderPayout = async (id: string, currentStatus: "PENDING" | "PAID") => {
-    try {
-      if (currentStatus === "PENDING") {
-        await handleRecordPayout(id);
-      } else {
-        await handleRemovePayout(id);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to update payout status";
-      showToast(msg, "error");
-    }
-  };
+
 
   // Submit handler for adding a new client
   const handleAddClient = async (e: React.FormEvent) => {
@@ -647,7 +629,7 @@ export default function OutsourcingView() {
   }, [vendors, searchQuery, statusFilter]);
 
   // Aggregate dynamic metrics from work orders (or legacy vendors fallback)
-  const { totalCommittedCents, outstandingPayablesCents, settledPayoutsCents } = useMemo(() => {
+  const { outstandingPayablesCents, settledPayoutsCents } = useMemo(() => {
     if (workOrders.length > 0) {
       let committed = 0;
       let pending = 0;

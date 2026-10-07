@@ -6,7 +6,6 @@ import path from "path";
 import fs from "fs";
 import * as schema from "./schema";
 import { catalogPriceSchema } from "../validation";
-import { isDemoMode } from "../demo";
 
 // Financial integrity: automatic business sample seeding is strictly disabled
 // outside an explicit demo mode (isDemoMode()). The SQLite database always starts

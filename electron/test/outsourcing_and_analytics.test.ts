@@ -6,7 +6,6 @@ import { initDatabase, closeDatabaseForTesting, getDb } from "../db";
 import { clients, invoices, vendors, tasks, workOrders, vendorPayouts, attachments, expenses } from "../db/schema";
 import { listVendors } from "../ipc/vendors";
 import {
-  listWorkOrders,
   getWorkOrder,
   createWorkOrder,
   updateWorkOrder,

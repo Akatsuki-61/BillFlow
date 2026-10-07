@@ -149,7 +149,6 @@ export function WidgetRenderer({
     pendingCents,
     pendingCount,
     paidRatioPct,
-    avgInvoiceCents,
     avgInvoiceStr,
   } = useMemo(() => {
     if (filteredInvoices.length === 0) {

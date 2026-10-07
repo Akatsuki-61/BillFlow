@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/Workspace";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
-import { WidgetRenderer } from "@/components/widgets/WidgetRenderer";
+import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { useWidgetContext } from "@/context/WidgetContext";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { Timeframe } from "@/types/analytics";

@@ -6,9 +6,9 @@ import {
   Inter,
   Newsreader,
 } from "next/font/google";
-import AdvanceTrackingPrompt from "@/components/AdvanceTrackingPrompt";
-import Sidebar from "@/components/Sidebar";
-import TitleBar from "@/components/TitleBar";
+import AdvanceTrackingPrompt from "@/components/tasks/AdvanceTrackingPrompt";
+import Sidebar from "@/components/layout/Sidebar";
+import TitleBar from "@/components/layout/TitleBar";
 import { NavProvider } from "@/context/NavContext";
 import { DataProvider } from "@/lib/data/DataProvider";
 import { WidgetProvider } from "@/context/WidgetContext";

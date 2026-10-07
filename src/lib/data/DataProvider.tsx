@@ -41,17 +41,28 @@ import type {
 import type { TaskItem } from "@/types/tasks";
 import type { WorkflowAPI, TrackingOffer, AttachmentItem } from "@/types/workflow";
 import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "@/types/expenses";
-import {
-  SEED_SETTINGS,
-  SEED_CLIENTS,
-  SEED_CATALOG_ITEMS,
-  SEED_INVOICES,
-  SEED_PAYMENTS,
-  SEED_TASKS,
-  SEED_VENDORS,
-  SEED_WORK_ORDERS,
-  SEED_EXPENSES,
-} from "./seedData";
+
+const DEFAULT_SETTINGS: AppSettings = {
+  id: "default",
+  businessName: "",
+  professionalTitle: "",
+  email: "",
+  phone: "",
+  website: "",
+  taxId: "",
+  address: "",
+  paymentDetails: "",
+  defaultCurrency: "USD",
+  invoicePrefix: "INV-",
+  nextInvoiceSeq: 1,
+  defaultDueDays: 14,
+  defaultTaxRate: 0,
+  defaultNotes: "Payment due within specified due date. Thank you for your business.",
+  dateFormat: "YYYY-MM-DD",
+  currencyDisplay: "symbol",
+  pdfExportDirectory: "",
+  updatedAt: new Date().toISOString(),
+};
 
 interface DataContextType {
   tasks: TaskItem[];
@@ -119,15 +130,15 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | null>(null);
 
 // In-memory fallback repository when running outside Electron.
-let memoryCatalog: CatalogItem[] = [...SEED_CATALOG_ITEMS];
-let memoryClients: ClientWithStats[] = [...SEED_CLIENTS];
-let memoryInvoices: InvoiceWithClient[] = [...SEED_INVOICES];
-let memoryPayments: InvoicePayment[] = [...SEED_PAYMENTS];
-let memoryVendors: VendorItem[] = [...SEED_VENDORS];
-let memoryExpenses: ExpenseItem[] = [...SEED_EXPENSES];
-let memoryWorkOrders: WorkOrderItem[] = [...SEED_WORK_ORDERS];
-let memoryTasks: TaskItem[] = [...SEED_TASKS];
-let memorySettings: AppSettings = { ...SEED_SETTINGS };
+let memoryCatalog: CatalogItem[] = [];
+let memoryClients: ClientWithStats[] = [];
+let memoryInvoices: InvoiceWithClient[] = [];
+let memoryPayments: InvoicePayment[] = [];
+let memoryVendors: VendorItem[] = [];
+let memoryExpenses: ExpenseItem[] = [];
+let memoryWorkOrders: WorkOrderItem[] = [];
+let memoryTasks: TaskItem[] = [];
+let memorySettings: AppSettings = { ...DEFAULT_SETTINGS };
 
 // Browser storage implements the same async snapshot contract as desktop IPC.
 async function loadBrowserSnapshot() {

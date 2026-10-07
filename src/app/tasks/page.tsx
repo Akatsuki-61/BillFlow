@@ -35,7 +35,7 @@ import {
 
 import { useData } from "@/lib/data/DataProvider";
 import type { TaskPatchInput } from "@/types/workflow";
-import TaskTiming from "@/components/TaskTiming";
+import TaskTiming from "@/components/tasks/TaskTiming";
 import Link from "next/link";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 
