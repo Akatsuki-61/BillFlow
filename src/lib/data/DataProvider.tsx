@@ -17,7 +17,7 @@ import type {
   InvoicePayment,
   RecordPaymentInput,
 } from "@/types/billing";
-import { getActiveInvoiceCurrency, getSystemCurrency } from "@/lib/format";
+import { getSystemCurrency } from "@/lib/format";
 import type {
   AppSettings,
   UpdateSettingsInput,
@@ -41,6 +41,17 @@ import type {
 import type { TaskItem } from "@/types/tasks";
 import type { WorkflowAPI, TrackingOffer, AttachmentItem } from "@/types/workflow";
 import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "@/types/expenses";
+import {
+  SEED_SETTINGS,
+  SEED_CLIENTS,
+  SEED_CATALOG_ITEMS,
+  SEED_INVOICES,
+  SEED_PAYMENTS,
+  SEED_TASKS,
+  SEED_VENDORS,
+  SEED_WORK_ORDERS,
+  SEED_EXPENSES,
+} from "./seedData";
 
 interface DataContextType {
   tasks: TaskItem[];
@@ -108,35 +119,15 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | null>(null);
 
 // In-memory fallback repository when running outside Electron.
-// Financial integrity guarantee: automatic business sample seeding is strictly disabled
-// outside an explicit demo mode (isDemoMode()). Memory collections initialize clean.
-let memoryCatalog: CatalogItem[] = [];
-let memoryClients: ClientWithStats[] = [];
-let memoryInvoices: InvoiceWithClient[] = [];
-const memoryPayments: InvoicePayment[] = [];
-let memoryVendors: VendorItem[] = [];
-let memoryExpenses: ExpenseItem[] = [];
-let memoryWorkOrders: WorkOrderItem[] = [];
-let memorySettings: AppSettings = {
-  id: "default",
-  businessName: "",
-  professionalTitle: "",
-  email: "",
-  phone: "",
-  website: "",
-  taxId: "",
-  address: "",
-  paymentDetails: "",
-  defaultCurrency: "USD",
-  invoicePrefix: "INV-",
-  nextInvoiceSeq: 1,
-  defaultDueDays: 14,
-  defaultTaxRate: 0,
-  defaultNotes: "Payment due within specified due date. Thank you for your business.",
-  dateFormat: "YYYY-MM-DD",
-  currencyDisplay: "symbol",
-  updatedAt: new Date().toISOString(),
-};
+let memoryCatalog: CatalogItem[] = [...SEED_CATALOG_ITEMS];
+let memoryClients: ClientWithStats[] = [...SEED_CLIENTS];
+let memoryInvoices: InvoiceWithClient[] = [...SEED_INVOICES];
+let memoryPayments: InvoicePayment[] = [...SEED_PAYMENTS];
+let memoryVendors: VendorItem[] = [...SEED_VENDORS];
+let memoryExpenses: ExpenseItem[] = [...SEED_EXPENSES];
+let memoryWorkOrders: WorkOrderItem[] = [...SEED_WORK_ORDERS];
+let memoryTasks: TaskItem[] = [...SEED_TASKS];
+let memorySettings: AppSettings = { ...SEED_SETTINGS };
 
 // Browser storage implements the same async snapshot contract as desktop IPC.
 async function loadBrowserSnapshot() {
@@ -151,12 +142,18 @@ async function loadBrowserSnapshot() {
     vendors: [...memoryVendors],
     expenses: [...memoryExpenses],
     catalogItems: [...memoryCatalog],
+    tasks: [...memoryTasks],
+    workOrders: [...memoryWorkOrders],
     settings: { ...memorySettings },
     dashboard: {
       activeClients: memoryClients.length,
       unpaidCount: memoryInvoices.filter((invoice) => invoice.status !== "PAID" && invoice.status !== "DRAFT").length,
-      totalBilledByCurrency: {},
-      outstandingByCurrency: {},
+      totalBilledByCurrency: {
+        USD: memoryInvoices.reduce((acc, inv) => acc + inv.amountCents, 0),
+      },
+      outstandingByCurrency: {
+        USD: memoryInvoices.reduce((acc, inv) => acc + (inv.amountCents - (inv.paidCents || 0)), 0),
+      },
       recentInvoices: memoryInvoices.slice(0, 5),
     },
   };
@@ -198,7 +195,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       ]);
       return { clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expenses: expensesList || [], workOrders: workOrdersList || [], isElectron: true };
     }
-    return { ...await loadBrowserSnapshot(), tasks: [] as TaskItem[], trackingOffers: [] as TrackingOffer[], workOrders: memoryWorkOrders, isElectron: false };
+    const browser = await loadBrowserSnapshot();
+    return { ...browser, trackingOffers: [] as TrackingOffer[], isElectron: false };
   }, [checkIsElectron]);
 
   const refresh = useCallback(() => {
@@ -607,6 +605,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       memoryClients = [];
       memoryInvoices = [];
       memoryVendors = [];
+      memoryExpenses = [];
+      memoryWorkOrders = [];
+      memoryTasks = [];
+      memoryPayments = [];
       memorySettings = {
         ...memorySettings,
         nextInvoiceSeq: 1,
@@ -620,23 +622,83 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createCatalogItem = async (input: NewCatalogItemInput): Promise<CatalogItem> => {
-    if (!checkIsElectron() || !window.billflow) throw new Error("Open the desktop app to save Catalog records.");
-    const created = await window.billflow.catalog.create(input);
-    await refresh(); return created;
+    if (checkIsElectron() && window.billflow) {
+      const created = await window.billflow.catalog.create(input);
+      await refresh(); return created;
+    }
+    const priceCents = Math.round(parseFloat(input.price || "0") * 100);
+    const item: CatalogItem = {
+      id: `cat-${Date.now()}`,
+      title: input.title,
+      category: input.category,
+      sku: input.sku || `SKU-${Date.now()}`,
+      description: input.description || "",
+      price: input.price || "0.00",
+      priceCents,
+      currency: input.currency || "USD",
+      unit: input.unit || "/ Hourly",
+      iconType: input.iconType || "code",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    memoryCatalog = [item, ...memoryCatalog];
+    await refresh();
+    return item;
   };
   const updateCatalogItem = async (id: string, patch: CatalogItemPatchInput): Promise<CatalogItem> => {
-    if (!checkIsElectron() || !window.billflow) throw new Error("Open the desktop app to save Catalog records.");
-    const updated = await window.billflow.catalog.update(id, patch);
-    await refresh(); return updated;
+    if (checkIsElectron() && window.billflow) {
+      const updated = await window.billflow.catalog.update(id, patch);
+      await refresh(); return updated;
+    }
+    const idx = memoryCatalog.findIndex((c) => c.id === id);
+    if (idx === -1) throw new Error("Catalog item not found");
+    const existing = memoryCatalog[idx];
+    const price = patch.price !== undefined ? patch.price : existing.price;
+    const priceCents = patch.price !== undefined ? Math.round(parseFloat(patch.price || "0") * 100) : existing.priceCents;
+    const updated: CatalogItem = {
+      ...existing,
+      ...patch,
+      price,
+      priceCents,
+      updatedAt: new Date().toISOString(),
+    };
+    memoryCatalog[idx] = updated;
+    await refresh();
+    return updated;
   };
   const deleteCatalogItem = async (id: string): Promise<void> => {
-    if (!checkIsElectron() || !window.billflow) throw new Error("Open the desktop app to save Catalog records.");
-    await window.billflow.catalog.remove(id); await refresh();
+    if (checkIsElectron() && window.billflow) {
+      await window.billflow.catalog.remove(id); await refresh();
+      return;
+    }
+    memoryCatalog = memoryCatalog.filter((c) => c.id !== id);
+    await refresh();
   };
   const bulkImportCatalogItems = async (items: NewCatalogItemInput[]): Promise<number> => {
-    if (!checkIsElectron() || !window.billflow) throw new Error("Open the desktop app to import Catalog records.");
-    const result = await window.billflow.catalog.bulkImport(items);
-    await refresh(); return result.count;
+    if (checkIsElectron() && window.billflow) {
+      const result = await window.billflow.catalog.bulkImport(items);
+      await refresh(); return result.count;
+    }
+    const imported: CatalogItem[] = items.map((input, idx) => {
+      const priceCents = Math.round(parseFloat(input.price || "0") * 100);
+      return {
+        id: `cat-${Date.now()}-${idx}`,
+        title: input.title,
+        category: input.category,
+        sku: input.sku || `SKU-${Date.now()}-${idx}`,
+        description: input.description || "",
+        price: input.price || "0.00",
+        priceCents,
+        currency: input.currency || "USD",
+        unit: input.unit || "/ Hourly",
+        iconType: input.iconType || "code",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    memoryCatalog = [...imported, ...memoryCatalog];
+    await refresh();
+    return imported.length;
   };
 
   const createVendor = async (input: NewVendorInput): Promise<VendorItem> => {
@@ -1138,11 +1200,54 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
   const workflow: WorkflowAPI = {
     tasks: {
-      list: async () => requireDesktop().tasks.list(),
-      create: async input => { const result = await requireDesktop().tasks.create(input); await refresh(); return result; },
-      update: async (id, patch) => { const result = await requireDesktop().tasks.update(id, patch); await refresh(); return result; },
-      remove: async id => { await requireDesktop().tasks.remove(id); await refresh(); },
-      history: async id => requireDesktop().tasks.history(id),
+      list: async () => checkIsElectron() && window.billflow ? window.billflow.tasks.list() : [...memoryTasks],
+      create: async input => {
+        if (checkIsElectron() && window.billflow) {
+          const result = await window.billflow.tasks.create(input);
+          await refresh();
+          return result;
+        }
+        const created: TaskItem = {
+          ...input,
+          id: input.id || `tsk-${Date.now()}`,
+          subtasks: input.subtasks || [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          activeMilliseconds: 0,
+        };
+        memoryTasks = [created, ...memoryTasks];
+        await refresh();
+        return created;
+      },
+      update: async (id, patch) => {
+        if (checkIsElectron() && window.billflow) {
+          const result = await window.billflow.tasks.update(id, patch);
+          await refresh();
+          return result;
+        }
+        const idx = memoryTasks.findIndex((t) => t.id === id);
+        if (idx === -1) throw new Error("Task not found");
+        const existing = memoryTasks[idx];
+        const updated: TaskItem = {
+          ...existing,
+          ...patch,
+          updatedAt: new Date().toISOString(),
+          completedAt: patch.status === "done" && !existing.completedAt ? new Date().toISOString() : existing.completedAt,
+        };
+        memoryTasks[idx] = updated;
+        await refresh();
+        return updated;
+      },
+      remove: async id => {
+        if (checkIsElectron() && window.billflow) {
+          await window.billflow.tasks.remove(id);
+          await refresh();
+          return;
+        }
+        memoryTasks = memoryTasks.filter((t) => t.id !== id);
+        await refresh();
+      },
+      history: async () => [],
     },
     tracking: {
       pending: async () => requireDesktop().tracking.pending(),

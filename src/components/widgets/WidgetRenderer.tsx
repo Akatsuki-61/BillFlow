@@ -24,6 +24,8 @@ import {
   BarChart3,
   Activity,
   Sparkles,
+  Target,
+  Users,
 } from "lucide-react";
 import { MetricCard } from "@/components/ui/Workspace";
 import {
@@ -39,6 +41,12 @@ import { DashboardPeriod } from "@/types/dashboard";
 import { WidgetDisplaySize } from "@/types/widgets";
 import "../analytics/analytics.css";
 import { ProfitTrajectoryPlot } from "./ProfitTrajectoryPlot";
+import { LatencyPercentilesChart } from "./charts/LatencyPercentilesChart";
+import { PortfolioComparisonChart } from "./charts/PortfolioComparisonChart";
+import { GrowthBenchmarkChart } from "./charts/GrowthBenchmarkChart";
+import { AudienceGrowthChart } from "./charts/AudienceGrowthChart";
+import { ServiceTrendsLineChart } from "./charts/ServiceTrendsLineChart";
+import { ItemizedVolumeBarChart } from "./charts/ItemizedVolumeBarChart";
 
 interface WidgetRendererProps {
   widgetId: string;
@@ -1308,6 +1316,156 @@ export function WidgetRenderer({
                 Board →
               </Link>
             </div>
+          </div>
+        );
+
+      // 19. Turnaround & Lead Time Percentiles Chart
+      case "latency-percentiles-chart":
+        return (
+          <div className="analytics-creative-chart-card">
+            <div className="analytics-creative-header">
+              <div className="analytics-creative-title-group">
+                <div className="analytics-creative-icon-box">
+                  <Clock className="w-4 h-4 text-content-amber-600" />
+                </div>
+                <div>
+                  <h3 className="analytics-creative-title">
+                    Turnaround & Lead Time Percentiles
+                  </h3>
+                  {!isCompact && (
+                    <p className="analytics-creative-subtitle">
+                      Deliverable turnaround velocity by SLA distribution (P50, P75, P95, P99 in hours)
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <LatencyPercentilesChart />
+          </div>
+        );
+
+      // 20. Service Revenue Yield & Retainers Chart
+      case "portfolio-comparison-chart":
+        return (
+          <div className="analytics-creative-chart-card">
+            <div className="analytics-creative-header">
+              <div className="analytics-creative-title-group">
+                <div className="analytics-creative-icon-box">
+                  <TrendingUp className="w-4 h-4 text-content-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="analytics-creative-title">
+                    Service Revenue Yield & Retainers
+                  </h3>
+                  {!isCompact && (
+                    <p className="analytics-creative-subtitle">
+                      Step-curve comparative yield performance across Web Development and AI Retainers
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <PortfolioComparisonChart />
+          </div>
+        );
+
+      // 21. Billable Capacity Benchmark Chart
+      case "growth-benchmark-chart":
+        return (
+          <div className="analytics-creative-chart-card">
+            <div className="analytics-creative-header">
+              <div className="analytics-creative-title-group">
+                <div className="analytics-creative-icon-box">
+                  <Target className="w-4 h-4 text-content-blue-600" />
+                </div>
+                <div>
+                  <h3 className="analytics-creative-title">
+                    Billable Capacity Benchmark
+                  </h3>
+                  {!isCompact && (
+                    <p className="analytics-creative-subtitle">
+                      Weekly billable milestone velocity tracked against planned target curves
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <GrowthBenchmarkChart />
+          </div>
+        );
+
+      // 22. Delivered Solutions Reach Chart
+      case "audience-growth-chart":
+        return (
+          <div className="analytics-creative-chart-card">
+            <div className="analytics-creative-header">
+              <div className="analytics-creative-title-group">
+                <div className="analytics-creative-icon-box">
+                  <Users className="w-4 h-4 text-content-purple-600" />
+                </div>
+                <div>
+                  <h3 className="analytics-creative-title">
+                    Delivered Solutions Reach
+                  </h3>
+                  {!isCompact && (
+                    <p className="analytics-creative-subtitle">
+                      Monthly active engagement and throughput across client-delivered software & AI agents
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <AudienceGrowthChart />
+          </div>
+        );
+
+      // 23. Service Delivery Trends Line Chart
+      case "service-trends-line-chart":
+        return (
+          <div className="analytics-creative-chart-card">
+            <div className="analytics-creative-header">
+              <div className="analytics-creative-title-group">
+                <div className="analytics-creative-icon-box">
+                  <Activity className="w-4 h-4 text-content-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="analytics-creative-title">
+                    Service Delivery Trends
+                  </h3>
+                  {!isCompact && (
+                    <p className="analytics-creative-subtitle">
+                      Monthly web development and AI consulting volume with buffer forecasting
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <ServiceTrendsLineChart />
+          </div>
+        );
+
+      // 24. Contract Deliverables Volume Bar Chart
+      case "itemized-volume-bar-chart":
+        return (
+          <div className="analytics-creative-chart-card">
+            <div className="analytics-creative-header">
+              <div className="analytics-creative-title-group">
+                <div className="analytics-creative-icon-box">
+                  <BarChart3 className="w-4 h-4 text-content-blue-600" />
+                </div>
+                <div>
+                  <h3 className="analytics-creative-title">
+                    Contract Deliverables Volume
+                  </h3>
+                  {!isCompact && (
+                    <p className="analytics-creative-subtitle">
+                      Monthly itemized deliverable distribution with interactive timeline brush
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <ItemizedVolumeBarChart />
           </div>
         );
 

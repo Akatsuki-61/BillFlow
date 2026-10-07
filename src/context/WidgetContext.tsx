@@ -128,7 +128,14 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
       if (storedAnalytics) {
         const parsed = JSON.parse(storedAnalytics);
         if (Array.isArray(parsed)) {
-          setAnalyticsWidgets(parsed);
+          const activeIds = new Set(parsed);
+          const merged = [...parsed];
+          for (const defaultId of DEFAULT_ANALYTICS_WIDGET_IDS) {
+            if (!activeIds.has(defaultId)) {
+              merged.push(defaultId);
+            }
+          }
+          setAnalyticsWidgets(merged);
         }
       }
       const storedSizes = localStorage.getItem(STORAGE_KEY_SIZES);
