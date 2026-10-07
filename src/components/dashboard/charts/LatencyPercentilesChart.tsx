@@ -6,9 +6,14 @@ import { cn } from "@/lib/utils";
 import { useData } from "@/lib/data/DataProvider";
 import type { TaskItem } from "@/types/tasks";
 
-function getTaskHours(t: TaskItem): number {
-  if (t.activeMilliseconds && t.activeMilliseconds > 0) {
-    return Math.max(0, Math.round((t.activeMilliseconds / 3600000) * 10) / 10);
+function getTaskHours(t: TaskItem, nowMs?: number): number {
+  let ms = t.activeMilliseconds || 0;
+  if (t.activeSince && nowMs !== undefined) {
+    const elapsed = nowMs - new Date(t.activeSince).getTime();
+    if (!isNaN(elapsed) && elapsed > 0) ms += elapsed;
+  }
+  if (ms > 0) {
+    return Math.max(0, Math.round((ms / 3600000) * 10) / 10);
   }
   if (t.completedAt && t.startedAt) {
     const diff = (new Date(t.completedAt).getTime() - new Date(t.startedAt).getTime()) / 3600000;
@@ -36,7 +41,10 @@ export function LatencyPercentilesChart() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const { series, chartData, hasTrackedHours } = useMemo(() => {
-    const allHours = (tasks || []).map(getTaskHours);
+    const now = new Date();
+    const nowMs = now.getTime();
+    const getHours = (t: TaskItem) => getTaskHours(t, nowMs);
+    const allHours = (tasks || []).map(getHours);
     const positiveHours = allHours.filter((h) => h > 0);
 
     const devTasks = (tasks || []).filter(
@@ -49,9 +57,9 @@ export function LatencyPercentilesChart() {
       (t) => t.category === "Design" || /design|frontend|web/i.test(t.title),
     );
 
-    const devHours = devTasks.map(getTaskHours).filter((h) => h > 0);
-    const aiHours = aiTasks.map(getTaskHours).filter((h) => h > 0);
-    const webHours = webTasks.map(getTaskHours).filter((h) => h > 0);
+    const devHours = devTasks.map(getHours).filter((h) => h > 0);
+    const aiHours = aiTasks.map(getHours).filter((h) => h > 0);
+    const webHours = webTasks.map(getHours).filter((h) => h > 0);
 
     const p99 = calcPercentile(devHours.length > 0 ? devHours : positiveHours, 99);
     const p95 = calcPercentile(aiHours.length > 0 ? aiHours : positiveHours, 95);
@@ -75,7 +83,6 @@ export function LatencyPercentilesChart() {
       p50: number;
     }> = [];
 
-    const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -86,7 +93,7 @@ export function LatencyPercentilesChart() {
         return dateStr && dateStr.startsWith(key);
       });
 
-      const bucketHours = bucketTasks.map(getTaskHours).filter((h) => h > 0);
+      const bucketHours = bucketTasks.map(getHours).filter((h) => h > 0);
 
       milestones.push({
         milestone: sprintLabel,

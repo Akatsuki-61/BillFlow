@@ -181,11 +181,12 @@ export default function InvoicesView() {
   }, [invoiceHighlightParam]);
 
   const linkedClient = clients.find((client) => client.id === clientFilterParam);
-  const modalQueryKey = JSON.stringify([isNewParam, clientFilterParam, linkedClient?.currency]);
+  const isNewActive = isNewParam === "1" || isNewParam === "true";
+  const modalQueryKey = JSON.stringify([isNewActive, searchParams.get("t"), clientFilterParam, linkedClient?.currency]);
   const [previousModalQueryKey, setPreviousModalQueryKey] = useState<string | null>(null);
   if (previousModalQueryKey !== modalQueryKey) {
     setPreviousModalQueryKey(modalQueryKey);
-    if (isNewParam === "1" || isNewParam === "true") {
+    if (isNewActive) {
       setShowAddInvoiceModal(true);
       if (clientFilterParam) setNewClientId(clientFilterParam);
       if (linkedClient) {
@@ -194,6 +195,16 @@ export default function InvoicesView() {
       }
     }
   }
+
+  const closeAddInvoiceModal = () => {
+    setShowAddInvoiceModal(false);
+    if (typeof window !== "undefined" && window.location.search.includes("new=")) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("new");
+      url.searchParams.delete("t");
+      window.history.replaceState(null, "", url.pathname + (url.search ? url.search : ""));
+    }
+  };
 
   // Load attachments when inspecting payments
   useEffect(() => {
@@ -659,7 +670,7 @@ export default function InvoicesView() {
         status: newStatus,
       });
 
-      setShowAddInvoiceModal(false);
+      closeAddInvoiceModal();
       requestId.current = null;
       setNewLineItems([{ id: "1", description: "", quantity: 1, unitPrice: "" }]);
       setNewDiscount("");
@@ -1261,7 +1272,7 @@ export default function InvoicesView() {
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
           >
             <MotionSurface
-              onDismiss={() => setShowAddInvoiceModal(false)}
+              onDismiss={closeAddInvoiceModal}
               kind="panel"
               className="bg-surface rounded-2xl w-full max-w-2xl shadow-2xl border border-line-neutral-200 overflow-hidden my-8"
             >
@@ -1283,7 +1294,7 @@ export default function InvoicesView() {
                   aria-label="Close"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowAddInvoiceModal(false)}
+                  onClick={closeAddInvoiceModal}
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -1731,7 +1742,7 @@ export default function InvoicesView() {
                   <Button
                     variant="ghost"
                     type="button"
-                    onClick={() => setShowAddInvoiceModal(false)}
+                    onClick={closeAddInvoiceModal}
                   >
                     Cancel
                   </Button>

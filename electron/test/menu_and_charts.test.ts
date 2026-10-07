@@ -18,9 +18,10 @@ describe("macOS Menu & About Panel Configuration", () => {
     expect(pkg.productName).toBe("BillFlow");
   });
 
-  it("electron-builder.yml includes logo-white.png in extraResources", () => {
+  it("electron-builder.yml includes logo-white.png in extraResources and copyright", () => {
     const yaml = fs.readFileSync("electron-builder.yml", "utf-8");
     expect(yaml).toContain("logo-white.png");
+    expect(yaml).toContain("Copyright © 2026 Akatsuki-61");
   });
 
   it("builds the macOS Application Menu with BillFlow, File, Edit, View, Tabs, Window", () => {
@@ -82,5 +83,13 @@ describe("macOS Menu & About Panel Configuration", () => {
       item?.click?.({} as MenuItem, undefined, {} as KeyboardEvent);
       expect(navigatedRoutes).toContain(route);
     });
+  });
+
+  it("widget definitions contain updated financial title and description for audience-growth-chart", async () => {
+    const { WIDGET_CATALOG } = await import("../../src/lib/widgets/widgetDefinitions");
+    const chart = WIDGET_CATALOG.find((w) => w.id === "audience-growth-chart");
+    expect(chart).toBeDefined();
+    expect(chart?.title).toBe("Delivered Solutions Financial Growth");
+    expect(chart?.description).toContain("profit");
   });
 });

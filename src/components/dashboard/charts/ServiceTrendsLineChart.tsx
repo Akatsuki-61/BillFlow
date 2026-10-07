@@ -66,6 +66,23 @@ export function ServiceTrendsLineChart() {
       const target = months.find((m) => m.key === key);
       if (!target) return;
 
+      if (inv.items && inv.items.length > 0) {
+        inv.items.forEach((item) => {
+          const desc = `${item.description || ""}`.toLowerCase();
+          const isWeb = /web|software|site|development|frontend|backend/i.test(desc);
+          const isAi = /ai|consulting|automation|agent/i.test(desc);
+          if (isWeb) {
+            target.web += 1;
+            count += 1;
+          }
+          if (isAi) {
+            target.ai += 1;
+            count += 1;
+          }
+        });
+        return;
+      }
+
       const title = (inv.title || inv.clientName || "").toLowerCase();
       const isWeb = /web|software|site/i.test(title);
       const isAi = /ai|consulting|automation/i.test(title);

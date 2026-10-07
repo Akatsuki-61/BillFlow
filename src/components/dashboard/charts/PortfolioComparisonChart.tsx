@@ -20,12 +20,25 @@ export function PortfolioComparisonChart() {
     const validInvoices = (invoices || []).filter((inv) => inv.status !== "DRAFT");
 
     validInvoices.forEach((inv) => {
-      const text = `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
-      const isAi = /ai|consulting|automation|agent/i.test(text);
-      if (isAi) {
-        totalAiCents += inv.amountCents;
+      if (inv.items && inv.items.length > 0) {
+        inv.items.forEach((item) => {
+          const desc = `${item.description || ""}`.toLowerCase();
+          const isAi = /ai|consulting|automation|agent/i.test(desc);
+          const itemCents = (item.quantity || 1) * (item.unitPriceCents || 0);
+          if (isAi) {
+            totalAiCents += itemCents;
+          } else {
+            totalWebCents += itemCents;
+          }
+        });
       } else {
-        totalWebCents += inv.amountCents;
+        const text = `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
+        const isAi = /ai|consulting|automation|agent/i.test(text);
+        if (isAi) {
+          totalAiCents += inv.amountCents;
+        } else {
+          totalWebCents += inv.amountCents;
+        }
       }
     });
 
@@ -68,14 +81,27 @@ export function PortfolioComparisonChart() {
       const target = days.find((d) => d.key === invDate);
       if (!target) return;
 
-      const text = `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
-      const isAi = /ai|consulting|automation|agent/i.test(text);
-      const amtMajor = Math.round(inv.amountCents / 100);
-
-      if (isAi) {
-        target.ai += amtMajor;
+      if (inv.items && inv.items.length > 0) {
+        inv.items.forEach((item) => {
+          const desc = `${item.description || ""}`.toLowerCase();
+          const isAi = /ai|consulting|automation|agent/i.test(desc);
+          const itemMajor = Math.round(((item.quantity || 1) * (item.unitPriceCents || 0)) / 100);
+          if (isAi) {
+            target.ai += itemMajor;
+          } else {
+            target.web += itemMajor;
+          }
+        });
       } else {
-        target.web += amtMajor;
+        const text = `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
+        const isAi = /ai|consulting|automation|agent/i.test(text);
+        const amtMajor = Math.round(inv.amountCents / 100);
+
+        if (isAi) {
+          target.ai += amtMajor;
+        } else {
+          target.web += amtMajor;
+        }
       }
     });
 

@@ -33,7 +33,12 @@ export function GrowthBenchmarkChart() {
         if (!timeStr) return;
         const taskTime = new Date(timeStr).getTime();
         if (taskTime >= weekStart.getTime() && taskTime <= weekEnd.getTime()) {
-          weekHours += (t.activeMilliseconds || 0) / 3600000;
+          let ms = t.activeMilliseconds || 0;
+          if (t.activeSince) {
+            const elapsed = now.getTime() - new Date(t.activeSince).getTime();
+            if (!isNaN(elapsed) && elapsed > 0) ms += elapsed;
+          }
+          weekHours += ms / 3600000;
         }
       });
 
@@ -108,6 +113,12 @@ export function GrowthBenchmarkChart() {
           </div>
         </div>
       </div>
+
+      {!hasTrackedHours && (
+        <div className="mt-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No weekly sprint hours recorded yet. Tracked hours update as tasks are worked on.
+        </div>
+      )}
 
       <EChartsAreaChart
         data={chartData}

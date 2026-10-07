@@ -57,13 +57,18 @@ export function buildMenuTemplate(
         label: "Check for Updates...",
         click: () => {
           const win = getMainWindow ? getMainWindow() : null;
-          dialog.showMessageBox(win ?? (undefined as unknown as BrowserWindow), {
-            type: "info",
+          const options = {
+            type: "info" as const,
             title: "Check for Updates",
             message: "BillFlow is up to date",
             detail: "You are running the latest version of BillFlow (v0.1.0).",
             buttons: ["OK"],
-          });
+          };
+          if (win && !win.isDestroyed()) {
+            dialog.showMessageBox(win, options);
+          } else {
+            dialog.showMessageBox(options);
+          }
         },
       },
       { type: "separator" },
@@ -187,11 +192,27 @@ export function buildMenuTemplate(
     : [fileMenu, editMenu, viewMenu, tabsMenu, windowMenu];
 }
 
-export function createApplicationMenu(getMainWindow: () => BrowserWindow | null): void {
+export function createApplicationMenu(
+  getMainWindow: () => BrowserWindow | null,
+  showWindow?: () => void,
+): void {
   const navigate = (route: string) => {
+    if (showWindow) {
+      showWindow();
+    }
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send("navigate-to", route);
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+
+      if (win.webContents.isLoading()) {
+        win.webContents.once("did-finish-load", () => {
+          win.webContents.send("navigate-to", route);
+        });
+      } else {
+        win.webContents.send("navigate-to", route);
+      }
     }
   };
 

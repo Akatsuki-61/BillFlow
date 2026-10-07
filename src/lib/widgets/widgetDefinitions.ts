@@ -170,8 +170,8 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
   {
     id: "audience-growth-chart",
-    title: "Delivered Solutions Reach",
-    description: "Monthly realized cash collections and client deliverable value across solutions",
+    title: "Delivered Solutions Financial Growth",
+    description: "Monthly realized collections, operating costs, and net profit across client solutions",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,

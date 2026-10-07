@@ -219,7 +219,7 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   setupAboutPanel();
-  createApplicationMenu(() => mainWindow);
+  createApplicationMenu(() => mainWindow, showMainWindow);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

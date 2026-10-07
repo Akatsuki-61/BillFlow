@@ -1,5 +1,6 @@
 appId: com.billflow.desktop
 productName: BillFlow
+copyright: "Copyright © 2026 Akatsuki-61"
 directories:
   output: release
   buildResources: build

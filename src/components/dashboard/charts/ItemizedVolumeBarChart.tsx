@@ -22,7 +22,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function ItemizedVolumeBarChart() {
-  const { tasks } = useData();
+  const { tasks, invoices } = useData();
 
   const { chartData, hasData } = useMemo(() => {
     const months: Array<{ month: string; key: string; web: number; ai: number }> = [];
@@ -57,11 +57,49 @@ export function ItemizedVolumeBarChart() {
       }
     });
 
+    // Also factor in non-draft invoices if tasks are not created yet
+    (invoices || []).forEach((inv) => {
+      if (inv.status === "DRAFT" || !inv.issueDate) return;
+      const key = inv.issueDate.slice(0, 7);
+      const target = months.find((m) => m.key === key);
+      if (!target) return;
+
+      if (inv.items && inv.items.length > 0) {
+        inv.items.forEach((item) => {
+          const desc = `${item.description || ""}`.toLowerCase();
+          const isWeb = /web|software|site|development|frontend|backend/i.test(desc);
+          const isAi = /ai|consulting|automation|agent/i.test(desc);
+          if (isWeb && target.web === 0) {
+            target.web += 1;
+            count += 1;
+          }
+          if (isAi && target.ai === 0) {
+            target.ai += 1;
+            count += 1;
+          }
+        });
+        return;
+      }
+
+      const title = (inv.title || inv.clientName || "").toLowerCase();
+      const isWeb = /web|software|site/i.test(title);
+      const isAi = /ai|consulting|automation/i.test(title);
+
+      if (isWeb && target.web === 0) {
+        target.web += 1;
+        count += 1;
+      }
+      if (isAi && target.ai === 0) {
+        target.ai += 1;
+        count += 1;
+      }
+    });
+
     return {
       chartData: months.map(({ month, web, ai }) => ({ month, web, ai })),
       hasData: count > 0,
     };
-  }, [tasks]);
+  }, [tasks, invoices]);
 
   return (
     <div className="flex h-full w-full min-h-[300px] flex-col p-4">
