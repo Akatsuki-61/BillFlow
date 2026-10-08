@@ -5,16 +5,12 @@ import {
   Upload,
   Plus,
   Search,
-  TrendingUp,
   Code2,
   Pencil,
   Cloud,
   Briefcase,
-  ChevronLeft,
-  ChevronRight,
   X,
   FileSpreadsheet,
-  MoreHorizontal,
   Trash2,
   Info,
   Download,
@@ -22,9 +18,10 @@ import {
   Check,
   FileText,
   CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { useCatalog, useClients, useInvoices, useData } from "@/lib/data/DataProvider";
-import { Button, PageHeader } from "@/components/ui/Workspace";
+import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 import type {
   CatalogItem,
   CatalogIconType,
@@ -84,7 +81,6 @@ export default function CatalogView() {
   const invoiceRequest = useRef<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category>("All Items");
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Notifications / Toast
   const [notification, setNotification] = useState<{
@@ -153,6 +149,72 @@ export default function CatalogView() {
   const [newCurrency, setNewCurrency] = useState(settings?.defaultCurrency || activeCurrency || "LKR");
   const [newUnit, setNewUnit] = useState("/ Hourly");
   const [newDescription, setNewDescription] = useState("");
+  const [hasCatalogDraft, setHasCatalogDraft] = useState(false);
+
+  const isCatalogFormDirty = () => {
+    return Boolean(
+      newTitle.trim() ||
+      newPrice.trim() ||
+      newDescription.trim()
+    );
+  };
+
+  const saveCatalogDraft = () => {
+    if (!isCatalogFormDirty()) return;
+    const draft = {
+      newTitle,
+      newCategory,
+      newSku,
+      newPrice,
+      newCurrency,
+      newUnit,
+      newDescription,
+    };
+    try {
+      localStorage.setItem("billflow_draft_catalog", JSON.stringify(draft));
+      setHasCatalogDraft(true);
+    } catch {}
+  };
+
+  const clearCatalogDraft = () => {
+    try {
+      localStorage.removeItem("billflow_draft_catalog");
+    } catch {}
+    setHasCatalogDraft(false);
+  };
+
+  const handleRestoreCatalogDraft = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_catalog");
+      if (!saved) return;
+      const draft = JSON.parse(saved);
+      if (draft.newTitle !== undefined) setNewTitle(draft.newTitle);
+      if (draft.newCategory !== undefined) setNewCategory(draft.newCategory);
+      if (draft.newSku !== undefined) setNewSku(draft.newSku);
+      if (draft.newPrice !== undefined) setNewPrice(draft.newPrice);
+      if (draft.newCurrency !== undefined) setNewCurrency(draft.newCurrency);
+      if (draft.newUnit !== undefined) setNewUnit(draft.newUnit);
+      if (draft.newDescription !== undefined) setNewDescription(draft.newDescription);
+      showToast("Draft restored");
+    } catch {}
+  };
+
+  const closeNewItemModal = (saveDraft = true) => {
+    if (saveDraft) {
+      saveCatalogDraft();
+    }
+    setShowNewItemModal(false);
+  };
+
+  const openNewItemModal = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_catalog");
+      setHasCatalogDraft(Boolean(saved));
+    } catch {
+      setHasCatalogDraft(false);
+    }
+    setShowNewItemModal(true);
+  };
 
   // Edit Item Form state
   const [editTitle, setEditTitle] = useState("");
@@ -216,7 +278,8 @@ export default function CatalogView() {
       return;
     } finally {setSaving(false);}
 
-    setShowNewItemModal(false);
+    clearCatalogDraft();
+    closeNewItemModal(false);
 
     // Reset Form
     setNewTitle("");
@@ -235,7 +298,6 @@ export default function CatalogView() {
     setEditCurrency(item.currency || "LKR");
     setEditUnit(item.unit);
     setEditDescription(item.description);
-    setOpenMenuId(null);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -260,7 +322,7 @@ export default function CatalogView() {
         price: rawPrice,
         currency: editCurrency as Currency,
         unit: editUnit,
-        description: editDescription.trim() || editingItem.description,
+        description: editDescription.trim(),
         iconType: iconTypeMap[editCategory] || editingItem.iconType,
       });
       showToast("Catalog item updated successfully!");
@@ -284,7 +346,6 @@ export default function CatalogView() {
         return;
       }
       setDeletingItem(null);
-      setOpenMenuId(null);
     }
   };
 
@@ -368,7 +429,7 @@ export default function CatalogView() {
       {/* Toast Notification */}
       {notification && (
         <div
-          className={`fixed top-14 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+          className={`fixed top-14 right-6 z-[9999] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
             notification.type === "error"
               ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
               : "bg-surface-neutral-900 border-line-neutral-700 text-white"
@@ -402,7 +463,7 @@ export default function CatalogView() {
             variant="primary"
             onClick={() => {
               createRequest.current = null;
-              setShowNewItemModal(true);
+              openNewItemModal();
             }}
             className="gap-2"
           >
@@ -412,240 +473,219 @@ export default function CatalogView() {
         </div>
       </PageHeader>
 
-      {/* Main Split Layout: Left Controls + Right Catalog Box */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column (Search, Categories, Total Items Card) */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          {/* Search & Categories Box */}
-          <div className="bg-surface rounded-2xl border border-line-neutral-200/80 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search catalog..."
-                className="w-full pl-9 pr-3.5 py-2.5 bg-surface-neutral-50 rounded-xl border border-line-neutral-200/70 text-sm text-content-neutral-900 placeholder:text-content-neutral-400 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 transition-all"
-              />
-            </div>
-
-            {/* Categories Section */}
-            <div className="mt-5">
-              <span className="block text-[11px] font-bold tracking-wider text-content-neutral-400 uppercase mb-3">
-                Categories
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {categoryList.map((category) => {
-                  const isActive = selectedCategory === category;
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setSelectedCategory(category)}
-                      className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-                        isActive
-                          ? "bg-accent-solid text-white font-semibold shadow-xs"
-                          : "bg-surface border border-line-neutral-200/80 text-content-neutral-700 font-medium hover:bg-surface-neutral-50 hover:text-content-neutral-900"
-                      }`}
-                    >
-                      {category} <span className="opacity-70 font-normal">({categoryCounts[category]})</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Total Items Metric Card */}
-          <div className="relative overflow-hidden bg-surface rounded-2xl border border-line-neutral-200/80 p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="catalog-items-glow" />
-            <span className="block text-[11px] font-bold tracking-wider text-content-neutral-400 uppercase mb-2">
-              Total Items
-            </span>
-            <div className="text-4xl md:text-[42px] font-bold text-content-neutral-900 tracking-tight leading-none">
-              {catalogItems.length}
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-normal mt-4">
-              <TrendingUp className="w-4 h-4 text-content-emerald-600" strokeWidth={2.2} />
-              <span className="font-bold text-content-emerald-600">Active</span>
-              <span className="text-content-neutral-500">items in catalog</span>
-            </div>
-          </div>
+      {/* Search & Category Filter Bar across the top (similar to Tasks page) */}
+      <div className="ui-card p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shrink-0">
+        {/* Search Input */}
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search deliverables by name, SKU, or description..."
+            className="ui-field ui-search-input w-full pl-10 pr-9 border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-sm"
+            style={{ paddingLeft: "40px" }}
+          />
+          {searchQuery && (
+            <Button
+              aria-label="Clear search"
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-content-neutral-400 hover:text-content-neutral-600"
+            >
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          )}
         </div>
 
-        {/* Right Column (Catalog List Container) */}
-        <div className="lg:col-span-8 bg-canvas rounded-3xl border border-line-neutral-300/60 p-6 md:p-8 shadow-[0_1px_4px_rgba(0,0,0,0.02)] flex flex-col justify-between min-h-[540px]">
-          <div>
-            {/* Header Labels */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-line-neutral-300/60 text-[11px] font-bold tracking-wider text-content-neutral-500 uppercase">
-              <span>Catalog Deliverables ({filteredItems.length})</span>
-              <span>Price & Actions</span>
-            </div>
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 shrink-0">
+          {categoryList.map((category) => {
+            const isActive = selectedCategory === category;
+            return (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setSelectedCategory(category)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-accent-solid text-white shadow-xs"
+                    : "bg-surface-neutral-50 text-content-neutral-600 hover:bg-surface-neutral-100 hover:text-content-neutral-900 border border-line-neutral-200/80"
+                }`}
+              >
+                {category} <span className="opacity-75 font-normal">({categoryCounts[category]})</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-            {/* Catalog Items Grid */}
-            {filteredItems.length === 0 ? (
-              <div className="py-16 text-center text-sm text-content-neutral-500">
-                No catalog items found matching your criteria.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                {filteredItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-surface rounded-2xl border border-line-neutral-200/90 p-4 flex flex-col justify-between shadow-2xs hover:shadow-sm hover:border-line-neutral-300 transition-all group"
+      {/* Catalog Details Table in a Box (similar to Expenses page) */}
+      <div className="ui-card overflow-hidden flex flex-col flex-1 min-h-[420px] shadow-sm">
+        {/* Box Top Bar */}
+        <div className="px-6 py-3.5 border-b border-line-neutral-200/80 bg-surface-neutral-50/60 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-content-neutral-500">
+              Catalog Deliverables
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-neutral-100 text-content-neutral-700 border border-line-neutral-200">
+              {filteredItems.length} {filteredItems.length === 1 ? "deliverable" : "deliverables"}
+            </span>
+          </div>
+          <span className="text-xs text-content-neutral-400 font-medium hidden sm:inline">
+            Standardized deliverables, services, and pricing units
+          </span>
+        </div>
+
+        {/* Scrollable List Body: ONLY this section scrolls */}
+        <div className="overflow-y-auto overflow-x-auto flex-1 max-h-[calc(100vh-270px)]">
+          {filteredItems.length === 0 ? (
+            <div className="py-20 text-center">
+              <EmptyState
+                title={catalogItems.length === 0 ? "No catalog deliverables yet" : "No deliverables match search"}
+                description={
+                  catalogItems.length === 0
+                    ? "Create reusable services and deliverables to auto-fill invoices."
+                    : "Try adjusting your search query or selecting a different category."
+                }
+                icon={<FileSpreadsheet className="w-8 h-8 text-content-neutral-400" />}
+              >
+                {catalogItems.length === 0 && (
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      createRequest.current = null;
+                      openNewItemModal();
+                    }}
+                    className="mt-4 gap-2"
                   >
-                    <div>
-                      {/* Card Header: Icon + Title + Dropdown */}
-                      <div className="flex items-start justify-between gap-2.5">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-surface-neutral-50 border border-line-neutral-200/80 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                            {renderIcon(item.iconType)}
-                          </div>
-                          <div className="min-w-0">
-                            <h3
-                              className="text-sm font-bold text-content-neutral-900 leading-snug tracking-tight truncate"
-                              title={item.title}
-                            >
-                              {item.title}
-                            </h3>
-                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-neutral-100 border border-line-neutral-200 text-content-neutral-600">
-                                {item.category}
-                              </span>
-                              <span className="text-[11px] text-content-neutral-500 font-mono">
-                                {item.sku}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 3-Dots Action Button & Dropdown */}
-                        <div className="relative shrink-0">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setOpenMenuId(openMenuId === item.id ? null : item.id)
-                            }
-                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                              openMenuId === item.id
-                                ? "bg-surface-neutral-200 text-content-neutral-900"
-                                : "text-content-neutral-400 hover:text-content-neutral-700 hover:bg-surface-neutral-100"
-                            }`}
-                            aria-label={`Options for ${item.title}`}
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-
-                          {/* Dropdown Menu */}
-                          {openMenuId === item.id && (
-                            <>
-                              {/* Backdrop */}
-                              <div
-                                className="fixed inset-0 z-30"
-                                onClick={() => setOpenMenuId(null)}
-                              />
-
-                              <div className="absolute right-0 top-full mt-1.5 w-44 bg-surface rounded-2xl shadow-xl border border-line-neutral-200/90 py-1.5 z-40 text-left text-xs animate-in fade-in zoom-in-95 duration-100 font-medium">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleOpenCreateInvoice(item);
-                                    setOpenMenuId(null);
-                                  }}
-                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-content-neutral-700 hover:text-content-purple-700 hover:bg-surface-purple-50/60 transition-colors cursor-pointer"
-                                >
-                                  <FileText className="w-3.5 h-3.5 text-content-purple-600" />
-                                  <span>Create Invoice</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEdit(item)}
-                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-content-neutral-700 hover:text-content-neutral-900 hover:bg-surface-neutral-50 transition-colors cursor-pointer"
-                                >
-                                  <Pencil className="w-3.5 h-3.5 text-content-neutral-500" />
-                                  <span>Edit Item</span>
-                                </button>
-
-                                <div className="my-1 border-t border-line-neutral-100" />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setDeletingItem(item);
-                                    setOpenMenuId(null);
-                                  }}
-                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 dark:text-red-400 hover:bg-surface-rose-50/80 transition-colors cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                  <span>Delete Item</span>
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                    <Plus className="w-4 h-4" />
+                    <span>Create First Item</span>
+                  </Button>
+                )}
+              </EmptyState>
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 z-10 bg-surface-neutral-50/95 backdrop-blur-xs border-b border-line-neutral-200/80 shadow-xs">
+                <tr className="text-[11px] font-bold uppercase tracking-wider text-content-neutral-400">
+                  <th className="py-3.5 pl-6 pr-3 w-12">
+                    <span className="sr-only">Icon</span>
+                  </th>
+                  <th className="py-3.5 px-4 font-bold">Deliverable & Description</th>
+                  <th className="py-3.5 px-4 font-bold">Category</th>
+                  <th className="py-3.5 px-4 font-bold">SKU</th>
+                  <th className="py-3.5 px-4 font-bold">Unit</th>
+                  <th className="py-3.5 px-4 font-bold">Price</th>
+                  <th className="py-3.5 pr-6 pl-4 text-right w-44">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-neutral-100/80">
+                {filteredItems.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="group hover:bg-surface-soft transition-colors"
+                  >
+                    {/* Icon */}
+                    <td className="py-4 pl-6 pr-3 align-top w-12">
+                      <div className="w-9 h-9 rounded-xl bg-surface-neutral-50 border border-line-neutral-200/80 flex items-center justify-center shrink-0 shadow-2xs group-hover:border-line-neutral-300 transition-colors">
+                        {renderIcon(item.iconType)}
                       </div>
+                    </td>
 
-                      {/* Description Box */}
-                      <div
-                        className="mt-3 px-3 py-2 bg-surface-neutral-50/70 rounded-xl border border-line-neutral-200/60 text-xs text-content-neutral-600 leading-relaxed font-normal min-h-[52px] line-clamp-2"
-                        title={item.description}
-                      >
-                        {item.description}
+                    {/* Deliverable Title & Description */}
+                    <td className="py-4 px-4 align-top max-w-md">
+                      <div className="font-semibold text-sm text-content-neutral-900 leading-snug">
+                        {item.title}
                       </div>
-                    </div>
+                      {item.description ? (
+                        <div
+                          className="text-xs text-content-neutral-500 mt-1 line-clamp-2 leading-relaxed"
+                          title={item.description}
+                        >
+                          {item.description}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-content-neutral-400 italic mt-0.5">
+                          No description provided
+                        </div>
+                      )}
+                    </td>
 
-                    {/* Footer: Price + Quick Invoice */}
-                    <div className="mt-3 pt-3 border-t border-line-neutral-100 flex items-center justify-between">
-                      <div>
-                        <div className="text-base font-bold text-content-neutral-900 tracking-tight leading-none">
-                          {formatPriceWithCurrency(item.price, item.currency)}
-                        </div>
-                        <div className="text-[11px] text-content-neutral-400 font-medium mt-0.5">
-                          {item.unit}
-                        </div>
+                    {/* Category */}
+                    <td className="py-4 px-4 align-top whitespace-nowrap">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wider bg-surface-neutral-100 border border-line-neutral-200/80 text-content-neutral-700">
+                        {item.category}
+                      </span>
+                    </td>
+
+                    {/* SKU */}
+                    <td className="py-4 px-4 align-top whitespace-nowrap">
+                      <span className="text-xs font-mono font-medium text-content-neutral-600 bg-surface-neutral-50 px-2 py-0.5 rounded border border-line-neutral-200/60">
+                        {item.sku}
+                      </span>
+                    </td>
+
+                    {/* Unit */}
+                    <td className="py-4 px-4 align-top whitespace-nowrap">
+                      <span className="text-xs text-content-neutral-500 font-medium">
+                        {item.unit || "—"}
+                      </span>
+                    </td>
+
+                    {/* Price */}
+                    <td className="py-4 px-4 align-top whitespace-nowrap">
+                      <div className="text-sm font-bold text-content-neutral-900 font-mono leading-tight">
+                        {formatPriceWithCurrency(item.price, item.currency)}
                       </div>
+                      <div className="text-[10px] text-content-neutral-400 mt-0.5 uppercase tracking-wider font-sans">
+                        {item.currency}
+                      </div>
+                    </td>
 
-                      <button
-                        type="button"
-                        onClick={() => handleOpenCreateInvoice(item)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-accent bg-accent-faint hover:bg-accent/15 rounded-lg border border-border-accent-soft transition-colors cursor-pointer"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Bill Item</span>
-                      </button>
-                    </div>
-                  </div>
+                    {/* Actions */}
+                    <td className="py-4 pr-6 pl-4 align-top text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          onClick={() => handleOpenCreateInvoice(item)}
+                          title={`Create invoice with ${item.title}`}
+                          className="text-xs gap-1.5 font-medium"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-accent" />
+                          <span>Bill Item</span>
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEdit(item)}
+                          title="Edit catalog item"
+                          className="text-content-neutral-500 hover:text-content-neutral-800"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeletingItem(item)}
+                          title="Delete catalog item"
+                          className="text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            )}
-          </div>
-
-          {/* Footer & Pagination */}
-          <div className="pt-6 mt-4 border-t border-line-neutral-300/60 flex items-center justify-between text-xs text-content-neutral-500">
-            <div>
-              Showing {filteredItems.length === 0 ? 0 : 1}-{filteredItems.length} of {catalogItems.length} items
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                className="w-7 h-7 rounded-lg bg-surface-neutral-200/80 hover:bg-surface-neutral-300 text-content-neutral-700 flex items-center justify-center transition-colors cursor-pointer"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                className="w-7 h-7 rounded-lg bg-surface-neutral-200/80 hover:bg-surface-neutral-300 text-content-neutral-700 flex items-center justify-center transition-colors cursor-pointer"
-                aria-label="Next page"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -772,13 +812,13 @@ export default function CatalogView() {
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Item Description
+                  Item Description <span className="text-[10px] font-normal text-content-neutral-400 lowercase">(optional)</span>
                 </label>
                 <textarea
                   rows={3}
-                  required
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Describe the scope, deliverables, or specifications of this item..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                 />
               </div>
@@ -858,13 +898,28 @@ export default function CatalogView() {
                   Define a standardized product, service, or pricing unit.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowNewItemModal(false)}
-                className="text-content-neutral-400 hover:text-content-neutral-600 p-1.5 rounded-lg hover:bg-surface-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {hasCatalogDraft && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="small"
+                    onClick={handleRestoreCatalogDraft}
+                    className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                    title="Restore previously typed item draft"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Restore</span>
+                  </Button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => closeNewItemModal()}
+                  className="text-content-neutral-400 hover:text-content-neutral-600 p-1.5 rounded-lg hover:bg-surface-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleCreateItem} className="mt-5 space-y-4">
@@ -971,11 +1026,10 @@ export default function CatalogView() {
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Item Description
+                  Item Description <span className="text-[10px] font-normal text-content-neutral-400 lowercase">(optional)</span>
                 </label>
                 <textarea
                   rows={3}
-                  required
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   placeholder="Describe the scope, deliverables, or specifications of this item..."
@@ -986,7 +1040,7 @@ export default function CatalogView() {
               <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100">
                 <button
                   type="button"
-                  onClick={() => setShowNewItemModal(false)}
+                  onClick={() => closeNewItemModal()}
                   className="px-4 py-2 text-sm text-content-neutral-600 hover:bg-surface-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel

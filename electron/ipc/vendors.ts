@@ -1,8 +1,8 @@
 import { ipcMain } from "electron";
 import crypto from "crypto";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db";
-import { vendors, clients } from "../db/schema";
+import { vendors, clients, workOrders } from "../db/schema";
 import { newVendorSchema, vendorPatchSchema } from "../validation";
 import { AppError, formatError } from "./errors";
 import {
@@ -43,6 +43,35 @@ export function listVendors(): VendorItem[] {
     createdAt: v.createdAt,
     updatedAt: v.updatedAt,
   }));
+}
+
+export function removeVendor(id: string): { success: boolean } {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(vendors)
+    .where(eq(vendors.id, id))
+    .get();
+  if (!existing) throw new AppError("NOT_FOUND", "Vendor not found");
+
+  const woCountRes = db
+    .select({ count: sql<number>`count(*)` })
+    .from(workOrders)
+    .where(eq(workOrders.vendorId, id))
+    .get();
+  const woCount = woCountRes?.count || 0;
+  if (woCount > 0) {
+    throw new AppError(
+      "VENDOR_HAS_WORK_ORDERS",
+      `Cannot delete vendor. This vendor is assigned to ${woCount} work order${woCount > 1 ? "s" : ""}.`
+    );
+  }
+
+  db.delete(vendors)
+    .where(eq(vendors.id, id))
+    .run();
+
+  return { success: true };
 }
 
 export function registerVendorHandlers(broadcastDataChanged: () => void) {
@@ -187,20 +216,9 @@ export function registerVendorHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("vendors:remove", async (_event, id: string) => {
     try {
-      const db = getDb();
-      const existing = db
-        .select()
-        .from(vendors)
-        .where(eq(vendors.id, id))
-        .get();
-      if (!existing) throw new AppError("NOT_FOUND", "Vendor not found");
-
-      db.delete(vendors)
-        .where(eq(vendors.id, id))
-        .run();
-
+      const result = removeVendor(id);
       broadcastDataChanged();
-      return { success: true };
+      return result;
     } catch (err) {
       throw formatError(err);
     }

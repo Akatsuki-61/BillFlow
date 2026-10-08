@@ -38,6 +38,7 @@ import type { WorkflowAPI } from "./workflow";
 export interface BillFlowAPI extends WorkflowAPI {
   isElectron: boolean;
   platform?: string;
+  getPathForFile?: (file: File) => string;
   theme: {
     initialPreference: ThemePreference;
     setPreference: (preference: ThemePreference) => Promise<void>;

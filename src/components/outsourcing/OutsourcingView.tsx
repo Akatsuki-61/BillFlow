@@ -26,6 +26,7 @@ import {
   Clock,
   Paperclip,
   FileCheck,
+  RotateCcw,
 } from "lucide-react";
 
 import {
@@ -144,6 +145,98 @@ export default function OutsourcingView() {
   const [woNotes, setWoNotes] = useState("");
   const [woFormErrors, setWoFormErrors] = useState<Record<string, string>>({});
   const [isSubmittingWorkOrder, setIsSubmittingWorkOrder] = useState(false);
+  const [hasWorkOrderDraft, setHasWorkOrderDraft] = useState(false);
+
+  const isWorkOrderFormDirty = () => {
+    return Boolean(
+      woScope.trim() ||
+      woFee.trim() ||
+      woNotes.trim() ||
+      woDeliveryUrl.trim() ||
+      newVendorInlineName.trim()
+    );
+  };
+
+  const saveWorkOrderDraft = () => {
+    if (!isWorkOrderFormDirty()) return;
+    const draft = {
+      woVendorId,
+      isCreatingNewVendorInline,
+      newVendorInlineName,
+      newVendorInlineService,
+      newVendorInlineCategory,
+      newVendorInlineEmail,
+      newVendorInlinePhone,
+      woTaskId,
+      woTaskTitle,
+      woInvoiceId,
+      woInvoiceCode,
+      woClientId,
+      woClientName,
+      woScope,
+      woFee,
+      woCurrency,
+      woDueDate,
+      woDeliveryUrl,
+      woNotes,
+    };
+    try {
+      localStorage.setItem("billflow_draft_workorder", JSON.stringify(draft));
+      setHasWorkOrderDraft(true);
+    } catch {}
+  };
+
+  const clearWorkOrderDraft = () => {
+    try {
+      localStorage.removeItem("billflow_draft_workorder");
+    } catch {}
+    setHasWorkOrderDraft(false);
+  };
+
+  const handleRestoreWorkOrderDraft = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_workorder");
+      if (!saved) return;
+      const draft = JSON.parse(saved);
+      if (draft.woVendorId !== undefined) setWoVendorId(draft.woVendorId);
+      if (draft.isCreatingNewVendorInline !== undefined) setIsCreatingNewVendorInline(draft.isCreatingNewVendorInline);
+      if (draft.newVendorInlineName !== undefined) setNewVendorInlineName(draft.newVendorInlineName);
+      if (draft.newVendorInlineService !== undefined) setNewVendorInlineService(draft.newVendorInlineService);
+      if (draft.newVendorInlineCategory !== undefined) setNewVendorInlineCategory(draft.newVendorInlineCategory);
+      if (draft.newVendorInlineEmail !== undefined) setNewVendorInlineEmail(draft.newVendorInlineEmail);
+      if (draft.newVendorInlinePhone !== undefined) setNewVendorInlinePhone(draft.newVendorInlinePhone);
+      if (draft.woTaskId !== undefined) setWoTaskId(draft.woTaskId);
+      if (draft.woTaskTitle !== undefined) setWoTaskTitle(draft.woTaskTitle);
+      if (draft.woInvoiceId !== undefined) setWoInvoiceId(draft.woInvoiceId);
+      if (draft.woInvoiceCode !== undefined) setWoInvoiceCode(draft.woInvoiceCode);
+      if (draft.woClientId !== undefined) setWoClientId(draft.woClientId);
+      if (draft.woClientName !== undefined) setWoClientName(draft.woClientName);
+      if (draft.woScope !== undefined) setWoScope(draft.woScope);
+      if (draft.woFee !== undefined) setWoFee(draft.woFee);
+      if (draft.woCurrency !== undefined) setWoCurrency(draft.woCurrency);
+      if (draft.woDueDate !== undefined) setWoDueDate(draft.woDueDate);
+      if (draft.woDeliveryUrl !== undefined) setWoDeliveryUrl(draft.woDeliveryUrl);
+      if (draft.woNotes !== undefined) setWoNotes(draft.woNotes);
+      showToast("Draft restored");
+    } catch {}
+  };
+
+  const closeWorkOrderModal = (saveDraft = true) => {
+    if (saveDraft) {
+      saveWorkOrderDraft();
+    }
+    setIsWorkOrderModalOpen(false);
+  };
+
+  const openWorkOrderModal = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_workorder");
+      setHasWorkOrderDraft(Boolean(saved));
+    } catch {
+      setHasWorkOrderDraft(false);
+    }
+    setIsWorkOrderModalOpen(true);
+  };
 
   // Toast notification state
   const [toastNotification, setToastNotification] = useState<{
@@ -342,7 +435,7 @@ export default function OutsourcingView() {
     if (!workflow) return;
     try {
       setIsAttachingReceipt(true);
-      const requestId = `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const requestId = crypto.randomUUID();
       const result = await workflow.attachments.select({ type: "payout", id: payoutId }, requestId);
       if (result) {
         const updated = await workflow.attachments.list({ type: "payout", id: payoutId });
@@ -549,8 +642,9 @@ export default function OutsourcingView() {
         status: "todo",
       });
 
+      clearWorkOrderDraft();
+      closeWorkOrderModal(false);
       showToast("Work order created and linked to task.");
-      setIsWorkOrderModalOpen(false);
 
       // Reset work order form states
       setWoVendorId("");
@@ -671,7 +765,7 @@ export default function OutsourcingView() {
         {toastNotification && (
           <MotionSurface
             kind="toast"
-            className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 text-white rounded-xl shadow-xl text-[12px] font-medium ${
+            className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-2.5 px-4 py-2.5 text-white rounded-xl shadow-xl text-[12px] font-medium ${
               toastNotification.type === "error"
                 ? "bg-rose-900 border border-rose-700"
                 : "bg-toast border border-line-neutral-700"
@@ -717,7 +811,7 @@ export default function OutsourcingView() {
                 setIsCreatingNewVendorInline(true);
               }
               setWoFormErrors({});
-              setIsWorkOrderModalOpen(true);
+              openWorkOrderModal();
             }}
           >
             <Plus className="text-[12px]" />
@@ -870,7 +964,7 @@ export default function OutsourcingView() {
                       variant="primary"
                       onClick={() => {
                         setWoFormErrors({});
-                        setIsWorkOrderModalOpen(true);
+                        openWorkOrderModal();
                       }}
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -1074,7 +1168,7 @@ export default function OutsourcingView() {
                           setWoVendorId(vendor.id);
                           setIsCreatingNewVendorInline(false);
                           setWoFormErrors({});
-                          setIsWorkOrderModalOpen(true);
+                          openWorkOrderModal();
                         }}
                       >
                         <Plus className="w-3 h-3" />
@@ -1597,7 +1691,7 @@ export default function OutsourcingView() {
         {isWorkOrderModalOpen && (
           <MotionSurface kind="dialog" className="outsourcing-modal-overlay">
             <MotionSurface
-              onDismiss={() => setIsWorkOrderModalOpen(false)}
+              onDismiss={() => closeWorkOrderModal()}
               kind="panel"
               className="outsourcing-modal-panel max-w-lg"
             >
@@ -1608,15 +1702,30 @@ export default function OutsourcingView() {
                     Create Outsourcing Work Order
                   </h3>
                 </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => setIsWorkOrderModalOpen(false)}
-                >
-                  <X className="text-sm" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {hasWorkOrderDraft && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="small"
+                      onClick={handleRestoreWorkOrderDraft}
+                      className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                      title="Restore previously typed work order draft"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restore</span>
+                    </Button>
+                  )}
+                  <Button
+                    aria-label="Close"
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    onClick={() => closeWorkOrderModal()}
+                  >
+                    <X className="text-sm" />
+                  </Button>
+                </div>
               </div>
 
               <form onSubmit={handleCreateWorkOrder} className="p-6 space-y-4">
@@ -1885,7 +1994,7 @@ export default function OutsourcingView() {
                   <Button
                     variant="ghost"
                     type="button"
-                    onClick={() => setIsWorkOrderModalOpen(false)}
+                    onClick={() => closeWorkOrderModal()}
                   >
                     Cancel
                   </Button>

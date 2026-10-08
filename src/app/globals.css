@@ -149,6 +149,11 @@ aside nav a[aria-current="page"] svg {
   transform-origin: top right;
 }
 
+/* Toast feedback notifications always appear on the topmost layer above all modals, overlays, and drawers. */
+[data-motion-surface="toast"] {
+  z-index: 9999 !important;
+}
+
 @keyframes page-arrive {
   from {
     opacity: 0;

@@ -130,6 +130,7 @@ export function MotionSurface({
       }}
       style={{
         ...props.style,
+        ...(kind === "toast" ? { zIndex: 9999 } : {}),
         ...(kind === "group" ? { display: "contents" } : {}),
       }}
     >

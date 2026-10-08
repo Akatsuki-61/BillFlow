@@ -25,6 +25,7 @@ import {
   Link2,
   CheckSquare,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import {
   TaskItem,
@@ -129,6 +130,82 @@ export default function TasksPage() {
   const [newOutsourcedVendor, setNewOutsourcedVendor] =
     useState("");
   const [newOutsourceBudget, setNewOutsourceBudget] = useState("");
+  const [hasTaskDraft, setHasTaskDraft] = useState(false);
+
+  const isTaskFormDirty = () => {
+    return Boolean(
+      newTitle.trim() ||
+      newDescription.trim() ||
+      newDueDate.trim() ||
+      newClientName.trim() ||
+      newOutsourcedVendor.trim() ||
+      newOutsourceBudget.trim()
+    );
+  };
+
+  const saveTaskDraft = () => {
+    if (!isTaskFormDirty()) return;
+    const draft = {
+      newTitle,
+      newDescription,
+      newStatus,
+      newPriority,
+      newCategory,
+      newDueDate,
+      newClientName,
+      newIsOutsourced,
+      newOutsourcedVendor,
+      newOutsourceBudget,
+    };
+    try {
+      localStorage.setItem("billflow_draft_task", JSON.stringify(draft));
+      setHasTaskDraft(true);
+    } catch {}
+  };
+
+  const clearTaskDraft = () => {
+    try {
+      localStorage.removeItem("billflow_draft_task");
+    } catch {}
+    setHasTaskDraft(false);
+  };
+
+  const handleRestoreTaskDraft = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_task");
+      if (!saved) return;
+      const draft = JSON.parse(saved);
+      if (draft.newTitle !== undefined) setNewTitle(draft.newTitle);
+      if (draft.newDescription !== undefined) setNewDescription(draft.newDescription);
+      if (draft.newStatus !== undefined) setNewStatus(draft.newStatus);
+      if (draft.newPriority !== undefined) setNewPriority(draft.newPriority);
+      if (draft.newCategory !== undefined) setNewCategory(draft.newCategory);
+      if (draft.newDueDate !== undefined) setNewDueDate(draft.newDueDate);
+      if (draft.newClientName !== undefined) setNewClientName(draft.newClientName);
+      if (draft.newIsOutsourced !== undefined) setNewIsOutsourced(draft.newIsOutsourced);
+      if (draft.newOutsourcedVendor !== undefined) setNewOutsourcedVendor(draft.newOutsourcedVendor);
+      if (draft.newOutsourceBudget !== undefined) setNewOutsourceBudget(draft.newOutsourceBudget);
+      showToast("Draft restored");
+    } catch {}
+  };
+
+  const closeAddTaskModal = (saveDraft = true) => {
+    if (saveDraft) {
+      saveTaskDraft();
+    }
+    setIsAddModalOpen(false);
+  };
+
+  const openAddTaskModal = (status: TaskStatus = "todo") => {
+    setNewStatus(status);
+    try {
+      const saved = localStorage.getItem("billflow_draft_task");
+      setHasTaskDraft(Boolean(saved));
+    } catch {
+      setHasTaskDraft(false);
+    }
+    setIsAddModalOpen(true);
+  };
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -277,7 +354,8 @@ export default function TasksPage() {
     try { await workflow.tasks.create(newTask); draftId.current = null; }
     catch (error) { showToast(error instanceof Error ? error.message : "Could not create task."); return; }
     finally { setSaving(false); }
-    setIsAddModalOpen(false);
+    clearTaskDraft();
+    closeAddTaskModal(false);
 
     // Reset Form
     setNewTitle("");
@@ -308,7 +386,7 @@ export default function TasksPage() {
         {toastMessage && (
           <MotionSurface
             kind="toast"
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-surface-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-line-neutral-800 transition-all"
+            className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 bg-surface-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-line-neutral-800 transition-all"
           >
             <div className="w-2 h-2 rounded-full bg-accent-solid animate-ping" />
             <span>{toastMessage}</span>
@@ -361,10 +439,7 @@ export default function TasksPage() {
           {/* Create Task Button */}
           <Button
             variant="primary"
-            onClick={() => {
-              setNewStatus("todo");
-              setIsAddModalOpen(true);
-            }}
+            onClick={() => openAddTaskModal("todo")}
           >
             <Plus className="w-4 h-4 transition-transform duration-200 group-hover:scale-105 group-hover:rotate-6" />
             <span>New Task</span>
@@ -535,10 +610,7 @@ export default function TasksPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
-                      setNewStatus(col.id);
-                      setIsAddModalOpen(true);
-                    }}
+                    onClick={() => openAddTaskModal(col.id)}
                     disabled={!isElectron || isLoading || saving}
                     title={`Add task to ${col.title}`}
                   >
@@ -554,10 +626,7 @@ export default function TasksPage() {
                         variant="ghost"
                         size="small"
                         disabled={!isElectron || isLoading || saving}
-                        onClick={() => {
-                          setNewStatus(col.id);
-                          setIsAddModalOpen(true);
-                        }}
+                        onClick={() => openAddTaskModal(col.id)}
                       >
                         <Plus />
                         Add a task
@@ -748,10 +817,7 @@ export default function TasksPage() {
                       >
                         <Button
                           variant="primary"
-                          onClick={() => {
-                            setNewStatus("todo");
-                            setIsAddModalOpen(true);
-                          }}
+                          onClick={() => openAddTaskModal("todo")}
                         >
                           <Plus />
                           New Task
@@ -856,7 +922,7 @@ export default function TasksPage() {
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-neutral-900/40 backdrop-blur-xs"
           >
             <MotionSurface
-              onDismiss={() => setIsAddModalOpen(false)}
+              onDismiss={() => closeAddTaskModal()}
               kind="panel"
               className="bg-surface rounded-2xl w-full max-w-xl shadow-[0_24px_48px_-12px_rgba(0,0,0,0.25)] border border-line-neutral-200 overflow-hidden"
             >
@@ -871,14 +937,29 @@ export default function TasksPage() {
                     subcontractor outsourcing.
                   </p>
                 </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsAddModalOpen(false)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {hasTaskDraft && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="small"
+                      onClick={handleRestoreTaskDraft}
+                      className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                      title="Restore previously typed task draft"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restore</span>
+                    </Button>
+                  )}
+                  <Button
+                    aria-label="Close"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => closeAddTaskModal()}
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
 
               {/* Modal Form */}
@@ -1060,7 +1141,7 @@ export default function TasksPage() {
                   <Button
                     variant="secondary"
                     type="button"
-                    onClick={() => setIsAddModalOpen(false)}
+                    onClick={() => closeAddTaskModal()}
                   >
                     Cancel
                   </Button>

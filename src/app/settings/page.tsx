@@ -346,7 +346,7 @@ function SettingsContent() {
       {/* Toast Notification */}
       <MotionPresence>
         {notification && (
-          <div className="fixed top-14 right-6 z-50 pointer-events-none">
+          <div className="fixed top-14 right-6 z-[9999] pointer-events-none">
             <MotionSurface
               kind="toast"
               className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm font-medium shadow-[0px_4px_12px_rgba(0,0,0,0.08)] pointer-events-auto ${

@@ -1266,7 +1266,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     },
     attachments: {
       list: async owner => requireDesktop().attachments.list(owner),
-      select: async (owner, requestId) => { const result = await requireDesktop().attachments.select(owner, requestId); await refresh(); return result; },
+      select: async (owner, requestId, filePath?) => { const result = await requireDesktop().attachments.select(owner, requestId, filePath); await refresh(); return result; },
+      chooseFile: async () => {
+        const fn = requireDesktop().attachments.chooseFile;
+        return fn ? fn() : null;
+      },
       open: async id => requireDesktop().attachments.open(id),
     },
     files: {

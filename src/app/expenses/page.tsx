@@ -30,6 +30,7 @@ import {
   Search,
   Receipt,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { useExpenses, useData } from "@/lib/data/DataProvider";
 import type { ExpenseItem } from "@/types/expenses";
@@ -65,6 +66,57 @@ export default function ExpensesPage() {
     deductible: true,
     receiptAttached: false,
   });
+  const [hasExpenseDraft, setHasExpenseDraft] = useState(false);
+
+  const isExpenseFormDirty = () => {
+    return Boolean(
+      formData.merchant.trim() ||
+      formData.description.trim() ||
+      formData.amount.trim()
+    );
+  };
+
+  const saveExpenseDraft = () => {
+    if (!isExpenseFormDirty()) return;
+    try {
+      localStorage.setItem("billflow_draft_expense", JSON.stringify(formData));
+      setHasExpenseDraft(true);
+    } catch {}
+  };
+
+  const clearExpenseDraft = () => {
+    try {
+      localStorage.removeItem("billflow_draft_expense");
+    } catch {}
+    setHasExpenseDraft(false);
+  };
+
+  const handleRestoreExpenseDraft = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_expense");
+      if (!saved) return;
+      const draft = JSON.parse(saved);
+      setFormData((prev) => ({ ...prev, ...draft }));
+      showToast("Draft restored");
+    } catch {}
+  };
+
+  const closeLogExpenseModal = (saveDraft = true) => {
+    if (saveDraft) {
+      saveExpenseDraft();
+    }
+    setIsLogModalOpen(false);
+  };
+
+  const openLogExpenseModal = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_expense");
+      setHasExpenseDraft(Boolean(saved));
+    } catch {
+      setHasExpenseDraft(false);
+    }
+    setIsLogModalOpen(true);
+  };
 
   const showToast = (msg: string) => {
     setNotification(msg);
@@ -156,7 +208,8 @@ export default function ExpensesPage() {
         }
       }
 
-      setIsLogModalOpen(false);
+      clearExpenseDraft();
+      closeLogExpenseModal(false);
       setFormData({
         merchant: "",
         description: "",
@@ -238,7 +291,7 @@ export default function ExpensesPage() {
         {notification && (
           <MotionSurface
             kind="toast"
-            className="fixed top-14 right-6 z-[100] bg-surface-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-line-neutral-700"
+            className="fixed top-14 right-6 z-[9999] bg-surface-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-line-neutral-700"
           >
             <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
             <span>{notification}</span>
@@ -309,7 +362,7 @@ export default function ExpensesPage() {
             <span>Export Report</span>
           </Button>
         </div>
-        <Button variant="primary" onClick={() => setIsLogModalOpen(true)}>
+        <Button variant="primary" onClick={openLogExpenseModal}>
           <Plus />
           Log Expense
         </Button>
@@ -373,7 +426,7 @@ export default function ExpensesPage() {
                     >
                       <Button
                         variant="primary"
-                        onClick={() => setIsLogModalOpen(true)}
+                        onClick={openLogExpenseModal}
                         className="mt-4"
                       >
                         <Plus className="w-4 h-4" />
@@ -536,7 +589,7 @@ export default function ExpensesPage() {
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
             <MotionSurface
-              onDismiss={() => setIsLogModalOpen(false)}
+              onDismiss={() => closeLogExpenseModal()}
               kind="panel"
               className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
             >
@@ -554,14 +607,29 @@ export default function ExpensesPage() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsLogModalOpen(false)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {hasExpenseDraft && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="small"
+                      onClick={handleRestoreExpenseDraft}
+                      className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                      title="Restore previously typed expense draft"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restore</span>
+                    </Button>
+                  )}
+                  <Button
+                    aria-label="Close"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => closeLogExpenseModal()}
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
 
               {/* Presets */}
@@ -797,7 +865,7 @@ export default function ExpensesPage() {
                   <Button
                     variant="ghost"
                     type="button"
-                    onClick={() => setIsLogModalOpen(false)}
+                    onClick={() => closeLogExpenseModal()}
                   >
                     Cancel
                   </Button>

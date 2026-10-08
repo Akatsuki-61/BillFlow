@@ -207,4 +207,41 @@ describe("October 10 Demonstration: Chethaka direct-work loop", () => {
     expect(reloadedAttachments).toHaveLength(1);
     expect(reloadedAttachments[0].originalName).toBe("bank-slip.png");
   });
+
+  it("qualifies for tracking when advance payment is recorded for an unpaid invoice", () => {
+    const created = createInvoice({
+      requestId: crypto.randomUUID(),
+      newClient: {
+        name: "Direct Status Client",
+        email: "status@test.com",
+        currency: "LKR" as const,
+      },
+      code: "INV-2026-STATUS",
+      items: [
+        {
+          description: "Full-stack web application",
+          quantity: 1,
+          unitPriceCents: 10000000,
+        },
+      ],
+      amountCents: 10000000,
+      advanceCents: 5000000,
+      currency: "LKR" as const,
+    });
+
+    expect(created.status).toBe("UNPAID");
+    expect(pendingTracking()).toHaveLength(0);
+
+    recordPayment({
+      invoiceId: created.id,
+      amountCents: 5000000,
+      currency: "LKR",
+      reference: "Advance payment",
+      requestId: crypto.randomUUID(),
+    });
+
+    const offers = pendingTracking();
+    expect(offers).toHaveLength(1);
+    expect(offers[0].invoiceId).toBe(created.id);
+  });
 });

@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { getDb } from "../db";
-import { catalogItems } from "../db/schema";
+import { catalogItems, invoices } from "../db/schema";
 import { newCatalogItemSchema, catalogItemPatchSchema } from "../validation";
 import { AppError, formatError } from "./errors";
 import type { CatalogItem, NewCatalogItemInput, CatalogItemPatchInput } from "../../src/types/billing";
@@ -38,8 +38,14 @@ export function updateCatalogItem(id: string, patch: CatalogItemPatchInput): Cat
 }
 export function removeCatalogItem(id: string) {
   z.string().min(1).parse(id);
-  getDb().delete(catalogItems).where(eq(catalogItems.id,id)).run();
-  return {success:true}; // ON DELETE SET NULL preserves issued invoice details.
+  const db = getDb();
+  const existing = db.select().from(catalogItems).where(eq(catalogItems.id, id)).get();
+  if (!existing) throw new AppError("NOT_FOUND", "Catalog item not found.");
+  return db.transaction((tx) => {
+    tx.update(invoices).set({ catalogItemId: null }).where(eq(invoices.catalogItemId, id)).run();
+    tx.delete(catalogItems).where(eq(catalogItems.id, id)).run();
+    return { success: true };
+  });
 }
 export function bulkImportCatalogItems(input: NewCatalogItemInput[]) {
   const rows = z.array(newCatalogItemSchema).min(1).max(5000).parse(input);

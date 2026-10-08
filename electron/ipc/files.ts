@@ -97,11 +97,30 @@ export async function openInvoicePdf(invoiceId: string, reveal = false) {
 export function registerFileHandlers(broadcast: () => void) {
   ipcMain.handle("attachments:list", (_e, owner: AttachmentOwner) => listAttachments(owner));
   ipcMain.handle("attachments:open", (_e, id: string) => openAttachment(id));
-  ipcMain.handle("attachments:select", async (_e, input: AttachmentOwner, requestId: string) => {
+  ipcMain.handle("attachments:select", async (_e, input: AttachmentOwner, requestId: string, filePath?: string) => {
     const owner = attachmentOwnerSchema.parse(input); recordId.parse(requestId); checkOwner(owner);
-    const result = await dialog.showOpenDialog({ title: "Attach receipt", properties: ["openFile"], filters: [{ name: "Receipts", extensions: ["pdf", "png", "jpg", "jpeg", "webp"] }] });
+    let chosenPath = filePath;
+    if (!chosenPath) {
+      const result = await dialog.showOpenDialog({ title: "Attach receipt", properties: ["openFile"], filters: [{ name: "Receipts", extensions: ["pdf", "png", "jpg", "jpeg", "webp"] }] });
+      if (result.canceled || !result.filePaths[0]) return null;
+      chosenPath = result.filePaths[0];
+    }
+    const receipt = copyReceipt(owner, chosenPath, requestId); broadcast(); return receipt;
+  });
+  ipcMain.handle("attachments:chooseFile", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Select payment slip or receipt",
+      properties: ["openFile"],
+      filters: [{ name: "Receipts & Slips", extensions: ["pdf", "png", "jpg", "jpeg", "webp"] }],
+    });
     if (result.canceled || !result.filePaths[0]) return null;
-    const receipt = copyReceipt(owner, result.filePaths[0], requestId); broadcast(); return receipt;
+    const target = result.filePaths[0];
+    const stat = fs.statSync(target);
+    return {
+      path: target,
+      name: path.basename(target),
+      size: stat.size,
+    };
   });
   ipcMain.handle("files:selectPdfDirectory", async () => {
     const result = await dialog.showOpenDialog({ title: "Choose invoice PDF folder", properties: ["openDirectory", "createDirectory"] });

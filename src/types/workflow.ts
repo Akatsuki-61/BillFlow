@@ -10,6 +10,7 @@ export interface AttachmentItem {
   id: string; paymentId: string | null; expenseId: string | null; payoutId: string | null;
   originalName: string; mimeType: string; sizeBytes: number; createdAt: string;
 }
+export interface ChosenAttachmentFile { path: string; name: string; size: number }
 export interface WorkflowAPI {
   tasks: {
     list: () => Promise<TaskItem[]>;
@@ -24,7 +25,8 @@ export interface WorkflowAPI {
   };
   attachments: {
     list: (owner: AttachmentOwner) => Promise<AttachmentItem[]>;
-    select: (owner: AttachmentOwner, requestId: string) => Promise<AttachmentItem | null>;
+    select: (owner: AttachmentOwner, requestId: string, filePath?: string) => Promise<AttachmentItem | null>;
+    chooseFile?: () => Promise<ChosenAttachmentFile | null>;
     open: (id: string) => Promise<void>;
   };
   files: {

@@ -27,6 +27,9 @@ import {
   Paperclip,
   UserPlus,
   Search,
+  ChevronDown,
+  RotateCcw,
+  Upload,
 } from "lucide-react";
 import {
   useInvoices,
@@ -58,6 +61,20 @@ interface LineItemDraft {
   description: string;
   quantity: number;
   unitPrice: string;
+}
+
+interface FloatingActionMenuState {
+  invoice: InvoiceWithClient;
+  top?: number;
+  bottom?: number;
+  right: number;
+}
+
+interface FloatingStatusMenuState {
+  invoice: InvoiceWithClient;
+  top?: number;
+  bottom?: number;
+  left: number;
 }
 
 export default function InvoicesView() {
@@ -92,7 +109,8 @@ export default function InvoicesView() {
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [actionMenu, setActionMenu] = useState<FloatingActionMenuState | null>(null);
+  const [statusMenu, setStatusMenu] = useState<FloatingStatusMenuState | null>(null);
   const [expiredInvoiceHighlight, setExpiredInvoiceHighlight] = useState<
     string | null
   >(null);
@@ -116,6 +134,7 @@ export default function InvoicesView() {
   const [newDeliveryUrl, setNewDeliveryUrl] = useState("");
   const [newNotes, setNewNotes] = useState("");
   const [isSubmittingNew, setIsSubmittingNew] = useState(false);
+  const [hasInvoiceDraft, setHasInvoiceDraft] = useState(false);
 
   // Edit Invoice Modal state
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithClient | null>(null);
@@ -142,7 +161,9 @@ export default function InvoicesView() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
-  const [attachSlipDirectly, setAttachSlipDirectly] = useState(true);
+  const [selectedSlip, setSelectedSlip] = useState<{ path: string; name: string; size: number } | null>(null);
+  const [isDraggingSlip, setIsDraggingSlip] = useState(false);
+  const slipFileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // Payment Inspection Modal state
@@ -198,7 +219,84 @@ export default function InvoicesView() {
     }
   }
 
-  const closeAddInvoiceModal = () => {
+  const isInvoiceFormDirty = () => {
+    const hasItems = newLineItems.some(
+      (it) => it.description.trim() || it.unitPrice.trim(),
+    );
+    const hasClient =
+      clientMode === "new"
+        ? Boolean(clientName.trim() || clientEmail.trim())
+        : false;
+    const hasNotes = Boolean(
+      newNotes.trim() || newDiscount.trim() || newDeliveryUrl.trim(),
+    );
+    return hasItems || hasClient || hasNotes;
+  };
+
+  const saveInvoiceDraft = () => {
+    if (!isInvoiceFormDirty()) return;
+    const draft = {
+      clientMode,
+      newClientId,
+      clientName,
+      clientEmail,
+      clientContact,
+      clientCategory,
+      newCurrency,
+      newDueDate,
+      newLineItems,
+      newDiscount,
+      newTaxRate,
+      requireAdvance,
+      advancePercent,
+      saveAsPermanentClient,
+      newDeliveryUrl,
+      newNotes,
+    };
+    try {
+      localStorage.setItem("billflow_draft_invoice", JSON.stringify(draft));
+      setHasInvoiceDraft(true);
+    } catch {}
+  };
+
+  const clearInvoiceDraft = () => {
+    try {
+      localStorage.removeItem("billflow_draft_invoice");
+    } catch {}
+    setHasInvoiceDraft(false);
+  };
+
+  const handleRestoreInvoiceDraft = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_invoice");
+      if (!saved) return;
+      const draft = JSON.parse(saved);
+      if (draft.clientMode !== undefined) setClientMode(draft.clientMode);
+      if (draft.newClientId !== undefined) setNewClientId(draft.newClientId);
+      if (draft.clientName !== undefined) setClientName(draft.clientName);
+      if (draft.clientEmail !== undefined) setClientEmail(draft.clientEmail);
+      if (draft.clientContact !== undefined) setClientContact(draft.clientContact);
+      if (draft.clientCategory !== undefined) setClientCategory(draft.clientCategory);
+      if (draft.newCurrency !== undefined) setNewCurrency(draft.newCurrency);
+      if (draft.newDueDate !== undefined) setNewDueDate(draft.newDueDate);
+      if (Array.isArray(draft.newLineItems) && draft.newLineItems.length > 0) {
+        setNewLineItems(draft.newLineItems);
+      }
+      if (draft.newDiscount !== undefined) setNewDiscount(draft.newDiscount);
+      if (draft.newTaxRate !== undefined) setNewTaxRate(draft.newTaxRate);
+      if (draft.requireAdvance !== undefined) setRequireAdvance(draft.requireAdvance);
+      if (draft.advancePercent !== undefined) setAdvancePercent(draft.advancePercent);
+      if (draft.saveAsPermanentClient !== undefined) setSaveAsPermanentClient(draft.saveAsPermanentClient);
+      if (draft.newDeliveryUrl !== undefined) setNewDeliveryUrl(draft.newDeliveryUrl);
+      if (draft.newNotes !== undefined) setNewNotes(draft.newNotes);
+      showToast("Draft restored");
+    } catch {}
+  };
+
+  const closeAddInvoiceModal = (saveDraft = true) => {
+    if (saveDraft) {
+      saveInvoiceDraft();
+    }
     setShowAddInvoiceModal(false);
     if (typeof window !== "undefined" && window.location.search.includes("new=")) {
       const url = new URL(window.location.href);
@@ -272,6 +370,13 @@ export default function InvoicesView() {
       if (clients[0].driveUrl) setNewDeliveryUrl(clients[0].driveUrl);
     }
 
+    try {
+      const saved = localStorage.getItem("billflow_draft_invoice");
+      setHasInvoiceDraft(Boolean(saved));
+    } catch {
+      setHasInvoiceDraft(false);
+    }
+
     setShowAddInvoiceModal(true);
   };
 
@@ -340,11 +445,129 @@ export default function InvoicesView() {
     filteredInvoices.length > 0 &&
     filteredInvoices.every((inv) => selectedIds.includes(inv.id));
 
+  // Dismiss floating menus on scroll, resize, or Escape
+  useEffect(() => {
+    const handleCloseMenus = () => {
+      setActionMenu(null);
+      setStatusMenu(null);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setActionMenu(null);
+        setStatusMenu(null);
+      }
+    };
+    window.addEventListener("scroll", handleCloseMenus, true);
+    window.addEventListener("resize", handleCloseMenus);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("scroll", handleCloseMenus, true);
+      window.removeEventListener("resize", handleCloseMenus);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  const handleToggleActionMenu = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    inv: InvoiceWithClient,
+  ) => {
+    e.stopPropagation();
+    if (actionMenu?.invoice.id === inv.id) {
+      setActionMenu(null);
+      return;
+    }
+    setStatusMenu(null);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const estimatedHeight = 360;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < estimatedHeight && rect.top > estimatedHeight;
+
+    if (openUpward) {
+      setActionMenu({
+        invoice: inv,
+        bottom: Math.max(8, window.innerHeight - rect.top + 6),
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    } else {
+      setActionMenu({
+        invoice: inv,
+        top: Math.max(8, rect.bottom + 6),
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    }
+  };
+
+  const handleToggleStatusMenu = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    inv: InvoiceWithClient,
+  ) => {
+    e.stopPropagation();
+    if (statusMenu?.invoice.id === inv.id) {
+      setStatusMenu(null);
+      return;
+    }
+    setActionMenu(null);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const estimatedHeight = 240;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < estimatedHeight && rect.top > estimatedHeight;
+
+    if (openUpward) {
+      setStatusMenu({
+        invoice: inv,
+        bottom: Math.max(8, window.innerHeight - rect.top + 6),
+        left: Math.max(8, rect.left),
+      });
+    } else {
+      setStatusMenu({
+        invoice: inv,
+        top: Math.max(8, rect.bottom + 6),
+        left: Math.max(8, rect.left),
+      });
+    }
+  };
+
   // Quick Change Status
   const handleChangeStatus = async (id: string, nextStatus: InvoiceStatus) => {
     try {
+      const inv = allInvoices.find((i) => i.id === id);
+      if (!inv) return;
+
+      if (nextStatus === "PAID") {
+        setStatusMenu(null);
+        setActionMenu(null);
+        const needed = inv.amountCents - (inv.paidCents || 0);
+        if (needed <= 0) {
+          showToast("Invoice is already fully paid.");
+          return;
+        }
+        handleOpenPayment(inv, "full");
+        return;
+      }
+
+      if (nextStatus === "ADVANCE_PAID") {
+        setStatusMenu(null);
+        setActionMenu(null);
+        const existingAdvance = inv.advanceCents ?? 0;
+        const targetAdvance =
+          existingAdvance > 0
+            ? existingAdvance
+            : Math.round(inv.amountCents * 0.5);
+        if (existingAdvance <= 0) {
+          void updateInvoice(id, { advanceCents: targetAdvance });
+        }
+        const currentPaid = inv.paidCents || 0;
+        if (currentPaid >= targetAdvance && currentPaid > 0) {
+          showToast("Advance payment has already been recorded.");
+          return;
+        }
+        handleOpenPayment(inv, "advance");
+        return;
+      }
+
       await setInvoiceStatus(id, nextStatus);
-      setOpenMenuId(null);
+      setStatusMenu(null);
+      setActionMenu(null);
       showToast(`Invoice status updated to ${nextStatus}.`);
     } catch (err: unknown) {
       const msg =
@@ -358,7 +581,7 @@ export default function InvoicesView() {
   const handlePromoteClient = async (inv: InvoiceWithClient) => {
     try {
       await promoteClient(inv.id);
-      setOpenMenuId(null);
+      setActionMenu(null);
       showToast(`Saved "${inv.clientName}" to permanent clients directory.`);
     } catch (err: unknown) {
       const msg =
@@ -371,6 +594,8 @@ export default function InvoicesView() {
 
   // Open Edit Modal
   const handleOpenEdit = (inv: InvoiceWithClient) => {
+    setActionMenu(null);
+    setStatusMenu(null);
     setEditingInvoice(inv);
     setEditCode(inv.code);
     setEditClientId(inv.clientId || "");
@@ -415,7 +640,7 @@ export default function InvoicesView() {
       setEditAdvancePercent(50);
     }
 
-    setOpenMenuId(null);
+    setActionMenu(null);
   };
 
   const handleAddEditLineItem = () => {
@@ -548,7 +773,7 @@ export default function InvoicesView() {
       setSelectedIds((prev) => prev.filter((id) => id !== deletingInvoice.id));
       showToast(`Invoice ${deletingInvoice.code} deleted.`);
       setDeletingInvoice(null);
-      setOpenMenuId(null);
+      setActionMenu(null);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -686,7 +911,8 @@ export default function InvoicesView() {
         status: newStatus,
       });
 
-      closeAddInvoiceModal();
+      clearInvoiceDraft();
+      closeAddInvoiceModal(false);
       requestId.current = null;
       setNewLineItems([{ id: "1", description: "", quantity: 1, unitPrice: "" }]);
       setNewDiscount("");
@@ -708,22 +934,83 @@ export default function InvoicesView() {
   };
 
   // Open Record Payment Modal
-  const handleOpenPayment = (inv: InvoiceWithClient) => {
+  const handleOpenPayment = (inv: InvoiceWithClient, targetType?: "advance" | "full") => {
     setPaymentInvoice(inv);
     const today = new Date().toISOString().split("T")[0];
     setPaymentDate(today);
 
     const paid = inv.paidCents || 0;
-    const advance = inv.advanceCents || 0;
-    if (advance > 0 && paid < advance) {
-      setPaymentAmount(((advance - paid) / 100).toFixed(2));
+    const advance = inv.advanceCents || Math.round(inv.amountCents * 0.5);
+    const remaining = Math.max(0, inv.amountCents - paid);
+
+    if (targetType === "advance") {
+      const advNeeded = Math.max(0, advance - paid);
+      setPaymentAmount((advNeeded / 100).toFixed(2));
+    } else if (targetType === "full") {
+      setPaymentAmount((remaining / 100).toFixed(2));
     } else {
-      setPaymentAmount((Math.max(0, inv.amountCents - paid) / 100).toFixed(2));
+      if (advance > 0 && paid < advance) {
+        setPaymentAmount(((advance - paid) / 100).toFixed(2));
+      } else {
+        setPaymentAmount((remaining / 100).toFixed(2));
+      }
     }
-    setPaymentReference(`SLIP-${Date.now().toString().slice(-4)}`);
-    setAttachSlipDirectly(true);
+
+    setPaymentReference(`SLIP-${crypto.randomUUID().slice(0, 4).toUpperCase()}`);
+    setSelectedSlip(null);
     setShowPaymentModal(true);
-    setOpenMenuId(null);
+    setActionMenu(null);
+    setStatusMenu(null);
+  };
+
+  const handlePickReceipt = async () => {
+    if (workflow?.attachments?.chooseFile) {
+      try {
+        const file = await workflow.attachments.chooseFile();
+        if (file) {
+          setSelectedSlip(file);
+          return;
+        }
+      } catch {
+        // Fallback to HTML input
+      }
+    }
+    slipFileInputRef.current?.click();
+  };
+
+  const handleSlipInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    let filePath = "";
+    if (typeof window !== "undefined" && window.billflow?.getPathForFile) {
+      filePath = window.billflow.getPathForFile(file);
+    } else if ((file as unknown as { path?: string }).path) {
+      filePath = (file as unknown as { path?: string }).path || "";
+    }
+    setSelectedSlip({
+      path: filePath || file.name,
+      name: file.name,
+      size: file.size,
+    });
+    e.target.value = "";
+  };
+
+  const handleSlipDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingSlip(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    let filePath = "";
+    if (typeof window !== "undefined" && window.billflow?.getPathForFile) {
+      filePath = window.billflow.getPathForFile(file);
+    } else if ((file as unknown as { path?: string }).path) {
+      filePath = (file as unknown as { path?: string }).path || "";
+    }
+    setSelectedSlip({
+      path: filePath || file.name,
+      name: file.name,
+      size: file.size,
+    });
   };
 
   // Submit Payment
@@ -746,24 +1033,33 @@ export default function InvoicesView() {
         requestId: reqId,
       });
 
-      showToast(
-        `Recorded payment of ${formatCents(amountCents, paymentInvoice.currency)} for ${paymentInvoice.code}.`,
-      );
-      setShowPaymentModal(false);
-
-      if (attachSlipDirectly && workflow) {
+      if (selectedSlip && workflow) {
         try {
           const slip = await workflow.attachments.select(
             { type: "payment", id: res.payment.id },
             crypto.randomUUID(),
+            selectedSlip.path,
           );
           if (slip) {
-            showToast(`Payment slip "${slip.originalName}" attached.`);
+            showToast(`Recorded payment of ${formatCents(amountCents, paymentInvoice.currency)} with receipt "${slip.originalName}".`);
+          } else {
+            showToast(`Recorded payment of ${formatCents(amountCents, paymentInvoice.currency)} for ${paymentInvoice.code}.`);
           }
-        } catch {
-          // File dialog cancelled or failed
+        } catch (err: unknown) {
+          const msg =
+            err instanceof Error
+              ? err.message
+              : "Payment recorded, but receipt attachment failed.";
+          showToast(msg, "error");
         }
+      } else {
+        showToast(
+          `Recorded payment of ${formatCents(amountCents, paymentInvoice.currency)} for ${paymentInvoice.code}.`,
+        );
       }
+
+      setShowPaymentModal(false);
+      setSelectedSlip(null);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -799,7 +1095,7 @@ export default function InvoicesView() {
   // Open Payment Inspector
   const handleOpenInspector = (inv: InvoiceWithClient) => {
     setInspectingInvoice(inv);
-    setOpenMenuId(null);
+    setActionMenu(null);
   };
 
   // Attach receipt to an existing payment
@@ -832,7 +1128,7 @@ export default function InvoicesView() {
         {notification && (
           <MotionSurface
             kind="toast"
-            className={`fixed top-14 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+            className={`fixed top-14 right-6 z-[9999] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
               notification.type === "error"
                 ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
                 : "bg-surface-neutral-900 border-line-neutral-700 text-white"
@@ -993,7 +1289,6 @@ export default function InvoicesView() {
               ) : (
                 filteredInvoices.map((inv) => {
                   const isSelected = selectedIds.includes(inv.id);
-                  const isMenuOpen = openMenuId === inv.id;
                   const isHighlighted = highlightedInvoiceId === inv.id;
                   const balanceDueCents = Math.max(
                     0,
@@ -1141,46 +1436,46 @@ export default function InvoicesView() {
 
                       {/* Status Dropdown/Pill */}
                       <td className="py-4.5 px-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleStatusMenu(e, inv)}
+                          aria-haspopup="true"
+                          aria-expanded={statusMenu?.invoice.id === inv.id}
+                          title="Click to change invoice status"
+                          className={`group/pill inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/30 hover:shadow-xs active:scale-95 ${
                             inv.status === "PAID"
-                              ? "bg-surface-emerald-100 text-content-emerald-800 border border-border-emerald-300"
+                              ? "bg-surface-emerald-100 text-content-emerald-800 border-border-emerald-300 hover:bg-surface-emerald-200/80"
                               : inv.status === "ADVANCE_PAID"
-                                ? "bg-surface-amber-100 text-content-amber-800 border border-border-amber-300"
+                                ? "bg-surface-amber-100 text-content-amber-800 border-border-amber-300 hover:bg-surface-amber-200/80"
                                 : inv.status === "OVERDUE"
-                                  ? "bg-surface-rose-100 text-content-rose-800 border border-border-rose-300 font-bold"
+                                  ? "bg-surface-rose-100 text-content-rose-800 border-border-rose-300 hover:bg-surface-rose-200/80 font-bold"
                                   : inv.status === "DRAFT"
-                                    ? "bg-surface-neutral-100 text-content-neutral-600 border border-line-neutral-200"
-                                    : "bg-surface-blue-100 text-content-blue-800 border border-border-blue-300"
+                                    ? "bg-surface-neutral-100 text-content-neutral-600 border-line-neutral-200 hover:bg-surface-neutral-200/80"
+                                    : "bg-surface-blue-100 text-content-blue-800 border-border-blue-300 hover:bg-surface-blue-200/80"
                           }`}
                         >
-                          {inv.status === "ADVANCE_PAID"
-                            ? "Advance Paid"
-                            : inv.status}
-                        </span>
+                          <span>
+                            {inv.status === "ADVANCE_PAID"
+                              ? "Advance Paid"
+                              : inv.status.charAt(0) + inv.status.slice(1).toLowerCase()}
+                          </span>
+                          <ChevronDown className="w-3 h-3 opacity-60 group-hover/pill:opacity-100 transition-opacity" />
+                        </button>
                       </td>
 
                       {/* Actions */}
-                      <td className="py-4.5 pr-6 pl-4 text-right relative">
+                      <td className="py-4.5 pr-6 pl-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {inv.status !== "PAID" && inv.status !== "DRAFT" && (
-                            <Button
-                              variant="secondary"
-                              size="small"
-                              onClick={() => handleOpenPayment(inv)}
-                              title="Record advance or remaining payment"
-                              className="text-xs"
-                            >
-                              <CreditCard className="w-3.5 h-3.5 text-accent" />
-                              <span>Pay</span>
-                            </Button>
-                          )}
 
                           <Button
                             variant="ghost"
                             size="icon"
                             type="button"
-                            onClick={() => handleOpenPdf(inv)}
+                            onClick={() => {
+                              setActionMenu(null);
+                              setStatusMenu(null);
+                              handleOpenPdf(inv);
+                            }}
                             title="Open Invoice PDF"
                           >
                             <FileText className="w-4 h-4 text-content-neutral-600" />
@@ -1190,110 +1485,14 @@ export default function InvoicesView() {
                             variant="ghost"
                             size="icon"
                             type="button"
-                            onClick={() =>
-                              setOpenMenuId(isMenuOpen ? null : inv.id)
-                            }
-                            aria-label="Actions"
+                            onClick={(e) => handleToggleActionMenu(e, inv)}
+                            aria-haspopup="true"
+                            aria-expanded={actionMenu?.invoice.id === inv.id}
+                            aria-label="Invoice actions"
                           >
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </div>
-
-                        {isMenuOpen && (
-                          <div className="absolute right-6 top-10 z-40 bg-surface rounded-xl shadow-xl border border-line-neutral-200 py-1.5 w-48 text-xs font-medium text-content-neutral-700 text-left">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenPdf(inv)}
-                              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer"
-                            >
-                              <FileText className="w-3.5 h-3.5 text-content-neutral-500" />
-                              <span>Open PDF</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleRevealPdf(inv)}
-                              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer"
-                            >
-                              <FolderOpen className="w-3.5 h-3.5 text-content-neutral-500" />
-                              <span>Reveal PDF in folder</span>
-                            </button>
-
-                            {inv.payments && inv.payments.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenInspector(inv)}
-                                className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer"
-                              >
-                                <Paperclip className="w-3.5 h-3.5 text-content-neutral-500" />
-                                <span>Payments & Receipts ({inv.payments.length})</span>
-                              </button>
-                            )}
-
-                            <div className="my-1 border-t border-line-neutral-100" />
-
-                            {!inv.clientId && (
-                              <button
-                                type="button"
-                                onClick={() => handlePromoteClient(inv)}
-                                className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer text-accent font-semibold"
-                              >
-                                <UserPlus className="w-3.5 h-3.5 text-accent" />
-                                <span>Save as Permanent Client</span>
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(inv)}
-                              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer"
-                            >
-                              <Pencil className="w-3.5 h-3.5 text-content-neutral-400" />
-                              <span>Edit Details</span>
-                            </button>
-
-                            <div className="my-1 border-t border-line-neutral-100" />
-                            <div className="px-3 py-1 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider">
-                              Change Status
-                            </div>
-                            {(
-                              [
-                                "UNPAID",
-                                "ADVANCE_PAID",
-                                "PAID",
-                                "OVERDUE",
-                                "DRAFT",
-                              ] as InvoiceStatus[]
-                            ).map((s) => (
-                              <button
-                                key={s}
-                                type="button"
-                                onClick={() => handleChangeStatus(inv.id, s)}
-                                className={`w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center justify-between cursor-pointer ${
-                                  inv.status === s ? "font-bold text-accent" : ""
-                                }`}
-                              >
-                                <span>{s === "ADVANCE_PAID" ? "ADVANCE PAID" : s}</span>
-                                {inv.status === s && (
-                                  <CheckCircle2 className="w-3 h-3 text-accent" />
-                                )}
-                              </button>
-                            ))}
-
-                            <div className="my-1 border-t border-line-neutral-100" />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDeletingInvoice(inv);
-                                setOpenMenuId(null);
-                              }}
-                              className="w-full px-3.5 py-1.5 hover:bg-surface-rose-50 text-content-rose-600 flex items-center gap-2 cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
-                              <span>Delete Invoice</span>
-                            </button>
-                          </div>
-                        )}
                       </td>
                     </tr>
                   );
@@ -1330,14 +1529,29 @@ export default function InvoicesView() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={closeAddInvoiceModal}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {hasInvoiceDraft && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="small"
+                      onClick={handleRestoreInvoiceDraft}
+                      className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                      title="Restore previously typed invoice draft"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restore</span>
+                    </Button>
+                  )}
+                  <Button
+                    aria-label="Close"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => closeAddInvoiceModal()}
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
 
               <form
@@ -1790,7 +2004,7 @@ export default function InvoicesView() {
                   <Button
                     variant="ghost"
                     type="button"
-                    onClick={closeAddInvoiceModal}
+                    onClick={() => closeAddInvoiceModal()}
                   >
                     Cancel
                   </Button>
@@ -1812,7 +2026,10 @@ export default function InvoicesView() {
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
             <MotionSurface
-              onDismiss={() => setShowPaymentModal(false)}
+              onDismiss={() => {
+                setShowPaymentModal(false);
+                setSelectedSlip(null);
+              }}
               kind="panel"
               className="bg-surface rounded-2xl w-full max-w-md shadow-2xl border border-line-neutral-200 overflow-hidden"
             >
@@ -1834,7 +2051,10 @@ export default function InvoicesView() {
                   aria-label="Close"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowPaymentModal(false)}
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setSelectedSlip(null);
+                  }}
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -1982,22 +2202,106 @@ export default function InvoicesView() {
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer pt-2">
+                {/* Payment Slip / Receipt Upload Zone */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500">
+                      Payment Slip / Receipt Proof <span className="text-content-neutral-400 font-normal lowercase">(optional)</span>
+                    </label>
+                    {selectedSlip && (
+                      <span className="text-[11px] font-medium text-content-emerald-600 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready to attach
+                      </span>
+                    )}
+                  </div>
+
                   <input
-                    type="checkbox"
-                    checked={attachSlipDirectly}
-                    onChange={(e) => setAttachSlipDirectly(e.target.checked)}
-                    className="w-4 h-4 rounded border-line-neutral-300 text-purple-600 focus:ring-purple-500/20 cursor-pointer accent-purple-600"
+                    ref={slipFileInputRef}
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp"
+                    onChange={handleSlipInputChange}
+                    className="hidden"
                   />
-                  <span>Attach payment slip / receipt file after recording</span>
-                </label>
+
+                  {!selectedSlip ? (
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDraggingSlip(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        setIsDraggingSlip(false);
+                      }}
+                      onDrop={handleSlipDrop}
+                      onClick={handlePickReceipt}
+                      className={`p-4 rounded-xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center gap-2 text-center ${
+                        isDraggingSlip
+                          ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                          : "border-line-neutral-200 hover:border-accent/50 bg-surface-neutral-50/50 hover:bg-surface-neutral-100/50"
+                      }`}
+                    >
+                      <div className="w-9 h-9 rounded-full bg-surface-neutral-100 flex items-center justify-center text-content-neutral-500">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-semibold text-content-neutral-800">
+                          Click to upload payment receipt, or drag and drop
+                        </p>
+                        <p className="text-[11px] text-content-neutral-400">
+                          PDF, PNG, JPG or WEBP (up to 20 MB)
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/70">
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <div className="w-8 h-8 rounded-lg bg-surface-purple-100 text-content-purple-700 flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="truncate">
+                          <p className="text-xs font-semibold text-content-neutral-900 truncate">
+                            {selectedSlip.name}
+                          </p>
+                          <p className="text-[11px] text-content-neutral-400">
+                            {(selectedSlip.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="small"
+                          onClick={handlePickReceipt}
+                          className="text-xs h-7 px-2"
+                        >
+                          Change
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSelectedSlip(null)}
+                          className="w-7 h-7 text-content-neutral-400 hover:text-content-rose-600"
+                          aria-label="Remove attached file"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Actions */}
                 <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100">
                   <Button
                     variant="ghost"
                     type="button"
-                    onClick={() => setShowPaymentModal(false)}
+                    onClick={() => {
+                      setShowPaymentModal(false);
+                      setSelectedSlip(null);
+                    }}
                   >
                     Cancel
                   </Button>
@@ -2629,6 +2933,199 @@ export default function InvoicesView() {
           </MotionSurface>
         )}
       </MotionPresence>
+
+      {/* Floating Backdrop for outside clicks */}
+      {(actionMenu || statusMenu) && (
+        <div
+          className="fixed inset-0 z-40 bg-transparent cursor-default"
+          onClick={() => {
+            setActionMenu(null);
+            setStatusMenu(null);
+          }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Floating Status Menu */}
+      {statusMenu && (
+        <div
+          style={{
+            position: "fixed",
+            top: statusMenu.top !== undefined ? `${statusMenu.top}px` : undefined,
+            bottom: statusMenu.bottom !== undefined ? `${statusMenu.bottom}px` : undefined,
+            left: `${statusMenu.left}px`,
+          }}
+          className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-60 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)] animate-in fade-in-0 zoom-in-95 duration-100"
+          role="menu"
+        >
+          <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider border-b border-line-neutral-100 mb-1">
+            Change Status · {statusMenu.invoice.code}
+          </div>
+          {[
+            { value: "UNPAID", label: "Unpaid", desc: "No payments recorded yet", dot: "bg-blue-500" },
+            { value: "ADVANCE_PAID", label: "Advance Paid", desc: "Deposit received, ready to track", dot: "bg-amber-500" },
+            { value: "PAID", label: "Paid", desc: "Fully settled invoice", dot: "bg-emerald-500" },
+            { value: "OVERDUE", label: "Overdue", desc: "Past agreed payment date", dot: "bg-rose-500" },
+            { value: "DRAFT", label: "Draft", desc: "Estimate or unfinalized invoice", dot: "bg-neutral-400" },
+          ].map((opt) => {
+            const isCurrent = statusMenu.invoice.status === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="menuitem"
+                onClick={() => void handleChangeStatus(statusMenu.invoice.id, opt.value as InvoiceStatus)}
+                className={`w-full px-3 py-2 hover:bg-surface-neutral-50 flex items-center justify-between text-left cursor-pointer transition-colors ${
+                  isCurrent ? "bg-surface-neutral-50/80 font-semibold text-accent" : ""
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${opt.dot}`} />
+                  <div>
+                    <div className="text-xs leading-none">{opt.label}</div>
+                    <div className="text-[10px] text-content-neutral-400 mt-0.5 leading-tight">{opt.desc}</div>
+                  </div>
+                </div>
+                {isCurrent && <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 ml-2" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Floating Actions Menu */}
+      {actionMenu && (
+        <div
+          style={{
+            position: "fixed",
+            top: actionMenu.top !== undefined ? `${actionMenu.top}px` : undefined,
+            bottom: actionMenu.bottom !== undefined ? `${actionMenu.bottom}px` : undefined,
+            right: `${actionMenu.right}px`,
+          }}
+          className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-52 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)] animate-in fade-in-0 zoom-in-95 duration-100 max-h-[85vh] overflow-y-auto"
+          role="menu"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              const inv = actionMenu.invoice;
+              setActionMenu(null);
+              void handleOpenPdf(inv);
+            }}
+            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5 text-content-neutral-500" />
+            <span>Open PDF</span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              const inv = actionMenu.invoice;
+              setActionMenu(null);
+              void handleRevealPdf(inv);
+            }}
+            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-content-neutral-500" />
+            <span>Reveal PDF in folder</span>
+          </button>
+
+          {actionMenu.invoice.payments && actionMenu.invoice.payments.length > 0 && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                handleOpenInspector(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Paperclip className="w-3.5 h-3.5 text-content-neutral-500" />
+              <span>Payments & Receipts ({actionMenu.invoice.payments.length})</span>
+            </button>
+          )}
+
+          <div className="my-1 border-t border-line-neutral-100" />
+
+          {!actionMenu.invoice.clientId && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                void handlePromoteClient(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer text-accent font-semibold transition-colors"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-accent" />
+              <span>Save as Permanent Client</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              const inv = actionMenu.invoice;
+              setActionMenu(null);
+              handleOpenEdit(inv);
+            }}
+            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5 text-content-neutral-400" />
+            <span>Edit Details</span>
+          </button>
+
+          <div className="my-1 border-t border-line-neutral-100" />
+          <div className="px-3 py-1 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider">
+            Change Status
+          </div>
+          {(
+            [
+              { value: "UNPAID", label: "UNPAID" },
+              { value: "ADVANCE_PAID", label: "ADVANCE PAID" },
+              { value: "PAID", label: "PAID" },
+              { value: "OVERDUE", label: "OVERDUE" },
+              { value: "DRAFT", label: "DRAFT" },
+            ] as { value: InvoiceStatus; label: string }[]
+          ).map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              role="menuitem"
+              onClick={() => void handleChangeStatus(actionMenu.invoice.id, s.value)}
+              className={`w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center justify-between cursor-pointer transition-colors ${
+                actionMenu.invoice.status === s.value ? "font-bold text-accent" : ""
+              }`}
+            >
+              <span>{s.label}</span>
+              {actionMenu.invoice.status === s.value && (
+                <CheckCircle2 className="w-3 h-3 text-accent" />
+              )}
+            </button>
+          ))}
+
+          <div className="my-1 border-t border-line-neutral-100" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              const inv = actionMenu.invoice;
+              setActionMenu(null);
+              setDeletingInvoice(inv);
+            }}
+            className="w-full px-3.5 py-1.5 hover:bg-surface-rose-50 text-content-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
+            <span>Delete Invoice</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -45,6 +45,7 @@ export default function AnalyticsView() {
     showAllAnalytics,
     resetToDefaults,
     toastMessage,
+    toastAction,
     showToast,
   } = useWidgetContext();
 
@@ -138,10 +139,22 @@ export default function AnalyticsView() {
         {toastMessage && (
           <MotionSurface
             kind="toast"
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-toast text-white rounded-xl shadow-lg text-[12px] font-medium"
+            className="fixed bottom-6 right-6 z-[9999] flex items-center justify-between gap-3 px-4 py-2.5 bg-toast text-white rounded-xl shadow-xl text-[12px] font-medium min-w-[280px]"
           >
-            <CheckCircle2 className="text-success-bright text-[13px]" />
-            <span>{toastMessage}</span>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="text-success-bright text-[13px] shrink-0" />
+              <span>{toastMessage}</span>
+            </div>
+            {toastAction && (
+              <button
+                type="button"
+                onClick={toastAction.onClick}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer border border-white/25 shrink-0"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>{toastAction.label}</span>
+              </button>
+            )}
           </MotionSurface>
         )}
       </MotionPresence>

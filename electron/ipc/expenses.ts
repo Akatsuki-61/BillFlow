@@ -146,8 +146,10 @@ export function removeExpense(idInput: string, broadcast?: () => void): { succes
   const existing = db.select().from(expenses).where(eq(expenses.id, id)).get();
   if (!existing) throw new AppError("NOT_FOUND", "Expense record not found.");
 
-  db.delete(attachments).where(eq(attachments.expenseId, id)).run();
-  db.delete(expenses).where(eq(expenses.id, id)).run();
+  db.transaction((tx) => {
+    tx.delete(attachments).where(eq(attachments.expenseId, id)).run();
+    tx.delete(expenses).where(eq(expenses.id, id)).run();
+  });
 
   if (broadcast) broadcast();
   return { success: true };

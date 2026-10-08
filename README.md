@@ -206,7 +206,7 @@ Guidelines for team members and contributors collaborating on BillFlow:
 | :--- | :--- |
 | `main` | Production-ready releases. Protected branch. |
 | `Nipun` | Architecture, Electron shell, database, invoicing, PDF export, analytics, tasks. |
-| `Lahiru` | Navigation shell, clients directory, delivery link resolution, expenses ledger. |
+| `Lahiru` | Navigation shell, clients directory, delivery link resolution, expenses ledger, lead QA & bug hunting. |
 | `Binuka` | Outsourcing work orders, contractor payouts, currency synchronization. |
 | `Sandika` | Service catalog, CSV/Excel import, invoice styling reconciliation. |
 
@@ -234,7 +234,7 @@ Run the verification suite before committing:
 ```bash
 npx tsc --noEmit    # Type checking
 npm run lint        # Code style & linting
-npm test            # 86 unit and integration tests
+npm test            # 96 unit and integration tests (14 suites)
 ```
 
 For the complete contribution guide, local environment configuration, and PR workflow, read **[CONTRIBUTING.md](CONTRIBUTING.md)**.
@@ -247,8 +247,8 @@ BillFlow is designed and built by the **Akatsuki** engineering team:
 
 | Contributor | GitHub | Primary Modules |
 | :--- | :--- | :--- |
-| **Nipun Yatawara** | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron runtime, SQLite/Drizzle layer, itemized invoices, vector PDF generator, Kanban workflow, domain analytics, dark/light theme engine. |
-| **GVSL-Lahiru** | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Application layout & navigation, Clients profiles & delivery defaults, Expenses SQLite ledger, receipt attachments, delivery link resolution. |
+| **Nipun Yatawara** | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron runtime, SQLite/Drizzle layer, itemized invoices, vector PDF generator, Kanban workflow, domain analytics, dark/light theme engine, bug resolution. |
+| **GVSL-Lahiru** | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Lead Quality Assurance & bug hunting audit, application layout & navigation, Clients profiles & delivery defaults, Expenses SQLite ledger, receipt attachments, delivery link resolution. |
 | **Binuka Reshan** | [@Binukareshane](https://github.com/Binukareshane) | Outsourcing work orders, subcontractor payout management, financial integrity, multi-currency synchronization. |
 | **Sandika** | [@Sandika-2003](https://github.com/Sandika-2003) | Service Catalog management, CSV/Excel bulk import, migration naming reconciliation, invoice styling. |
 

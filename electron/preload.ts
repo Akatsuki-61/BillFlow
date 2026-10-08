@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   ClientWithStats,
   NewClientInput,
@@ -158,8 +158,17 @@ contextBridge.exposeInMainWorld("billflow", {
   },
   attachments: {
     list: (owner: AttachmentOwner) => ipcRenderer.invoke("attachments:list", owner),
-    select: (owner: AttachmentOwner, requestId: string) => ipcRenderer.invoke("attachments:select", owner, requestId),
+    select: (owner: AttachmentOwner, requestId: string, filePath?: string) =>
+      ipcRenderer.invoke("attachments:select", owner, requestId, filePath),
+    chooseFile: () => ipcRenderer.invoke("attachments:chooseFile"),
     open: (id: string) => ipcRenderer.invoke("attachments:open", id),
+  },
+  getPathForFile: (file: File) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return (file as unknown as { path?: string }).path || "";
+    }
   },
   files: {
     selectPdfDirectory: () => ipcRenderer.invoke("files:selectPdfDirectory"),

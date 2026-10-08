@@ -8,8 +8,8 @@ This document records the individual module ownership, development timeline, and
 
 | Member | GitHub Username | Branch | Core Responsibilities & Modules |
 | :--- | :--- | :--- | :--- |
-| **Nipun Yatawara** | `nipunyatawara-dev` | `Nipun` | Project architecture, Electron desktop shell, SQLite database & Drizzle ORM migrations, Dashboard customization engine & widgets, itemized Invoices & PDF export, Kanban task workflow, theme engine, and domain ECharts analytics. |
-| **GVSL-Lahiru** | `GVSL-Lahiru` | `Lahiru` | Initial application layout, sidebar navigation, Clients profiles & delivery URL defaults, Expenses breakdown ledger with receipt persistence, and multi-view delivery link integrations. |
+| **Nipun Yatawara** | `nipunyatawara-dev` | `Nipun` | Project architecture, Electron desktop shell, SQLite database & Drizzle ORM migrations, Dashboard customization engine & widgets, itemized Invoices & PDF export, Kanban task workflow, theme engine, domain ECharts analytics, and bug fix engineering for releases v0.1.1/v0.1.2. |
+| **GVSL-Lahiru** | `GVSL-Lahiru` | `Lahiru` | Lead Quality Assurance & Bug Hunting Engineer, exploratory testing audit across releases, initial application layout, sidebar navigation, Clients profiles & delivery URL defaults, Expenses breakdown ledger with receipt persistence, and multi-view delivery link integrations. |
 | **Binuka Reshan** | `Binukareshane` | `Binuka` | Outsourcing UI and work order lifecycles, Analytics views, subcontractor payout management, and global currency synchronization across widgets. |
 | **Sandika** | `Sandika-2003` | `Sandika` | Catalog management, CSV/Excel bulk item import and template guides, initial invoice UI styling, and SQLite migration naming reconciliation. |
 
@@ -39,12 +39,39 @@ This document records the individual module ownership, development timeline, and
   - Integrated and adapted 6 Apache ECharts visual components to freelance metrics (turnaround velocity percentiles, retainer revenue yields, capacity benchmarks, and timeline brushes).
 - **Branding & Design Polish:**
   - Integrated official BillFlow brand marks, vector assets, and light/dark theme styling (`src/app/theme.css`).
+- **Bug Resolution & Release Engineering (v0.1.1 & v0.1.2-pre):**
+  - Implemented engineering solutions for all 17 defects audited and reported by Lahiru (`c47fb18`, `7c45210`).
+  - Restructured modal z-index hierarchy across the application to prevent validation alerts and toasts from clipping under backdrop layers.
+  - Refactored invoice editing into a dedicated, unclipped modal overlay and implemented form state reset hooks on modal cancellation.
+  - Corrected sidebar active route detection, resolved dashboard widget header button collisions, and standardized responsive grid layouts.
+  - Packaged and released desktop version v0.1.1 (`release/BillFlow-0.1.1-arm64.dmg`, `release/BillFlow.Setup.0.1.1.exe`).
 
 ---
 
 ### 2. GVSL-Lahiru (`GVSL-Lahiru`)
 **Primary Branch:** `Lahiru`
 
+- **Lead Quality Assurance, Exploratory Bug Hunting & UX Audit:**
+  - Spearheaded end-to-end exploratory testing and quality assurance across the packaged desktop releases (v0.1.0 and v0.1.1).
+  - Systematically audited user workflows, visual layout boundaries, and edge cases, discovering and logging over 90% of all user-facing defects (17 critical bugs audited post-v0.1.0 release).
+  - Categorized and filed actionable bug reports spanning navigation state retention, z-index backdrop clipping on modals, dialog form state leakage on cancel/reopen, ECharts aspect ratio distortion, OS-native versus in-app confirmation ergonomics, and database query integrity:
+    1. **Dashboard Navigation Highlight Bleed:** Identified that the Dashboard sidebar link remained highlighted when browsing to Invoices, Clients, or Tasks.
+    2. **Analytics KPI Metric Font Sizing:** Caught text-wrapping issues where large numerical/currency values broke into two lines across compact metric cards.
+    3. **Revenue vs Expenses Bar Chart Distortion:** Identified horizontal/vertical stretching and aspect-ratio distortion on the cashflow bar chart.
+    4. **Log Expense Modal Input Width Glitch:** Caught anomalous rightward over-stretching of the Amount input container.
+    5. **Dashboard Card Action & "All" Button Collision:** Discovered severe click-collision UX where the widget shrink/close controls overlapped the "All" view button.
+    6. **Add Client Validation Error Layer Trapping:** Uncovered z-index clipping where RFC email validation alerts rendered underneath the backdrop blur layer.
+    7. **Invoice Edit Sub-tab Trapping & Freeze:** Identified that editing an invoice opened within the sub-tab container without dismiss capability instead of an overlay modal.
+    8. **Active Clients Card Redundant Metrics:** Flagged redundant display of duplicate active indicators, recommending total client counts alongside active/inactive breakdowns.
+    9. **Catalog Item List Vertical Overflow:** Recommended restructuring infinite vertical scrolling into a responsive multi-column grid layout.
+    10. **Native OS Confirm Prompt on Expense Deletion:** Audited modal consistency and flagged that deleting an expense invoked the operating system `window.confirm` dialog rather than an in-app modal.
+    11. **Analytics Customize Modal Button Redundancy:** Discovered that both "Reset Default" and "Show All" buttons erroneously activated all widgets instead of restoring curated defaults.
+    12. **Outsourcing Vendor Directory Integrity:** Audited the vendor directory to verify that all contractor records bind to persistent SQLite records with zero mock generation.
+    13. **Tasks Board Assignee Hardcoding:** Flagged hardcoded team names in the Kanban assignee dropdown, ensuring alignment with solo freelance workflow.
+    14. **Help & Support Search Filter Failure:** Identified that the search input in the knowledge base was unlinked and non-functional.
+    15. **Analytics Toast Notification Backdrop Clipping:** Uncovered that settings modification feedback toasts rendered behind the modal backdrop blur.
+    16. **Catalog Item Error Modal Layer Trapping:** Identified that validation errors in the catalog creation dialog rendered behind the backdrop layer.
+    17. **Modal Form State Leakage on Dismissal:** Caught persistent dirty form state where closing a creation modal without saving failed to reset fields on subsequent reopenings across Catalog, Clients, and Invoices.
 - **Layout & Application Shell:**
   - Built the responsive sidebar navigation, shared page layout containers, and application navigation structure.
 - **Expenses Ledger & Receipts:**
@@ -111,6 +138,10 @@ This document records the individual module ownership, development timeline, and
 | **Oct 07** | Lahiru | `Lahiru` | Client profile editing, delivery defaults, and multi-view link resolution. |
 | **Oct 07** | Nipun | `Nipun` | UI consistency polish, catalog layout standardization, and navigation cleanups. |
 | **Oct 07** | Nipun | `Nipun` | ECharts domain adaptation, container rendering fixes, and unified seed data. |
+| **Oct 07** | Nipun | `main` | Initial desktop release v0.1.0 packaging (`40f538d`). |
+| **Oct 08** | Lahiru | `Lahiru` | Systematic exploratory QA audit of desktop v0.1.0, logging 17 critical user-facing bugs. |
+| **Oct 08** | Nipun | `Nipun` | Bug resolution across all 17 defects (`c47fb18`), modal z-index re-stacking, and v0.1.1 desktop release. |
+| **Oct 08** | Nipun | `Nipun` | Unclip invoice actions menu, interactive advance tracking status pill, and test suite expansion (`7c45210`). |
 
 ---
 
@@ -118,14 +149,14 @@ This document records the individual module ownership, development timeline, and
 
 The integrated system is tested and verified through automated test suites and production packaging:
 - **Test Framework:** Vitest runner (`vitest run`).
-- **Total Test Suites:** 12 files passed.
-- **Total Unit & Integration Tests:** 86 tests passed.
+- **Total Test Suites:** 14 files passed.
+- **Total Unit & Integration Tests:** 96 tests passed (100% pass rate).
 - **Type Checking:** `npx tsc --noEmit` compiles cleanly with zero errors.
 - **Linter:** `npm run lint` passes cleanly with zero errors.
 - **Desktop Packaging:**
-  - macOS Apple Silicon (M1+): `release/BillFlow-0.1.0-arm64.dmg` verified and built.
+  - macOS Apple Silicon (M1+): `release/BillFlow-0.1.1-arm64.dmg` verified and built.
   - macOS Intel: `release/BillFlow-0.1.0.dmg` verified and built.
-  - Windows: NSIS installer configuration verified (`npm run dist:win`).
+  - Windows: `release/BillFlow.Setup.0.1.1.exe` NSIS installer verified and built.
 
 For developer setup, code guidelines, and contribution workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
 For the product overview and freelance workflow specification, see [README.md](README.md).

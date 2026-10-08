@@ -213,6 +213,22 @@ describe("managed files and complete backups", () => {
     const snapshot = JSON.parse(existingInvoice?.clientSnapshot || "{}");
     expect(snapshot.driveUrl).toBe("https://example.com/issued");
   });
+
+  it("attaches pre-selected receipt slips directly to payments", () => {
+    invoiceFixture(); pay();
+    const source = path.join(directory, "slip.png");
+    fs.writeFileSync(source, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"));
+    const attached = copyReceipt({ type: "payment", id: "advance" }, source, "slip-req-1");
+    expect(attached).toMatchObject({
+      id: "slip-req-1",
+      paymentId: "advance",
+      originalName: "slip.png",
+      mimeType: "image/png",
+    });
+    const list = listAttachments({ type: "payment", id: "advance" });
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe("slip-req-1");
+  });
 });
 
 it("migrates a populated pre-workflow database while preserving client/invoice/vendor records", () => {

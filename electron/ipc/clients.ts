@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import crypto from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db";
-import { clients, invoices } from "../db/schema";
+import { clients, invoices, tasks, vendors } from "../db/schema";
 import { newClientSchema, clientPatchSchema } from "../validation";
 import { AppError, formatError } from "./errors";
 import { ClientWithStats, NewClientInput, ClientPatchInput } from "../../src/types/billing";
@@ -45,6 +45,30 @@ export function listClientsWithStats(): ClientWithStats[] {
       invoicesCount: clientInvoices.length,
       recentInvoices,
     };
+  });
+}
+
+export function removeClient(id: string): { success: boolean } {
+  const db = getDb();
+  const countRes = db
+    .select({ count: sql<number>`count(*)` })
+    .from(invoices)
+    .where(eq(invoices.clientId, id))
+    .get();
+
+  const count = countRes?.count || 0;
+  if (count > 0) {
+    throw new AppError(
+      "CLIENT_HAS_INVOICES",
+      `Cannot delete client. This client is linked to ${count} invoice${count > 1 ? "s" : ""}.`
+    );
+  }
+
+  return db.transaction((tx) => {
+    tx.update(tasks).set({ clientId: null }).where(eq(tasks.clientId, id)).run();
+    tx.update(vendors).set({ linkedClientId: null }).where(eq(vendors.linkedClientId, id)).run();
+    tx.delete(clients).where(eq(clients.id, id)).run();
+    return { success: true };
   });
 }
 
@@ -132,24 +156,9 @@ export function registerClientHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("clients:remove", async (_event, id: string) => {
     try {
-      const db = getDb();
-      const countRes = db
-        .select({ count: sql<number>`count(*)` })
-        .from(invoices)
-        .where(eq(invoices.clientId, id))
-        .get();
-
-      const count = countRes?.count || 0;
-      if (count > 0) {
-        throw new AppError(
-          "CLIENT_HAS_INVOICES",
-          `Cannot delete client. This client is linked to ${count} invoice${count > 1 ? "s" : ""}.`
-        );
-      }
-
-      db.delete(clients).where(eq(clients.id, id)).run();
+      const result = removeClient(id);
       broadcastDataChanged();
-      return { success: true };
+      return result;
     } catch (err) {
       throw formatError(err);
     }

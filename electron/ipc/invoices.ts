@@ -2,7 +2,23 @@ import { ipcMain } from "electron";
 import crypto from "crypto";
 import { eq, desc, asc } from "drizzle-orm";
 import { getDb } from "../db";
-import { clients, invoices, settings, catalogItems, catalogServices, invoiceItems, invoicePayments } from "../db/schema";
+import {
+  clients,
+  invoices,
+  settings,
+  catalogItems,
+  catalogServices,
+  invoiceItems,
+  invoicePayments,
+  invoicePdfExports,
+  attachments,
+  tasks,
+  subtasks,
+  taskHistory,
+  workOrders,
+  vendorPayouts,
+  expenses,
+} from "../db/schema";
 import { newInvoiceSchema, invoicePatchSchema, recordPaymentSchema, promoteInvoiceClientSchema } from "../validation";
 import { getOrCreateSettings } from "./settings";
 import { AppError, formatError } from "./errors";
@@ -443,6 +459,132 @@ export function promoteInvoiceClient(invoiceId: string): typeof clients.$inferSe
   return db.select().from(clients).where(eq(clients.id, newClientId)).get()!;
 }
 
+export function removeInvoice(id: string): { success: boolean } {
+  const db = getDb();
+  return db.transaction((tx) => {
+    const existing = tx.select().from(invoices).where(eq(invoices.id, id)).get();
+    if (!existing) {
+      throw new AppError("NOT_FOUND", "Invoice not found.");
+    }
+
+    // 1. Clean up payments and their receipt attachments
+    const payments = tx
+      .select({ id: invoicePayments.id })
+      .from(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, id))
+      .all();
+
+    for (const payment of payments) {
+      tx.delete(attachments)
+        .where(eq(attachments.paymentId, payment.id))
+        .run();
+    }
+
+    tx.delete(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, id))
+      .run();
+
+    // 2. Clean up any work orders directly linked to this invoice, including their payouts and attachments
+    const linkedWorkOrders = tx
+      .select({ id: workOrders.id, taskId: workOrders.taskId })
+      .from(workOrders)
+      .where(eq(workOrders.invoiceId, id))
+      .all();
+
+    for (const wo of linkedWorkOrders) {
+      const payouts = tx
+        .select({ id: vendorPayouts.id })
+        .from(vendorPayouts)
+        .where(eq(vendorPayouts.workOrderId, wo.id))
+        .all();
+
+      for (const payout of payouts) {
+        tx.delete(attachments)
+          .where(eq(attachments.payoutId, payout.id))
+          .run();
+      }
+
+      tx.delete(vendorPayouts)
+        .where(eq(vendorPayouts.workOrderId, wo.id))
+        .run();
+
+      tx.delete(workOrders)
+        .where(eq(workOrders.id, wo.id))
+        .run();
+    }
+
+    // 3. Find any tasks linked to this invoice OR tasks linked to this invoice's items
+    const items = tx
+      .select({ id: invoiceItems.id })
+      .from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, id))
+      .all();
+    const itemIds = new Set(items.map((i) => i.id));
+
+    const allTasks = tx.select().from(tasks).all();
+    const tasksToDelete = allTasks.filter(
+      (t) => t.invoiceId === id || (t.invoiceItemId && itemIds.has(t.invoiceItemId))
+    );
+
+    for (const task of tasksToDelete) {
+      const taskWorkOrders = tx
+        .select({ id: workOrders.id })
+        .from(workOrders)
+        .where(eq(workOrders.taskId, task.id))
+        .all();
+
+      for (const two of taskWorkOrders) {
+        const payouts = tx
+          .select({ id: vendorPayouts.id })
+          .from(vendorPayouts)
+          .where(eq(vendorPayouts.workOrderId, two.id))
+          .all();
+
+        for (const payout of payouts) {
+          tx.delete(attachments)
+            .where(eq(attachments.payoutId, payout.id))
+            .run();
+        }
+
+        tx.delete(vendorPayouts)
+          .where(eq(vendorPayouts.workOrderId, two.id))
+          .run();
+
+        tx.delete(workOrders)
+          .where(eq(workOrders.id, two.id))
+          .run();
+      }
+
+      tx.delete(subtasks).where(eq(subtasks.taskId, task.id)).run();
+      tx.delete(taskHistory).where(eq(taskHistory.taskId, task.id)).run();
+      tx.delete(tasks).where(eq(tasks.id, task.id)).run();
+    }
+
+    // 4. Unlink any expenses linked to this invoice (preserves the general expense)
+    tx.update(expenses)
+      .set({ invoiceId: null })
+      .where(eq(expenses.invoiceId, id))
+      .run();
+
+    // 5. Delete invoice PDF export records
+    tx.delete(invoicePdfExports)
+      .where(eq(invoicePdfExports.invoiceId, id))
+      .run();
+
+    // 6. Delete invoice items
+    tx.delete(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, id))
+      .run();
+
+    // 7. Finally delete the invoice
+    tx.delete(invoices)
+      .where(eq(invoices.id, id))
+      .run();
+
+    return { success: true };
+  });
+}
+
 export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle("invoices:list", async (_event, filter?: { clientId?: string }) => {
     try {
@@ -559,13 +701,56 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
           throw new AppError("NOT_FOUND", "Invoice not found.");
         }
 
-        const paidCents = status === "PAID" ? existing.amountCents : existing.paidCents;
+        const now = new Date().toISOString();
+        let targetAdvance = existing.advanceCents;
+        if (status === "ADVANCE_PAID" && targetAdvance <= 0) {
+          targetAdvance = Math.round(existing.amountCents * 0.5);
+        }
+
+        const allPayments = db
+          .select()
+          .from(invoicePayments)
+          .where(eq(invoicePayments.invoiceId, id))
+          .all();
+        const currentPaid = allPayments.reduce((sum, p) => sum + p.amountCents, 0);
+
+        if (status === "ADVANCE_PAID" && currentPaid < targetAdvance) {
+          const needed = targetAdvance - currentPaid;
+          db.insert(invoicePayments).values({
+            id: crypto.randomUUID(),
+            invoiceId: id,
+            amountCents: needed,
+            currency: existing.currency,
+            receivedAt: now,
+            reference: "Advance payment",
+            requestId: crypto.randomUUID(),
+          }).run();
+        } else if (status === "PAID" && currentPaid < existing.amountCents) {
+          const needed = existing.amountCents - currentPaid;
+          db.insert(invoicePayments).values({
+            id: crypto.randomUUID(),
+            invoiceId: id,
+            amountCents: needed,
+            currency: existing.currency,
+            receivedAt: now,
+            reference: "Full payment settlement",
+            requestId: crypto.randomUUID(),
+          }).run();
+        }
+
+        const updatedPayments = db
+          .select()
+          .from(invoicePayments)
+          .where(eq(invoicePayments.invoiceId, id))
+          .all();
+        const newPaidCents = updatedPayments.reduce((sum, p) => sum + p.amountCents, 0);
 
         db.update(invoices)
           .set({
             status,
-            paidCents,
-            updatedAt: new Date().toISOString(),
+            advanceCents: targetAdvance,
+            paidCents: newPaidCents,
+            updatedAt: now,
           })
           .where(eq(invoices.id, id))
           .run();
@@ -581,10 +766,9 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("invoices:remove", async (_event, id: string) => {
     try {
-      const db = getDb();
-      db.delete(invoices).where(eq(invoices.id, id)).run();
+      const result = removeInvoice(id);
       broadcastDataChanged();
-      return { success: true };
+      return result;
     } catch (err) {
       throw formatError(err);
     }

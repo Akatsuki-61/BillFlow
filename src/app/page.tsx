@@ -222,7 +222,7 @@ export default function DashboardPage() {
         {toastMessage && (
           <MotionSurface
             kind="toast"
-            className="fixed bottom-6 right-6 z-50 flex items-center justify-between gap-3 px-4 py-2.5 bg-toast text-white rounded-xl shadow-xl text-[12px] font-medium min-w-[280px]"
+            className="fixed bottom-6 right-6 z-[9999] flex items-center justify-between gap-3 px-4 py-2.5 bg-toast text-white rounded-xl shadow-xl text-[12px] font-medium min-w-[280px]"
           >
             <div className="flex items-center gap-2">
               <CheckCircle2 className="text-success-bright text-[13px] shrink-0" />

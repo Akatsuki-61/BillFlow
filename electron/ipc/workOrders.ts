@@ -423,17 +423,17 @@ export function removeWorkOrderPayout(
     throw new AppError("NOT_FOUND", "Work order not found");
   }
 
-  db.transaction(() => {
+  db.transaction((tx) => {
     // Delete any attachments associated with this payout
-    const payouts = db
+    const payouts = tx
       .select()
       .from(vendorPayouts)
       .where(eq(vendorPayouts.workOrderId, workOrderId))
       .all();
     for (const p of payouts) {
-      db.delete(attachments).where(eq(attachments.payoutId, p.id)).run();
+      tx.delete(attachments).where(eq(attachments.payoutId, p.id)).run();
     }
-    db.delete(vendorPayouts)
+    tx.delete(vendorPayouts)
       .where(eq(vendorPayouts.workOrderId, workOrderId))
       .run();
   });
@@ -476,27 +476,27 @@ export function removeWorkOrder(
     throw new AppError("NOT_FOUND", "Work order not found");
   }
 
-  db.transaction(() => {
+  db.transaction((tx) => {
     // 1. Remove payouts and attachments
-    const payouts = db
+    const payouts = tx
       .select()
       .from(vendorPayouts)
       .where(eq(vendorPayouts.workOrderId, id))
       .all();
     for (const p of payouts) {
-      db.delete(attachments).where(eq(attachments.payoutId, p.id)).run();
+      tx.delete(attachments).where(eq(attachments.payoutId, p.id)).run();
     }
-    db.delete(vendorPayouts)
+    tx.delete(vendorPayouts)
       .where(eq(vendorPayouts.workOrderId, id))
       .run();
 
     // 2. Remove work order
-    db.delete(workOrders)
+    tx.delete(workOrders)
       .where(eq(workOrders.id, id))
       .run();
 
     // 3. Reset task outsource state
-    db.update(tasks)
+    tx.update(tasks)
       .set({
         isOutsourced: false,
         outsourcedVendor: null,

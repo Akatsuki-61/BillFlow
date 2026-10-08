@@ -22,7 +22,7 @@ export function getAboutIconPath(): string | undefined {
 export function setupAboutPanel(): void {
   if (process.platform !== "darwin") return;
   const iconPath = getAboutIconPath();
-  const currentVersion = app?.getVersion ? app.getVersion() : "0.1.1";
+  const currentVersion = app?.getVersion ? app.getVersion() : "0.1.2";
   app.setAboutPanelOptions({
     applicationName: "BillFlow",
     applicationVersion: currentVersion,
@@ -58,7 +58,7 @@ export function buildMenuTemplate(
         label: "Check for Updates...",
         click: () => {
           const win = getMainWindow ? getMainWindow() : null;
-          const currentVersion = app?.getVersion ? app.getVersion() : "0.1.1";
+          const currentVersion = app?.getVersion ? app.getVersion() : "0.1.2";
           const options = {
             type: "info" as const,
             title: "Check for Updates",

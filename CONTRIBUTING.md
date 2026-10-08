@@ -20,7 +20,7 @@ The repository uses dedicated member branches alongside feature branches:
 | :--- | :--- |
 | `main` | Production-ready releases. Protected branch. |
 | `Nipun` | Architecture, Electron shell, database, invoicing, PDF export, analytics, tasks. |
-| `Lahiru` | Navigation shell, clients, delivery links, expenses ledger. |
+| `Lahiru` | Navigation shell, clients, delivery links, expenses ledger, lead QA & bug hunting. |
 | `Binuka` | Outsourcing work orders, vendor payouts, financial metrics. |
 | `Sandika` | Catalog management, bulk import, styling reconciliation. |
 

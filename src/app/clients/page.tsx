@@ -24,6 +24,7 @@ import {
   Receipt,
   Edit3,
   Search,
+  RotateCcw,
 } from "lucide-react";
 import { useClients, useInvoices, useData } from "@/lib/data/DataProvider";
 import {
@@ -80,6 +81,59 @@ function ClientsContent() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmittingClient, setIsSubmittingClient] = useState(false);
+  const [hasClientDraft, setHasClientDraft] = useState(false);
+
+  const isClientFormDirty = () => {
+    return Boolean(
+      formData.name.trim() ||
+      formData.email.trim() ||
+      formData.phone.trim() ||
+      formData.contactPerson.trim() ||
+      formData.driveUrl.trim()
+    );
+  };
+
+  const saveClientDraft = () => {
+    if (!isClientFormDirty()) return;
+    try {
+      localStorage.setItem("billflow_draft_client", JSON.stringify(formData));
+      setHasClientDraft(true);
+    } catch {}
+  };
+
+  const clearClientDraft = () => {
+    try {
+      localStorage.removeItem("billflow_draft_client");
+    } catch {}
+    setHasClientDraft(false);
+  };
+
+  const handleRestoreClientDraft = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_client");
+      if (!saved) return;
+      const draft = JSON.parse(saved);
+      setFormData((prev) => ({ ...prev, ...draft }));
+      showToast("Draft restored");
+    } catch {}
+  };
+
+  const closeAddClientModal = (saveDraft = true) => {
+    if (saveDraft) {
+      saveClientDraft();
+    }
+    setIsAddModalOpen(false);
+  };
+
+  const openAddClientModal = () => {
+    try {
+      const saved = localStorage.getItem("billflow_draft_client");
+      setHasClientDraft(Boolean(saved));
+    } catch {
+      setHasClientDraft(false);
+    }
+    setIsAddModalOpen(true);
+  };
 
   // Edit Client Form State
   const [editingClient, setEditingClient] = useState<ClientWithStats | null>(null);
@@ -142,7 +196,8 @@ function ClientsContent() {
         driveUrl: formData.driveUrl.trim() || undefined,
       });
 
-      setIsAddModalOpen(false);
+      clearClientDraft();
+      closeAddClientModal(false);
       setFormData({
         name: "",
         category: "Enterprise",
@@ -302,7 +357,7 @@ function ClientsContent() {
         {notification && (
           <MotionSurface
             kind="toast"
-            className={`fixed top-14 right-6 z-[100] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+            className={`fixed top-14 right-6 z-[9999] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
               notification.type === "error"
                 ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
                 : "bg-surface-neutral-900 border-line-neutral-700 text-white"
@@ -328,7 +383,7 @@ function ClientsContent() {
             variant="primary"
             onClick={() => {
               setFormErrors({});
-              setIsAddModalOpen(true);
+              openAddClientModal();
             }}
           >
             <div className="w-4 h-4 flex items-center justify-center">
@@ -394,7 +449,7 @@ function ClientsContent() {
                 variant="primary"
                 onClick={() => {
                   setFormErrors({});
-                  setIsAddModalOpen(true);
+                  openAddClientModal();
                 }}
                 className="mt-5"
               >
@@ -632,7 +687,7 @@ function ClientsContent() {
             kind="dialog"
             className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           >
-            <MotionSurface onDismiss={() => setIsAddModalOpen(false)}
+            <MotionSurface onDismiss={() => closeAddClientModal()}
               kind="panel"
               className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
             >
@@ -650,14 +705,29 @@ function ClientsContent() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsAddModalOpen(false)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {hasClientDraft && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="small"
+                      onClick={handleRestoreClientDraft}
+                      className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                      title="Restore previously typed client draft"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restore</span>
+                    </Button>
+                  )}
+                  <Button
+                    aria-label="Close"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => closeAddClientModal()}
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
 
               <form
@@ -831,7 +901,7 @@ function ClientsContent() {
                   <Button
                     variant="ghost"
                     type="button"
-                    onClick={() => setIsAddModalOpen(false)}
+                    onClick={() => closeAddClientModal()}
                   >
                     Cancel
                   </Button>
