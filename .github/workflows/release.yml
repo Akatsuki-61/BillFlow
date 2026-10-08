@@ -42,7 +42,7 @@ jobs:
 
       - name: Package macOS DMG
         if: runner.os == 'macOS'
-        run: npx electron-builder --mac --universal
+        run: npx electron-builder --mac --arm64 --x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
