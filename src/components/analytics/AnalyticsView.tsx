@@ -229,7 +229,7 @@ export default function AnalyticsView() {
             All analytics widgets are currently hidden
           </h3>
           <p className="text-xs text-content-neutral-500 mt-1 max-w-md mx-auto">
-            You can re-enable any of the 18 business metrics, charts, and feeds
+            You can re-enable any of the {WIDGET_CATALOG.length} business metrics, charts, and feeds
             from the widget customizer.
           </p>
           <Button
@@ -237,7 +237,7 @@ export default function AnalyticsView() {
             onClick={showAllAnalytics}
             className="mt-4"
           >
-            Show All 18 Widgets
+            Show All ({WIDGET_CATALOG.length}) Widgets
           </Button>
         </div>
       ) : (
@@ -475,7 +475,7 @@ export default function AnalyticsView() {
                     type="button"
                     onClick={showAllAnalytics}
                   >
-                    Show All (18)
+                    Show All ({WIDGET_CATALOG.length})
                   </Button>
                   <Button
                     variant="primary"

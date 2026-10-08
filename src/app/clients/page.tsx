@@ -23,6 +23,7 @@ import {
   ArrowRight,
   Receipt,
   Edit3,
+  Search,
 } from "lucide-react";
 import { useClients, useInvoices, useData } from "@/lib/data/DataProvider";
 import {
@@ -58,6 +59,7 @@ function ClientsContent() {
   const [selectedClientForBill, setSelectedClientForBill] =
     useState<ClientWithStats | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Notifications / Toasts
   const [notification, setNotification] = useState<{
@@ -123,6 +125,7 @@ function ClientsContent() {
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
+      showToast(errors.email || errors.name || "Please resolve form errors", "error");
       return;
     }
 
@@ -192,6 +195,7 @@ function ClientsContent() {
 
     if (Object.keys(errors).length > 0) {
       setEditFormErrors(errors);
+      showToast(errors.email || errors.name || "Please resolve form errors", "error");
       return;
     }
 
@@ -279,6 +283,18 @@ function ClientsContent() {
     ? allInvoices.filter((i) => i.clientId === selectedClientForHistory.id)
     : [];
 
+  // Filter clients by search query
+  const filteredClients = clients.filter((c) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.email.toLowerCase().includes(q) ||
+      (c.contactPerson && c.contactPerson.toLowerCase().includes(q)) ||
+      (c.category && c.category.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <div className="workspace-page motion-page">
       {/* Toast Notification */}
@@ -286,7 +302,7 @@ function ClientsContent() {
         {notification && (
           <MotionSurface
             kind="toast"
-            className={`fixed top-14 right-6 z-50 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+            className={`fixed top-14 right-6 z-[100] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
               notification.type === "error"
                 ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
                 : "bg-surface-neutral-900 border-line-neutral-700 text-white"
@@ -326,6 +342,36 @@ function ClientsContent() {
         </div>
       </PageHeader>
 
+      {/* Search & Directory Summary */}
+      {clients.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search clients by name, email, contact..."
+              className="ui-field ui-search-input w-full pl-9 pr-8 text-xs rounded-xl"
+              style={{ paddingLeft: "38px" }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="text-xs text-content-neutral-500 font-medium">
+            Showing {filteredClients.length} of {clients.length} clients
+          </div>
+        </div>
+      )}
+
       {/* Client Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
@@ -357,8 +403,22 @@ function ClientsContent() {
               </Button>
             </EmptyState>
           </div>
+        ) : filteredClients.length === 0 ? (
+          <div className="ui-card col-span-full p-12 text-center">
+            <p className="text-sm text-content-neutral-600">
+              No clients found matching &ldquo;{searchQuery}&rdquo;.
+            </p>
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={() => setSearchQuery("")}
+              className="mt-3 text-xs"
+            >
+              Clear Search
+            </Button>
+          </div>
         ) : (
-          clients.map((client) => {
+          filteredClients.map((client) => {
             const letter = client.name.trim().charAt(0).toUpperCase();
 
             return (
@@ -602,11 +662,12 @@ function ClientsContent() {
 
               <form
                 onSubmit={handleAddClient}
+                noValidate
                 className="p-6 space-y-4 text-xs font-medium text-content-neutral-700"
               >
                 <div>
                   <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                    Client / Company Name *
+                    Client / Company Name <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -650,7 +711,7 @@ function ClientsContent() {
 
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Billing Currency *
+                      Billing Currency <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <select
                       value={formData.currency}
@@ -712,7 +773,7 @@ function ClientsContent() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Email Address *
+                      Email Address <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="email"
@@ -823,11 +884,11 @@ function ClientsContent() {
                 </Button>
               </div>
 
-              <form onSubmit={handleUpdateClient} className="p-6 space-y-4 text-xs font-medium text-content-neutral-700">
+              <form onSubmit={handleUpdateClient} noValidate className="p-6 space-y-4 text-xs font-medium text-content-neutral-700">
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Client Name *
+                      Client Name <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="text"
@@ -897,7 +958,7 @@ function ClientsContent() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Email Address *
+                      Email Address <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="email"

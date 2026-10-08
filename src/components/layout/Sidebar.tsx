@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -15,10 +15,9 @@ import {
   BarChart3,
   Settings,
   HelpCircle,
-  Plus,
-  Check,
 } from "lucide-react";
-import { useWidgetContext } from "@/context/WidgetContext";
+
+import { isNavActive } from "@/lib/navigation";
 
 // Interface for sidebar navigation items
 interface NavItem {
@@ -51,9 +50,6 @@ const footerNavItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { pinToDashboard, isDragging } = useWidgetContext();
-  const [isDragOverDashboard, setIsDragOverDashboard] = useState(false);
-  const [showSuccessPulse, setShowSuccessPulse] = useState(false);
 
   return (
     <aside className="workspace-sidebar h-full flex flex-col justify-between bg-surface border-r border-line-neutral-200/70 select-none z-30 app-no-drag">
@@ -95,58 +91,17 @@ export default function Sidebar() {
         <nav aria-label="Main Navigation" className="px-3.5 py-2 space-y-1">
           {mainNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname?.startsWith(item.href) || false;
-
-            const isDashboard = item.id === "dashboard";
+            const isActive = isNavActive(pathname, item.href);
 
             return (
               <Link
                 key={item.id}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                onDragOver={
-                  isDashboard
-                    ? (e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "copy";
-                        setIsDragOverDashboard(true);
-                      }
-                    : undefined
-                }
-                onDragLeave={
-                  isDashboard
-                    ? () => {
-                        setIsDragOverDashboard(false);
-                      }
-                    : undefined
-                }
-                onDrop={
-                  isDashboard
-                    ? (e) => {
-                        e.preventDefault();
-                        setIsDragOverDashboard(false);
-                        const widgetId = e.dataTransfer.getData("text/plain");
-                        if (widgetId) {
-                          pinToDashboard(widgetId);
-                          setShowSuccessPulse(true);
-                          setTimeout(() => setShowSuccessPulse(false), 1400);
-                        }
-                      }
-                    : undefined
-                }
-                className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left outline-none cursor-pointer ${
-                  isDashboard && isDragOverDashboard
-                    ? "bg-accent-soft text-accent ring-2 ring-accent scale-[1.03] shadow-md font-semibold"
-                    : isDashboard && showSuccessPulse
-                      ? "bg-surface-emerald-50 text-content-emerald-800 ring-2 ring-line-emerald-500 scale-[1.03] shadow-md font-semibold"
-                      : isDashboard && isDragging
-                        ? "bg-surface-purple-50/70 text-content-purple-900 border border-dashed border-accent/50 animate-pulse"
-                        : isActive
-                          ? "bg-accent-soft/60 text-content-neutral-950 font-semibold"
-                          : "text-content-neutral-600 hover:text-content-neutral-900 hover:bg-surface-neutral-100/70"
+                className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left outline-none cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 ${
+                  isActive
+                    ? "bg-accent-soft/60 text-content-neutral-950 font-semibold"
+                    : "text-content-neutral-600 hover:text-content-neutral-900 hover:bg-surface-neutral-100/70"
                 }`}
               >
                 {/* Lucide animated icon on hover */}
@@ -154,31 +109,13 @@ export default function Sidebar() {
                   <Icon
                     strokeWidth={isActive ? 2.2 : 1.9}
                     className={`w-[19px] h-[19px] transition-all duration-200 ease-out group-hover:scale-105 group-hover:-translate-y-px ${
-                      isDashboard && isDragOverDashboard
-                        ? "text-accent scale-110"
-                        : isDashboard && showSuccessPulse
-                          ? "text-content-emerald-600 scale-110"
-                          : isActive
-                            ? "text-accent"
-                            : "text-content-neutral-400 group-hover:text-accent"
+                      isActive
+                        ? "text-accent"
+                        : "text-content-neutral-400 group-hover:text-accent"
                     }`}
                   />
                 </div>
                 <span className="truncate">{item.name}</span>
-
-                {/* Drop Indicator Badges for Dashboard */}
-                {isDashboard && isDragOverDashboard && (
-                  <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent-solid text-white shadow-xs">
-                    <Plus className="w-2.5 h-2.5" />
-                    <span>Drop</span>
-                  </span>
-                )}
-                {isDashboard && showSuccessPulse && (
-                  <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-emerald-600 text-white shadow-xs">
-                    <Check className="w-2.5 h-2.5" />
-                    <span>Pinned</span>
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -189,17 +126,14 @@ export default function Sidebar() {
       <div className="shrink-0 p-3.5 border-t border-line-neutral-100/80 space-y-1">
         {footerNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = item.href.startsWith("/#")
-            ? false
-            : pathname === item.href ||
-              Boolean(pathname?.startsWith(item.href));
+          const isActive = isNavActive(pathname, item.href);
 
           return (
             <Link
               key={item.id}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
-              className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left outline-none cursor-pointer ${
+              className={`group w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left outline-none cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 ${
                 isActive
                   ? "bg-accent-soft/60 text-content-neutral-950 font-semibold"
                   : "text-content-neutral-600 hover:text-content-neutral-900 hover:bg-surface-neutral-100/70"

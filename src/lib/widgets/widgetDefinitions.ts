@@ -31,8 +31,8 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
   {
     id: "active-clients",
-    title: "Active Client Accounts",
-    description: "Retainers, enterprise accounts, and project-based clients",
+    title: "Total Clients",
+    description: "Total client directory with active and inactive breakdown",
     category: "clients",
     size: "metric",
     defaultOnDashboard: true,
@@ -83,7 +83,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "financial",
     size: "metric",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "cashflow-runway",
@@ -92,7 +92,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "financial",
     size: "metric",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "client-concentration",
@@ -101,7 +101,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "clients",
     size: "metric",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "effective-hourly-rate",
@@ -110,7 +110,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "operations",
     size: "metric",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
 
   // Charts & Visualizations
@@ -148,7 +148,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "portfolio-comparison-chart",
@@ -157,7 +157,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "growth-benchmark-chart",
@@ -166,7 +166,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "audience-growth-chart",
@@ -175,7 +175,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "service-trends-line-chart",
@@ -184,7 +184,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "itemized-volume-bar-chart",
@@ -193,7 +193,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
 
   // 3 Operational Lists & Feeds
@@ -204,7 +204,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "activity",
     size: "medium",
     defaultOnDashboard: false,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
   {
     id: "recent-invoices",
@@ -222,7 +222,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     category: "activity",
     size: "wide",
     defaultOnDashboard: true,
-    defaultOnAnalytics: true,
+    defaultOnAnalytics: false,
   },
 ];
 
@@ -230,4 +230,8 @@ export const DEFAULT_DASHBOARD_WIDGET_IDS = WIDGET_CATALOG.filter(
   (w) => w.defaultOnDashboard,
 ).map((w) => w.id);
 
-export const DEFAULT_ANALYTICS_WIDGET_IDS = WIDGET_CATALOG.map((w) => w.id);
+export const DEFAULT_ANALYTICS_WIDGET_IDS = WIDGET_CATALOG.filter(
+  (w) => w.defaultOnAnalytics,
+).map((w) => w.id);
+
+export const ALL_ANALYTICS_WIDGET_IDS = WIDGET_CATALOG.map((w) => w.id);

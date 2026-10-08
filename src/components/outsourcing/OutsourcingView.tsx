@@ -1640,7 +1640,7 @@ export default function OutsourcingView() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[12px] font-semibold text-text-secondary">
-                      Assigned Subcontractor *
+                      Assigned Subcontractor <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <button
                       type="button"
@@ -1676,7 +1676,7 @@ export default function OutsourcingView() {
                     <div className="p-3.5 rounded-xl bg-surface-neutral-50 border border-line-neutral-200 space-y-3">
                       <div>
                         <label className="block text-[11px] font-semibold text-content-neutral-700 mb-1">
-                          Contractor / Agency Name *
+                          Contractor / Agency Name <span className="text-content-rose-500 font-bold">*</span>
                         </label>
                         <input
                           type="text"
@@ -1693,7 +1693,7 @@ export default function OutsourcingView() {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[11px] font-semibold text-content-neutral-700 mb-1">
-                            Primary Specialty *
+                            Primary Specialty <span className="text-content-rose-500 font-bold">*</span>
                           </label>
                           <input
                             type="text"
@@ -1753,7 +1753,7 @@ export default function OutsourcingView() {
                 {!searchParams.get("taskId") && tasks.length > 0 && (
                   <div>
                     <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                      Sprint Deliverable Task *
+                      Sprint Deliverable Task <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <select
                       value={woTaskId}
@@ -1787,7 +1787,7 @@ export default function OutsourcingView() {
                 {/* Scope Description */}
                 <div>
                   <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                    Deliverable Scope & Task Description *
+                    Deliverable Scope & Task Description <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <textarea
                     rows={2}
@@ -1805,7 +1805,7 @@ export default function OutsourcingView() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                      Agreed Contractor Fee *
+                      Agreed Contractor Fee <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="number"
@@ -1822,7 +1822,7 @@ export default function OutsourcingView() {
 
                   <div>
                     <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                      Payable Currency *
+                      Payable Currency <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <select
                       value={woCurrency}
@@ -1933,7 +1933,7 @@ export default function OutsourcingView() {
               <form onSubmit={handleAddVendor} className="p-6 space-y-4">
                 <div>
                   <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                    Vendor / Contractor Name *
+                    Vendor / Contractor Name <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -1950,7 +1950,7 @@ export default function OutsourcingView() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                      Primary Service / Specialty *
+                      Primary Service / Specialty <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="text"
@@ -2074,7 +2074,7 @@ export default function OutsourcingView() {
               <form onSubmit={handleAddClient} className="p-6 space-y-4">
                 <div>
                   <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                    Client Organization Name *
+                    Client Organization Name <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -2090,7 +2090,7 @@ export default function OutsourcingView() {
 
                 <div>
                   <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                    Email Address *
+                    Email Address <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"

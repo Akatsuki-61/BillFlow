@@ -280,8 +280,14 @@ export function WidgetRenderer({
     return Math.round((netProfitCents / totalRevenueCents) * 100);
   }, [totalRevenueCents, netProfitCents]);
 
-  // Active Clients count
-  const activeClientsCount = dashboard?.activeClients ?? clients.length;
+  // Total & Active Clients count
+  const totalClientsCount = clients.length;
+  const activeClientsCount = useMemo(() => {
+    return clients.filter(
+      (c) => c.invoicesCount > 0 || c.outstandingBalanceCents > 0,
+    ).length;
+  }, [clients]);
+  const inactiveClientsCount = Math.max(0, totalClientsCount - activeClientsCount);
 
   // Top Client Concentration
   const topClient = useMemo(() => {
@@ -425,7 +431,7 @@ export function WidgetRenderer({
         <div
           className={`ui-card p-4 min-h-[140px] h-full flex flex-col justify-between rounded-2xl transition-all ${
             tone === "accent"
-              ? "border-line-purple-200/80 bg-surface-purple-50/20"
+              ? "border-border-accent-soft bg-accent-soft/20"
               : tone === "warning"
                 ? "border-line-amber-200/80 bg-surface-amber-50/20"
                 : ""
@@ -435,7 +441,7 @@ export function WidgetRenderer({
             <span className="text-[11px] font-medium text-content-neutral-500 block truncate">
               {label}
             </span>
-            <div className="font-serif text-xl sm:text-2xl font-semibold text-content-neutral-900 mt-1.5 tracking-tight truncate">
+            <div className="font-serif text-lg sm:text-xl font-semibold text-content-neutral-900 mt-1.5 tracking-tight truncate">
               {value}
             </div>
           </div>
@@ -509,7 +515,7 @@ export function WidgetRenderer({
           "Pending Receivables",
           pendingReceivablesStr,
           <>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-amber-50 text-content-amber-800 border-line-amber-200/60">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-purple-50 text-content-purple-700 border-line-purple-200/60">
               {pendingCount} pending
             </span>
             <span>
@@ -518,24 +524,28 @@ export function WidgetRenderer({
                 : "invoices awaiting payment"}
             </span>
           </>,
-          "warning",
+          "accent",
           `${pendingCount} pending`,
         );
 
-      // 4. Active Clients
+      // 4. Clients Overview
       case "active-clients":
         return renderMetric(
-          "Active Client Accounts",
-          String(activeClientsCount),
+          "Total Clients",
+          String(totalClientsCount),
           <>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-surface-blue-50 text-content-blue-700 border-line-blue-200/60">
               <Briefcase className="w-3 h-3" />
               {activeClientsCount} active
             </span>
-            <span>client accounts & retainers</span>
+            <span>
+              {inactiveClientsCount > 0
+                ? `· ${inactiveClientsCount} inactive`
+                : "all active"}
+            </span>
           </>,
           "default",
-          `${activeClientsCount} accounts`,
+          `${activeClientsCount} active / ${totalClientsCount} total`,
         );
 
       // 5. Outsourced Costs
@@ -792,7 +802,7 @@ export function WidgetRenderer({
               <svg
                 viewBox="0 0 540 170"
                 className="analytics-creative-svg"
-                preserveAspectRatio="none"
+                preserveAspectRatio="xMidYMid meet"
               >
                 <defs>
                   <linearGradient id="revBarGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1497,16 +1507,11 @@ export function WidgetRenderer({
       }`}
     >
       {/* Quick Actions Toolbar on Dashboard:
-          Displays on card hover (or persistently in Customize Layout mode).
-          Offers instant Remove from Dashboard (X), Resize toggle (Square vs Standard),
-          and directional reorder buttons (Move Left / Right). */}
-      {source === "dashboard" && (
+          Displays only when in Customize Layout mode (isEditing) to prevent
+          overlapping card headers, links, and 'All' buttons during normal browsing. */}
+      {source === "dashboard" && isEditing && (
         <div
-          className={`absolute top-2 right-2 z-30 flex items-center gap-1 p-1 bg-surface/95 rounded-xl border border-line-neutral-200/90 shadow-md backdrop-blur-xs select-none transition-all duration-150 ${
-            isEditing
-              ? "opacity-100 ring-1 ring-line-purple-300"
-              : "opacity-0 group-hover:opacity-100"
-          }`}
+          className="absolute top-2 right-2 z-30 flex items-center gap-1 p-1 bg-surface/95 rounded-xl border border-line-neutral-200/90 shadow-md backdrop-blur-xs select-none ring-1 ring-line-purple-300"
         >
           {isEditing && onMoveLeft && (
             <button

@@ -197,13 +197,28 @@ export default function SupportPage() {
     };
   }, [getDbPath]);
 
+  const liveSearchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return FAQ_DATABASE.filter(
+      (item) =>
+        item.question.toLowerCase().includes(q) ||
+        item.answer.toLowerCase().includes(q),
+    );
+  }, [searchQuery]);
+
+  const effectiveExpandedId = searchQuery.trim()
+    ? (expandedId && liveSearchResults.some((f) => f.id === expandedId)
+        ? expandedId
+        : liveSearchResults[0]?.id || null)
+    : expandedId;
+
   const filteredFAQs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return FAQ_DATABASE.filter((item) => {
       const matchesCategory =
         selectedCategory === "all" || item.category === selectedCategory;
-      if (!matchesCategory) return false;
-      if (!query) return true;
+      if (!query) return matchesCategory;
       return (
         item.question.toLowerCase().includes(query) ||
         item.answer.toLowerCase().includes(query)
@@ -323,7 +338,8 @@ export default function SupportPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search guides (e.g., advance payment, PDF folder, task timer, database)..."
-              className="ui-field w-full pl-10 pr-10 border border-line-neutral-200 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-sm rounded-xl"
+              className="ui-field ui-search-input w-full pl-10 pr-10 border border-line-neutral-200 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-sm rounded-xl"
+              style={{ paddingLeft: "40px" }}
             />
             {searchQuery && (
               <button
@@ -336,6 +352,57 @@ export default function SupportPage() {
               </button>
             )}
           </div>
+
+          {searchQuery.trim() && (
+            <div className="bg-surface rounded-xl border border-line-neutral-200/90 shadow-md p-3.5 max-h-72 overflow-y-auto space-y-2 mt-2">
+              <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-content-neutral-500 uppercase tracking-wider">
+                <span>
+                  {liveSearchResults.length} {liveSearchResults.length === 1 ? "guide found" : "guides found"} for &ldquo;{searchQuery}&rdquo;
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-accent hover:underline lowercase font-medium cursor-pointer"
+                >
+                  Clear search
+                </button>
+              </div>
+
+              {liveSearchResults.length === 0 ? (
+                <div className="py-4 text-center text-xs text-content-neutral-500">
+                  No matching guides found. Try searching for &ldquo;advance&rdquo;, &ldquo;PDF&rdquo;, &ldquo;tasks&rdquo;, or &ldquo;database&rdquo;.
+                </div>
+              ) : (
+                <div className="divide-y divide-line-neutral-100">
+                  {liveSearchResults.map((faq) => (
+                    <button
+                      key={faq.id}
+                      type="button"
+                      onClick={() => {
+                        setExpandedId(faq.id);
+                        setSelectedCategory("all");
+                        const el = document.getElementById(`faq-${faq.id}`);
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
+                      className="w-full text-left py-2.5 px-2 rounded-lg hover:bg-surface-neutral-50 transition-colors group cursor-pointer block"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-content-neutral-900 group-hover:text-accent">
+                          {faq.question}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-600 shrink-0">
+                          {faq.category}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-content-neutral-500 mt-1 line-clamp-2 leading-relaxed">
+                        {faq.answer}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Subtle background decoration */}
@@ -603,10 +670,11 @@ export default function SupportPage() {
             </div>
           ) : (
             filteredFAQs.map((faq) => {
-              const isOpen = expandedId === faq.id;
+              const isOpen = effectiveExpandedId === faq.id;
               return (
                 <div
                   key={faq.id}
+                  id={`faq-${faq.id}`}
                   className={`ui-card rounded-xl border transition-all ${
                     isOpen
                       ? "border-line-purple-300 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.1),0px_1px_0px_0px_rgba(25,28,33,0.02),0px_0px_0px_1px_rgba(25,28,33,0.08)] bg-surface"

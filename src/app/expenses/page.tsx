@@ -27,6 +27,7 @@ import {
   DollarSign,
   Sparkles,
   Server,
+  Search,
   Receipt,
   Trash2,
 } from "lucide-react";
@@ -37,8 +38,10 @@ import { formatCents, formatDateDisplay } from "@/lib/format";
 
 export default function ExpensesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All Categories");
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [deletingExpense, setDeletingExpense] = useState<{ id: string; merchant: string } | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
   const {
@@ -78,15 +81,15 @@ export default function ExpensesPage() {
     }
   };
 
-  const handleDeleteExpense = async (id: string, merchant: string) => {
-    if (confirm(`Are you sure you want to delete expense for ${merchant}?`)) {
-      try {
-        await deleteExpense(id);
-        showToast(`Expense for ${merchant} deleted.`);
-      } catch (err) {
-        console.error(err);
-        showToast("Failed to delete expense.");
-      }
+  const handleConfirmDelete = async () => {
+    if (!deletingExpense) return;
+    try {
+      await deleteExpense(deletingExpense.id);
+      showToast(`Expense for ${deletingExpense.merchant} deleted.`);
+      setDeletingExpense(null);
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to delete expense.");
     }
   };
 
@@ -209,10 +212,24 @@ export default function ExpensesPage() {
     return <DollarSign className="w-4.5 h-4.5" />;
   };
 
+  const searchedExpenses = useMemo(() => {
+    if (!searchQuery.trim()) return expenses;
+    const q = searchQuery.toLowerCase().trim();
+    return expenses.filter(
+      (e) =>
+        e.merchant.toLowerCase().includes(q) ||
+        (e.description && e.description.toLowerCase().includes(q)) ||
+        e.category.toLowerCase().includes(q),
+    );
+  }, [expenses, searchQuery]);
+
   const itemsPerPage = 8;
   const paginatedExpenses = useMemo(() => {
-    return expenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [expenses, currentPage]);
+    return searchedExpenses.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage,
+    );
+  }, [searchedExpenses, currentPage]);
 
   return (
     <div className="workspace-page motion-page">
@@ -221,7 +238,7 @@ export default function ExpensesPage() {
         {notification && (
           <MotionSurface
             kind="toast"
-            className="fixed top-14 right-6 z-50 bg-surface-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-line-neutral-700"
+            className="fixed top-14 right-6 z-[100] bg-surface-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-line-neutral-700"
           >
             <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
             <span>{notification}</span>
@@ -234,8 +251,33 @@ export default function ExpensesPage() {
         title="Expenses"
         description="Manage and track your business expenditures in the SQLite ledger."
       >
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search expenses..."
+              className="ui-field ui-search-input pl-9 pr-8 text-xs font-medium w-44 sm:w-52 border border-line-neutral-200"
+              style={{ paddingLeft: "38px" }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5 cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-        <div className="flex items-center gap-3">
           <div className="relative">
             <select
               value={selectedCategory}
@@ -412,7 +454,7 @@ export default function ExpensesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteExpense(item.id, item.merchant)}
+                          onClick={() => setDeletingExpense({ id: item.id, merchant: item.merchant })}
                           title="Delete expense"
                         >
                           <Trash2 className="w-4 h-4 text-content-neutral-400 hover:text-red-600 transition-colors" />
@@ -430,9 +472,9 @@ export default function ExpensesPage() {
         <div className="py-4 px-6 border-t border-line-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-content-neutral-400">
           <div>
             Showing{" "}
-            {expenses.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{" "}
-            {Math.min(currentPage * itemsPerPage, expenses.length)} of{" "}
-            {expenses.length} entries
+            {searchedExpenses.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{" "}
+            {Math.min(currentPage * itemsPerPage, searchedExpenses.length)} of{" "}
+            {searchedExpenses.length} entries
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -595,10 +637,11 @@ export default function ExpensesPage() {
                 onSubmit={handleCreateExpense}
                 className="p-6 space-y-4 text-xs font-medium text-content-neutral-700"
               >
+                {/* Row 1: Merchant & Category */}
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Payee / Merchant *
+                      Payee / Merchant <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="text"
@@ -612,55 +655,6 @@ export default function ExpensesPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Amount *
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={formData.currency}
-                        onChange={(e) =>
-                          setFormData({ ...formData, currency: e.target.value as Currency })
-                        }
-                        className="ui-field h-10 w-28 shrink-0 pl-3 pr-8 border border-line-neutral-200 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-accent/40"
-                      >
-                        <option value="LKR">LKR</option>
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                        <option value="GBP">GBP</option>
-                        <option value="CAD">CAD</option>
-                      </select>
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
-                        placeholder="0.00"
-                        value={formData.amount}
-                        onChange={(e) =>
-                          setFormData({ ...formData, amount: e.target.value })
-                        }
-                        className="ui-field h-10 flex-1 px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                    Expense Description
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Monthly developer tools subscription"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                       Category
@@ -686,6 +680,41 @@ export default function ExpensesPage() {
                       <option value="HARDWARE">HARDWARE</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Row 2: Amount & Date */}
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                      Amount <span className="text-content-rose-500 font-bold">*</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={formData.currency}
+                        onChange={(e) =>
+                          setFormData({ ...formData, currency: e.target.value as Currency })
+                        }
+                        className="ui-field h-10 w-24 shrink-0 pl-2.5 pr-6 border border-line-neutral-200 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-accent/40"
+                      >
+                        <option value="LKR">LKR</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                        <option value="CAD">CAD</option>
+                      </select>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        placeholder="0.00"
+                        value={formData.amount}
+                        onChange={(e) =>
+                          setFormData({ ...formData, amount: e.target.value })
+                        }
+                        className="ui-field h-10 w-full flex-1 px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono"
+                      />
+                    </div>
+                  </div>
 
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
@@ -700,6 +729,22 @@ export default function ExpensesPage() {
                       className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
+                </div>
+
+                {/* Row 3: Description */}
+                <div>
+                  <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                    Expense Description
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Monthly developer tools subscription"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                  />
                 </div>
 
                 <div className="p-3.5 bg-surface-neutral-50 rounded-xl border border-line-neutral-100 space-y-3">
@@ -761,6 +806,52 @@ export default function ExpensesPage() {
                   </Button>
                 </div>
               </form>
+            </MotionSurface>
+          </MotionSurface>
+        )}
+      </MotionPresence>
+
+      {/* Delete Expense Confirmation Modal */}
+      <MotionPresence>
+        {deletingExpense && (
+          <MotionSurface
+            kind="dialog"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <MotionSurface
+              onDismiss={() => setDeletingExpense(null)}
+              kind="panel"
+              className="bg-surface rounded-2xl w-full max-w-sm shadow-2xl border border-line-neutral-200 p-6 text-center"
+            >
+              <div className="w-12 h-12 rounded-xl bg-surface-rose-50 text-content-rose-600 flex items-center justify-center mx-auto mb-3.5">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-semibold text-content-neutral-900">
+                Delete Expense?
+              </h3>
+              <p className="text-xs text-content-neutral-500 mt-1">
+                Are you sure you want to delete expense for{" "}
+                <strong className="text-content-neutral-900">
+                  {deletingExpense.merchant}
+                </strong>
+                ? This action cannot be undone.
+              </p>
+              <div className="flex justify-center gap-3 mt-6">
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => setDeletingExpense(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  type="button"
+                  onClick={handleConfirmDelete}
+                >
+                  Delete
+                </Button>
+              </div>
             </MotionSurface>
           </MotionSurface>
         )}

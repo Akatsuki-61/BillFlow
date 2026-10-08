@@ -12,6 +12,7 @@ import {
   WIDGET_CATALOG,
   DEFAULT_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_WIDGET_IDS,
+  ALL_ANALYTICS_WIDGET_IDS,
 } from "@/lib/widgets/widgetDefinitions";
 import { WidgetDisplaySize } from "@/types/widgets";
 
@@ -280,8 +281,8 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   );
 
   const showAllAnalytics = useCallback(() => {
-    setAnalyticsWidgets(DEFAULT_ANALYTICS_WIDGET_IDS);
-    showToast("All 18 analytics widgets enabled");
+    setAnalyticsWidgets(ALL_ANALYTICS_WIDGET_IDS);
+    showToast(`All ${ALL_ANALYTICS_WIDGET_IDS.length} analytics widgets enabled`);
   }, [showToast]);
 
   const resetToDefaults = useCallback(() => {

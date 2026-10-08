@@ -26,6 +26,7 @@ import {
   FolderOpen,
   Paperclip,
   UserPlus,
+  Search,
 } from "lucide-react";
 import {
   useInvoices,
@@ -89,6 +90,7 @@ export default function InvoicesView() {
   const requestId = useRef<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [expiredInvoiceHighlight, setExpiredInvoiceHighlight] = useState<
@@ -273,15 +275,29 @@ export default function InvoicesView() {
     setShowAddInvoiceModal(true);
   };
 
-  // Filter invoices according to selected client and tabs
+  // Filter invoices according to selected client, search query and tabs
   const filteredInvoices = allInvoices.filter((inv) => {
     if (clientFilterParam && inv.clientId !== clientFilterParam) {
       return false;
     }
-    if (activeTab === "Advance Paid") return inv.status === "ADVANCE_PAID";
-    if (activeTab === "Drafts") return inv.status === "DRAFT";
-    if (activeTab === "Overdue") return inv.status === "OVERDUE";
-    if (activeTab === "Paid") return inv.status === "PAID";
+    if (activeTab === "Advance Paid" && inv.status !== "ADVANCE_PAID") return false;
+    if (activeTab === "Drafts" && inv.status !== "DRAFT") return false;
+    if (activeTab === "Overdue" && inv.status !== "OVERDUE") return false;
+    if (activeTab === "Paid" && inv.status !== "PAID") return false;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const codeMatch = inv.code.toLowerCase().includes(q);
+      const clientMatch = inv.clientName.toLowerCase().includes(q);
+      const titleMatch = inv.title?.toLowerCase().includes(q);
+      const itemsMatch = inv.items?.some((it) =>
+        it.description.toLowerCase().includes(q),
+      );
+      if (!codeMatch && !clientMatch && !titleMatch && !itemsMatch) {
+        return false;
+      }
+    }
+
     return true;
   });
 
@@ -861,37 +877,61 @@ export default function InvoicesView() {
           />
         </div>
 
-        {/* Filters and Active Client Chip */}
-        <div className="flex flex-wrap items-center gap-2 self-start">
-          {activeClientFilterObj && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-accent-faint border border-border-accent-soft text-accent text-xs font-semibold rounded-xl">
-              <span>Client: {activeClientFilterObj.name}</span>
-              <Button
-                variant="ghost"
-                size="icon"
+        {/* Filters, Search and Active Client Chip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 w-full">
+          <div className="flex flex-wrap items-center gap-2">
+            {activeClientFilterObj && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-accent-faint border border-border-accent-soft text-accent text-xs font-semibold rounded-xl">
+                <span>Client: {activeClientFilterObj.name}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  type="button"
+                  onClick={() => router.push("/invoices")}
+                  title="Clear filter"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
+
+            <SegmentedControl
+              value={activeTab}
+              onChange={setActiveTab}
+              label="Invoice status"
+              options={(
+                [
+                  "All Invoices",
+                  "Advance Paid",
+                  "Drafts",
+                  "Overdue",
+                  "Paid",
+                ] as FilterTab[]
+              ).map((value) => ({ value, label: value }))}
+            />
+          </div>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search invoices, clients..."
+              className="ui-field ui-search-input w-full pl-9 pr-8 text-xs rounded-xl"
+              style={{ paddingLeft: "38px" }}
+            />
+            {searchQuery && (
+              <button
                 type="button"
-                onClick={() => router.push("/invoices")}
-                title="Clear filter"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5"
+                aria-label="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          )}
-
-          <SegmentedControl
-            value={activeTab}
-            onChange={setActiveTab}
-            label="Invoice status"
-            options={(
-              [
-                "All Invoices",
-                "Advance Paid",
-                "Drafts",
-                "Overdue",
-                "Paid",
-              ] as FilterTab[]
-            ).map((value) => ({ value, label: value }))}
-          />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -906,7 +946,7 @@ export default function InvoicesView() {
                     type="checkbox"
                     checked={isAllSelected}
                     onChange={handleSelectAll}
-                    className="w-4 h-4 rounded border-line-neutral-300 text-content-purple-600 focus:ring-line-purple-500/20 cursor-pointer accent-neutral-900"
+                    className="w-4 h-4 rounded border-line-neutral-300 text-purple-600 focus:ring-purple-500/20 cursor-pointer accent-purple-600"
                     aria-label="Select all invoices"
                   />
                 </th>
@@ -973,7 +1013,7 @@ export default function InvoicesView() {
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleToggleSelect(inv.id)}
-                          className="w-4 h-4 rounded border-line-neutral-300 text-content-purple-600 focus:ring-line-purple-500/20 cursor-pointer accent-neutral-900"
+                          className="w-4 h-4 rounded border-line-neutral-300 text-purple-600 focus:ring-purple-500/20 cursor-pointer accent-purple-600"
                           aria-label={`Select invoice ${inv.code}`}
                         />
                       </td>
@@ -1330,10 +1370,12 @@ export default function InvoicesView() {
                 {clientMode === "new" ? (
                   <div className="grid grid-cols-2 gap-3 p-3 bg-surface-neutral-50 rounded-xl border border-line-neutral-200/80">
                     <label className="space-y-1">
-                      <span>Client name *</span>
+                      <span className="text-xs font-semibold text-content-neutral-700">
+                        Client name <span className="text-content-rose-500 font-bold">*</span>
+                      </span>
                       <input
                         aria-label="New client name"
-                        className="ui-field w-full"
+                        className="ui-field w-full px-3.5"
                         required
                         value={clientName}
                         onChange={(e) => setClientName(e.target.value)}
@@ -1341,10 +1383,12 @@ export default function InvoicesView() {
                       />
                     </label>
                     <label className="space-y-1">
-                      <span>Email *</span>
+                      <span className="text-xs font-semibold text-content-neutral-700">
+                        Email <span className="text-content-rose-500 font-bold">*</span>
+                      </span>
                       <input
                         aria-label="New client email"
-                        className="ui-field w-full"
+                        className="ui-field w-full px-3.5"
                         type="email"
                         required
                         value={clientEmail}
@@ -1353,20 +1397,24 @@ export default function InvoicesView() {
                       />
                     </label>
                     <label className="space-y-1">
-                      <span>Contact person</span>
+                      <span className="text-xs font-semibold text-content-neutral-700">
+                        Contact person
+                      </span>
                       <input
                         aria-label="New client contact"
-                        className="ui-field w-full"
+                        className="ui-field w-full px-3.5"
                         value={clientContact}
                         onChange={(e) => setClientContact(e.target.value)}
                         placeholder="John Doe"
                       />
                     </label>
                     <label className="space-y-1">
-                      <span>Category</span>
+                      <span className="text-xs font-semibold text-content-neutral-700">
+                        Category
+                      </span>
                       <select
                         aria-label="New client category"
-                        className="ui-field w-full"
+                        className="ui-field w-full px-3.5"
                         value={clientCategory}
                         onChange={(e) => setClientCategory(e.target.value)}
                       >
@@ -1387,7 +1435,7 @@ export default function InvoicesView() {
                         type="checkbox"
                         checked={saveAsPermanentClient}
                         onChange={(e) => setSaveAsPermanentClient(e.target.checked)}
-                        className="w-4 h-4 rounded border-line-neutral-300 text-accent focus:ring-accent/20 cursor-pointer accent-neutral-900"
+                        className="w-4 h-4 rounded border-line-neutral-300 text-purple-600 focus:ring-purple-500/20 cursor-pointer accent-purple-600"
                       />
                       <span>Save to permanent clients directory (uncheck for temporary one-off client)</span>
                     </label>
@@ -1396,7 +1444,7 @@ export default function InvoicesView() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                        Target Client *
+                        Target Client <span className="text-content-rose-500 font-bold">*</span>
                       </label>
                       <select
                         required
@@ -1423,7 +1471,7 @@ export default function InvoicesView() {
 
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                        Invoice Code *
+                        Invoice Code <span className="text-content-rose-500 font-bold">*</span>
                       </label>
                       <input
                         type="text"
@@ -1474,7 +1522,7 @@ export default function InvoicesView() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-bold uppercase tracking-wider text-content-neutral-700">
-                        Itemized Services & Deliverables *
+                        Itemized Services & Deliverables <span className="text-content-rose-500 font-bold">*</span>
                       </h4>
                       <p className="text-[11px] text-content-neutral-400">
                         Each item will become a tracked task upon advance payment.
@@ -1484,7 +1532,7 @@ export default function InvoicesView() {
                     {catalogItems.length > 0 && (
                       <div className="w-56">
                         <select
-                          className="ui-field w-full text-xs"
+                          className="ui-field w-full px-3.5 text-xs"
                           defaultValue=""
                           onChange={(e) => {
                             if (e.target.value) {
@@ -1531,7 +1579,7 @@ export default function InvoicesView() {
                                 description: e.target.value,
                               })
                             }
-                            className="ui-field flex-1"
+                            className="ui-field flex-1 px-3.5"
                           />
 
                           <div className="w-20">
@@ -1546,7 +1594,7 @@ export default function InvoicesView() {
                                   quantity: parseInt(e.target.value, 10) || 1,
                                 })
                               }
-                              className="ui-field w-full text-center"
+                              className="ui-field w-full px-2 text-center"
                             />
                           </div>
 
@@ -1563,7 +1611,7 @@ export default function InvoicesView() {
                                   unitPrice: e.target.value,
                                 })
                               }
-                              className="ui-field w-full"
+                              className="ui-field w-full px-3.5"
                             />
                           </div>
 
@@ -1607,7 +1655,7 @@ export default function InvoicesView() {
                     value={newDeliveryUrl}
                     onChange={(e) => setNewDeliveryUrl(e.target.value)}
                     placeholder="https://drive.google.com/drive/folders/... or https://github.com/..."
-                    className="ui-field w-full font-mono text-xs"
+                    className="ui-field w-full px-3.5 font-mono text-xs"
                   />
                   <p className="text-[11px] text-content-neutral-400">
                     Links directly to client deliverables, PDF invoice, and tasks board.
@@ -1628,7 +1676,7 @@ export default function InvoicesView() {
                         placeholder="e.g. 10000 (First-time client discount)"
                         value={newDiscount}
                         onChange={(e) => setNewDiscount(e.target.value)}
-                        className="ui-field w-full"
+                        className="ui-field w-full px-3.5"
                       />
                     </label>
 
@@ -1643,7 +1691,7 @@ export default function InvoicesView() {
                         placeholder="0"
                         value={newTaxRate}
                         onChange={(e) => setNewTaxRate(e.target.value)}
-                        className="ui-field w-full"
+                        className="ui-field w-full px-3.5"
                       />
                     </label>
                   </div>
@@ -1689,7 +1737,7 @@ export default function InvoicesView() {
                         type="checkbox"
                         checked={requireAdvance}
                         onChange={(e) => setRequireAdvance(e.target.checked)}
-                        className="w-4 h-4 rounded border-line-neutral-300 text-accent accent-neutral-900"
+                        className="w-4 h-4 rounded border-line-neutral-300 text-purple-600 focus:ring-purple-500/20 cursor-pointer accent-purple-600"
                       />
                       <span>Require 50% advance deposit before starting work</span>
                     </label>
@@ -1733,7 +1781,7 @@ export default function InvoicesView() {
                     value={newNotes}
                     onChange={(e) => setNewNotes(e.target.value)}
                     placeholder="e.g. Please transfer the 50% advance to start website development."
-                    className="ui-field w-full text-xs"
+                    className="ui-field w-full px-3.5 py-2.5 text-xs resize-none"
                   />
                 </div>
 
@@ -1893,7 +1941,7 @@ export default function InvoicesView() {
                 {/* Fields */}
                 <div className="space-y-1">
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500">
-                    Amount Received ({paymentInvoice.currency}) *
+                    Amount Received ({paymentInvoice.currency}) <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1902,21 +1950,21 @@ export default function InvoicesView() {
                     required
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="ui-field w-full"
+                    className="ui-field w-full px-3.5"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500">
-                      Payment Date *
+                      Payment Date <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="date"
                       required
                       value={paymentDate}
                       onChange={(e) => setPaymentDate(e.target.value)}
-                      className="ui-field w-full"
+                      className="ui-field w-full px-3.5"
                     />
                   </div>
 
@@ -1929,7 +1977,7 @@ export default function InvoicesView() {
                       value={paymentReference}
                       onChange={(e) => setPaymentReference(e.target.value)}
                       placeholder="e.g. SLIP-2026-001"
-                      className="ui-field w-full"
+                      className="ui-field w-full px-3.5"
                     />
                   </div>
                 </div>
@@ -1939,7 +1987,7 @@ export default function InvoicesView() {
                     type="checkbox"
                     checked={attachSlipDirectly}
                     onChange={(e) => setAttachSlipDirectly(e.target.checked)}
-                    className="w-4 h-4 rounded border-line-neutral-300 text-accent accent-neutral-900"
+                    className="w-4 h-4 rounded border-line-neutral-300 text-purple-600 focus:ring-purple-500/20 cursor-pointer accent-purple-600"
                   />
                   <span>Attach payment slip / receipt file after recording</span>
                 </label>
@@ -2100,12 +2148,14 @@ export default function InvoicesView() {
         {editingInvoice && (
           <MotionSurface
             kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setEditingInvoice(null)}
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
           >
             <MotionSurface
               onDismiss={() => setEditingInvoice(null)}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
               kind="panel"
-              className="bg-surface rounded-2xl w-full max-w-2xl shadow-2xl border border-line-neutral-200 overflow-hidden max-h-[90vh] flex flex-col"
+              className="bg-surface rounded-2xl w-full max-w-2xl shadow-2xl border border-line-neutral-200 overflow-hidden my-8 max-h-[90vh] flex flex-col"
             >
               <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50 shrink-0">
                 <div className="flex items-center gap-2.5">
@@ -2133,20 +2183,21 @@ export default function InvoicesView() {
 
               <form
                 onSubmit={handleEditSubmit}
-                className="p-6 space-y-4 text-xs font-medium text-content-neutral-700 overflow-y-auto"
+                className="flex flex-col flex-1 min-h-0 overflow-hidden"
               >
+                <div className="p-6 space-y-4 text-xs font-medium text-content-neutral-700 overflow-y-auto flex-1">
                 {/* Invoice Code & Client & Currency */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                      Invoice Code *
+                      Invoice Code <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="text"
                       required
                       value={editCode}
                       onChange={(e) => setEditCode(e.target.value)}
-                      className="ui-field w-full font-mono"
+                      className="ui-field w-full px-3.5 font-mono"
                     />
                   </div>
 
@@ -2165,7 +2216,7 @@ export default function InvoicesView() {
                           if (chosen.driveUrl) setEditDeliveryUrl(chosen.driveUrl);
                         }
                       }}
-                      className="ui-field w-full cursor-pointer"
+                      className="ui-field w-full px-3.5 cursor-pointer"
                     >
                       <option value="">(Temporary / Unlinked Client)</option>
                       {clients.map((c) => (
@@ -2183,7 +2234,7 @@ export default function InvoicesView() {
                     <select
                       value={editCurrency}
                       onChange={(e) => setEditCurrency(e.target.value as Currency)}
-                      className="ui-field w-full cursor-pointer"
+                      className="ui-field w-full px-3.5 cursor-pointer"
                     >
                       <option value="LKR">LKR (Rs.)</option>
                       <option value="USD">USD ($)</option>
@@ -2204,7 +2255,7 @@ export default function InvoicesView() {
                       type="date"
                       value={editDueDate}
                       onChange={(e) => setEditDueDate(e.target.value)}
-                      className="ui-field w-full cursor-pointer"
+                      className="ui-field w-full px-3.5 cursor-pointer"
                     />
                   </div>
 
@@ -2215,7 +2266,7 @@ export default function InvoicesView() {
                     <select
                       value={editStatus}
                       onChange={(e) => setEditStatus(e.target.value as InvoiceStatus)}
-                      className="ui-field w-full cursor-pointer"
+                      className="ui-field w-full px-3.5 cursor-pointer"
                     >
                       <option value="DRAFT">DRAFT</option>
                       <option value="UNPAID">UNPAID</option>
@@ -2231,7 +2282,7 @@ export default function InvoicesView() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-bold uppercase tracking-wider text-content-neutral-700">
-                        Itemized Services & Deliverables *
+                        Itemized Services & Deliverables <span className="text-content-rose-500 font-bold">*</span>
                       </h4>
                       <p className="text-[11px] text-content-neutral-400">
                         Modify line items, quantities, or prices.
@@ -2241,7 +2292,7 @@ export default function InvoicesView() {
                     {catalogItems.length > 0 && (
                       <div className="w-52">
                         <select
-                          className="ui-field w-full text-xs"
+                          className="ui-field w-full px-3.5 text-xs"
                           defaultValue=""
                           onChange={(e) => {
                             if (e.target.value) {
@@ -2288,7 +2339,7 @@ export default function InvoicesView() {
                                 description: e.target.value,
                               })
                             }
-                            className="ui-field flex-1"
+                            className="ui-field flex-1 px-3.5"
                           />
 
                           <div className="w-20">
@@ -2303,7 +2354,7 @@ export default function InvoicesView() {
                                   quantity: parseInt(e.target.value, 10) || 1,
                                 })
                               }
-                              className="ui-field w-full text-center"
+                              className="ui-field w-full px-2 text-center"
                             />
                           </div>
 
@@ -2320,7 +2371,7 @@ export default function InvoicesView() {
                                   unitPrice: e.target.value,
                                 })
                               }
-                              className="ui-field w-full"
+                              className="ui-field w-full px-3.5"
                             />
                           </div>
 
@@ -2364,7 +2415,7 @@ export default function InvoicesView() {
                     value={editDeliveryUrl}
                     onChange={(e) => setEditDeliveryUrl(e.target.value)}
                     placeholder="https://drive.google.com/drive/folders/... or https://github.com/..."
-                    className="ui-field w-full font-mono text-xs"
+                    className="ui-field w-full px-3.5 font-mono text-xs"
                   />
                 </div>
 
@@ -2382,7 +2433,7 @@ export default function InvoicesView() {
                         placeholder="0"
                         value={editDiscount}
                         onChange={(e) => setEditDiscount(e.target.value)}
-                        className="ui-field w-full"
+                        className="ui-field w-full px-3.5"
                       />
                     </label>
 
@@ -2397,7 +2448,7 @@ export default function InvoicesView() {
                         placeholder="0"
                         value={editTaxRate}
                         onChange={(e) => setEditTaxRate(e.target.value)}
-                        className="ui-field w-full"
+                        className="ui-field w-full px-3.5"
                       />
                     </label>
                   </div>
@@ -2444,7 +2495,7 @@ export default function InvoicesView() {
                           type="checkbox"
                           checked={editRequireAdvance}
                           onChange={(e) => setEditRequireAdvance(e.target.checked)}
-                          className="w-4 h-4 rounded border-line-neutral-300 text-accent focus:ring-accent/20 cursor-pointer accent-neutral-900"
+                          className="w-4 h-4 rounded border-line-neutral-300 text-purple-600 focus:ring-purple-500/20 cursor-pointer accent-purple-600"
                         />
                         <span className="text-xs font-semibold text-content-neutral-800">
                           Require Upfront Advance / Deposit
@@ -2510,11 +2561,12 @@ export default function InvoicesView() {
                     value={editNotes}
                     onChange={(e) => setEditNotes(e.target.value)}
                     placeholder="Bank account details, delivery scope, or client payment terms..."
-                    className="ui-field w-full text-xs"
+                    className="ui-field w-full px-3.5 py-2.5 text-xs resize-none"
                   />
                 </div>
+              </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100 shrink-0">
+                <div className="flex justify-end gap-3 px-6 py-4 bg-surface-neutral-50/50 border-t border-line-neutral-100 shrink-0">
                   <Button
                     variant="ghost"
                     type="button"

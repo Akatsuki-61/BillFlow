@@ -76,6 +76,7 @@ export function MetricCard({
   action,
   tone = "default",
   className = "",
+  compact = false,
 }: {
   label: string;
   value: ReactNode;
@@ -83,9 +84,14 @@ export function MetricCard({
   action?: ReactNode;
   tone?: "default" | "accent" | "warning" | "success";
   className?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className={`ui-card ui-metric ui-metric--${tone} ${className}`}>
+    <div
+      className={`ui-card ui-metric ui-metric--${tone} ${
+        compact ? "ui-metric--compact" : ""
+      } ${className}`}
+    >
       <div className="ui-metric-heading">
         <span>{label}</span>
         {action}

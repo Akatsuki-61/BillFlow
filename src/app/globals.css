@@ -389,6 +389,17 @@ aside nav a[aria-current="page"] svg {
   cursor: not-allowed;
 }
 
+:where(.ui-field) {
+  min-height: 40px;
+  border-radius: var(--ui-radius-control);
+  padding: 8px 14px;
+  font-size: 13px;
+  line-height: 22px;
+  background-color: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+
 .ui-field {
   min-height: 40px;
   border-radius: var(--ui-radius-control);
@@ -400,13 +411,22 @@ aside nav a[aria-current="page"] svg {
 .ui-field::placeholder {
   color: var(--ui-placeholder);
 }
+.ui-search-input,
+.ui-field-search,
+input.ui-search-input,
+input.ui-field-search {
+  padding-left: 40px !important;
+}
 .ui-textarea {
   min-height: 96px;
+  padding: 10px 14px;
+  resize: vertical;
 }
+.ui-field:focus,
 .ui-field:focus-visible {
-  box-shadow: none;
-  outline: 2px solid var(--ui-accent);
-  outline-offset: 2px;
+  outline: none;
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--theme-accent-soft, rgba(124, 58, 237, 0.25));
 }
 
 /* Custom Inset Select Chevrons (Prevents arrow touching corner border) */
@@ -533,11 +553,13 @@ input[type="checkbox"] {
 .ui-metric-value {
   font-family: var(--font-inter), sans-serif;
   font-variant-numeric: tabular-nums;
-  font-size: 32px;
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: -0.035em;
-  overflow-wrap: anywhere;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ui-metric--accent .ui-metric-value {
   color: var(--ui-accent);
@@ -561,6 +583,28 @@ input[type="checkbox"] {
 .ui-metric-footer .ui-button {
   min-height: 28px;
   padding-block: 3px;
+}
+.ui-metric--compact {
+  min-height: 0;
+  padding: 10px 14px;
+  gap: 4px;
+}
+.ui-metric--compact .ui-metric-heading {
+  min-height: 0;
+}
+.ui-metric--compact .ui-metric-heading > span {
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.05em;
+}
+.ui-metric--compact .ui-metric-value {
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+.ui-metric--compact .ui-metric-footer {
+  font-size: 11px;
+  line-height: 14px;
+  gap: 4px;
 }
 
 .ui-empty {

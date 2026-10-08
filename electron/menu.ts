@@ -22,10 +22,11 @@ export function getAboutIconPath(): string | undefined {
 export function setupAboutPanel(): void {
   if (process.platform !== "darwin") return;
   const iconPath = getAboutIconPath();
+  const currentVersion = app?.getVersion ? app.getVersion() : "0.1.1";
   app.setAboutPanelOptions({
     applicationName: "BillFlow",
-    applicationVersion: "0.1.0",
-    version: "0.1.0",
+    applicationVersion: currentVersion,
+    version: currentVersion,
     copyright: "Copyright © 2026 Akatsuki-61",
     authors: ["Akatsuki-61"],
     website: "https://github.com/Akatsuki-61/BillFlow",
@@ -57,11 +58,12 @@ export function buildMenuTemplate(
         label: "Check for Updates...",
         click: () => {
           const win = getMainWindow ? getMainWindow() : null;
+          const currentVersion = app?.getVersion ? app.getVersion() : "0.1.1";
           const options = {
             type: "info" as const,
             title: "Check for Updates",
             message: "BillFlow is up to date",
-            detail: "You are running the latest version of BillFlow (v0.1.0).",
+            detail: `You are running the latest version of BillFlow (v${currentVersion}).`,
             buttons: ["OK"],
           };
           if (win && !win.isDestroyed()) {

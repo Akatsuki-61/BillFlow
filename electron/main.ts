@@ -202,12 +202,18 @@ app.whenReady().then(() => {
         filePath = filePath + ".html";
       } else if (fs.existsSync(path.join(filePath, "index.html"))) {
         filePath = path.join(filePath, "index.html");
+      } else if (filePath.endsWith(".txt")) {
+        const altTxt = path.join(filePath.replace(/\.txt$/, ""), "index.txt");
+        if (fs.existsSync(altTxt)) {
+          filePath = altTxt;
+        }
       }
     }
 
     if (!filePath.startsWith(outDir) || !fs.existsSync(filePath)) {
+      const isHtmlNav = !path.extname(url.pathname) || url.pathname.endsWith(".html");
       const fallbackIndex = path.join(outDir, "index.html");
-      if (fs.existsSync(fallbackIndex)) {
+      if (isHtmlNav && fs.existsSync(fallbackIndex)) {
         return net.fetch(pathToFileURL(fallbackIndex).toString());
       }
       return new Response("Not found", { status: 404 });

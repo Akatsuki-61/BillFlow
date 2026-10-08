@@ -9,17 +9,18 @@ interface NavContextType {
 }
 
 const NavContext = createContext<NavContextType>({
-  activeNav: "invoices",
+  activeNav: "/",
   setActiveNav: () => {},
 });
 
 export function NavProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [activeNav, setActiveNav] = useState("invoices");
+  const [activeNav, setActiveNav] = useState("/");
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.billflow?.onNavigate) return;
     const unsubscribe = window.billflow.onNavigate((route) => {
+      setActiveNav(route);
       router.push(route);
     });
     return () => {

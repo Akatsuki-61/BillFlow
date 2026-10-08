@@ -389,25 +389,14 @@ export default function CatalogView() {
         description="Manage standardized products, services, and pricing units."
       >
         <div className="flex items-center gap-3">
-          <div className="inline-flex items-center rounded-xl shadow-xs">
-            <Button
-              variant="secondary"
-              onClick={() => setShowBulkImportModal(true)}
-              className="rounded-r-none border-r-0 gap-2"
-            >
-              <Upload className="w-4 h-4" strokeWidth={1.8} />
-              <span>Bulk Import</span>
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => setShowImportInfoModal(true)}
-              title="Bulk Import File Format Guide (CSV & Excel)"
-              className="rounded-l-none"
-            >
-              <Info className="w-4 h-4" strokeWidth={2} />
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            onClick={() => setShowBulkImportModal(true)}
+            className="gap-2"
+          >
+            <Upload className="w-4 h-4" strokeWidth={1.8} />
+            <span>Bulk Import</span>
+          </Button>
 
           <Button
             variant="primary"
@@ -490,127 +479,147 @@ export default function CatalogView() {
           <div>
             {/* Header Labels */}
             <div className="flex items-center justify-between pb-3.5 border-b border-line-neutral-300/60 text-[11px] font-bold tracking-wider text-content-neutral-500 uppercase">
-              <span>Item Details</span>
-              <span>Unit / Price</span>
+              <span>Catalog Deliverables ({filteredItems.length})</span>
+              <span>Price & Actions</span>
             </div>
 
-            {/* Catalog Items Rows */}
-            <div className="divide-y divide-line-neutral-300/60">
-              {filteredItems.length === 0 ? (
-                <div className="py-16 text-center text-sm text-content-neutral-500">
-                  No catalog items found matching your criteria.
-                </div>
-              ) : (
-                filteredItems.map((item) => (
-                  <div key={item.id} className="py-5 flex items-start gap-4">
-                    {/* Left Icon Badge */}
-                    <div className="w-10 h-10 rounded-xl bg-surface/90 border border-line-neutral-300/70 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                      {renderIcon(item.iconType)}
-                    </div>
+            {/* Catalog Items Grid */}
+            {filteredItems.length === 0 ? (
+              <div className="py-16 text-center text-sm text-content-neutral-500">
+                No catalog items found matching your criteria.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                {filteredItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-surface rounded-2xl border border-line-neutral-200/90 p-4 flex flex-col justify-between shadow-2xs hover:shadow-sm hover:border-line-neutral-300 transition-all group"
+                  >
+                    <div>
+                      {/* Card Header: Icon + Title + Dropdown */}
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-surface-neutral-50 border border-line-neutral-200/80 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                            {renderIcon(item.iconType)}
+                          </div>
+                          <div className="min-w-0">
+                            <h3
+                              className="text-sm font-bold text-content-neutral-900 leading-snug tracking-tight truncate"
+                              title={item.title}
+                            >
+                              {item.title}
+                            </h3>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-neutral-100 border border-line-neutral-200 text-content-neutral-600">
+                                {item.category}
+                              </span>
+                              <span className="text-[11px] text-content-neutral-500 font-mono">
+                                {item.sku}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
-                    {/* Middle Details & Description */}
-                    <div className="flex-1 min-w-0 pr-2">
-                      <h3 className="text-base md:text-[17px] font-bold text-content-neutral-900 leading-snug tracking-tight">
-                        {item.title}
-                      </h3>
+                        {/* 3-Dots Action Button & Dropdown */}
+                        <div className="relative shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenMenuId(openMenuId === item.id ? null : item.id)
+                            }
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              openMenuId === item.id
+                                ? "bg-surface-neutral-200 text-content-neutral-900"
+                                : "text-content-neutral-400 hover:text-content-neutral-700 hover:bg-surface-neutral-100"
+                            }`}
+                            aria-label={`Options for ${item.title}`}
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
 
-                      {/* Category Badge & SKU */}
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface/90 border border-line-neutral-300/80 text-content-neutral-600">
-                          {item.category}
-                        </span>
-                        <span className="text-xs text-content-neutral-500 font-medium">
-                          SKU: {item.sku}
-                        </span>
+                          {/* Dropdown Menu */}
+                          {openMenuId === item.id && (
+                            <>
+                              {/* Backdrop */}
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setOpenMenuId(null)}
+                              />
+
+                              <div className="absolute right-0 top-full mt-1.5 w-44 bg-surface rounded-2xl shadow-xl border border-line-neutral-200/90 py-1.5 z-40 text-left text-xs animate-in fade-in zoom-in-95 duration-100 font-medium">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleOpenCreateInvoice(item);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-content-neutral-700 hover:text-content-purple-700 hover:bg-surface-purple-50/60 transition-colors cursor-pointer"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-content-purple-600" />
+                                  <span>Create Invoice</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(item)}
+                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-content-neutral-700 hover:text-content-neutral-900 hover:bg-surface-neutral-50 transition-colors cursor-pointer"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-content-neutral-500" />
+                                  <span>Edit Item</span>
+                                </button>
+
+                                <div className="my-1 border-t border-line-neutral-100" />
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeletingItem(item);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 dark:text-red-400 hover:bg-surface-rose-50/80 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                  <span>Delete Item</span>
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {/* Description Box */}
-                      <div className="mt-3 px-3.5 py-2.5 bg-surface/85 rounded-xl border border-line-neutral-300/80 text-xs text-content-neutral-700 leading-relaxed font-normal shadow-2xs">
+                      <div
+                        className="mt-3 px-3 py-2 bg-surface-neutral-50/70 rounded-xl border border-line-neutral-200/60 text-xs text-content-neutral-600 leading-relaxed font-normal min-h-[52px] line-clamp-2"
+                        title={item.description}
+                      >
                         {item.description}
                       </div>
                     </div>
 
-                    {/* Right Price, Unit & 3-Dots Menu */}
-                    <div className="flex items-start gap-2 shrink-0">
-                      <div className="text-right">
-                        <div className="text-lg md:text-xl font-bold text-content-neutral-900 tracking-tight leading-none">
+                    {/* Footer: Price + Quick Invoice */}
+                    <div className="mt-3 pt-3 border-t border-line-neutral-100 flex items-center justify-between">
+                      <div>
+                        <div className="text-base font-bold text-content-neutral-900 tracking-tight leading-none">
                           {formatPriceWithCurrency(item.price, item.currency)}
                         </div>
-                        <div className="text-xs text-content-neutral-500 font-medium mt-1">
+                        <div className="text-[11px] text-content-neutral-400 font-medium mt-0.5">
                           {item.unit}
                         </div>
                       </div>
 
-                      {/* 3-Dots Action Button & Dropdown */}
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenMenuId(openMenuId === item.id ? null : item.id)
-                          }
-                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                            openMenuId === item.id
-                              ? "bg-surface-neutral-300/70 text-content-neutral-900"
-                              : "text-content-neutral-400 hover:text-content-neutral-700 hover:bg-surface-neutral-300/50"
-                          }`}
-                          aria-label={`Options for ${item.title}`}
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {openMenuId === item.id && (
-                          <>
-                            {/* Backdrop */}
-                            <div
-                              className="fixed inset-0 z-30"
-                              onClick={() => setOpenMenuId(null)}
-                            />
-
-                            <div className="absolute right-0 top-full mt-1.5 w-44 bg-surface rounded-2xl shadow-xl border border-line-neutral-200/90 py-1.5 z-40 text-left text-xs animate-in fade-in zoom-in-95 duration-100 font-medium">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleOpenCreateInvoice(item);
-                                  setOpenMenuId(null);
-                                }}
-                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-content-neutral-700 hover:text-content-purple-700 hover:bg-surface-purple-50/60 transition-colors cursor-pointer"
-                              >
-                                <FileText className="w-3.5 h-3.5 text-content-purple-600" />
-                                <span>Create Invoice</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEdit(item)}
-                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-content-neutral-700 hover:text-content-neutral-900 hover:bg-surface-neutral-50 transition-colors cursor-pointer"
-                              >
-                                <Pencil className="w-3.5 h-3.5 text-content-neutral-500" />
-                                <span>Edit Item</span>
-                              </button>
-
-                              <div className="my-1 border-t border-line-neutral-100" />
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDeletingItem(item);
-                                  setOpenMenuId(null);
-                                }}
-                                className="w-full px-3.5 py-2 flex items-center gap-2.5 text-red-600 dark:text-red-400 hover:bg-surface-rose-50/80 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                <span>Delete Item</span>
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCreateInvoice(item)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-accent bg-accent-faint hover:bg-accent/15 rounded-lg border border-border-accent-soft transition-colors cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Bill Item</span>
+                      </button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Footer & Pagination */}
@@ -665,7 +674,7 @@ export default function CatalogView() {
             <form onSubmit={handleSaveEdit} className="mt-5 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Item Title
+                  Item Title <span className="text-content-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -699,7 +708,7 @@ export default function CatalogView() {
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    SKU Code <span className="normal-case font-normal text-content-neutral-400">(Stock Keeping Unit)</span>
+                    SKU Code <span className="text-content-rose-500 font-bold">*</span> <span className="normal-case font-normal text-content-neutral-400">(Stock Keeping Unit)</span>
                   </label>
                   <input
                     type="text"
@@ -714,7 +723,7 @@ export default function CatalogView() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Price
+                    Price <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -861,7 +870,7 @@ export default function CatalogView() {
             <form onSubmit={handleCreateItem} className="mt-5 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Item Title
+                  Item Title <span className="text-content-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
@@ -896,7 +905,7 @@ export default function CatalogView() {
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    SKU Code <span className="normal-case font-normal text-content-neutral-400">(Stock Keeping Unit)</span>
+                    SKU Code <span className="text-content-rose-500 font-bold">*</span> <span className="normal-case font-normal text-content-neutral-400">(Stock Keeping Unit)</span>
                   </label>
                   <input
                     type="text"
@@ -912,7 +921,7 @@ export default function CatalogView() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Price
+                    Price <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="number"
@@ -1042,17 +1051,9 @@ export default function CatalogView() {
               </p>
             </div>
 
-            <div className="mt-3 flex items-center justify-between px-1 text-xs text-content-neutral-500">
-              <span>Supports CSV; export Excel sheets as CSV first.</span>
-              <button
-                type="button"
-                onClick={() => setShowImportInfoModal(true)}
-                className="text-content-purple-600 hover:text-content-purple-700 font-semibold flex items-center gap-1 cursor-pointer hover:underline"
-              >
-                <Info className="w-3.5 h-3.5" />
-                <span>File Format Guide & Template</span>
-              </button>
-            </div>
+            <p className="mt-3 px-1 text-xs text-content-neutral-500">
+              Supports CSV; export Excel sheets as CSV first.
+            </p>
 
             <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-line-neutral-100">
               <button
@@ -1120,7 +1121,7 @@ export default function CatalogView() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500">
-                    Billed Client <span className="text-content-purple-600">*</span>
+                    Billed Client <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <a
                     href="/clients"

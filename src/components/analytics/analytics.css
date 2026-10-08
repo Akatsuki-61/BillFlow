@@ -95,6 +95,13 @@
   }
 }
 
+.analytics-metrics-grid .ui-metric-value {
+  font-size: 1.35rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Charts & Breakdown Grid */
 .analytics-charts-grid {
   display: grid;
@@ -414,10 +421,14 @@
 .analytics-creative-canvas-area {
   padding: 0.875rem 1.25rem 0.5rem;
   position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .analytics-creative-svg {
   width: 100%;
+  max-width: 680px;
   height: 11.5rem;
   overflow: visible;
 }

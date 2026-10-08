@@ -540,3 +540,322 @@
     --theme-toast: #18181b;
   }
 }
+
+/* ==========================================================================
+   Accent Color Presets
+   ========================================================================== */
+
+/* Blue (Ocean) */
+:root[data-accent="blue"] {
+  --ui-accent: #2563eb;
+  --ui-accent-solid: #2563eb;
+  --ui-accent-solid-hover: #1d4ed8;
+  --ui-accent-soft: #eff6ff;
+  --theme-accent: #2563eb;
+  --theme-accent-deep-solid: #1d4ed8;
+  --theme-accent-faint: #eff6ff;
+  --theme-accent-pale: #f0f7ff;
+  --theme-accent-soft: #dbeafe;
+  --theme-accent-solid: #2563eb;
+  --theme-border-accent: #bfdbfe;
+  --theme-border-accent-soft: #dbeafe;
+  --theme-focus: #3b82f6;
+
+  --theme-content-purple-600: #2563eb;
+  --theme-content-purple-700: #1d4ed8;
+  --theme-content-purple-800: #1e40af;
+  --theme-content-purple-900: #1e3a8a;
+  --theme-content-purple-950: #172554;
+  --theme-line-purple-100: #dbeafe;
+  --theme-line-purple-200: #bfdbfe;
+  --theme-line-purple-300: #93c5fd;
+  --theme-line-purple-400: #60a5fa;
+  --theme-line-purple-500: #3b82f6;
+  --theme-line-purple-600: #2563eb;
+  --theme-surface-purple-100: #dbeafe;
+  --theme-surface-purple-50: #eff6ff;
+  --theme-shadow-purple-200: #bfdbfe;
+}
+
+:root[data-theme="dark"][data-accent="blue"] {
+  --ui-accent: #60a5fa;
+  --ui-accent-solid: #2563eb;
+  --ui-accent-solid-hover: #1d4ed8;
+  --ui-accent-soft: #172554;
+  --theme-accent: #60a5fa;
+  --theme-accent-deep-solid: #2563eb;
+  --theme-accent-faint: #172554;
+  --theme-accent-pale: #172554;
+  --theme-accent-soft: #1e3a8a;
+  --theme-accent-solid: #2563eb;
+  --theme-border-accent: #1e40af;
+  --theme-border-accent-soft: #1d4ed8;
+  --theme-focus: #60a5fa;
+
+  --theme-content-purple-600: #60a5fa;
+  --theme-content-purple-700: #93c5fd;
+  --theme-content-purple-800: #93c5fd;
+  --theme-content-purple-900: #bfdbfe;
+  --theme-content-purple-950: #dbeafe;
+  --theme-line-purple-100: #1e3a8a;
+  --theme-line-purple-200: #1e40af;
+  --theme-line-purple-300: #1d4ed8;
+  --theme-line-purple-400: #2563eb;
+  --theme-line-purple-500: #3b82f6;
+  --theme-line-purple-600: #60a5fa;
+  --theme-surface-purple-100: #1e3a8a;
+  --theme-surface-purple-50: #172554;
+  --theme-shadow-purple-200: #1e40af;
+}
+
+/* Emerald (Forest) */
+:root[data-accent="emerald"] {
+  --ui-accent: #059669;
+  --ui-accent-solid: #059669;
+  --ui-accent-solid-hover: #047857;
+  --ui-accent-soft: #ecfdf5;
+  --theme-accent: #059669;
+  --theme-accent-deep-solid: #047857;
+  --theme-accent-faint: #ecfdf5;
+  --theme-accent-pale: #f0fdf4;
+  --theme-accent-soft: #d1fae5;
+  --theme-accent-solid: #059669;
+  --theme-border-accent: #a7f3d0;
+  --theme-border-accent-soft: #d1fae5;
+  --theme-focus: #10b981;
+
+  --theme-content-purple-600: #059669;
+  --theme-content-purple-700: #047857;
+  --theme-content-purple-800: #065f46;
+  --theme-content-purple-900: #064e3b;
+  --theme-content-purple-950: #022c22;
+  --theme-line-purple-100: #d1fae5;
+  --theme-line-purple-200: #a7f3d0;
+  --theme-line-purple-300: #6ee7b7;
+  --theme-line-purple-400: #34d399;
+  --theme-line-purple-500: #10b981;
+  --theme-line-purple-600: #059669;
+  --theme-surface-purple-100: #d1fae5;
+  --theme-surface-purple-50: #ecfdf5;
+  --theme-shadow-purple-200: #a7f3d0;
+}
+
+:root[data-theme="dark"][data-accent="emerald"] {
+  --ui-accent: #34d399;
+  --ui-accent-solid: #059669;
+  --ui-accent-solid-hover: #047857;
+  --ui-accent-soft: #064e3b;
+  --theme-accent: #34d399;
+  --theme-accent-deep-solid: #059669;
+  --theme-accent-faint: #064e3b;
+  --theme-accent-pale: #064e3b;
+  --theme-accent-soft: #065f46;
+  --theme-accent-solid: #059669;
+  --theme-border-accent: #047857;
+  --theme-border-accent-soft: #065f46;
+  --theme-focus: #34d399;
+
+  --theme-content-purple-600: #34d399;
+  --theme-content-purple-700: #6ee7b7;
+  --theme-content-purple-800: #6ee7b7;
+  --theme-content-purple-900: #a7f3d0;
+  --theme-content-purple-950: #d1fae5;
+  --theme-line-purple-100: #064e3b;
+  --theme-line-purple-200: #065f46;
+  --theme-line-purple-300: #047857;
+  --theme-line-purple-400: #059669;
+  --theme-line-purple-500: #10b981;
+  --theme-line-purple-600: #34d399;
+  --theme-surface-purple-100: #065f46;
+  --theme-surface-purple-50: #064e3b;
+  --theme-shadow-purple-200: #047857;
+}
+
+/* Rose (Ruby) */
+:root[data-accent="rose"] {
+  --ui-accent: #e11d48;
+  --ui-accent-solid: #e11d48;
+  --ui-accent-solid-hover: #be123c;
+  --ui-accent-soft: #fff1f2;
+  --theme-accent: #e11d48;
+  --theme-accent-deep-solid: #be123c;
+  --theme-accent-faint: #fff1f2;
+  --theme-accent-pale: #fff1f2;
+  --theme-accent-soft: #ffe4e6;
+  --theme-accent-solid: #e11d48;
+  --theme-border-accent: #fecdd3;
+  --theme-border-accent-soft: #ffe4e6;
+  --theme-focus: #f43f5e;
+
+  --theme-content-purple-600: #e11d48;
+  --theme-content-purple-700: #be123c;
+  --theme-content-purple-800: #9f1239;
+  --theme-content-purple-900: #881337;
+  --theme-content-purple-950: #4c0519;
+  --theme-line-purple-100: #ffe4e6;
+  --theme-line-purple-200: #fecdd3;
+  --theme-line-purple-300: #fda4af;
+  --theme-line-purple-400: #fb7185;
+  --theme-line-purple-500: #f43f5e;
+  --theme-line-purple-600: #e11d48;
+  --theme-surface-purple-100: #ffe4e6;
+  --theme-surface-purple-50: #fff1f2;
+  --theme-shadow-purple-200: #fecdd3;
+}
+
+:root[data-theme="dark"][data-accent="rose"] {
+  --ui-accent: #fb7185;
+  --ui-accent-solid: #e11d48;
+  --ui-accent-solid-hover: #be123c;
+  --ui-accent-soft: #4c0519;
+  --theme-accent: #fb7185;
+  --theme-accent-deep-solid: #e11d48;
+  --theme-accent-faint: #4c0519;
+  --theme-accent-pale: #4c0519;
+  --theme-accent-soft: #881337;
+  --theme-accent-solid: #e11d48;
+  --theme-border-accent: #9f1239;
+  --theme-border-accent-soft: #881337;
+  --theme-focus: #fb7185;
+
+  --theme-content-purple-600: #fb7185;
+  --theme-content-purple-700: #fda4af;
+  --theme-content-purple-800: #fda4af;
+  --theme-content-purple-900: #fecdd3;
+  --theme-content-purple-950: #ffe4e6;
+  --theme-line-purple-100: #4c0519;
+  --theme-line-purple-200: #881337;
+  --theme-line-purple-300: #9f1239;
+  --theme-line-purple-400: #be123c;
+  --theme-line-purple-500: #e11d48;
+  --theme-line-purple-600: #fb7185;
+  --theme-surface-purple-100: #881337;
+  --theme-surface-purple-50: #4c0519;
+  --theme-shadow-purple-200: #9f1239;
+}
+
+/* Amber (Bronze) */
+:root[data-accent="amber"] {
+  --ui-accent: #d97706;
+  --ui-accent-solid: #d97706;
+  --ui-accent-solid-hover: #b45309;
+  --ui-accent-soft: #fffbeb;
+  --theme-accent: #d97706;
+  --theme-accent-deep-solid: #b45309;
+  --theme-accent-faint: #fffbeb;
+  --theme-accent-pale: #fffbeb;
+  --theme-accent-soft: #fef3c7;
+  --theme-accent-solid: #d97706;
+  --theme-border-accent: #fde68a;
+  --theme-border-accent-soft: #fef3c7;
+  --theme-focus: #f59e0b;
+
+  --theme-content-purple-600: #d97706;
+  --theme-content-purple-700: #b45309;
+  --theme-content-purple-800: #92400e;
+  --theme-content-purple-900: #78350f;
+  --theme-content-purple-950: #451a03;
+  --theme-line-purple-100: #fef3c7;
+  --theme-line-purple-200: #fde68a;
+  --theme-line-purple-300: #fcd34d;
+  --theme-line-purple-400: #fbbf24;
+  --theme-line-purple-500: #f59e0b;
+  --theme-line-purple-600: #d97706;
+  --theme-surface-purple-100: #fef3c7;
+  --theme-surface-purple-50: #fffbeb;
+  --theme-shadow-purple-200: #fde68a;
+}
+
+:root[data-theme="dark"][data-accent="amber"] {
+  --ui-accent: #fbbf24;
+  --ui-accent-solid: #d97706;
+  --ui-accent-solid-hover: #b45309;
+  --ui-accent-soft: #451a03;
+  --theme-accent: #fbbf24;
+  --theme-accent-deep-solid: #d97706;
+  --theme-accent-faint: #451a03;
+  --theme-accent-pale: #451a03;
+  --theme-accent-soft: #78350f;
+  --theme-accent-solid: #d97706;
+  --theme-border-accent: #92400e;
+  --theme-border-accent-soft: #78350f;
+  --theme-focus: #fbbf24;
+
+  --theme-content-purple-600: #fbbf24;
+  --theme-content-purple-700: #fcd34d;
+  --theme-content-purple-800: #fcd34d;
+  --theme-content-purple-900: #fde68a;
+  --theme-content-purple-950: #fef3c7;
+  --theme-line-purple-100: #451a03;
+  --theme-line-purple-200: #78350f;
+  --theme-line-purple-300: #92400e;
+  --theme-line-purple-400: #b45309;
+  --theme-line-purple-500: #d97706;
+  --theme-line-purple-600: #fbbf24;
+  --theme-surface-purple-100: #78350f;
+  --theme-surface-purple-50: #451a03;
+  --theme-shadow-purple-200: #92400e;
+}
+
+/* Indigo (Midnight) */
+:root[data-accent="indigo"] {
+  --ui-accent: #4f46e5;
+  --ui-accent-solid: #4f46e5;
+  --ui-accent-solid-hover: #4338ca;
+  --ui-accent-soft: #eef2ff;
+  --theme-accent: #4f46e5;
+  --theme-accent-deep-solid: #4338ca;
+  --theme-accent-faint: #eef2ff;
+  --theme-accent-pale: #eef2ff;
+  --theme-accent-soft: #e0e7ff;
+  --theme-accent-solid: #4f46e5;
+  --theme-border-accent: #c7d2fe;
+  --theme-border-accent-soft: #e0e7ff;
+  --theme-focus: #6366f1;
+
+  --theme-content-purple-600: #4f46e5;
+  --theme-content-purple-700: #4338ca;
+  --theme-content-purple-800: #3730a3;
+  --theme-content-purple-900: #312e81;
+  --theme-content-purple-950: #1e1b4b;
+  --theme-line-purple-100: #e0e7ff;
+  --theme-line-purple-200: #c7d2fe;
+  --theme-line-purple-300: #a5b4fc;
+  --theme-line-purple-400: #818cf8;
+  --theme-line-purple-500: #6366f1;
+  --theme-line-purple-600: #4f46e5;
+  --theme-surface-purple-100: #e0e7ff;
+  --theme-surface-purple-50: #eef2ff;
+  --theme-shadow-purple-200: #c7d2fe;
+}
+
+:root[data-theme="dark"][data-accent="indigo"] {
+  --ui-accent: #818cf8;
+  --ui-accent-solid: #4f46e5;
+  --ui-accent-solid-hover: #4338ca;
+  --ui-accent-soft: #1e1b4b;
+  --theme-accent: #818cf8;
+  --theme-accent-deep-solid: #4f46e5;
+  --theme-accent-faint: #1e1b4b;
+  --theme-accent-pale: #1e1b4b;
+  --theme-accent-soft: #312e81;
+  --theme-accent-solid: #4f46e5;
+  --theme-border-accent: #3730a3;
+  --theme-border-accent-soft: #312e81;
+  --theme-focus: #818cf8;
+
+  --theme-content-purple-600: #818cf8;
+  --theme-content-purple-700: #a5b4fc;
+  --theme-content-purple-800: #a5b4fc;
+  --theme-content-purple-900: #c7d2fe;
+  --theme-content-purple-950: #e0e7ff;
+  --theme-line-purple-100: #1e1b4b;
+  --theme-line-purple-200: #312e81;
+  --theme-line-purple-300: #3730a3;
+  --theme-line-purple-400: #4338ca;
+  --theme-line-purple-500: #4f46e5;
+  --theme-line-purple-600: #818cf8;
+  --theme-surface-purple-100: #312e81;
+  --theme-surface-purple-50: #1e1b4b;
+  --theme-shadow-purple-200: #3730a3;
+}

@@ -32,15 +32,30 @@ import { useTheme } from "@/context/ThemeContext";
 import { useSearchParams } from "next/navigation";
 import type { Currency } from "@/types/billing";
 import { getCurrencySymbol } from "@/lib/format";
+import type { AccentPreference } from "@/lib/theme";
 
 type SettingsTab = "profile" | "invoices" | "data" | "appearance";
+
+const ACCENT_OPTIONS: Array<{
+  id: AccentPreference;
+  name: string;
+  description: string;
+  color: string;
+}> = [
+  { id: "purple", name: "Purple", description: "Default", color: "#7c3aed" },
+  { id: "blue", name: "Blue", description: "Ocean", color: "#2563eb" },
+  { id: "emerald", name: "Emerald", description: "Forest", color: "#059669" },
+  { id: "rose", name: "Rose", description: "Ruby", color: "#e11d48" },
+  { id: "amber", name: "Amber", description: "Bronze", color: "#d97706" },
+  { id: "indigo", name: "Indigo", description: "Midnight", color: "#4f46e5" },
+];
 
 function SettingsContent() {
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get("tab");
   const initialTab: SettingsTab = ["profile", "invoices", "data", "appearance"].includes(requestedTab || "") ? requestedTab as SettingsTab : "profile";
   const { workflow, isElectron, error: dataError } = useData();
-  const { preference, setPreference, ready } = useTheme();
+  const { preference, setPreference, accent, setAccent, ready } = useTheme();
   const {
     settings,
     isLoading,
@@ -422,32 +437,93 @@ function SettingsContent() {
       {/* Main Content Area */}
       <div className="workspace-form w-full max-w-none">
         {activeTab === "appearance" ? (
-          <section
-            className="ui-card p-5 flex flex-wrap items-center justify-between gap-4"
-            aria-labelledby="appearance-heading"
-          >
-            <div>
-              <h2 id="appearance-heading">Color theme</h2>
-              <p className="text-sm text-content-neutral-500 mt-1">
-                Choose a theme. System follows your device’s appearance.
-              </p>
-              <p className="text-xs text-content-neutral-500 mt-1" role="status">
-                Changes save automatically on this device.
-              </p>
-            </div>
-            {ready && (
-              <SegmentedControl
-                value={preference}
-                onChange={setPreference}
-                label="Color theme"
-                options={[
-                  { value: "light", label: "Light" },
-                  { value: "dark", label: "Dark" },
-                  { value: "system", label: "System" },
-                ]}
-              />
-            )}
-          </section>
+          <div className="space-y-6">
+            <section
+              className="ui-card p-5 flex flex-wrap items-center justify-between gap-4"
+              aria-labelledby="appearance-heading"
+            >
+              <div>
+                <h2 id="appearance-heading" className="text-base font-semibold text-content-neutral-900">
+                  Color theme
+                </h2>
+                <p className="text-sm text-content-neutral-500 mt-1">
+                  Choose a theme. System follows your device’s appearance.
+                </p>
+                <p className="text-xs text-content-neutral-500 mt-1" role="status">
+                  Changes save automatically on this device.
+                </p>
+              </div>
+              {ready && (
+                <SegmentedControl
+                  value={preference}
+                  onChange={setPreference}
+                  label="Color theme"
+                  options={[
+                    { value: "light", label: "Light" },
+                    { value: "dark", label: "Dark" },
+                    { value: "system", label: "System" },
+                  ]}
+                />
+              )}
+            </section>
+
+            <section
+              className="ui-card p-5 space-y-4"
+              aria-labelledby="accent-heading"
+            >
+              <div>
+                <h2 id="accent-heading" className="text-base font-semibold text-content-neutral-900">
+                  Accent color
+                </h2>
+                <p className="text-sm text-content-neutral-500 mt-1">
+                  Select your highlight color for buttons, navigation links, badges, and metrics.
+                </p>
+                <p className="text-xs text-content-neutral-500 mt-1" role="status">
+                  Updates instantly across light and dark modes.
+                </p>
+              </div>
+
+              <div
+                role="radiogroup"
+                aria-labelledby="accent-heading"
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-1"
+              >
+                {ACCENT_OPTIONS.map((option) => {
+                  const isSelected = accent === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      aria-label={`${option.name} accent color (${option.description})`}
+                      onClick={() => setAccent(option.id)}
+                      className={`group relative flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                        isSelected
+                          ? "bg-accent-soft/40 border-accent shadow-xs ring-1 ring-accent/40"
+                          : "bg-surface border-line-neutral-200/80 hover:border-line-neutral-300 hover:bg-surface-neutral-50/70"
+                      }`}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center shadow-xs transition-transform group-hover:scale-105"
+                        style={{ backgroundColor: option.color }}
+                      >
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-white stroke-[2.5]" />
+                        )}
+                      </div>
+                      <span className="mt-2 text-xs font-semibold text-content-neutral-900">
+                        {option.name}
+                      </span>
+                      <span className="text-[11px] text-content-neutral-500">
+                        {option.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
         ) : isLoading ? (
           <div className="bg-surface rounded-2xl border border-line-neutral-200/80 p-8 space-y-6 animate-pulse">
             <div className="h-6 w-36 bg-surface-neutral-200 rounded-md" />

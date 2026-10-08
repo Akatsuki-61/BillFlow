@@ -39,33 +39,28 @@ import TaskTiming from "@/components/tasks/TaskTiming";
 import Link from "next/link";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 
-// Team member profiles for assignees
-const teamMembers = [
-  {
-    name: "Nipun Yatawara",
-    avatarLetter: "N",
-    bgColor: "bg-surface-purple-100",
-    textColor: "text-content-purple-700",
-  },
-  {
-    name: "Lahiru Kavinda",
-    avatarLetter: "L",
-    bgColor: "bg-surface-blue-100",
-    textColor: "text-content-blue-700",
-  },
-  {
-    name: "Binuka Madusanka",
-    avatarLetter: "B",
-    bgColor: "bg-surface-emerald-100",
-    textColor: "text-content-emerald-700",
-  },
-  {
-    name: "Sandika Madushan",
-    avatarLetter: "S",
-    bgColor: "bg-surface-amber-100",
-    textColor: "text-content-amber-700",
-  },
-];
+function HighlightText({ text, query }: { text: string; query: string }) {
+  const trimmed = query.trim();
+  if (!trimmed) return <>{text}</>;
+  const lowerText = text.toLowerCase();
+  const lowerQuery = trimmed.toLowerCase();
+  const index = lowerText.indexOf(lowerQuery);
+  if (index === -1) return <>{text}</>;
+
+  const before = text.substring(0, index);
+  const match = text.substring(index, index + trimmed.length);
+  const after = text.substring(index + trimmed.length);
+
+  return (
+    <>
+      {before}
+      <mark className="bg-accent/25 text-accent rounded px-0.5 font-semibold">
+        {match}
+      </mark>
+      {after}
+    </>
+  );
+}
 
 const columnDefinitions: {
   id: TaskStatus;
@@ -102,7 +97,6 @@ const columnDefinitions: {
 export default function TasksPage() {
   const router = useRouter();
 
-  // State
   const { tasks, invoices, workflow, clients, vendors, settings, isElectron, isLoading, error, activeCurrency } = useData();
   const [saving, setSaving] = useState(false);
   const draftId = useRef<string | null>(null);
@@ -111,7 +105,6 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedAssignee, setSelectedAssignee] = useState<string>("all");
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
@@ -122,13 +115,14 @@ export default function TasksPage() {
   const setSelectedTaskForDetail = (task: TaskItem | null) => { setSubtaskTitle(""); setSelectedTaskId(task?.id || null); };
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const leadFreelancerName = settings?.businessName?.trim() || "Lead Freelancer";
+
   // Form State for New Task
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newStatus, setNewStatus] = useState<TaskStatus>("todo");
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium");
   const [newCategory, setNewCategory] = useState<TaskCategory>("Development");
-  const [newAssigneeName, setNewAssigneeName] = useState(teamMembers[0].name);
   const [newDueDate, setNewDueDate] = useState("");
   const [newClientName, setNewClientName] = useState("");
   const [newIsOutsourced, setNewIsOutsourced] = useState(false);
@@ -151,38 +145,52 @@ export default function TasksPage() {
     finally { setSaving(false); }
   };
 
-  // Filtered Tasks
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.clientName &&
-          t.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (t.outsourcedVendor &&
-          t.outsourcedVendor.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Search and Filter logic
+  const trimmedSearchQuery = searchQuery.trim().toLowerCase();
+  const isSearching = trimmedSearchQuery.length > 0;
 
+  // Base filtered tasks matching priority & category filters
+  const baseTasks = useMemo(() => {
+    return tasks.filter((t) => {
       const matchesPriority =
         selectedPriority === "all" || t.priority === selectedPriority;
-
       const matchesCategory =
         selectedCategory === "all" || t.category === selectedCategory;
-
-      const matchesAssignee =
-        selectedAssignee === "all" || t.assignee.name === selectedAssignee;
-
-      return (
-        matchesSearch && matchesPriority && matchesCategory && matchesAssignee
-      );
+      return matchesPriority && matchesCategory;
     });
-  }, [
-    tasks,
-    searchQuery,
-    selectedPriority,
-    selectedCategory,
-    selectedAssignee,
-  ]);
+  }, [tasks, selectedPriority, selectedCategory]);
+
+  const isTaskMatch = (title: string) => {
+    return isSearching && title.toLowerCase().includes(trimmedSearchQuery);
+  };
+
+  // In Kanban, tasks matching search by title float to top of their column
+  const getColumnTasks = (status: TaskStatus) => {
+    const colTasks = baseTasks.filter((t) => t.status === status);
+    if (!isSearching) {
+      return colTasks;
+    }
+    return [...colTasks].sort((a, b) => {
+      const aMatch = a.title.toLowerCase().includes(trimmedSearchQuery);
+      const bMatch = b.title.toLowerCase().includes(trimmedSearchQuery);
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      return 0;
+    });
+  };
+
+  // In List View, matching tasks float to top
+  const displayListTasks = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return baseTasks;
+    return [...baseTasks].sort((a, b) => {
+      const aMatch = a.title.toLowerCase().includes(query);
+      const bMatch = b.title.toLowerCase().includes(query);
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      return 0;
+    });
+  }, [baseTasks, searchQuery]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -240,8 +248,12 @@ export default function TasksPage() {
     if (!newTitle.trim() || saving) return;
     setSaving(true);
 
-    const assignee =
-      teamMembers.find((m) => m.name === newAssigneeName) || teamMembers[0];
+    const assignee = {
+      name: leadFreelancerName,
+      avatarLetter: (leadFreelancerName[0] || "L").toUpperCase(),
+      bgColor: "bg-surface-purple-100",
+      textColor: "text-content-purple-700",
+    };
 
     const newTask = {
       id: draftId.current || (draftId.current = crypto.randomUUID()),
@@ -360,24 +372,28 @@ export default function TasksPage() {
         </div>
       </PageHeader>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard
+          compact
           label="Total Tasks"
           value={stats.total}
           footer="active items"
         />
         <MetricCard
+          compact
           label="In Progress"
           value={stats.inProgress}
           footer="in current sprint"
         />
         <MetricCard
+          compact
           label="Outsourced"
           value={stats.outsourced}
           tone="accent"
           footer="subcontracted"
         />
         <MetricCard
+          compact
           label="Completed"
           value={stats.completed}
           tone="success"
@@ -386,31 +402,32 @@ export default function TasksPage() {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="ui-card p-4 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3.5">
-        {/* Search Input */}
+      <div className="ui-card p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        {/* Search Input - Strictly searches task title */}
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search deliverables, clients, vendors..."
-            className="ui-field w-full pl-10 pr-4 border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all"
+            placeholder="Search tasks by name..."
+            className="ui-field ui-search-input w-full !pl-10 pl-10 pr-9 border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-sm"
+            style={{ paddingLeft: "40px" }}
           />
           {searchQuery && (
             <Button
-              aria-label="Close"
+              aria-label="Clear search"
               variant="ghost"
               size="icon"
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-content-neutral-400 hover:text-content-neutral-600"
             >
               <X className="w-3.5 h-3.5" />
             </Button>
           )}
         </div>
 
-        {/* Dropdowns - Equal size and properly inset chevrons */}
+        {/* Dropdowns - Priority & Category (Assignee removed for solo workflow) */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Priority Filter */}
           <div className="relative w-36">
@@ -451,36 +468,14 @@ export default function TasksPage() {
             />
           </div>
 
-          {/* Assignee Filter */}
-          <div className="relative w-36">
-            <select
-              value={selectedAssignee}
-              onChange={(e) => setSelectedAssignee(e.target.value)}
-              className="ui-field w-full appearance-none pl-3.5 pr-8 border border-line-neutral-200/90 font-medium text-content-neutral-700 focus:outline-none focus:border-accent cursor-pointer transition-colors truncate"
-            >
-              <option value="all">Assignee: All</option>
-              {teamMembers.map((m) => (
-                <option key={m.name} value={m.name}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              className="w-3.5 h-3.5 text-content-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-              strokeWidth={2}
-            />
-          </div>
-
           {(selectedPriority !== "all" ||
             selectedCategory !== "all" ||
-            selectedAssignee !== "all" ||
             searchQuery !== "") && (
             <Button
               variant="ghost"
               onClick={() => {
                 setSelectedPriority("all");
                 setSelectedCategory("all");
-                setSelectedAssignee("all");
                 setSearchQuery("");
               }}
             >
@@ -495,12 +490,14 @@ export default function TasksPage() {
         /* KANBAN BOARD */
         <div
           key="board"
-          className="motion-page grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-6 items-start"
+          className="motion-page grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-start"
         >
           {columnDefinitions.map((col) => {
-            const columnTasks = filteredTasks.filter(
-              (t) => t.status === col.id,
-            );
+            const columnTasks = getColumnTasks(col.id);
+            const totalInCol = columnTasks.length;
+            const matchCount = isSearching
+              ? columnTasks.filter((t) => isTaskMatch(t.title)).length
+              : 0;
             const isDropTarget = dragOverColumn === col.id;
 
             return (
@@ -509,22 +506,28 @@ export default function TasksPage() {
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, col.id)}
-                className={`bg-surface-cool/80 rounded-2xl p-4 border transition-all duration-200 min-h-[360px] flex flex-col ${
+                className={`bg-surface-cool/80 rounded-2xl p-3 border transition-all duration-200 min-h-[380px] flex flex-col ${
                   isDropTarget
                     ? "border-accent bg-accent-soft/30 ring-2 ring-accent/20"
                     : "border-line-neutral-200/70"
                 }`}
               >
                 {/* Column Header */}
-                <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-line-neutral-200/70">
+                <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-line-neutral-200/70">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-content-neutral-900 tracking-tight">
                       {col.title}
                     </span>
                     <span
-                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${col.badgeBg}`}
+                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                        isSearching && matchCount > 0
+                          ? "bg-accent/20 text-accent ring-1 ring-accent/30 font-bold"
+                          : col.badgeBg
+                      }`}
                     >
-                      {columnTasks.length}
+                      {isSearching
+                        ? `${matchCount}/${totalInCol}`
+                        : totalInCol}
                     </span>
                   </div>
 
@@ -536,7 +539,6 @@ export default function TasksPage() {
                       setNewStatus(col.id);
                       setIsAddModalOpen(true);
                     }}
-
                     disabled={!isElectron || isLoading || saving}
                     title={`Add task to ${col.title}`}
                   >
@@ -545,7 +547,7 @@ export default function TasksPage() {
                 </div>
 
                 {/* Column Card Container */}
-                <div className="space-y-3.5 flex-1 overflow-y-auto">
+                <div className="space-y-2.5 flex-1 overflow-y-auto">
                   {columnTasks.length === 0 ? (
                     <EmptyState compact title={`No tasks in ${col.title}`}>
                       <Button
@@ -567,6 +569,8 @@ export default function TasksPage() {
                         (st) => st.completed,
                       ).length;
                       const isDragging = draggedTaskId === task.id;
+                      const matched = isTaskMatch(task.title);
+                      const dimmed = isSearching && !matched;
 
                       return (
                         <div
@@ -574,12 +578,18 @@ export default function TasksPage() {
                           draggable={!saving}
                           onDragStart={(e) => handleDragStart(e, task.id)}
                           onClick={() => setSelectedTaskForDetail(task)}
-                          className={`motion-card group relative bg-surface rounded-xl p-4 border border-line-neutral-200/80 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.06),0px_1px_0px_0px_rgba(25,28,33,0.02)] hover:border-line-neutral-300 hover:shadow-[0px_4px_8px_-2px_rgba(0,0,0,0.08)] transition-all cursor-grab active:cursor-grabbing ${
-                            isDragging ? "opacity-40 scale-98" : ""
+                          className={`motion-card group relative bg-surface rounded-xl p-3.5 border transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                            isDragging
+                              ? "opacity-40 scale-98"
+                              : matched
+                                ? "ring-2 ring-accent border-accent shadow-[0_0_14px_rgba(139,92,246,0.22)] opacity-100 z-10"
+                                : dimmed
+                                  ? "opacity-35 dark:opacity-25 grayscale-[70%] border-line-neutral-200/50 shadow-none hover:opacity-75"
+                                  : "border-line-neutral-200/80 shadow-[0px_2px_3px_-1px_rgba(0,0,0,0.06),0px_1px_0px_0px_rgba(25,28,33,0.02)] hover:border-line-neutral-300 hover:shadow-[0px_4px_8px_-2px_rgba(0,0,0,0.08)]"
                           }`}
                         >
                           {/* Top Tag Strip */}
-                          <div className="flex items-center justify-between gap-2 mb-2.5">
+                          <div className="flex items-center justify-between gap-1.5 mb-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {/* Category Tag */}
                               <span className="text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-md bg-surface-neutral-100 text-content-neutral-600">
@@ -600,6 +610,12 @@ export default function TasksPage() {
                               >
                                 {task.priority}
                               </span>
+
+                              {matched && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-accent/20 text-accent uppercase tracking-wider">
+                                  Match
+                                </span>
+                              )}
                             </div>
 
                             {/* Client Association */}
@@ -610,19 +626,19 @@ export default function TasksPage() {
                             )}
                           </div>
 
-                          {/* Task Title */}
+                          {/* Task Title with Highlight */}
                           <h3 className="text-sm font-semibold text-content-neutral-900 group-hover:text-accent transition-colors leading-snug">
-                            {task.title}
+                            <HighlightText text={task.title} query={searchQuery} />
                           </h3>
 
                           {/* Description snippet */}
-                          <p className="text-xs text-content-neutral-500 mt-1.5 line-clamp-2 leading-relaxed">
+                          <p className="text-xs text-content-neutral-500 mt-1 line-clamp-2 leading-relaxed">
                             {task.description}
                           </p>
 
                           {/* Subtasks Progress Bar */}
                           {task.subtasks.length > 0 && (
-                            <div className="mt-3 pt-2.5 border-t border-line-neutral-100">
+                            <div className="mt-2.5 pt-2 border-t border-line-neutral-100">
                               <div className="flex items-center justify-between text-[11px] text-content-neutral-500 mb-1">
                                 <span className="flex items-center gap-1">
                                   <CheckSquare className="w-3 h-3 text-content-neutral-400" />
@@ -647,25 +663,14 @@ export default function TasksPage() {
                             </div>
                           )}
 
-                          {/* Bottom Row: Assignee, Due Date, and DIRECT OUTSOURCE BUTTON */}
-                          <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between gap-2">
-                            {/* Assignee & Due Date */}
-                            <div className="flex items-center gap-2">
-                              {/* Assignee Avatar */}
-                              <div
-                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${task.assignee.bgColor} ${task.assignee.textColor}`}
-                                title={task.assignee.name}
-                              >
-                                {task.assignee.avatarLetter}
-                              </div>
-
-                              <span className="text-[11px] text-content-neutral-500 flex items-center gap-1">
-                                <Calendar className="w-3 h-3 text-content-neutral-400" />
-                                <span>
-                                  {task.dueDate.replace(", 2026", "")}
-                                </span>
+                          {/* Bottom Row: Due Date and Direct Outsource / Delivery Actions */}
+                          <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-content-neutral-500 flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-content-neutral-400" />
+                              <span>
+                                {task.dueDate ? task.dueDate.replace(", 2026", "") : "No due date"}
                               </span>
-                            </div>
+                            </span>
 
                             {/* Direct Outsource Task & Delivery Buttons */}
                             <div className="flex items-center gap-1.5">
@@ -729,15 +734,14 @@ export default function TasksPage() {
                   <th className="py-3 px-4">Category</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Priority</th>
-                  <th className="py-3 px-4">Assignee</th>
                   <th className="py-3 px-4">Due Date</th>
                   <th className="py-3 px-4 text-right">Outsource Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-neutral-100">
-                {filteredTasks.length === 0 && (
+                {displayListTasks.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-0">
+                    <td colSpan={6} className="p-0">
                       <EmptyState
                         title="No tasks found"
                         description="Add a deliverable or adjust your filters to find a task."
@@ -756,89 +760,88 @@ export default function TasksPage() {
                     </td>
                   </tr>
                 )}
-                {filteredTasks.map((task) => (
-                  <tr
-                    key={task.id}
-                    onClick={() => setSelectedTaskForDetail(task)}
-                    className="hover:bg-surface-neutral-50/80 transition-colors cursor-pointer group"
-                  >
-                    <td className="py-3.5 px-4 font-medium text-content-neutral-900 max-w-xs">
-                      <div className="font-semibold text-content-neutral-900 group-hover:text-accent transition-colors truncate">
-                        {task.title}
-                      </div>
-                      <div className="text-xs text-content-neutral-400 truncate">
-                        {task.clientName
-                          ? `Client: ${task.clientName}`
-                          : task.description}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="text-xs px-2 py-0.5 rounded-md bg-surface-neutral-100 text-content-neutral-600 font-medium">
-                        {task.category}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize ${
-                          task.status === "done"
-                            ? "bg-surface-emerald-50 text-content-emerald-700"
-                            : task.status === "in-progress"
-                              ? "bg-surface-blue-50 text-content-blue-700"
-                              : task.status === "review"
-                                ? "bg-surface-amber-50 text-content-amber-700"
-                                : "bg-surface-neutral-100 text-content-neutral-700"
-                        }`}
-                      >
-                        {task.status.replace("-", " ")}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`text-[11px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider ${
-                          task.priority === "urgent"
-                            ? "bg-surface-rose-100 text-content-rose-800"
-                            : task.priority === "high"
-                              ? "bg-surface-orange-100 text-content-orange-800"
-                              : task.priority === "medium"
-                                ? "bg-surface-amber-100 text-content-amber-800"
-                                : "bg-surface-blue-100 text-content-blue-800"
-                        }`}
-                      >
-                        {task.priority}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${task.assignee.bgColor} ${task.assignee.textColor}`}
-                        >
-                          {task.assignee.avatarLetter}
+                {displayListTasks.map((task) => {
+                  const matched = isTaskMatch(task.title);
+                  const dimmed = isSearching && !matched;
+
+                  return (
+                    <tr
+                      key={task.id}
+                      onClick={() => setSelectedTaskForDetail(task)}
+                      className={`transition-colors cursor-pointer group ${
+                        matched
+                          ? "bg-accent/10 border-l-4 border-l-accent opacity-100"
+                          : dimmed
+                            ? "opacity-35 dark:opacity-25 grayscale-[70%] hover:opacity-75"
+                            : "hover:bg-surface-neutral-50/80"
+                      }`}
+                    >
+                      <td className="py-3.5 px-4 font-medium text-content-neutral-900 max-w-xs">
+                        <div className="font-semibold text-content-neutral-900 group-hover:text-accent transition-colors truncate">
+                          <HighlightText text={task.title} query={searchQuery} />
                         </div>
-                        <span className="text-xs text-content-neutral-700">
-                          {task.assignee.name}
+                        <div className="text-xs text-content-neutral-400 truncate">
+                          {task.clientName
+                            ? `Client: ${task.clientName}`
+                            : task.description}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="text-xs px-2 py-0.5 rounded-md bg-surface-neutral-100 text-content-neutral-600 font-medium">
+                          {task.category}
                         </span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-content-neutral-500">
-                      {task.dueDate}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOutsourceTask(task);
-                        }}
-                      >
-                        <GitFork className="w-3.5 h-3.5" />
-                        <span>
-                          {task.isOutsourced ? "Outsourced" : "Outsource"}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize ${
+                            task.status === "done"
+                              ? "bg-surface-emerald-50 text-content-emerald-700"
+                              : task.status === "in-progress"
+                                ? "bg-surface-blue-50 text-content-blue-700"
+                                : task.status === "review"
+                                  ? "bg-surface-amber-50 text-content-amber-700"
+                                  : "bg-surface-neutral-100 text-content-neutral-700"
+                          }`}
+                        >
+                          {task.status.replace("-", " ")}
                         </span>
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider ${
+                            task.priority === "urgent"
+                              ? "bg-surface-rose-100 text-content-rose-800"
+                              : task.priority === "high"
+                                ? "bg-surface-orange-100 text-content-orange-800"
+                                : task.priority === "medium"
+                                  ? "bg-surface-amber-100 text-content-amber-800"
+                                  : "bg-surface-blue-100 text-content-blue-800"
+                          }`}
+                        >
+                          {task.priority}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-xs text-content-neutral-500">
+                        {task.dueDate || "No due date"}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOutsourceTask(task);
+                          }}
+                        >
+                          <GitFork className="w-3.5 h-3.5" />
+                          <span>
+                            {task.isOutsourced ? "Outsourced" : "Outsource"}
+                          </span>
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -886,7 +889,7 @@ export default function TasksPage() {
                 {/* Task Title */}
                 <div>
                   <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                    Task Title *
+                    Task Title <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -951,7 +954,7 @@ export default function TasksPage() {
                   </div>
                 </div>
 
-                {/* Category & Assignee Row */}
+                {/* Category & Client Row */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
@@ -974,26 +977,6 @@ export default function TasksPage() {
 
                   <div>
                     <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Team Assignee
-                    </label>
-                    <select
-                      value={newAssigneeName}
-                      onChange={(e) => setNewAssigneeName(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      {teamMembers.map((m) => (
-                        <option key={m.name} value={m.name}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Client & Due Date Row */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
                       Client Association
                     </label>
                     <select
@@ -1005,19 +988,20 @@ export default function TasksPage() {
                       {clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}
                     </select>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Due Date
-                    </label>
-                    <input
-                      type="date"
-                      value={newDueDate}
-                      onChange={(e) => setNewDueDate(e.target.value)}
-                      placeholder="e.g. Oct 12, 2026"
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
-                    />
-                  </div>
+                {/* Due Date */}
+                <div>
+                  <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                    placeholder="e.g. Oct 12, 2026"
+                    className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
+                  />
                 </div>
 
                 {/* Subcontractor Outsourcing Section */}
@@ -1255,7 +1239,7 @@ export default function TasksPage() {
                 </div>
 
                 {/* Status and Details Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-line-neutral-100 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-line-neutral-100 text-xs">
                   <div>
                     <span className="text-content-neutral-400 block mb-1">Status</span>
                     <select
@@ -1273,19 +1257,10 @@ export default function TasksPage() {
 
                   <div>
                     <span className="text-content-neutral-400 block mb-1">
-                      Assignee
-                    </span>
-                    <span className="font-semibold text-content-neutral-800">
-                      {selectedTaskForDetail.assignee.name}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-content-neutral-400 block mb-1">
                       Due Date
                     </span>
                     <span className="font-semibold text-content-neutral-800">
-                      {selectedTaskForDetail.dueDate}
+                      {selectedTaskForDetail.dueDate || "No due date"}
                     </span>
                   </div>
 
