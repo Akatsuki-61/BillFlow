@@ -32,9 +32,10 @@ nsis:
   uninstallerIcon: build/icon.ico
   oneClick: false
   allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
+  createDesktopShortcut: false
   createStartMenuShortcut: true
   shortcutName: BillFlow
+  include: build/installer.nsh
 mac:
   icon: build/icon.icns
   target:
