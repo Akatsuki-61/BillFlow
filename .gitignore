@@ -17,6 +17,11 @@
 /.next/
 /out/
 
+# ide
+.idea/
+*.iml
+.vscode/
+
 # misc
 .DS_Store
 *.pem

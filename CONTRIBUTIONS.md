@@ -142,6 +142,8 @@ This document records the individual module ownership, development timeline, and
 | **Oct 08** | Lahiru | `Lahiru` | Systematic exploratory QA audit of desktop v0.1.0, logging 17 critical user-facing bugs. |
 | **Oct 08** | Nipun | `Nipun` | Bug resolution across all 17 defects (`c47fb18`), modal z-index re-stacking, and v0.1.1 desktop release. |
 | **Oct 08** | Nipun | `Nipun` | Unclip invoice actions menu, interactive advance tracking status pill, and test suite expansion (`7c45210`). |
+| **Oct 08** | Nipun | `Nipun` / `main` | Production release v0.1.2: receipt attachments, modal draft restore, catalog table layout, interactive status pills, and deletion FK integrity (`c3b273a`). |
+| **Oct 08** | Nipun | `main` | Windows installer NSIS customization: desktop shortcut toggle option on finish screen (`b132a34`). |
 
 ---
 
@@ -149,15 +151,16 @@ This document records the individual module ownership, development timeline, and
 
 The integrated system is tested and verified through automated test suites and production packaging:
 - **Test Framework:** Vitest runner (`vitest run`).
-- **Total Test Suites:** 14 files passed.
-- **Total Unit & Integration Tests:** 96 tests passed (100% pass rate).
+- **Total Test Suites:** 15 files passed.
+- **Total Unit & Integration Tests:** 104 tests passed (100% pass rate).
 - **Type Checking:** `npx tsc --noEmit` compiles cleanly with zero errors.
 - **Linter:** `npm run lint` passes cleanly with zero errors.
 - **Desktop Packaging:**
-  - macOS Apple Silicon (M1+): `release/BillFlow-0.1.1-arm64.dmg` verified and built.
-  - macOS Intel: `release/BillFlow-0.1.0.dmg` verified and built.
-  - Windows: `release/BillFlow.Setup.0.1.1.exe` NSIS installer verified and built.
+  - macOS Apple Silicon (M1+): `release/BillFlow-0.1.2-arm64.dmg` verified and built.
+  - macOS Intel: `release/BillFlow-0.1.2.dmg` verified and built.
+  - Windows: `release/BillFlow Setup 0.1.2.exe` NSIS installer verified and built.
 
 For developer setup, code guidelines, and contribution workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
 For the product overview and freelance workflow specification, see [README.md](README.md).
+
 
