@@ -10,8 +10,8 @@ import {
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 
-import React, { useState, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useMemo, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Search,
@@ -33,10 +33,12 @@ import {
   TaskPriority,
   TaskCategory,
 } from "@/types/tasks";
-
+import type { CalendarEventItem } from "@/types/calendar";
 import { useData } from "@/lib/data/DataProvider";
 import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/tasks/TaskTiming";
+import TaskCalendarView from "@/components/tasks/TaskCalendarView";
+import EventModal from "@/components/tasks/EventModal";
 import Link from "next/link";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 
@@ -95,14 +97,16 @@ const columnDefinitions: {
   },
 ];
 
-export default function TasksPage() {
+function TasksContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialView = searchParams?.get("view") === "calendar" ? "calendar" : searchParams?.get("view") === "list" ? "list" : "kanban";
 
-  const { tasks, invoices, workflow, clients, vendors, settings, isElectron, isLoading, error, activeCurrency } = useData();
+  const { tasks, events, invoices, workflow, clients, vendors, settings, isElectron, isLoading, error, activeCurrency } = useData();
   const [saving, setSaving] = useState(false);
   const draftId = useRef<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "calendar">(initialView);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -111,6 +115,10 @@ export default function TasksPage() {
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [selectedEventToEdit, setSelectedEventToEdit] = useState<CalendarEventItem | null>(null);
+  const [calendarTargetDate, setCalendarTargetDate] = useState<string>("");
+  const [calendarTargetTaskId, setCalendarTargetTaskId] = useState<string>("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const selectedTaskForDetail = tasks.find(task => task.id === selectedTaskId) || null;
   const setSelectedTaskForDetail = (task: TaskItem | null) => { setSubtaskTitle(""); setSelectedTaskId(task?.id || null); };
@@ -408,18 +416,18 @@ export default function TasksPage() {
         title="Tasks"
         description="Manage your sprint deliverables, task execution, and vendor outsourcing."
       >
-        {/* View Switcher & Primary Action in the right corner */}
-        <div className="flex items-center gap-3">
+        {/* View Switcher & Primary Actions in the right corner */}
+        <div className="flex items-center gap-2.5 flex-wrap">
           <SegmentedControl
             value={viewMode}
-            onChange={setViewMode}
+            onChange={(val) => setViewMode(val as "kanban" | "list" | "calendar")}
             label="Task view"
             options={[
               {
                 value: "kanban",
                 label: (
                   <>
-                    <Kanban />
+                    <Kanban className="w-4 h-4" />
                     Board
                   </>
                 ),
@@ -428,13 +436,37 @@ export default function TasksPage() {
                 value: "list",
                 label: (
                   <>
-                    <List />
+                    <List className="w-4 h-4" />
                     List
+                  </>
+                ),
+              },
+              {
+                value: "calendar",
+                label: (
+                  <>
+                    <Calendar className="w-4 h-4" />
+                    Calendar
                   </>
                 ),
               },
             ]}
           />
+
+          {/* Create Event Button */}
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setCalendarTargetDate(new Date().toISOString().split("T")[0]);
+              setCalendarTargetTaskId("");
+              setSelectedEventToEdit(null);
+              setIsEventModalOpen(true);
+            }}
+            title="Schedule a client meeting, milestone review, or deadline"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>New Event</span>
+          </Button>
 
           {/* Create Task Button */}
           <Button
@@ -487,7 +519,6 @@ export default function TasksPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search tasks by name..."
             className="ui-field ui-search-input w-full !pl-10 pl-10 pr-9 border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-sm"
-            style={{ paddingLeft: "40px" }}
           />
           {searchQuery && (
             <Button
@@ -792,7 +823,7 @@ export default function TasksPage() {
             );
           })}
         </div>
-      ) : (
+      ) : viewMode === "list" ? (
         /* LIST VIEW */
         <div key="list" className="ui-card motion-page overflow-hidden">
           <div className="overflow-x-auto">
@@ -912,6 +943,32 @@ export default function TasksPage() {
             </table>
           </div>
         </div>
+      ) : (
+        /* CALENDAR VIEW */
+        <TaskCalendarView
+          tasks={baseTasks}
+          events={events}
+          onSelectTask={(task) => setSelectedTaskForDetail(task)}
+          onSelectEvent={(evt) => {
+            setSelectedEventToEdit(evt);
+            setIsEventModalOpen(true);
+          }}
+          onAddTaskForDate={(dateStr) => {
+            setNewDueDate(dateStr);
+            openAddTaskModal("todo");
+          }}
+          onAddEventForDate={(dateStr) => {
+            setCalendarTargetDate(dateStr);
+            setCalendarTargetTaskId("");
+            setSelectedEventToEdit(null);
+            setIsEventModalOpen(true);
+          }}
+          onRescheduleTask={async (taskId, newDate) => {
+            const ok = await saveTask(taskId, { dueDate: newDate });
+            if (ok) showToast(`Rescheduled task to ${newDate}`);
+            return ok;
+          }}
+        />
       )}
 
       {/* CREATE NEW TASK MODAL */}
@@ -1365,17 +1422,59 @@ export default function TasksPage() {
                   <span>Delete Task</span>
                 </Button>
 
-                <Button
-                  variant="primary"
-                  onClick={() => setSelectedTaskForDetail(null)}
-                >
-                  Close
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setCalendarTargetDate(selectedTaskForDetail.dueDate || new Date().toISOString().split("T")[0]);
+                      setCalendarTargetTaskId(selectedTaskForDetail.id);
+                      setSelectedEventToEdit(null);
+                      setIsEventModalOpen(true);
+                    }}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Schedule Event</span>
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    onClick={() => setSelectedTaskForDetail(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
             </MotionSurface>
           </MotionSurface>
         )}
       </MotionPresence>
+
+      {/* USER LOCAL CALENDAR EVENT MODAL */}
+      <EventModal
+        isOpen={isEventModalOpen}
+        onClose={() => {
+          setIsEventModalOpen(false);
+          setSelectedEventToEdit(null);
+        }}
+        eventToEdit={selectedEventToEdit}
+        initialDate={calendarTargetDate}
+        initialTaskId={calendarTargetTaskId}
+        onSaved={(msg) => showToast(msg)}
+      />
     </div>
+  );
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="workspace-page motion-page">
+          <div className="h-10 w-48 bg-surface-neutral-200 rounded-xl" />
+        </div>
+      }
+    >
+      <TasksContent />
+    </Suspense>
   );
 }

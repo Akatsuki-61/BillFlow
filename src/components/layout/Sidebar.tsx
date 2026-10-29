@@ -12,6 +12,7 @@ import {
   CreditCard,
   GitFork,
   ClipboardList,
+  CalendarDays,
   BarChart3,
   Settings,
   HelpCircle,
@@ -40,6 +41,7 @@ const mainNavItems: NavItem[] = [
     icon: GitFork,
   },
   { id: "tasks", name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { id: "calendar", name: "Calendar", href: "/calendar", icon: CalendarDays },
   { id: "analytics", name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
 

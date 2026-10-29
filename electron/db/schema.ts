@@ -263,3 +263,23 @@ export const invoicePdfExports = sqliteTable("invoice_pdf_exports", {
   filePath: text("file_path").notNull(),
   exportedAt: text("exported_at").notNull(),
 });
+
+export const calendarEvents = sqliteTable("calendar_events", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date"),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
+  category: text("category").notNull().default("general"),
+  color: text("color").notNull().default("blue"),
+  clientId: text("client_id").references(() => clients.id, { onDelete: "set null" }),
+  clientName: text("client_name"),
+  taskId: text("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  taskTitle: text("task_title"),
+  location: text("location"),
+  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+});

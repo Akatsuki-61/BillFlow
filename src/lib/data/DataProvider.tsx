@@ -41,6 +41,11 @@ import type {
 import type { TaskItem } from "@/types/tasks";
 import type { WorkflowAPI, TrackingOffer, AttachmentItem } from "@/types/workflow";
 import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "@/types/expenses";
+import type {
+  CalendarEventItem,
+  NewCalendarEventInput,
+  CalendarEventPatchInput,
+} from "@/types/calendar";
 
 const DEFAULT_SETTINGS: AppSettings = {
   id: "default",
@@ -74,6 +79,7 @@ interface DataContextType {
   vendors: VendorItem[];
   expenses: ExpenseItem[];
   workOrders: WorkOrderItem[];
+  events: CalendarEventItem[];
   catalogItems: CatalogItem[];
   dashboard: DashboardSummary | null;
   settings: AppSettings | null;
@@ -107,6 +113,9 @@ interface DataContextType {
   updateExpense: (id: string, patch: ExpensePatchInput) => Promise<ExpenseItem>;
   deleteExpense: (id: string) => Promise<void>;
   attachExpenseReceipt: (expenseId: string, requestId: string) => Promise<AttachmentItem | null>;
+  createEvent: (input: NewCalendarEventInput) => Promise<CalendarEventItem>;
+  updateEvent: (id: string, patch: CalendarEventPatchInput) => Promise<CalendarEventItem>;
+  deleteEvent: (id: string) => Promise<void>;
   createWorkOrder: (input: NewWorkOrderInput) => Promise<WorkOrderItem>;
   updateWorkOrder: (id: string, patch: WorkOrderPatchInput) => Promise<WorkOrderItem>;
   reviewWorkOrder: (input: ReviewWorkOrderInput) => Promise<WorkOrderItem>;
@@ -137,6 +146,7 @@ let memoryPayments: InvoicePayment[] = [];
 let memoryVendors: VendorItem[] = [];
 let memoryExpenses: ExpenseItem[] = [];
 let memoryWorkOrders: WorkOrderItem[] = [];
+let memoryEvents: CalendarEventItem[] = [];
 let memoryTasks: TaskItem[] = [];
 let memorySettings: AppSettings = { ...DEFAULT_SETTINGS };
 
@@ -155,6 +165,7 @@ async function loadBrowserSnapshot() {
     catalogItems: [...memoryCatalog],
     tasks: [...memoryTasks],
     workOrders: [...memoryWorkOrders],
+    events: [...memoryEvents],
     settings: { ...memorySettings },
     dashboard: {
       activeClients: memoryClients.length,
@@ -180,6 +191,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [vendors, setVendors] = useState<VendorItem[]>([]);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrderItem[]>([]);
+  const [events, setEvents] = useState<CalendarEventItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -192,7 +204,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const loadSnapshot = useCallback(async () => {
     if (checkIsElectron() && window.billflow) {
-      const [clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expensesList, workOrdersList] = await Promise.all([
+      const [clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expensesList, workOrdersList, eventsList] = await Promise.all([
         window.billflow.clients.list(),
         window.billflow.invoices.list(),
         window.billflow.dashboard.summary(),
@@ -203,8 +215,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         window.billflow.tracking.pending(),
         window.billflow.expenses ? window.billflow.expenses.list() : Promise.resolve([]),
         window.billflow.workOrders?.list().catch(() => [] as WorkOrderItem[]) ?? Promise.resolve([] as WorkOrderItem[]),
+        window.billflow.events ? window.billflow.events.list().catch(() => [] as CalendarEventItem[]) : Promise.resolve([] as CalendarEventItem[]),
       ]);
-      return { clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expenses: expensesList || [], workOrders: workOrdersList || [], isElectron: true };
+      return { clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expenses: expensesList || [], workOrders: workOrdersList || [], events: eventsList || [], isElectron: true };
     }
     const browser = await loadBrowserSnapshot();
     return { ...browser, trackingOffers: [] as TrackingOffer[], isElectron: false };
@@ -222,6 +235,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setVendors(snapshot.vendors);
     setExpenses(snapshot.expenses || []);
     setWorkOrders(snapshot.workOrders || []);
+    setEvents(snapshot.events || []);
     setCatalogItems(snapshot.catalogItems);
     setSettings(snapshot.settings);
     setDashboard(snapshot.dashboard);
@@ -1205,6 +1219,64 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
+  const createEvent = async (input: NewCalendarEventInput): Promise<CalendarEventItem> => {
+    if (checkIsElectron() && window.billflow?.events) {
+      const created = await window.billflow.events.create(input);
+      await refresh();
+      return created;
+    } else {
+      const id = input.id || `evt-${Date.now()}`;
+      const now = new Date().toISOString();
+      const newEvt: CalendarEventItem = {
+        id,
+        title: input.title,
+        description: input.description || "",
+        startDate: input.startDate,
+        endDate: input.endDate || null,
+        startTime: input.startTime || null,
+        endTime: input.endTime || null,
+        isAllDay: Boolean(input.isAllDay),
+        category: input.category || "general",
+        color: input.color || "blue",
+        clientId: input.clientId || null,
+        clientName: input.clientName || null,
+        taskId: input.taskId || null,
+        taskTitle: input.taskTitle || null,
+        location: input.location || null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      memoryEvents = [newEvt, ...memoryEvents];
+      await refresh();
+      return newEvt;
+    }
+  };
+
+  const updateEvent = async (id: string, patch: CalendarEventPatchInput): Promise<CalendarEventItem> => {
+    if (checkIsElectron() && window.billflow?.events) {
+      const updated = await window.billflow.events.update(id, patch);
+      await refresh();
+      return updated;
+    } else {
+      const now = new Date().toISOString();
+      memoryEvents = memoryEvents.map((evt) => (evt.id === id ? { ...evt, ...patch, updatedAt: now } : evt));
+      const found = memoryEvents.find((evt) => evt.id === id);
+      if (!found) throw new Error("Calendar event not found");
+      await refresh();
+      return found;
+    }
+  };
+
+  const deleteEvent = async (id: string): Promise<void> => {
+    if (checkIsElectron() && window.billflow?.events) {
+      await window.billflow.events.remove(id);
+      await refresh();
+    } else {
+      memoryEvents = memoryEvents.filter((evt) => evt.id !== id);
+      await refresh();
+    }
+  };
+
   const requireDesktop = () => {
     if (!checkIsElectron() || !window.billflow) throw new Error("Open the BillFlow desktop app to save workflow records.");
     return window.billflow;
@@ -1298,6 +1370,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         vendors,
         expenses,
         workOrders,
+        events,
         catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems,
         dashboard,
         settings,
@@ -1327,6 +1400,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updateExpense,
         deleteExpense,
         attachExpenseReceipt,
+        createEvent,
+        updateEvent,
+        deleteEvent,
         createWorkOrder,
         updateWorkOrder,
         reviewWorkOrder,
