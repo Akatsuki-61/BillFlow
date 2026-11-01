@@ -331,8 +331,8 @@ export default function SupportPage() {
             subcontractor work orders, and local SQLite data management.
           </p>
 
-          <div className="relative pt-1">
-            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="relative">
+            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 inset-y-0 my-auto pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
@@ -345,10 +345,10 @@ export default function SupportPage() {
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-1 rounded-md"
+                className="absolute right-2.5 inset-y-0 my-auto w-7 h-7 flex items-center justify-center rounded-md text-content-neutral-400 hover:text-content-neutral-700 hover:bg-surface-neutral-100 transition-colors cursor-pointer"
                 aria-label="Clear search query"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 hover:scale-100" />
               </button>
             )}
           </div>

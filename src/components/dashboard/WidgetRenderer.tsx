@@ -9,6 +9,8 @@ import {
   sharePercent,
   taskProgress,
   recentMonths,
+  localDateKey,
+  SHORT_MONTHS,
 } from "@/lib/visual-metrics";
 import { useRouter } from "next/navigation";
 import {
@@ -19,7 +21,7 @@ import {
   Maximize2,
   Minimize2,
   X,
-  MoreHorizontal,
+  Lightbulb,
 } from "lucide-react";
 import {
   useData,
@@ -339,7 +341,7 @@ export function WidgetRenderer({
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = d.toLocaleString("default", { month: "short" });
+      const label = SHORT_MONTHS[d.getMonth()];
       months.push({
         key,
         label,
@@ -473,6 +475,7 @@ export function WidgetRenderer({
     barPct,
     stripeTone = "blue",
     href = "/analytics",
+    actionLabel,
   }: {
     title: string;
     value: React.ReactNode;
@@ -481,6 +484,7 @@ export function WidgetRenderer({
     barPct?: number;
     stripeTone?: "blue" | "green" | "pink" | "amber";
     href?: string;
+    actionLabel?: string;
   }) => {
     const stripeClass =
       stripeTone === "green"
@@ -513,67 +517,283 @@ export function WidgetRenderer({
           isCompact ? "p-4 min-h-[155px]" : "p-6 min-h-[195px]"
         }`}
       >
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
-            {title}
-          </h3>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              router.push(href);
-            }}
-            className="zentra-circle-btn zentra-circle-btn--sm"
-            aria-label={`Open ${title}`}
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="my-3 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div
-              className={`${
-                isCompact ? "text-[26px]" : "text-[36px]"
-              } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
-            >
-              {value}
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="zentra-pill-badge !py-0.5 !px-2.5 !text-[11.5px]">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${dotActiveColor}`}
-                />
-                {badgeText}
-              </span>
-            </div>
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+              {title}
+            </h3>
           </div>
-        </div>
 
-        {barPct !== undefined && (
-          <div className="pt-2.5 border-t border-line-neutral-100 space-y-2">
-            <div className="flex items-center justify-between text-[12px] text-content-neutral-500">
-              <span className="truncate">{subtitle}</span>
-              <span className="font-semibold tabular-nums text-content-neutral-800">
-                {Math.round(barPct)}%
-              </span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-surface-neutral-100 p-[1.5px] overflow-hidden">
+          <div className="my-3 flex items-end justify-between gap-3">
+            <div className="min-w-0">
               <div
-                className={`h-full rounded-full ${stripeClass} transition-all duration-500`}
-                style={{ width: `${Math.round(barPct)}%` }}
-              />
+                className={`${
+                  isCompact ? "text-[26px]" : "text-[36px]"
+                } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+              >
+                {value}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="zentra-pill-badge !py-0.5 !px-2.5 !text-[11.5px]">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${dotActiveColor}`}
+                  />
+                  {badgeText}
+                </span>
+              </div>
             </div>
           </div>
-        )}
-        {barPct === undefined && <p className="summary-caption">{subtitle}</p>}
+
+          {barPct !== undefined && (
+            <div className="pt-2.5 border-t border-line-neutral-100 space-y-2">
+              <div className="flex items-center justify-between text-[12px] text-content-neutral-500">
+                <span className="truncate">{subtitle}</span>
+                <span className="font-semibold tabular-nums text-content-neutral-800">
+                  {Math.round(barPct)}%
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-surface-neutral-100 p-[1.5px] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${stripeClass} transition-all duration-500`}
+                  style={{ width: `${Math.round(barPct)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {barPct === undefined && <p className="summary-caption">{subtitle}</p>}
+        </div>
+
+        <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+          <span className="truncate text-[12px]">{subtitle}</span>
+          <Link
+            href={href}
+            onClick={(e) => e.stopPropagation()}
+            className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
+          >
+            <span>{actionLabel || `Open ${title}`}</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </div>
     );
   };
 
+  const [activeInsightIndex, setActiveInsightIndex] = useState(0);
+
+  const insightSlides = useMemo(() => {
+    let totalBilledCents = 0;
+    let collectedCents = 0;
+
+    filteredInvoices.forEach((inv) => {
+      totalBilledCents += inv.amountCents;
+      const collected =
+        inv.paidCents ?? (inv.status === "PAID" ? inv.amountCents : 0);
+      collectedCents += collected;
+    });
+
+    const contractorCents = workOrders
+      .filter(
+        (order) =>
+          order.currency === activeCurrency &&
+          filteredInvoices.some((inv) => inv.id === order.invoiceId),
+      )
+      .reduce((sum, order) => sum + order.feeCents, 0);
+
+    const generalExpCents = (expenses || [])
+      .filter(
+        (expense) =>
+          expense.currency === activeCurrency &&
+          (period === "all" ||
+            (period === "year"
+              ? expense.incurredAt.slice(0, 4) ===
+                String(new Date().getFullYear())
+              : period === "month"
+                ? expense.incurredAt.slice(0, 7) === localDateKey().slice(0, 7)
+                : new Date(expense.incurredAt).getFullYear() ===
+                    new Date().getFullYear() &&
+                  Math.floor(new Date(expense.incurredAt).getMonth() / 3) ===
+                    Math.floor(new Date().getMonth() / 3))),
+      )
+      .reduce((sum, e) => sum + (e.amountCents || 0), 0);
+
+    const netRetainedCents =
+      totalBilledCents - contractorCents - generalExpCents;
+
+    const collectionRatePct =
+      totalBilledCents > 0
+        ? Math.round((collectedCents / totalBilledCents) * 100)
+        : 0;
+
+    const completedTasksCount = tasks.filter((t) => t.status === "done").length;
+    const activeClientsCount = clients.filter(
+      (c) => c.invoicesCount > 0 || c.outstandingBalanceCents > 0,
+    ).length;
+
+    return [
+      {
+        metric: `${collectionRatePct}%`,
+        title:
+          "Advance payment collection keeps project cashflow positive from day one",
+        description:
+          "Recording the 50% advance deposit before generating sprint deliverables connects billing directly to execution.",
+        actionLabel: "Open Invoices",
+        actionHref: "/invoices",
+      },
+      {
+        metric: `${completedTasksCount}/${tasks.length}`,
+        title: `${completedTasksCount} of ${tasks.length} linked deliverables completed on the sprint board`,
+        description:
+          "Invoice line items convert into trackable Kanban deliverables with independent subcontractor outsourcing.",
+        actionLabel: "Open Sprint Board",
+        actionHref: "/tasks",
+      },
+      {
+        metric: `${activeClientsCount}`,
+        title: `${activeClientsCount} active client accounts with connected delivery repositories`,
+        description:
+          "Saved delivery links keep source repositories, staging URLs, and consulting docs attached to every job.",
+        actionLabel: "Open Clients",
+        actionHref: "/clients",
+      },
+      {
+        metric: formatCents(netRetainedCents, activeCurrency),
+        title:
+          "Net retained earnings after subcontractor work orders and operating expenses",
+        description:
+          "All figures reflect real recorded payments and contractor payouts in your local SQLite workspace.",
+        actionLabel: "Open Expenses",
+        actionHref: "/expenses",
+      },
+    ];
+  }, [
+    filteredInvoices,
+    workOrders,
+    expenses,
+    tasks,
+    clients,
+    activeCurrency,
+    period,
+  ]);
+
   // Render individual widget based on ID
   const renderContent = () => {
     switch (widgetId) {
+      // 0. Workspace Insights — Atmospheric Spotlight Hero Card
+      case "workspace-insights": {
+        const currentInsight =
+          insightSlides[activeInsightIndex % insightSlides.length];
+        const isCompact = displaySize === "compact";
+
+        return (
+          <div
+            onClick={() =>
+              setActiveInsightIndex((prev) => (prev + 1) % insightSlides.length)
+            }
+            className={`dashboard-insight zentra-insights-card rounded-[24px] shadow-sm cursor-pointer select-none relative overflow-hidden transition-all h-full ${
+              isCompact
+                ? "p-5 flex flex-col justify-between gap-4 min-h-[170px]"
+                : "p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 min-h-[160px]"
+            }`}
+          >
+            {/* Decorative Glass Geometric Prism SVG (right) */}
+            <svg
+              className="absolute -top-6 -right-4 w-56 h-56 text-white/25 pointer-events-none"
+              viewBox="0 0 200 200"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M70 10 L190 50 L150 185 L35 130 Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                fill="rgba(255,255,255,0.06)"
+              />
+              <path
+                d="M70 10 L125 95 L190 50"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M125 95 L150 185"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M35 130 L125 95"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+            </svg>
+
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-5">
+              <div className="flex flex-col gap-2 shrink-0">
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/25 text-white text-[12.5px] font-medium w-fit">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-200" />
+                  <span>Workspace Insights</span>
+                </span>
+                <div
+                  className={`${
+                    isCompact ? "text-[30px]" : "text-[40px] xl:text-[46px]"
+                  } font-medium tracking-[-0.04em] leading-none tabular-nums text-white`}
+                >
+                  {currentInsight.metric}
+                </div>
+              </div>
+
+              <div className="sm:border-l sm:border-white/25 sm:pl-5 max-w-xl">
+                <h3
+                  className={`${
+                    isCompact ? "text-[14.5px]" : "text-[16.5px]"
+                  } font-semibold text-white leading-snug`}
+                >
+                  {currentInsight.title}
+                </h3>
+                <p
+                  className={`${
+                    isCompact ? "text-[12px] line-clamp-2" : "text-[13px]"
+                  } text-white/85 mt-1 leading-relaxed`}
+                >
+                  {currentInsight.description}
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Quick Action Pill + 4-Segment Progress Indicator */}
+            <div
+              className="relative z-10 flex flex-col sm:items-end justify-between gap-4 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => router.push(currentInsight.actionHref)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-[#111115] text-[12.5px] font-semibold shadow-sm hover:bg-white/90 transition-all cursor-pointer w-fit"
+              >
+                <span>{currentInsight.actionLabel}</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="flex items-center gap-2 w-40">
+                {insightSlides.map((_, idx) => {
+                  const isCurrent =
+                    idx === activeInsightIndex % insightSlides.length;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      aria-label={`Insight ${idx + 1}`}
+                      onClick={() => setActiveInsightIndex(idx)}
+                      className={`h-1.5 flex-1 rounded-full transition-all cursor-pointer ${
+                        isCurrent ? "bg-white" : "bg-white/30 hover:bg-white/50"
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       // 1. Total Revenue — Zentra Pattern B (Big Metric + Trend Pill + 3 Diagonal-Striped Breakdown Bars)
       case "total-revenue": {
         const settledPct = sharePercent(paidFullCents, totalRevenueCents);
@@ -590,14 +810,6 @@ export function WidgetRenderer({
                 <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
                   Gross Volume & Revenue
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => router.push("/invoices")}
-                  className="zentra-circle-btn zentra-circle-btn--sm"
-                  aria-label="Open Invoices"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
               </div>
 
               <div className="mt-4 flex items-center gap-3 flex-wrap">
@@ -664,6 +876,17 @@ export function WidgetRenderer({
                 </div>
               </div>
             </div>
+
+            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>{paidRatioPct}% collected</span>
+              <Link
+                href="/invoices"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Invoices</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
       }
@@ -687,6 +910,16 @@ export function WidgetRenderer({
               }))}
               formatValue={(value) => formatCents(value, activeCurrency)}
             />
+            <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>{marginPct}% net margin</span>
+              <Link
+                href="/analytics"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Analytics</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
       }
@@ -695,58 +928,66 @@ export function WidgetRenderer({
       case "pending-receivables": {
         return (
           <div className="ui-card receivables-card p-6 flex flex-col justify-between h-full">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
-                Pending Receivables
-              </h3>
-              <button
-                type="button"
-                onClick={() => router.push("/invoices")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Invoices"
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
+                  Pending Receivables
+                </h3>
+              </div>
+
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                  <div className="text-[38px] font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums">
+                    {pendingReceivablesStr}
+                  </div>
+                  <div className="mt-2 text-[12.5px] text-content-neutral-500">
+                    {pendingCount}{" "}
+                    {pendingCount === 1
+                      ? "invoice awaiting payment"
+                      : "invoices awaiting payment"}
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0 hidden sm:block">
+                  <div className="text-[11.5px] text-content-neutral-400">
+                    paid ratio
+                  </div>
+                  <div className="text-[18px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
+                    {paidRatioPct}%
+                  </div>
+                </div>
+              </div>
+
+              <DataDots
+                label="Open invoices by issue month"
+                noun="invoices"
+                tone="green"
+                points={recentMonths().map((month) => ({
+                  ...month,
+                  value: filteredInvoices.filter(
+                    (invoice) =>
+                      invoice.currency === activeCurrency &&
+                      invoice.status !== "DRAFT" &&
+                      invoice.amountCents > invoice.paidCents &&
+                      invoice.issueDate.startsWith(month.key),
+                  ).length,
+                }))}
+              />
+            </div>
+
+            <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>
+                {pendingCount}{" "}
+                {pendingCount === 1 ? "invoice awaiting" : "invoices awaiting"}
+              </span>
+              <Link
+                href="/invoices"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
               >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
+                <span>Open Invoices</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
-
-            <div className="mt-4 flex items-end justify-between gap-4">
-              <div>
-                <div className="text-[38px] font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums">
-                  {pendingReceivablesStr}
-                </div>
-                <div className="mt-2 text-[12.5px] text-content-neutral-500">
-                  {pendingCount}{" "}
-                  {pendingCount === 1
-                    ? "invoice awaiting payment"
-                    : "invoices awaiting payment"}
-                </div>
-              </div>
-
-              <div className="text-right shrink-0 hidden sm:block">
-                <div className="text-[11.5px] text-content-neutral-400">
-                  paid ratio
-                </div>
-                <div className="text-[18px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
-                  {paidRatioPct}%
-                </div>
-              </div>
-            </div>
-
-            <DataDots
-              label="Open invoices by issue month"
-              noun="invoices"
-              tone="green"
-              points={recentMonths().map((month) => ({
-                ...month,
-                value: filteredInvoices.filter(
-                  (invoice) =>
-                    invoice.currency === activeCurrency &&
-                    invoice.status !== "DRAFT" &&
-                    invoice.amountCents > invoice.paidCents &&
-                    invoice.issueDate.startsWith(month.key),
-                ).length,
-              }))}
-            />
           </div>
         );
       }
@@ -760,50 +1001,55 @@ export function WidgetRenderer({
 
         return (
           <div className="ui-card p-6 flex flex-col justify-between h-full">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
-                Customers & Clients
-              </h3>
-              <button
-                type="button"
-                onClick={() => router.push("/clients")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Clients"
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
+                  Customers & Clients
+                </h3>
+              </div>
+
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                  <div className="text-[40px] font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums">
+                    {totalClientsCount.toLocaleString()}
+                  </div>
+                  <div className="mt-2 text-[12.5px] text-content-neutral-500">
+                    {activeClientsCount} active accounts
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0 hidden sm:block">
+                  <div className="text-[11.5px] text-content-neutral-400">
+                    active share
+                  </div>
+                  <div className="text-[18px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
+                    {activeRatio}%
+                  </div>
+                </div>
+              </div>
+
+              <DataDots
+                label="New clients by month"
+                noun="clients"
+                points={recentMonths().map((month) => ({
+                  ...month,
+                  value: clients.filter((client) =>
+                    client.createdAt.startsWith(month.key),
+                  ).length,
+                }))}
+              />
+            </div>
+
+            <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>{activeClientsCount} active accounts</span>
+              <Link
+                href="/clients"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
               >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
+                <span>Open Clients</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
-
-            <div className="mt-4 flex items-end justify-between gap-4">
-              <div>
-                <div className="text-[40px] font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums">
-                  {totalClientsCount.toLocaleString()}
-                </div>
-                <div className="mt-2 text-[12.5px] text-content-neutral-500">
-                  {activeClientsCount} active accounts
-                </div>
-              </div>
-
-              <div className="text-right shrink-0 hidden sm:block">
-                <div className="text-[11.5px] text-content-neutral-400">
-                  active share
-                </div>
-                <div className="text-[18px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
-                  {activeRatio}%
-                </div>
-              </div>
-            </div>
-
-            <DataDots
-              label="New clients by month"
-              noun="clients"
-              points={recentMonths().map((month) => ({
-                ...month,
-                value: clients.filter((client) =>
-                  client.createdAt.startsWith(month.key),
-                ).length,
-              }))}
-            />
           </div>
         );
       }
@@ -824,6 +1070,7 @@ export function WidgetRenderer({
               : 0,
           stripeTone: "blue",
           href: "/outsourcing",
+          actionLabel: "Open Outsourcing",
         });
 
       // 6. Operating Expenses
@@ -836,6 +1083,7 @@ export function WidgetRenderer({
           barPct: opexRatioPct,
           stripeTone: "pink",
           href: "/expenses",
+          actionLabel: "Open Expenses",
         });
 
       // 7. Paid Ratio
@@ -848,6 +1096,7 @@ export function WidgetRenderer({
           barPct: paidRatioPct,
           stripeTone: "green",
           href: "/invoices",
+          actionLabel: "Open Invoices",
         });
 
       // 8. Average Invoice Value
@@ -862,6 +1111,7 @@ export function WidgetRenderer({
           subtitle: "Mean contract ticket size",
           stripeTone: "blue",
           href: "/invoices",
+          actionLabel: "Open Invoices",
         });
 
       // 9. Overdue Receivables
@@ -879,6 +1129,7 @@ export function WidgetRenderer({
               : 0,
           stripeTone: "pink",
           href: "/invoices",
+          actionLabel: "Open Invoices",
         });
 
       // 10. Cashflow Runway
@@ -891,6 +1142,7 @@ export function WidgetRenderer({
             "Runway needs a cash reserve balance, which BillFlow does not record.",
           stripeTone: "green",
           href: "/analytics",
+          actionLabel: "Open Analytics",
         });
 
       // 11. Top Client Concentration
@@ -903,6 +1155,7 @@ export function WidgetRenderer({
           barPct: topClientPct,
           stripeTone: "blue",
           href: "/clients",
+          actionLabel: "Open Clients",
         });
 
       // 12. Realized Hourly Yield
@@ -920,6 +1173,7 @@ export function WidgetRenderer({
           subtitle: "Billed profit divided by recorded active hours",
           stripeTone: "green",
           href: "/tasks",
+          actionLabel: "Open Sprint Board",
         });
 
       // 13. Revenue vs Expenses Paired Bar Chart (Zentra Royal Blue & Pink Hatched Bars)
@@ -1101,9 +1355,13 @@ export function WidgetRenderer({
                   </strong>
                 </span>
               </div>
-              <span className="zentra-pill-badge !py-0.5 !px-2.5 !text-[11px]">
-                {filteredInvoices.length} Active Invoices
-              </span>
+              <Link
+                href="/analytics"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Analytics</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
         );
@@ -1119,17 +1377,6 @@ export function WidgetRenderer({
                 <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
                   Payments & Billing Pipeline
                 </h3>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => router.push("/invoices")}
-                  className="zentra-circle-btn zentra-circle-btn--sm"
-                  aria-label="Open Invoices"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
               </div>
             </div>
 
@@ -1249,10 +1496,19 @@ export function WidgetRenderer({
               </div>
             </div>
 
-            <p className="summary-caption mt-4">
-              Bar heights compare absolute amounts. Net profit uses billed
-              revenue; pink indicates a loss.
-            </p>
+            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span className="summary-caption">
+                Bar heights compare absolute amounts. Net profit uses billed
+                revenue.
+              </span>
+              <Link
+                href="/invoices"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
+              >
+                <span>Open Invoices</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
       }
@@ -1272,14 +1528,6 @@ export function WidgetRenderer({
               <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
                 Collection Efficiency
               </h3>
-              <button
-                type="button"
-                onClick={() => router.push("/invoices")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Invoices"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
             </div>
 
             <div className="my-4 flex items-center gap-5">
@@ -1356,9 +1604,13 @@ export function WidgetRenderer({
 
             <div className="pt-2.5 border-t border-line-neutral-100 flex items-center justify-between text-[12px] text-content-neutral-500">
               <span>{overdueInvoices.length} overdue invoices</span>
-              <span className="zentra-pill-badge !py-0.5 !px-2 !text-[11px]">
-                {hasInvoices ? "Live Ledger" : "No Invoices"}
-              </span>
+              <Link
+                href="/invoices"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Invoices</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
         );
@@ -1385,14 +1637,6 @@ export function WidgetRenderer({
                     {overdueInvoices.length} overdue
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => router.push("/invoices")}
-                  className="zentra-circle-btn zentra-circle-btn--sm"
-                  aria-label="Open Invoices"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
               </div>
 
               {/* Visual Overdue Amount & Striped Urgency Bar */}
@@ -1463,7 +1707,7 @@ export function WidgetRenderer({
                 href="/invoices"
                 className="text-content-neutral-900 font-medium hover:underline inline-flex items-center gap-1"
               >
-                <span>Resolve</span>
+                <span>Open Invoices</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -1486,14 +1730,6 @@ export function WidgetRenderer({
                     {paidRatioPct}% collected
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => router.push("/invoices")}
-                  className="zentra-circle-btn zentra-circle-btn--sm"
-                  aria-label="All Invoices"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
               </div>
 
               {/* Visual Collection Split Strip */}
@@ -1669,14 +1905,6 @@ export function WidgetRenderer({
                     <span>{taskCounts.donePct}% completed</span>
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => router.push("/tasks")}
-                  className="zentra-circle-btn zentra-circle-btn--sm"
-                  aria-label="Open Tasks Board"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
               </div>
 
               {/* Poppy 4-Stage Diagonal-Striped Sprint Matrix */}
@@ -1827,16 +2055,18 @@ export function WidgetRenderer({
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/tasks")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Tasks"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
             </div>
             <LatencyPercentilesChart />
+            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>Completed tasks active hours</span>
+              <Link
+                href="/tasks"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Sprint Board</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
 
@@ -1855,16 +2085,18 @@ export function WidgetRenderer({
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/catalog")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Catalog"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
             </div>
             <PortfolioComparisonChart />
+            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>Itemized service catalog breakdown</span>
+              <Link
+                href="/catalog"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Catalog</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
 
@@ -1883,16 +2115,18 @@ export function WidgetRenderer({
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/analytics")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Analytics"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
             </div>
             <GrowthBenchmarkChart />
+            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>8-week sprint velocity benchmark</span>
+              <Link
+                href="/analytics"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Analytics</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
 
@@ -1911,16 +2145,18 @@ export function WidgetRenderer({
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/analytics")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Analytics"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
             </div>
             <AudienceGrowthChart />
+            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>Net cashflow & collections ledger</span>
+              <Link
+                href="/analytics"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Analytics</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
 
@@ -1939,16 +2175,18 @@ export function WidgetRenderer({
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/analytics")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Analytics"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
             </div>
             <ServiceTrendsLineChart />
+            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>Monthly service category delivery</span>
+              <Link
+                href="/analytics"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Analytics</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
 
@@ -1967,16 +2205,18 @@ export function WidgetRenderer({
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/catalog")}
-                className="zentra-circle-btn zentra-circle-btn--sm"
-                aria-label="Open Catalog"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
             </div>
             <ItemizedVolumeBarChart />
+            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span>Service volume by description category</span>
+              <Link
+                href="/catalog"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Open Catalog</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         );
 
@@ -2074,7 +2314,7 @@ export function WidgetRenderer({
       )}
 
       {isDraggable && source === "analytics" && !isEditing && (
-        <div className="absolute top-3 right-12 z-20 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1.5 rounded-full bg-surface/90 shadow-xs border border-line-neutral-200 pointer-events-none">
+        <div className="absolute top-3.5 right-3.5 z-20 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1.5 rounded-full bg-surface/90 shadow-xs border border-line-neutral-200 pointer-events-none">
           <GripVertical className="w-3.5 h-3.5 text-content-neutral-500" />
         </div>
       )}

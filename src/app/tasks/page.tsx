@@ -43,6 +43,24 @@ import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/tasks/TaskTiming";
 import Link from "next/link";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
+import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
+
+const PRIORITY_OPTIONS: SelectOption[] = [
+  { value: "all", label: "Priority: All" },
+  { value: "urgent", label: "Urgent" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+
+const CATEGORY_OPTIONS: SelectOption[] = [
+  { value: "all", label: "Category: All" },
+  { value: "Development", label: "Development" },
+  { value: "Design", label: "Design" },
+  { value: "Infrastructure", label: "Infrastructure" },
+  { value: "Legal", label: "Legal" },
+  { value: "Documentation", label: "Documentation" },
+];
 
 function HighlightText({ text, query }: { text: string; query: string }) {
   const trimmed = query.trim();
@@ -654,42 +672,27 @@ export default function TasksPage() {
 
         {/* Dropdowns - Priority & Category */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="relative w-36">
-            <select
-              value={selectedPriority}
-              onChange={(e) => setSelectedPriority(e.target.value)}
-              className="ui-field w-full appearance-none pl-3.5 pr-8 !rounded-full border border-line-neutral-200/90 font-medium text-content-neutral-700 text-xs focus:outline-none focus:border-accent cursor-pointer transition-colors truncate"
-            >
-              <option value="all">Priority: All</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-            <ChevronDown
-              className="w-3.5 h-3.5 text-content-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-              strokeWidth={2}
-            />
-          </div>
+          <SelectDropdown
+            value={selectedPriority}
+            onChange={setSelectedPriority}
+            options={PRIORITY_OPTIONS}
+            renderValue={(opt) =>
+              opt?.value === "all" ? "Priority: All" : `Priority: ${opt?.label}`
+            }
+            buttonClassName="ui-field h-[38px] px-3.5 flex items-center justify-between gap-2 !rounded-full border border-line-neutral-200/90 font-medium text-content-neutral-700 text-xs hover:border-line-neutral-300 focus:outline-none focus:border-accent cursor-pointer transition-colors w-36"
+            menuClassName="w-40"
+          />
 
-          <div className="relative w-40">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="ui-field w-full appearance-none pl-3.5 pr-8 !rounded-full border border-line-neutral-200/90 font-medium text-content-neutral-700 text-xs focus:outline-none focus:border-accent cursor-pointer transition-colors truncate"
-            >
-              <option value="all">Category: All</option>
-              <option value="Development">Development</option>
-              <option value="Design">Design</option>
-              <option value="Infrastructure">Infrastructure</option>
-              <option value="Legal">Legal</option>
-              <option value="Documentation">Documentation</option>
-            </select>
-            <ChevronDown
-              className="w-3.5 h-3.5 text-content-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-              strokeWidth={2}
-            />
-          </div>
+          <SelectDropdown
+            value={selectedCategory}
+            onChange={setSelectedCategory}
+            options={CATEGORY_OPTIONS}
+            renderValue={(opt) =>
+              opt?.value === "all" ? "Category: All" : `Category: ${opt?.label}`
+            }
+            buttonClassName="ui-field h-[38px] px-3.5 flex items-center justify-between gap-2 !rounded-full border border-line-neutral-200/90 font-medium text-content-neutral-700 text-xs hover:border-line-neutral-300 focus:outline-none focus:border-accent cursor-pointer transition-colors w-40"
+            menuClassName="w-44"
+          />
 
           {(selectedPriority !== "all" ||
             selectedCategory !== "all" ||

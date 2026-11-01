@@ -40,6 +40,18 @@ import { useExpenses, useData } from "@/lib/data/DataProvider";
 import type { ExpenseItem } from "@/types/expenses";
 import type { Currency } from "@/types/billing";
 import { formatCents, formatDateDisplay } from "@/lib/format";
+import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
+
+const EXPENSE_CATEGORY_OPTIONS: SelectOption[] = [
+  { value: "All Categories", label: "All Categories" },
+  { value: "SOFTWARE", label: "SOFTWARE" },
+  { value: "AI INFRASTRUCTURE", label: "AI INFRASTRUCTURE" },
+  { value: "HOSTING", label: "HOSTING" },
+  { value: "TRAVEL", label: "TRAVEL" },
+  { value: "MEALS", label: "MEALS" },
+  { value: "OFFICE", label: "OFFICE" },
+  { value: "HARDWARE", label: "HARDWARE" },
+];
 
 export default function ExpensesPage() {
   const [selectedCategory, setSelectedCategory] =
@@ -331,26 +343,16 @@ export default function ExpensesPage() {
             )}
           </div>
 
-          <div className="relative">
-            <select
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="ui-field appearance-none border border-line-neutral-200/90 px-4 pr-9 font-semibold text-content-neutral-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-line-neutral-300 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/40"
-            >
-              <option value="All Categories">All Categories</option>
-              <option value="SOFTWARE">SOFTWARE</option>
-              <option value="AI INFRASTRUCTURE">AI INFRASTRUCTURE</option>
-              <option value="HOSTING">HOSTING</option>
-              <option value="TRAVEL">TRAVEL</option>
-              <option value="MEALS">MEALS</option>
-              <option value="OFFICE">OFFICE</option>
-              <option value="HARDWARE">HARDWARE</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-content-neutral-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-200" />
-          </div>
+          <SelectDropdown
+            value={selectedCategory}
+            onChange={(val) => {
+              setSelectedCategory(val);
+              setCurrentPage(1);
+            }}
+            options={EXPENSE_CATEGORY_OPTIONS}
+            buttonClassName="ui-field h-[38px] px-3.5 flex items-center justify-between gap-2 border border-line-neutral-200/90 font-semibold text-content-neutral-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-line-neutral-300 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/40 w-44"
+            menuClassName="w-48"
+          />
 
           <Button variant="secondary" onClick={handleExportPdf}>
             <div className="w-4 h-4 flex items-center justify-center">

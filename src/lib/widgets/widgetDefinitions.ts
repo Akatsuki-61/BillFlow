@@ -1,6 +1,18 @@
 import { WidgetMeta } from "@/types/widgets";
 
 export const WIDGET_CATALOG: WidgetMeta[] = [
+  // Overview Spotlight Hero Card
+  {
+    id: "workspace-insights",
+    title: "Workspace Insights",
+    description:
+      "Atmospheric spotlight card with live business intelligence and sprint recommendations",
+    category: "activity",
+    size: "full",
+    defaultOnDashboard: true,
+    defaultOnAnalytics: false,
+  },
+
   // 6 Core Financial KPIs
   {
     id: "total-revenue",
@@ -236,6 +248,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
 ];
 
 export const DEFAULT_DASHBOARD_WIDGET_IDS = [
+  "workspace-insights",
   "profit-trajectory-chart",
   "total-revenue",
   "net-profit",

@@ -73,6 +73,30 @@ function ClientsContent() {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Close active client dropdown menu on click outside or Escape
+  React.useEffect(() => {
+    if (!activeMenuId) return;
+
+    const handleOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("[data-client-menu]")) return;
+      setActiveMenuId(null);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setActiveMenuId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeMenuId]);
+
   // Notifications / Toasts
   const [notification, setNotification] = useState<{
     message: string;
@@ -667,7 +691,7 @@ function ClientsContent() {
                     </div>
 
                     {/* Circular 3-dots Context Menu Button */}
-                    <div className="relative shrink-0">
+                    <div className="relative shrink-0" data-client-menu="true">
                       <button
                         type="button"
                         onClick={() =>
@@ -676,6 +700,7 @@ function ClientsContent() {
                           )
                         }
                         aria-label="Options"
+                        aria-expanded={activeMenuId === client.id}
                         className="zentra-circle-btn zentra-circle-btn--sm"
                       >
                         <MoreVertical className="w-3.5 h-3.5" />
@@ -683,7 +708,7 @@ function ClientsContent() {
 
                       {/* Dropdown Menu */}
                       {activeMenuId === client.id && (
-                        <div className="absolute right-0 top-9 z-30 bg-surface rounded-[18px] shadow-lg border border-line-neutral-200 py-1.5 w-44 text-xs font-medium text-content-neutral-700">
+                        <div className="absolute right-0 top-10 mt-1 z-30 bg-surface/95 dark:bg-[#19191f]/95 backdrop-blur-md rounded-[16px] shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] border border-line-neutral-200/80 dark:border-[#2c2c37] p-1.5 w-48 text-xs font-medium text-content-neutral-700 animate-in fade-in-0 zoom-in-95 duration-150">
                           <Button
                             variant="menu"
                             onClick={() => {
