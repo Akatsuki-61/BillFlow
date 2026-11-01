@@ -1,13 +1,22 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { EChartsAreaChart, type ChartConfig } from "@/components/evilcharts/charts/echarts-area-chart";
+import {
+  EChartsAreaChart,
+  type ChartConfig,
+} from "@/components/evilcharts/charts/echarts-area-chart";
 import { useData, useActiveCurrency } from "@/lib/data/DataProvider";
 import { formatCents } from "@/lib/format";
 
 const chartConfig = {
-  web: { label: "Web & Custom Software", colors: { light: ["#2563eb"], dark: ["#3b82f6"] } },
-  ai: { label: "AI Consulting Retainers", colors: { light: ["#059669"], dark: ["#10b981"] } },
+  web: {
+    label: "Other services",
+    colors: { light: ["#2563eb"], dark: ["#3b82f6"] },
+  },
+  ai: {
+    label: "AI & consulting",
+    colors: { light: ["#059669"], dark: ["#10b981"] },
+  },
 } satisfies ChartConfig;
 
 export function PortfolioComparisonChart() {
@@ -17,13 +26,15 @@ export function PortfolioComparisonChart() {
   const { series, chartData, hasInvoices } = useMemo(() => {
     let totalWebCents = 0;
     let totalAiCents = 0;
-    const validInvoices = (invoices || []).filter((inv) => inv.status !== "DRAFT");
+    const validInvoices = (invoices || []).filter(
+      (inv) => inv.status !== "DRAFT" && inv.currency === activeCurrency,
+    );
 
     validInvoices.forEach((inv) => {
       if (inv.items && inv.items.length > 0) {
         inv.items.forEach((item) => {
           const desc = `${item.description || ""}`.toLowerCase();
-          const isAi = /ai|consulting|automation|agent/i.test(desc);
+          const isAi = /\bai\b|consulting|automation|agent/i.test(desc);
           const itemCents = (item.quantity || 1) * (item.unitPriceCents || 0);
           if (isAi) {
             totalAiCents += itemCents;
@@ -32,8 +43,9 @@ export function PortfolioComparisonChart() {
           }
         });
       } else {
-        const text = `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
-        const isAi = /ai|consulting|automation|agent/i.test(text);
+        const text =
+          `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
+        const isAi = /\bai\b|consulting|automation|agent/i.test(text);
         if (isAi) {
           totalAiCents += inv.amountCents;
         } else {
@@ -43,20 +55,26 @@ export function PortfolioComparisonChart() {
     });
 
     const totalPortfolioCents = totalWebCents + totalAiCents;
-    const webPct = totalPortfolioCents > 0 ? Math.round((totalWebCents / totalPortfolioCents) * 100) : 0;
-    const aiPct = totalPortfolioCents > 0 ? Math.round((totalAiCents / totalPortfolioCents) * 100) : 0;
+    const webPct =
+      totalPortfolioCents > 0
+        ? Math.round((totalWebCents / totalPortfolioCents) * 100)
+        : 0;
+    const aiPct =
+      totalPortfolioCents > 0
+        ? Math.round((totalAiCents / totalPortfolioCents) * 100)
+        : 0;
 
     const seriesData = [
       {
         key: "web",
-        label: "Web & Custom Software",
+        label: "Other services",
         color: "#2563eb",
         pct: webPct,
         formattedTotal: formatCents(totalWebCents, activeCurrency),
       },
       {
         key: "ai",
-        label: "AI Consulting Retainers",
+        label: "AI & consulting",
         color: "#10b981",
         pct: aiPct,
         formattedTotal: formatCents(totalAiCents, activeCurrency),
@@ -64,7 +82,8 @@ export function PortfolioComparisonChart() {
     ] as const;
 
     // 14-day timeline
-    const days: Array<{ date: string; key: string; web: number; ai: number }> = [];
+    const days: Array<{ date: string; key: string; web: number; ai: number }> =
+      [];
     const now = new Date();
     const MS_PER_DAY = 86400000;
 
@@ -84,8 +103,10 @@ export function PortfolioComparisonChart() {
       if (inv.items && inv.items.length > 0) {
         inv.items.forEach((item) => {
           const desc = `${item.description || ""}`.toLowerCase();
-          const isAi = /ai|consulting|automation|agent/i.test(desc);
-          const itemMajor = Math.round(((item.quantity || 1) * (item.unitPriceCents || 0)) / 100);
+          const isAi = /\bai\b|consulting|automation|agent/i.test(desc);
+          const itemMajor = Math.round(
+            ((item.quantity || 1) * (item.unitPriceCents || 0)) / 100,
+          );
           if (isAi) {
             target.ai += itemMajor;
           } else {
@@ -93,8 +114,9 @@ export function PortfolioComparisonChart() {
           }
         });
       } else {
-        const text = `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
-        const isAi = /ai|consulting|automation|agent/i.test(text);
+        const text =
+          `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
+        const isAi = /\bai\b|consulting|automation|agent/i.test(text);
         const amtMajor = Math.round(inv.amountCents / 100);
 
         if (isAi) {
@@ -114,6 +136,10 @@ export function PortfolioComparisonChart() {
 
   return (
     <div className="flex h-full w-full min-h-[300px] flex-col pt-4">
+      <p className="summary-caption px-4">
+        Gross line-item values before invoice discounts and tax. Groups inferred
+        from descriptions; chart shows the last 14 days.
+      </p>
       <div className="grid grid-cols-2 gap-x-8 px-4">
         {series.map(({ key, label, color, pct, formattedTotal }) => (
           <div key={key} className="flex flex-col gap-1">
@@ -136,7 +162,8 @@ export function PortfolioComparisonChart() {
 
       {!hasInvoices && (
         <div className="mt-2 mx-4 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
-          No service invoices recorded. Portfolio breakdown calculates from active client invoices.
+          No service invoices recorded. Portfolio breakdown calculates from
+          active client invoices.
         </div>
       )}
 
@@ -149,14 +176,22 @@ export function PortfolioComparisonChart() {
         enableHoverReveal
         chartOptions={{
           grid: { left: 8, right: 8, top: 16, bottom: 8 },
-          yAxis: { type: "value", show: false, scale: true, boundaryGap: ["12%", "16%"] },
+          yAxis: { type: "value", show: false, min: 0 },
         }}
       >
         <EChartsAreaChart.Tooltip variant="frosted-glass" />
-        <EChartsAreaChart.Area dataKey="web" variant="dotted" strokeVariant="solid">
+        <EChartsAreaChart.Area
+          dataKey="web"
+          variant="dotted"
+          strokeVariant="solid"
+        >
           <EChartsAreaChart.ActiveDot variant="ping" />
         </EChartsAreaChart.Area>
-        <EChartsAreaChart.Area dataKey="ai" variant="dotted" strokeVariant="solid">
+        <EChartsAreaChart.Area
+          dataKey="ai"
+          variant="dotted"
+          strokeVariant="solid"
+        >
           <EChartsAreaChart.ActiveDot variant="ping" />
         </EChartsAreaChart.Area>
       </EChartsAreaChart>

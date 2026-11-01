@@ -1,9 +1,13 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+
+import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
+import { recentMonths } from "@/lib/visual-metrics";
+
 import {
   Button,
   PageHeader,
-  MetricCard,
   Switch,
   EmptyState,
 } from "@/components/ui/Workspace";
@@ -38,11 +42,15 @@ import type { Currency } from "@/types/billing";
 import { formatCents, formatDateDisplay } from "@/lib/format";
 
 export default function ExpensesPage() {
-  const [selectedCategory, setSelectedCategory] = useState<string>("All Categories");
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>("All Categories");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
-  const [deletingExpense, setDeletingExpense] = useState<{ id: string; merchant: string } | null>(null);
+  const [deletingExpense, setDeletingExpense] = useState<{
+    id: string;
+    merchant: string;
+  } | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
   const {
@@ -71,8 +79,8 @@ export default function ExpensesPage() {
   const isExpenseFormDirty = () => {
     return Boolean(
       formData.merchant.trim() ||
-      formData.description.trim() ||
-      formData.amount.trim()
+        formData.description.trim() ||
+        formData.amount.trim(),
     );
   };
 
@@ -145,22 +153,6 @@ export default function ExpensesPage() {
     }
   };
 
-  // Stat calculations
-  const totalExpensesCents = useMemo(() => {
-    return allExpenses.reduce((sum, item) => sum + (item.amountCents || 0), 0);
-  }, [allExpenses]);
-
-  const deductibleCents = useMemo(() => {
-    return allExpenses
-      .filter((e) => e.deductible)
-      .reduce((sum, item) => sum + (item.amountCents || 0), 0);
-  }, [allExpenses]);
-
-  const deductiblePercentage =
-    totalExpensesCents > 0
-      ? Math.round((deductibleCents / totalExpensesCents) * 100)
-      : 0;
-
   const applyPreset = (preset: {
     merchant: string;
     description: string;
@@ -191,7 +183,8 @@ export default function ExpensesPage() {
     try {
       const created = await createExpense({
         merchant: formData.merchant.trim(),
-        description: formData.description.trim() || "General operational expense",
+        description:
+          formData.description.trim() || "General operational expense",
         category: formData.category,
         amountCents,
         currency: (formData.currency as Currency) || activeCurrency || "LKR",
@@ -235,7 +228,9 @@ export default function ExpensesPage() {
         await workflow.attachments.open(item.attachments[0].id);
       } catch (err) {
         console.error(err);
-        showToast(err instanceof Error ? err.message : "Could not open receipt file");
+        showToast(
+          err instanceof Error ? err.message : "Could not open receipt file",
+        );
       }
     } else {
       try {
@@ -257,11 +252,16 @@ export default function ExpensesPage() {
   const getCategoryIcon = (category: string) => {
     const cat = category.toUpperCase();
     if (cat.includes("TRAVEL")) return <Plane className="w-4.5 h-4.5" />;
-    if (cat.includes("MEALS") || cat.includes("FOOD")) return <Utensils className="w-4.5 h-4.5" />;
-    if (cat.includes("OFFICE") || cat.includes("HARDWARE")) return <Package className="w-4.5 h-4.5" />;
-    if (cat.includes("AI")) return <Sparkles className="w-4.5 h-4.5 text-accent" />;
-    if (cat.includes("HOSTING") || cat.includes("SERVER")) return <Server className="w-4.5 h-4.5" />;
-    if (cat.includes("SOFTWARE") || cat.includes("DEV")) return <Code2 className="w-4.5 h-4.5" />;
+    if (cat.includes("MEALS") || cat.includes("FOOD"))
+      return <Utensils className="w-4.5 h-4.5" />;
+    if (cat.includes("OFFICE") || cat.includes("HARDWARE"))
+      return <Package className="w-4.5 h-4.5" />;
+    if (cat.includes("AI"))
+      return <Sparkles className="w-4.5 h-4.5 text-accent" />;
+    if (cat.includes("HOSTING") || cat.includes("SERVER"))
+      return <Server className="w-4.5 h-4.5" />;
+    if (cat.includes("SOFTWARE") || cat.includes("DEV"))
+      return <Code2 className="w-4.5 h-4.5" />;
     return <DollarSign className="w-4.5 h-4.5" />;
   };
 
@@ -302,7 +302,7 @@ export default function ExpensesPage() {
       {/* Page Header */}
       <PageHeader
         title="Expenses"
-        description="Manage and track your business expenditures in the SQLite ledger."
+        description="Keep track of software, hosting and day-to-day business costs."
       >
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Search Bar */}
@@ -368,24 +368,102 @@ export default function ExpensesPage() {
         </Button>
       </PageHeader>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard
-          label="Total Expenses"
-          value={formatCents(totalExpensesCents, activeCurrency)}
-          footer="logged business expenses"
-        />
-        <MetricCard
-          label="Deductible"
-          value={formatCents(deductibleCents, activeCurrency)}
-          footer={`${deductiblePercentage}% of total expenses`}
-        />
-        <MetricCard
-          label="Logged Expenses"
-          value={allExpenses.length}
-          footer="entries in SQLite ledger"
-        />
-      </div>
+      {/* =====================================================================
+          ZENTRA 3-CARD EXPENSES BENTO HEADER ROW
+         ===================================================================== */}
+      {(() => {
+        const records = allExpenses.filter(
+          (expense) => expense.currency === activeCurrency,
+        );
+        const total = records.reduce(
+          (sum, expense) => sum + expense.amountCents,
+          0,
+        );
+        const deductible = records
+          .filter((expense) => expense.deductible)
+          .reduce((sum, expense) => sum + expense.amountCents, 0);
+        const receipts = records.filter(
+          (expense) => expense.attachments?.length,
+        ).length;
+        const money = (value: number) => formatCents(value, activeCurrency);
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <section className="ui-card p-6 space-y-5">
+              <h2>Operating Expenses</h2>
+              <div>
+                <div className="summary-value">{money(total)}</div>
+                <p className="summary-caption">
+                  {records.length} expenses · {activeCurrency}
+                </p>
+              </div>
+              <DataBreakdown
+                label="Expenses by deductibility"
+                total={total}
+                rows={[
+                  {
+                    label: "Marked deductible",
+                    value: deductible,
+                    display: money(deductible),
+                    tone: "green",
+                  },
+                  {
+                    label: "Other expenses",
+                    value: total - deductible,
+                    display: money(total - deductible),
+                  },
+                ]}
+              />
+            </section>
+            <section className="ui-card p-6 space-y-5">
+              <h2>Supporting Records</h2>
+              <div>
+                <div className="summary-value">
+                  {receipts}/{records.length}
+                </div>
+                <p className="summary-caption">
+                  Expenses with an attached receipt
+                </p>
+              </div>
+              <DataBreakdown
+                label="Receipt coverage"
+                total={records.length}
+                rows={[
+                  {
+                    label: "With receipts",
+                    value: receipts,
+                    display: `${receipts} expenses`,
+                    tone: "green",
+                  },
+                  {
+                    label: "Without receipts",
+                    value: records.length - receipts,
+                    display: `${records.length - receipts} expenses`,
+                    tone: "pink",
+                  },
+                ]}
+              />
+            </section>
+            <section className="ui-card p-6 space-y-5">
+              <h2>Monthly Spending</h2>
+              <p className="summary-caption">
+                Recorded by expense date · {activeCurrency}
+              </p>
+              <MonthlyBars
+                label="Expenses · last six months"
+                formatValue={money}
+                points={recentMonths().map((month) => ({
+                  ...month,
+                  value: records
+                    .filter((expense) =>
+                      expense.incurredAt.startsWith(month.key),
+                    )
+                    .reduce((sum, expense) => sum + expense.amountCents, 0),
+                }))}
+              />
+            </section>
+          </div>
+        );
+      })()}
 
       {/* Expenses Table */}
       <div className="ui-card overflow-hidden">
@@ -437,8 +515,12 @@ export default function ExpensesPage() {
                 </tr>
               ) : (
                 paginatedExpenses.map((item) => {
-                  const hasReceipt = Boolean(item.attachments && item.attachments.length > 0);
-                  const receiptName = hasReceipt ? item.attachments![0].originalName : null;
+                  const hasReceipt = Boolean(
+                    item.attachments && item.attachments.length > 0,
+                  );
+                  const receiptName = hasReceipt
+                    ? item.attachments![0].originalName
+                    : null;
 
                   return (
                     <tr
@@ -496,9 +578,15 @@ export default function ExpensesPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleAttachReceiptToRow(item)}
-                          title={hasReceipt ? `View ${receiptName}` : "Attach Receipt file"}
+                          title={
+                            hasReceipt
+                              ? `View ${receiptName}`
+                              : "Attach Receipt file"
+                          }
                         >
-                          <Paperclip className={`w-4.5 h-4.5 ${hasReceipt ? "text-accent" : "text-content-neutral-400"}`} />
+                          <Paperclip
+                            className={`w-4.5 h-4.5 ${hasReceipt ? "text-accent" : "text-content-neutral-400"}`}
+                          />
                         </Button>
                       </td>
 
@@ -507,7 +595,12 @@ export default function ExpensesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDeletingExpense({ id: item.id, merchant: item.merchant })}
+                          onClick={() =>
+                            setDeletingExpense({
+                              id: item.id,
+                              merchant: item.merchant,
+                            })
+                          }
                           title="Delete expense"
                         >
                           <Trash2 className="w-4 h-4 text-content-neutral-400 hover:text-red-600 transition-colors" />
@@ -525,9 +618,11 @@ export default function ExpensesPage() {
         <div className="py-4 px-6 border-t border-line-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-content-neutral-400">
           <div>
             Showing{" "}
-            {searchedExpenses.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{" "}
-            {Math.min(currentPage * itemsPerPage, searchedExpenses.length)} of{" "}
-            {searchedExpenses.length} entries
+            {searchedExpenses.length === 0
+              ? 0
+              : (currentPage - 1) * itemsPerPage + 1}{" "}
+            to {Math.min(currentPage * itemsPerPage, searchedExpenses.length)}{" "}
+            of {searchedExpenses.length} entries
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -542,7 +637,9 @@ export default function ExpensesPage() {
             </Button>
 
             {Array.from(
-              { length: Math.max(1, Math.ceil(expenses.length / itemsPerPage)) },
+              {
+                length: Math.max(1, Math.ceil(expenses.length / itemsPerPage)),
+              },
               (_, i) => i + 1,
             ).map((pageNumber) => (
               <button
@@ -584,58 +681,42 @@ export default function ExpensesPage() {
       {/* Log Expense Modal */}
       <MotionPresence>
         {isLogModalOpen && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface
-              onDismiss={() => closeLogExpenseModal()}
-              kind="panel"
-              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/60">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center">
-                    <DollarSign className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-content-neutral-900">
-                      Log Business Expense
-                    </h3>
-                    <p className="text-xs text-content-neutral-400">
-                      SQLite Ledger Expense Entry
-                    </p>
-                  </div>
+          <Dialog onClose={() => closeLogExpenseModal()} width={620}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center">
+                  <DollarSign className="w-4 h-4" />
                 </div>
-                <div className="flex items-center gap-2">
-                  {hasExpenseDraft && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="small"
-                      onClick={handleRestoreExpenseDraft}
-                      className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
-                      title="Restore previously typed expense draft"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restore</span>
-                    </Button>
-                  )}
-                  <Button
-                    aria-label="Close"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => closeLogExpenseModal()}
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
+                <div>
+                  <h3 className="text-base font-semibold text-content-neutral-900">
+                    Log Business Expense
+                  </h3>
+                  <p className="text-xs text-content-neutral-400">
+                    Track a business cost and keep its receipt.
+                  </p>
                 </div>
               </div>
-
+              <div className="flex items-center gap-2">
+                {hasExpenseDraft && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="small"
+                    onClick={handleRestoreExpenseDraft}
+                    className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                    title="Restore previously typed expense draft"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Restore</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="app-dialog-banner">
               {/* Presets */}
-              <div className="px-6 pt-4">
+              <div>
                 <label className="block text-[11px] font-semibold text-content-neutral-400 uppercase tracking-wider mb-2">
-                  1-Click OPEX Presets
+                  Quick expense presets
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <Button
@@ -700,16 +781,15 @@ export default function ExpensesPage() {
                   </Button>
                 </div>
               </div>
-
-              <form
-                onSubmit={handleCreateExpense}
-                className="p-6 space-y-4 text-xs font-medium text-content-neutral-700"
-              >
+            </div>
+            <form onSubmit={handleCreateExpense} className="app-dialog-form">
+              <div className="app-dialog-body">
                 {/* Row 1: Merchant & Category */}
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Payee / Merchant <span className="text-content-rose-500 font-bold">*</span>
+                      Payee / Merchant{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="text"
@@ -754,13 +834,17 @@ export default function ExpensesPage() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Amount <span className="text-content-rose-500 font-bold">*</span>
+                      Amount{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <div className="flex items-center gap-2">
                       <select
                         value={formData.currency}
                         onChange={(e) =>
-                          setFormData({ ...formData, currency: e.target.value as Currency })
+                          setFormData({
+                            ...formData,
+                            currency: e.target.value as Currency,
+                          })
                         }
                         className="ui-field h-10 w-24 shrink-0 pl-2.5 pr-6 border border-line-neutral-200 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-accent/40"
                       >
@@ -860,37 +944,29 @@ export default function ExpensesPage() {
                     />
                   </div>
                 </div>
-
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-line-neutral-100">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={() => closeLogExpenseModal()}
-                  >
-                    Cancel
-                  </Button>
-                  <Button variant="primary" type="submit">
-                    Save Expense
-                  </Button>
-                </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
+              </div>
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => closeLogExpenseModal()}
+                >
+                  Cancel
+                </Button>
+                <Button variant="primary" type="submit">
+                  Save Expense
+                </Button>
+              </div>
+            </form>
+          </Dialog>
         )}
       </MotionPresence>
 
       {/* Delete Expense Confirmation Modal */}
       <MotionPresence>
         {deletingExpense && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface
-              onDismiss={() => setDeletingExpense(null)}
-              kind="panel"
-              className="bg-surface rounded-2xl w-full max-w-sm shadow-2xl border border-line-neutral-200 p-6 text-center"
-            >
+          <Dialog onClose={() => setDeletingExpense(null)} width={460} compact>
+            <div className="app-dialog-body app-dialog-confirmation">
               <div className="w-12 h-12 rounded-xl bg-surface-rose-50 text-content-rose-600 flex items-center justify-center mx-auto mb-3.5">
                 <Trash2 className="w-6 h-6" />
               </div>
@@ -904,24 +980,24 @@ export default function ExpensesPage() {
                 </strong>
                 ? This action cannot be undone.
               </p>
-              <div className="flex justify-center gap-3 mt-6">
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={() => setDeletingExpense(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="danger"
-                  type="button"
-                  onClick={handleConfirmDelete}
-                >
-                  Delete
-                </Button>
-              </div>
-            </MotionSurface>
-          </MotionSurface>
+            </div>
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setDeletingExpense(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                type="button"
+                onClick={handleConfirmDelete}
+              >
+                Delete
+              </Button>
+            </div>
+          </Dialog>
         )}
       </MotionPresence>
     </div>

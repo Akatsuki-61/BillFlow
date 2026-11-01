@@ -1,5 +1,10 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+
+import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
+import { recentMonths } from "@/lib/visual-metrics";
+
 import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -11,30 +16,18 @@ import {
   ExternalLink,
   FileText,
   GitFork,
-  Link2,
   Plus,
-  Receipt,
   Search,
   SlidersHorizontal,
   UserPlus,
   Users,
-  X,
-  Check,
-  Calendar,
   Sparkles,
-  CheckCheck,
-  Clock,
   Paperclip,
   FileCheck,
   RotateCcw,
 } from "lucide-react";
 
-import {
-  Button,
-  PageHeader,
-  MetricCard,
-  EmptyState,
-} from "@/components/ui/Workspace";
+import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import {
@@ -47,10 +40,7 @@ import {
 } from "@/lib/data/DataProvider";
 import { formatCents, formatCurrencyAmount } from "@/lib/format";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
-import type {
-  VendorItem,
-  WorkOrderItem,
-} from "@/types/outsourcing";
+import type { VendorItem, WorkOrderItem } from "@/types/outsourcing";
 import type { Currency } from "@/types/billing";
 import type { AttachmentItem } from "@/types/workflow";
 import "./outsourcing.css";
@@ -73,30 +63,41 @@ export default function OutsourcingView() {
   const { activeCurrency } = useActiveCurrency();
 
   // Active view tab: Work Orders (payables) vs Reusable Vendor Directory
-  const [activeTab, setActiveTab] = useState<"work-orders" | "vendors">("work-orders");
+  const [activeTab, setActiveTab] = useState<"work-orders" | "vendors">(
+    "work-orders",
+  );
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "PAID">("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "PAID">(
+    "ALL",
+  );
 
   // Modal dialog states
-  const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrderItem | null>(null);
+  const [selectedWorkOrder, setSelectedWorkOrder] =
+    useState<WorkOrderItem | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<VendorItem | null>(null);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const [isWorkOrderModalOpen, setIsWorkOrderModalOpen] = useState(false);
 
   // Review Contractor Deliverable Dialog states
-  const [reviewingWorkOrder, setReviewingWorkOrder] = useState<WorkOrderItem | null>(null);
-  const [reviewStatus, setReviewStatus] = useState<"todo" | "in-progress" | "review" | "done">("todo");
+  const [reviewingWorkOrder, setReviewingWorkOrder] =
+    useState<WorkOrderItem | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<
+    "todo" | "in-progress" | "review" | "done"
+  >("todo");
   const [reviewDeliveryUrl, setReviewDeliveryUrl] = useState("");
   const [reviewNotes, setReviewNotes] = useState("");
   const [reviewUpdateTask, setReviewUpdateTask] = useState(true);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Payout receipts in Statement Voucher modal
-  const [payoutAttachments, setPayoutAttachments] = useState<AttachmentItem[]>([]);
-  const [isLoadingPayoutAttachments, setIsLoadingPayoutAttachments] = useState(false);
+  const [payoutAttachments, setPayoutAttachments] = useState<AttachmentItem[]>(
+    [],
+  );
+  const [isLoadingPayoutAttachments, setIsLoadingPayoutAttachments] =
+    useState(false);
   const [isAttachingReceipt, setIsAttachingReceipt] = useState(false);
 
   // Add Client Form States with explicit validation
@@ -106,24 +107,32 @@ export default function OutsourcingView() {
   const clientContactRole = "";
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
-  const [clientCurrency, setClientCurrency] = useState<Currency>(activeCurrency || "USD");
+  const [clientCurrency, setClientCurrency] = useState<Currency>(
+    activeCurrency || "USD",
+  );
   const [clientDriveUrl, setClientDriveUrl] = useState("");
-  const [clientFormErrors, setClientFormErrors] = useState<Record<string, string>>({});
+  const [clientFormErrors, setClientFormErrors] = useState<
+    Record<string, string>
+  >({});
   const [isSubmittingClient, setIsSubmittingClient] = useState(false);
 
   // Add Reusable Vendor Form States
   const [vendorName, setVendorName] = useState("");
   const [vendorService, setVendorService] = useState("");
-  const [vendorIconType, setVendorIconType] = useState<VendorItem["iconType"]>("devops");
+  const [vendorIconType, setVendorIconType] =
+    useState<VendorItem["iconType"]>("devops");
   const [vendorEmail, setVendorEmail] = useState("");
   const [vendorPhone, setVendorPhone] = useState("");
   const [vendorNotes, setVendorNotes] = useState("");
-  const [vendorFormErrors, setVendorFormErrors] = useState<Record<string, string>>({});
+  const [vendorFormErrors, setVendorFormErrors] = useState<
+    Record<string, string>
+  >({});
   const [isSubmittingVendor, setIsSubmittingVendor] = useState(false);
 
   // New Work Order Form States
   const [woVendorId, setWoVendorId] = useState("");
-  const [isCreatingNewVendorInline, setIsCreatingNewVendorInline] = useState(false);
+  const [isCreatingNewVendorInline, setIsCreatingNewVendorInline] =
+    useState(false);
   const [newVendorInlineName, setNewVendorInlineName] = useState("");
   const [newVendorInlineService, setNewVendorInlineService] = useState("");
   const [newVendorInlineCategory, setNewVendorInlineCategory] =
@@ -139,7 +148,9 @@ export default function OutsourcingView() {
   const [woClientName, setWoClientName] = useState("");
   const [woScope, setWoScope] = useState("");
   const [woFee, setWoFee] = useState("");
-  const [woCurrency, setWoCurrency] = useState<Currency>(activeCurrency || "LKR");
+  const [woCurrency, setWoCurrency] = useState<Currency>(
+    activeCurrency || "LKR",
+  );
   const [woDueDate, setWoDueDate] = useState("");
   const [woDeliveryUrl, setWoDeliveryUrl] = useState("");
   const [woNotes, setWoNotes] = useState("");
@@ -150,10 +161,10 @@ export default function OutsourcingView() {
   const isWorkOrderFormDirty = () => {
     return Boolean(
       woScope.trim() ||
-      woFee.trim() ||
-      woNotes.trim() ||
-      woDeliveryUrl.trim() ||
-      newVendorInlineName.trim()
+        woFee.trim() ||
+        woNotes.trim() ||
+        woDeliveryUrl.trim() ||
+        newVendorInlineName.trim(),
     );
   };
 
@@ -199,23 +210,31 @@ export default function OutsourcingView() {
       if (!saved) return;
       const draft = JSON.parse(saved);
       if (draft.woVendorId !== undefined) setWoVendorId(draft.woVendorId);
-      if (draft.isCreatingNewVendorInline !== undefined) setIsCreatingNewVendorInline(draft.isCreatingNewVendorInline);
-      if (draft.newVendorInlineName !== undefined) setNewVendorInlineName(draft.newVendorInlineName);
-      if (draft.newVendorInlineService !== undefined) setNewVendorInlineService(draft.newVendorInlineService);
-      if (draft.newVendorInlineCategory !== undefined) setNewVendorInlineCategory(draft.newVendorInlineCategory);
-      if (draft.newVendorInlineEmail !== undefined) setNewVendorInlineEmail(draft.newVendorInlineEmail);
-      if (draft.newVendorInlinePhone !== undefined) setNewVendorInlinePhone(draft.newVendorInlinePhone);
+      if (draft.isCreatingNewVendorInline !== undefined)
+        setIsCreatingNewVendorInline(draft.isCreatingNewVendorInline);
+      if (draft.newVendorInlineName !== undefined)
+        setNewVendorInlineName(draft.newVendorInlineName);
+      if (draft.newVendorInlineService !== undefined)
+        setNewVendorInlineService(draft.newVendorInlineService);
+      if (draft.newVendorInlineCategory !== undefined)
+        setNewVendorInlineCategory(draft.newVendorInlineCategory);
+      if (draft.newVendorInlineEmail !== undefined)
+        setNewVendorInlineEmail(draft.newVendorInlineEmail);
+      if (draft.newVendorInlinePhone !== undefined)
+        setNewVendorInlinePhone(draft.newVendorInlinePhone);
       if (draft.woTaskId !== undefined) setWoTaskId(draft.woTaskId);
       if (draft.woTaskTitle !== undefined) setWoTaskTitle(draft.woTaskTitle);
       if (draft.woInvoiceId !== undefined) setWoInvoiceId(draft.woInvoiceId);
-      if (draft.woInvoiceCode !== undefined) setWoInvoiceCode(draft.woInvoiceCode);
+      if (draft.woInvoiceCode !== undefined)
+        setWoInvoiceCode(draft.woInvoiceCode);
       if (draft.woClientId !== undefined) setWoClientId(draft.woClientId);
       if (draft.woClientName !== undefined) setWoClientName(draft.woClientName);
       if (draft.woScope !== undefined) setWoScope(draft.woScope);
       if (draft.woFee !== undefined) setWoFee(draft.woFee);
       if (draft.woCurrency !== undefined) setWoCurrency(draft.woCurrency);
       if (draft.woDueDate !== undefined) setWoDueDate(draft.woDueDate);
-      if (draft.woDeliveryUrl !== undefined) setWoDeliveryUrl(draft.woDeliveryUrl);
+      if (draft.woDeliveryUrl !== undefined)
+        setWoDeliveryUrl(draft.woDeliveryUrl);
       if (draft.woNotes !== undefined) setWoNotes(draft.woNotes);
       showToast("Draft restored");
     } catch {}
@@ -245,14 +264,19 @@ export default function OutsourcingView() {
   } | null>(null);
 
   // Show auto-dismissing toast feedback
-  const showToast = (message: string, type: "success" | "error" = "success") => {
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
     setToastNotification({ message, type });
     setTimeout(() => setToastNotification(null), 3500);
   };
 
   // Handle task redirection deep link / query params from Sprint Board (/tasks)
   const voucherQueryKey = searchParams.toString();
-  const [previousVoucherQueryKey, setPreviousVoucherQueryKey] = useState<string | null>(null);
+  const [previousVoucherQueryKey, setPreviousVoucherQueryKey] = useState<
+    string | null
+  >(null);
   if (previousVoucherQueryKey !== voucherQueryKey) {
     setPreviousVoucherQueryKey(voucherQueryKey);
     const action = searchParams.get("action");
@@ -264,7 +288,8 @@ export default function OutsourcingView() {
       const paramClientId = searchParams.get("clientId") || "";
       const paramClientName = searchParams.get("clientName") || "";
       const paramDeliveryUrl = searchParams.get("deliveryUrl") || "";
-      const paramCurrency = (searchParams.get("currency") as Currency) || activeCurrency || "LKR";
+      const paramCurrency =
+        (searchParams.get("currency") as Currency) || activeCurrency || "LKR";
       const paramVendor = searchParams.get("vendor") || "";
       const paramBudget = searchParams.get("budget") || "";
 
@@ -281,7 +306,11 @@ export default function OutsourcingView() {
         const num = parseFloat(paramBudget);
         if (!isNaN(num) && num > 0) {
           // If in cents (> 1000 and integer)
-          setWoFee(num > 1000 && Number.isInteger(num) ? String(num / 100) : String(num));
+          setWoFee(
+            num > 1000 && Number.isInteger(num)
+              ? String(num / 100)
+              : String(num),
+          );
         } else {
           setWoFee("");
         }
@@ -330,7 +359,8 @@ export default function OutsourcingView() {
       await setVendorStatus(id, nextStatus);
       showToast("Vendor settlement status updated");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to update vendor status";
+      const msg =
+        err instanceof Error ? err.message : "Failed to update vendor status";
       showToast(msg, "error");
     }
   };
@@ -410,7 +440,8 @@ export default function OutsourcingView() {
       }
       showToast("Contractor payout settled and recorded in ledger.");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to record payout";
+      const msg =
+        err instanceof Error ? err.message : "Failed to record payout";
       showToast(msg, "error");
     }
   };
@@ -425,7 +456,8 @@ export default function OutsourcingView() {
       setPayoutAttachments([]);
       showToast("Payout reverted to pending settlement.");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to remove payout";
+      const msg =
+        err instanceof Error ? err.message : "Failed to remove payout";
       showToast(msg, "error");
     }
   };
@@ -436,14 +468,21 @@ export default function OutsourcingView() {
     try {
       setIsAttachingReceipt(true);
       const requestId = crypto.randomUUID();
-      const result = await workflow.attachments.select({ type: "payout", id: payoutId }, requestId);
+      const result = await workflow.attachments.select(
+        { type: "payout", id: payoutId },
+        requestId,
+      );
       if (result) {
-        const updated = await workflow.attachments.list({ type: "payout", id: payoutId });
+        const updated = await workflow.attachments.list({
+          type: "payout",
+          id: payoutId,
+        });
         setPayoutAttachments(updated);
         showToast("Receipt slip attached to contractor payout.");
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to attach receipt";
+      const msg =
+        err instanceof Error ? err.message : "Failed to attach receipt";
       showToast(msg, "error");
     } finally {
       setIsAttachingReceipt(false);
@@ -461,8 +500,6 @@ export default function OutsourcingView() {
     }
   };
 
-
-
   // Submit handler for adding a new client
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -475,7 +512,8 @@ export default function OutsourcingView() {
     if (!clientEmail.trim()) {
       errors.email = "Email cannot be blank or contain only spaces";
     } else if (!clientEmail.includes("@")) {
-      errors.email = "Email must contain an '@' sign (e.g. alex@fintechlabs.com)";
+      errors.email =
+        "Email must contain an '@' sign (e.g. alex@fintechlabs.com)";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim())) {
       errors.email = "Please enter a valid email address with a domain";
     }
@@ -664,7 +702,8 @@ export default function OutsourcingView() {
       setWoNotes("");
       setWoFormErrors({});
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to create work order";
+      const msg =
+        err instanceof Error ? err.message : "Failed to create work order";
       showToast(msg, "error");
     } finally {
       setIsSubmittingWorkOrder(false);
@@ -722,42 +761,6 @@ export default function OutsourcingView() {
     });
   }, [vendors, searchQuery, statusFilter]);
 
-  // Aggregate dynamic metrics from work orders (or legacy vendors fallback)
-  const { outstandingPayablesCents, settledPayoutsCents } = useMemo(() => {
-    if (workOrders.length > 0) {
-      let committed = 0;
-      let pending = 0;
-      let settled = 0;
-      for (const wo of workOrders) {
-        committed += wo.feeCents;
-        if (wo.payoutStatus === "PAID") {
-          settled += wo.feeCents;
-        } else {
-          pending += wo.feeCents;
-        }
-      }
-      return {
-        totalCommittedCents: committed,
-        outstandingPayablesCents: pending,
-        settledPayoutsCents: settled,
-      };
-    }
-
-    // Fallback to vendors if no work orders yet
-    let pending = 0;
-    let settled = 0;
-    for (const v of vendors) {
-      const cents = (Number(v.currentBalance) || 0) * 100;
-      if (v.status === "PAID") settled += cents;
-      else pending += cents;
-    }
-    return {
-      totalCommittedCents: pending + settled,
-      outstandingPayablesCents: pending,
-      settledPayoutsCents: settled,
-    };
-  }, [workOrders, vendors]);
-
   return (
     <div className="workspace-page motion-page outsourcing-page-container">
       {/* Toast Feedback Notification */}
@@ -784,7 +787,7 @@ export default function OutsourcingView() {
       {/* Top Header */}
       <PageHeader
         title="Outsourcing"
-        description="Separate reusable vendor profiles from per-job payable work orders linked to sprint tasks and client invoices."
+        description="Your contractors, deliverables and payouts, connected to each client job."
       >
         <div className="outsourcing-header-actions">
           {/* New Work Order button (Primary) */}
@@ -797,11 +800,13 @@ export default function OutsourcingView() {
                 setWoTaskId(firstTask.id);
                 setWoTaskTitle(firstTask.title);
                 setWoScope(firstTask.title);
-                setWoInvoiceId(firstTask.invoiceId || (invoices[0]?.id || ""));
+                setWoInvoiceId(firstTask.invoiceId || invoices[0]?.id || "");
                 setWoClientId(firstTask.clientId || "");
                 setWoClientName(firstTask.clientName || "");
                 setWoDeliveryUrl(firstTask.deliveryUrl || "");
-                setWoCurrency((firstTask.currency as Currency) || activeCurrency || "LKR");
+                setWoCurrency(
+                  (firstTask.currency as Currency) || activeCurrency || "LKR",
+                );
               }
               if (vendors.length > 0 && !woVendorId) {
                 setWoVendorId(vendors[0].id);
@@ -845,29 +850,102 @@ export default function OutsourcingView() {
         </div>
       </PageHeader>
 
-      {/* Metric Cards Row */}
-      <div className="outsourcing-metrics-grid">
-        <MetricCard
-          label="Outstanding Payables"
-          value={formatCents(outstandingPayablesCents, activeCurrency)}
-          footer={`${workOrders.filter((w) => w.payoutStatus === "PENDING").length} work orders awaiting settlement`}
-        />
-        <MetricCard
-          label="Settled Payouts"
-          value={formatCents(settledPayoutsCents, activeCurrency)}
-          footer={`${workOrders.filter((w) => w.payoutStatus === "PAID").length} payouts settled to date`}
-        />
-        <MetricCard
-          label="Payable Work Orders"
-          value={workOrders.length}
-          footer="linked job work orders"
-        />
-        <MetricCard
-          label="Subcontractor Profiles"
-          value={vendors.length}
-          footer="reusable vendor profiles"
-        />
-      </div>
+      {/* =====================================================================
+          ZENTRA 3-CARD OUTSOURCING & PAYABLES BENTO HEADER ROW
+         ===================================================================== */}
+      {(() => {
+        const orders = workOrders.filter(
+          (order) => order.currency === activeCurrency,
+        );
+        const committed = orders.reduce(
+          (sum, order) => sum + order.feeCents,
+          0,
+        );
+        const paid = orders
+          .filter((order) => order.payoutStatus === "PAID")
+          .reduce(
+            (sum, order) => sum + (order.payoutAmountCents ?? order.feeCents),
+            0,
+          );
+        const done = orders.filter((order) => order.status === "done").length;
+        const money = (value: number) => formatCents(value, activeCurrency);
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <section className="ui-card p-6 space-y-5">
+              <h2>Subcontractor Payables</h2>
+              <div>
+                <div className="summary-value">{money(committed)}</div>
+                <p className="summary-caption">
+                  Agreed fees across {orders.length} work orders ·{" "}
+                  {activeCurrency}
+                </p>
+              </div>
+              <DataBreakdown
+                label="Contractor fee settlement"
+                total={committed}
+                rows={[
+                  {
+                    label: "Paid out",
+                    value: paid,
+                    display: money(paid),
+                    tone: "green",
+                  },
+                  {
+                    label: "Still payable",
+                    value: Math.max(0, committed - paid),
+                    display: money(Math.max(0, committed - paid)),
+                    tone: "pink",
+                  },
+                ]}
+              />
+            </section>
+            <section className="ui-card p-6 space-y-5">
+              <h2>Contractor Delivery</h2>
+              <div>
+                <div className="summary-value">
+                  {done}/{orders.length}
+                </div>
+                <p className="summary-caption">
+                  Completed work orders. Payouts are tracked separately.
+                </p>
+              </div>
+              <DataBreakdown
+                label="Work order delivery status"
+                total={orders.length}
+                rows={[
+                  {
+                    label: "In delivery or review",
+                    value: orders.length - done,
+                    display: `${orders.length - done} orders`,
+                  },
+                  {
+                    label: "Complete",
+                    value: done,
+                    display: `${done} orders`,
+                    tone: "green",
+                  },
+                ]}
+              />
+            </section>
+            <section className="ui-card p-6 space-y-5">
+              <h2>Scheduled Contractor Fees</h2>
+              <p className="summary-caption">
+                Agreed fees by contractor delivery due month
+              </p>
+              <MonthlyBars
+                label="Fees due · last six months"
+                formatValue={money}
+                points={recentMonths().map((month) => ({
+                  ...month,
+                  value: orders
+                    .filter((order) => order.dueDate?.startsWith(month.key))
+                    .reduce((sum, order) => sum + order.feeCents, 0),
+                }))}
+              />
+            </section>
+          </div>
+        );
+      })()}
 
       {/* Main Directory & Payables Card */}
       <div className="ui-card vendor-directory-card">
@@ -879,6 +957,7 @@ export default function OutsourcingView() {
               <button
                 type="button"
                 onClick={() => setActiveTab("work-orders")}
+                aria-pressed={activeTab === "work-orders"}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   activeTab === "work-orders"
                     ? "bg-surface text-content-neutral-900 shadow-xs"
@@ -890,6 +969,7 @@ export default function OutsourcingView() {
               <button
                 type="button"
                 onClick={() => setActiveTab("vendors")}
+                aria-pressed={activeTab === "vendors"}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   activeTab === "vendors"
                     ? "bg-surface text-content-neutral-900 shadow-xs"
@@ -901,7 +981,7 @@ export default function OutsourcingView() {
             </div>
             <p className="vendor-directory-subtitle">
               {activeTab === "work-orders"
-                ? "Per-job payable vouchers linked to sprint tasks, client invoices, and agreed subcontractor fees."
+                ? "Track contractor delivery and payments separately."
                 : "Reusable profiles for independent contractors, development partners, and design agencies."}
             </p>
           </div>
@@ -912,7 +992,11 @@ export default function OutsourcingView() {
               <Search className="vendor-search-icon" />
               <input
                 type="text"
-                placeholder={activeTab === "work-orders" ? "Search work orders..." : "Search vendors..."}
+                placeholder={
+                  activeTab === "work-orders"
+                    ? "Search work orders..."
+                    : "Search vendors..."
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="vendor-search-input"
@@ -923,6 +1007,7 @@ export default function OutsourcingView() {
               <button
                 type="button"
                 onClick={() => setStatusFilter("ALL")}
+                aria-pressed={statusFilter === "ALL"}
                 className={`vendor-filter-btn ${statusFilter === "ALL" ? "active" : ""}`}
               >
                 All
@@ -930,6 +1015,7 @@ export default function OutsourcingView() {
               <button
                 type="button"
                 onClick={() => setStatusFilter("PENDING")}
+                aria-pressed={statusFilter === "PENDING"}
                 className={`vendor-filter-btn ${statusFilter === "PENDING" ? "active" : ""}`}
               >
                 Pending
@@ -937,6 +1023,7 @@ export default function OutsourcingView() {
               <button
                 type="button"
                 onClick={() => setStatusFilter("PAID")}
+                aria-pressed={statusFilter === "PAID"}
                 className={`vendor-filter-btn ${statusFilter === "PAID" ? "active" : ""}`}
               >
                 Paid
@@ -946,12 +1033,16 @@ export default function OutsourcingView() {
         </div>
 
         {/* Content Area */}
-        <div className="bg-surface divide-y divide-line-neutral-100">
+        <div className="record-list-body">
           {activeTab === "work-orders" ? (
             /* TAB 1: WORK ORDERS */
             filteredWorkOrders.length === 0 ? (
               <EmptyState
-                title={workOrders.length === 0 ? "No payable work orders recorded" : "No matching work orders found"}
+                title={
+                  workOrders.length === 0
+                    ? "No payable work orders recorded"
+                    : "No matching work orders found"
+                }
                 description={
                   workOrders.length === 0
                     ? "Outsource deliverables from sprint tasks or create a work order linking a subcontractor to a client invoice."
@@ -974,232 +1065,244 @@ export default function OutsourcingView() {
                 )}
               </EmptyState>
             ) : (
-              filteredWorkOrders.map((wo) => (
-                <div key={wo.id} className="vendor-list-row">
-                  {/* Left: Info & Linkages */}
-                  <div className="vendor-info-group">
-                    <div className="vendor-avatar-icon">
-                      {renderVendorIcon(wo.vendorIconType)}
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="vendor-name-heading text-sm font-semibold text-content-neutral-900">
-                          {wo.scope}
-                        </h3>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-surface-purple-50 text-content-purple-700 border border-line-purple-200/60">
-                          <Users className="w-3 h-3" />
-                          <span>{wo.vendorName}</span>
-                        </span>
-                        {wo.invoiceCode && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium bg-surface-neutral-100 text-content-neutral-700 border border-line-neutral-200">
-                            <Receipt className="w-3 h-3 text-content-neutral-500" />
-                            <span>{wo.invoiceCode}</span>
-                            {wo.clientName && <span>· {wo.clientName}</span>}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3 text-[11.5px] text-content-neutral-500 flex-wrap">
-                        {wo.taskTitle && (
-                          <span className="flex items-center gap-1">
-                            <GitFork className="w-3 h-3 text-accent" />
-                            <span>Task: {wo.taskTitle}</span>
-                          </span>
-                        )}
-                        {wo.dueDate && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-content-neutral-400" />
-                            <span>Due: {wo.dueDate}</span>
-                          </span>
-                        )}
-                        {(() => {
-                          const resolved = resolveDeliveryUrl(wo, { tasks, invoices, clients });
-                          if (!resolved.hasLink) return null;
-                          return (
+              <div className="record-table-scroll">
+                <table className="record-table work-order-table">
+                  <caption className="sr-only">
+                    Payable work orders, delivery progress and contractor
+                    payments
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Work order</th>
+                      <th scope="col">Delivery</th>
+                      <th scope="col">Due date</th>
+                      <th scope="col" className="record-align-right">
+                        Contractor fee
+                      </th>
+                      <th scope="col">
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredWorkOrders.map((wo) => {
+                      const resolved = resolveDeliveryUrl(wo, {
+                        tasks,
+                        invoices,
+                        clients,
+                      });
+                      return (
+                        <tr key={wo.id}>
+                          <td className="work-order-scope">
+                            <div className="record-identity">
+                              <div className="record-avatar">
+                                {renderVendorIcon(wo.vendorIconType)}
+                              </div>
+                              <div className="min-w-0">
+                                <p
+                                  className="record-title"
+                                  title={wo.notes || wo.scope}
+                                >
+                                  {wo.scope}
+                                </p>
+                                <p className="record-secondary">
+                                  {wo.vendorName}
+                                </p>
+                                {(wo.invoiceCode || wo.clientName) && (
+                                  <p className="record-meta">
+                                    {[wo.invoiceCode, wo.clientName]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  </p>
+                                )}
+                                {resolved.hasLink && (
+                                  <button
+                                    type="button"
+                                    className="record-link"
+                                    onClick={(e) =>
+                                      openExternalLink(resolved.formattedUrl, e)
+                                    }
+                                    title={`${resolved.label}: ${resolved.url}`}
+                                  >
+                                    {resolved.label}
+                                    <ExternalLink className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span
+                              className="record-status"
+                              data-status={wo.status || "todo"}
+                            >
+                              <span
+                                className="record-status-dot"
+                                aria-hidden="true"
+                              />
+                              {wo.status === "in-progress"
+                                ? "In progress"
+                                : wo.status === "review"
+                                  ? "In review"
+                                  : wo.status === "done"
+                                    ? "Completed"
+                                    : "Assigned"}
+                            </span>
+                          </td>
+                          <td className="record-date">
+                            {wo.dueDate
+                              ? new Date(
+                                  `${wo.dueDate}T12:00:00`,
+                                ).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : "No due date"}
+                          </td>
+                          <td className="record-align-right">
+                            <strong className="record-amount">
+                              {formatCents(wo.feeCents, wo.currency)}
+                            </strong>
                             <button
                               type="button"
-                              onClick={(e) => openExternalLink(resolved.formattedUrl, e)}
-                              className="inline-flex items-center gap-1 text-accent hover:underline font-medium text-xs bg-transparent border-0 p-0 cursor-pointer"
-                              title={`${resolved.label}: ${resolved.url}`}
+                              className="record-settlement"
+                              data-paid={wo.payoutStatus === "PAID"}
+                              onClick={() => setSelectedWorkOrder(wo)}
+                              title="View contractor payments and receipts"
                             >
-                              <Link2 className="w-3 h-3" />
-                              <span>{resolved.label}</span>
-                              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                              {wo.payoutStatus === "PAID"
+                                ? "Paid in full"
+                                : "Payment pending"}
                             </button>
-                          );
-                        })()}
-                        {wo.notes && (
-                          <span className="text-content-neutral-600 truncate max-w-xs" title={wo.notes}>
-                            Note: {wo.notes}
-                          </span>
-                        )}
+                          </td>
+                          <td>
+                            <div className="record-actions">
+                              <Button
+                                variant="secondary"
+                                size="small"
+                                onClick={() => handleOpenReviewModal(wo)}
+                                title={`Review ${wo.scope}`}
+                              >
+                                Review
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setSelectedWorkOrder(wo)}
+                                title={`View voucher for ${wo.scope}`}
+                              >
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : /* TAB 2: REUSABLE VENDOR DIRECTORY */
+          filteredVendors.length === 0 ? (
+            <EmptyState
+              title={
+                vendors.length === 0
+                  ? "No vendor profiles registered"
+                  : "No matching vendors found"
+              }
+              description={
+                vendors.length === 0
+                  ? "Add reusable profiles for contractors and agencies you collaborate with."
+                  : "Try adjusting your search query or status filter."
+              }
+            >
+              {vendors.length === 0 && (
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setVendorFormErrors({});
+                      setIsVendorModalOpen(true);
+                    }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add First Vendor</span>
+                  </Button>
+                </div>
+              )}
+            </EmptyState>
+          ) : (
+            filteredVendors.map((vendor) => {
+              const linkedOrders = workOrders.filter(
+                (w) => w.vendorId === vendor.id,
+              );
+              return (
+                <div key={vendor.id} className="vendor-list-row">
+                  <div className="vendor-info-group">
+                    <div className="vendor-avatar-icon">
+                      {renderVendorIcon(vendor.iconType)}
+                    </div>
+                    <div>
+                      <div className="vendor-name-row">
+                        <h3 className="vendor-name-heading">{vendor.name}</h3>
+                        <span className="record-count">
+                          {linkedOrders.length}{" "}
+                          {linkedOrders.length === 1
+                            ? "work order"
+                            : "work orders"}
+                        </span>
+                      </div>
+                      <p className="vendor-service-desc">{vendor.service}</p>
+                      <div className="text-[11px] text-content-neutral-400 mt-1 flex items-center gap-3">
+                        {vendor.email && <span>Email: {vendor.email}</span>}
+                        {vendor.phone && <span>Phone: {vendor.phone}</span>}
                       </div>
                     </div>
                   </div>
 
-                  {/* Right: Fee, Work Status & Review, Settlement Payout Status, and Voucher Action */}
                   <div className="vendor-actions-group">
-                    <div className="vendor-balance-box">
-                      <span className="vendor-balance-label">Agreed Fee</span>
-                      <span className="vendor-balance-amount font-mono">
-                        {formatCents(wo.feeCents, wo.currency)}
-                      </span>
-                    </div>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={() => {
+                        setWoVendorId(vendor.id);
+                        setIsCreatingNewVendorInline(false);
+                        setWoFormErrors({});
+                        openWorkOrderModal();
+                      }}
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Work Order</span>
+                    </Button>
 
-                    {/* 1. Contractor Work Status Pill & Review Action */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenReviewModal(wo)}
-                        title="Click to review contractor deliverable and update status"
-                        className={`wo-status-pill status-${wo.status || "todo"} cursor-pointer hover:opacity-85`}
-                      >
-                        {wo.status === "done" && <CheckCheck className="w-2.5 h-2.5" />}
-                        {wo.status === "review" && <Clock className="w-2.5 h-2.5" />}
-                        <span>
-                          {wo.status === "todo"
-                            ? "Assigned"
-                            : wo.status === "in-progress"
-                              ? "In Progress"
-                              : wo.status === "review"
-                                ? "Under Review"
-                                : "Completed"}
-                        </span>
-                      </button>
-
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        type="button"
-                        onClick={() => handleOpenReviewModal(wo)}
-                        title="Review deliverable URL, notes, and sync to task"
-                        className="text-xs h-7 px-2"
-                      >
-                        <FileCheck className="w-3 h-3 mr-1" />
-                        <span>Review</span>
-                      </Button>
-                    </div>
-
-                    {/* 2. Settlement Payout Status (Tracked Separately) */}
                     <button
                       type="button"
-                      onClick={() => setSelectedWorkOrder(wo)}
-                      title="View payout voucher and attached receipts"
-                      className={`vendor-status-pill status-${(wo.payoutStatus || "PENDING").toLowerCase()}`}
+                      onClick={() => handleToggleVendorStatus(vendor.id)}
+                      title="Click to toggle status"
+                      className="record-status"
+                      data-status={vendor.status.toLowerCase()}
                     >
-                      {wo.payoutStatus === "PAID" && <Check className="w-2.5 h-2.5" />}
-                      <span>{wo.payoutStatus === "PAID" ? "Payout Paid" : "Payout Pending"}</span>
+                      <span className="record-status-dot" aria-hidden="true" />
+                      <span>
+                        {vendor.status === "PAID" ? "Paid" : "Pending"}
+                      </span>
                     </button>
 
-                    {/* Statement Voucher Button */}
                     <Button
-                      variant={wo.payoutStatus === "PENDING" ? "primary" : "secondary"}
+                      variant="secondary"
                       size="icon"
                       type="button"
-                      onClick={() => setSelectedWorkOrder(wo)}
-                      title="View Work Order Statement Voucher & Receipts"
+                      onClick={() => setSelectedVendor(vendor)}
+                      title="View Vendor Statement"
                       className="shrink-0"
                     >
                       <Download className="text-[11px]" />
                     </Button>
                   </div>
                 </div>
-              ))
-            )
-          ) : (
-            /* TAB 2: REUSABLE VENDOR DIRECTORY */
-            filteredVendors.length === 0 ? (
-              <EmptyState
-                title={vendors.length === 0 ? "No vendor profiles registered" : "No matching vendors found"}
-                description={
-                  vendors.length === 0
-                    ? "Add reusable profiles for contractors and agencies you collaborate with."
-                    : "Try adjusting your search query or status filter."
-                }
-              >
-                {vendors.length === 0 && (
-                  <div className="mt-4 flex items-center justify-center gap-2">
-                    <Button
-                      variant="primary"
-                      onClick={() => {
-                        setVendorFormErrors({});
-                        setIsVendorModalOpen(true);
-                      }}
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add First Vendor</span>
-                    </Button>
-                  </div>
-                )}
-              </EmptyState>
-            ) : (
-              filteredVendors.map((vendor) => {
-                const linkedOrders = workOrders.filter((w) => w.vendorId === vendor.id);
-                return (
-                  <div key={vendor.id} className="vendor-list-row">
-                    <div className="vendor-info-group">
-                      <div className="vendor-avatar-icon">
-                        {renderVendorIcon(vendor.iconType)}
-                      </div>
-                      <div>
-                        <div className="vendor-name-row">
-                          <h3 className="vendor-name-heading">
-                            {vendor.name}
-                          </h3>
-                          <span className="text-[11px] font-semibold text-content-neutral-500 px-2 py-0.5 rounded bg-surface-neutral-100 border border-line-neutral-200">
-                            {linkedOrders.length} {linkedOrders.length === 1 ? "work order" : "work orders"}
-                          </span>
-                        </div>
-                        <p className="vendor-service-desc">
-                          {vendor.service}
-                        </p>
-                        <div className="text-[11px] text-content-neutral-400 mt-1 flex items-center gap-3">
-                          {vendor.email && <span>Email: {vendor.email}</span>}
-                          {vendor.phone && <span>Phone: {vendor.phone}</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="vendor-actions-group">
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        onClick={() => {
-                          setWoVendorId(vendor.id);
-                          setIsCreatingNewVendorInline(false);
-                          setWoFormErrors({});
-                          openWorkOrderModal();
-                        }}
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Work Order</span>
-                      </Button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleToggleVendorStatus(vendor.id)}
-                        title="Click to toggle status"
-                        className={`vendor-status-pill status-${vendor.status.toLowerCase()}`}
-                      >
-                        {vendor.status === "PAID" && <Check className="w-2.5 h-2.5" />}
-                        <span>{vendor.status}</span>
-                      </button>
-
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        type="button"
-                        onClick={() => setSelectedVendor(vendor)}
-                        title="View Vendor Statement"
-                        className="shrink-0"
-                      >
-                        <Download className="text-[11px]" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })
-            )
+              );
+            })
           )}
         </div>
       </div>
@@ -1207,43 +1310,32 @@ export default function OutsourcingView() {
       {/* Modal Dialog: View Statement Voucher (Work Order or Vendor) */}
       <MotionPresence>
         {(selectedWorkOrder || selectedVendor) && (
-          <MotionSurface kind="dialog" className="outsourcing-modal-overlay">
-            <MotionSurface
-              onDismiss={() => {
-                setSelectedWorkOrder(null);
-                setSelectedVendor(null);
-              }}
-              kind="panel"
-              className="outsourcing-modal-panel voucher-panel"
-            >
-              <div className="outsourcing-modal-header">
-                <div className="flex items-center gap-2">
-                  <GitFork className="w-4 h-4 text-accent" />
-                  <h3 className="outsourcing-modal-title">
-                    {selectedWorkOrder ? "Payable Work Order Voucher" : "Vendor Statement Voucher"}
-                  </h3>
-                </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => {
-                    setSelectedWorkOrder(null);
-                    setSelectedVendor(null);
-                  }}
-                >
-                  <X className="text-sm" />
-                </Button>
+          <Dialog
+            onClose={() => {
+              setSelectedWorkOrder(null);
+              setSelectedVendor(null);
+            }}
+            width={620}
+          >
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2">
+                <GitFork className="w-4 h-4 text-accent" />
+                <h3 className="outsourcing-modal-title">
+                  {selectedWorkOrder
+                    ? "Payable Work Order Voucher"
+                    : "Vendor Statement Voucher"}
+                </h3>
               </div>
-
-              <div className="outsourcing-modal-body text-[12px] text-text-body p-6 space-y-4">
+            </div>
+            <div className="app-dialog-body">
+              <div className="app-dialog-section outsourcing-modal-body text-[12px] text-text-body p-6 space-y-4">
                 {selectedWorkOrder ? (
                   <>
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="text-[11px] font-mono text-content-neutral-400">
-                          VOUCHER #{selectedWorkOrder.id.slice(-8).toUpperCase()}
+                          VOUCHER #
+                          {selectedWorkOrder.id.slice(-8).toUpperCase()}
                         </div>
                         <div className="font-bold text-[16px] text-text-primary mt-0.5">
                           {selectedWorkOrder.scope}
@@ -1255,21 +1347,37 @@ export default function OutsourcingView() {
                           </span>
                         </div>
                       </div>
-                      <span className={`vendor-status-pill status-${(selectedWorkOrder.payoutStatus || "PENDING").toLowerCase()}`}>
-                        {selectedWorkOrder.payoutStatus || "PENDING"}
+                      <span
+                        className="record-status"
+                        data-status={(
+                          selectedWorkOrder.payoutStatus || "PENDING"
+                        ).toLowerCase()}
+                      >
+                        <span
+                          className="record-status-dot"
+                          aria-hidden="true"
+                        />
+                        {selectedWorkOrder.payoutStatus === "PAID"
+                          ? "Paid"
+                          : "Pending"}
                       </span>
                     </div>
 
                     <div className="voucher-client-box p-3 rounded-xl bg-surface-neutral-50 border border-line-neutral-200 space-y-2">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-content-neutral-500">Parent Client Invoice</span>
+                        <span className="text-content-neutral-500">
+                          Parent Client Invoice
+                        </span>
                         <span className="font-mono font-semibold text-content-neutral-900">
-                          {selectedWorkOrder.invoiceCode} ({selectedWorkOrder.clientName})
+                          {selectedWorkOrder.invoiceCode} (
+                          {selectedWorkOrder.clientName})
                         </span>
                       </div>
                       {selectedWorkOrder.taskTitle && (
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-content-neutral-500">Linked Deliverable Task</span>
+                          <span className="text-content-neutral-500">
+                            Linked Deliverable Task
+                          </span>
                           <span className="font-medium text-content-neutral-900">
                             {selectedWorkOrder.taskTitle}
                           </span>
@@ -1277,21 +1385,31 @@ export default function OutsourcingView() {
                       )}
                       {selectedWorkOrder.dueDate && (
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-content-neutral-500">Agreed Delivery Date</span>
+                          <span className="text-content-neutral-500">
+                            Agreed Delivery Date
+                          </span>
                           <span className="font-medium text-content-neutral-900">
                             {selectedWorkOrder.dueDate}
                           </span>
                         </div>
                       )}
                       {(() => {
-                        const resolved = resolveDeliveryUrl(selectedWorkOrder, { tasks, invoices, clients });
+                        const resolved = resolveDeliveryUrl(selectedWorkOrder, {
+                          tasks,
+                          invoices,
+                          clients,
+                        });
                         if (!resolved.hasLink) return null;
                         return (
                           <div className="flex justify-between items-center text-xs pt-1 border-t border-line-neutral-200">
-                            <span className="text-content-neutral-500">{resolved.label}</span>
+                            <span className="text-content-neutral-500">
+                              {resolved.label}
+                            </span>
                             <button
                               type="button"
-                              onClick={(e) => openExternalLink(resolved.formattedUrl, e)}
+                              onClick={(e) =>
+                                openExternalLink(resolved.formattedUrl, e)
+                              }
                               className="text-accent hover:underline inline-flex items-center gap-1 font-medium bg-transparent border-0 p-0 cursor-pointer"
                               title={resolved.url}
                             >
@@ -1306,10 +1424,17 @@ export default function OutsourcingView() {
                     {/* Contractor Work Status & Deliverable Details */}
                     <div className="p-3 rounded-xl bg-surface-neutral-50 border border-line-neutral-200 space-y-2">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-content-neutral-500">Contractor Work Status</span>
-                        <span className={`wo-status-pill status-${selectedWorkOrder.status || "todo"}`}>
-                          {selectedWorkOrder.status === "done" && <CheckCheck className="w-2.5 h-2.5" />}
-                          {selectedWorkOrder.status === "review" && <Clock className="w-2.5 h-2.5" />}
+                        <span className="text-content-neutral-500">
+                          Contractor Work Status
+                        </span>
+                        <span
+                          className="record-status"
+                          data-status={selectedWorkOrder.status || "todo"}
+                        >
+                          <span
+                            className="record-status-dot"
+                            aria-hidden="true"
+                          />
                           <span>
                             {selectedWorkOrder.status === "todo"
                               ? "Assigned"
@@ -1323,15 +1448,21 @@ export default function OutsourcingView() {
                       </div>
                       {selectedWorkOrder.completedAt && (
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-content-neutral-500">Completed On</span>
+                          <span className="text-content-neutral-500">
+                            Completed On
+                          </span>
                           <span className="font-mono text-content-neutral-800">
-                            {new Date(selectedWorkOrder.completedAt).toLocaleDateString()}
+                            {new Date(
+                              selectedWorkOrder.completedAt,
+                            ).toLocaleDateString()}
                           </span>
                         </div>
                       )}
                       {selectedWorkOrder.notes && (
                         <div className="text-xs pt-1 border-t border-line-neutral-200">
-                          <span className="text-content-neutral-500 block mb-0.5 font-medium">Deliverable Notes:</span>
+                          <span className="text-content-neutral-500 block mb-0.5 font-medium">
+                            Deliverable Notes:
+                          </span>
                           <p className="text-content-neutral-700 bg-surface-neutral-100/70 p-2 rounded-md font-mono text-[11px] whitespace-pre-wrap">
                             {selectedWorkOrder.notes}
                           </p>
@@ -1357,9 +1488,14 @@ export default function OutsourcingView() {
 
                     {/* Agreed Contractor Fee */}
                     <div className="p-3 rounded-xl bg-surface-purple-50/50 border border-line-purple-200 flex justify-between items-center">
-                      <span className="text-xs font-semibold text-content-purple-900">Agreed Contractor Fee</span>
+                      <span className="text-xs font-semibold text-content-purple-900">
+                        Agreed Contractor Fee
+                      </span>
                       <span className="font-mono text-base font-bold text-content-purple-900">
-                        {formatCents(selectedWorkOrder.feeCents, selectedWorkOrder.currency)}
+                        {formatCents(
+                          selectedWorkOrder.feeCents,
+                          selectedWorkOrder.currency,
+                        )}
                       </span>
                     </div>
 
@@ -1371,22 +1507,37 @@ export default function OutsourcingView() {
                             Settlement Payout & Receipts
                           </span>
                           <span className="text-[11px] text-content-neutral-500">
-                            Tracked independently from contractor work completion.
+                            Tracked independently from contractor work
+                            completion.
                           </span>
                         </div>
-                        <span className={`vendor-status-pill status-${(selectedWorkOrder.payoutStatus || "PENDING").toLowerCase()}`}>
-                          {selectedWorkOrder.payoutStatus === "PAID" && <Check className="w-2.5 h-2.5" />}
-                          <span>{selectedWorkOrder.payoutStatus || "PENDING"}</span>
+                        <span
+                          className="record-status"
+                          data-status={(
+                            selectedWorkOrder.payoutStatus || "PENDING"
+                          ).toLowerCase()}
+                        >
+                          <span
+                            className="record-status-dot"
+                            aria-hidden="true"
+                          />
+                          {selectedWorkOrder.payoutStatus === "PAID"
+                            ? "Paid"
+                            : "Pending"}
                         </span>
                       </div>
 
                       {selectedWorkOrder.payoutStatus === "PAID" ? (
                         <div className="space-y-2.5 pt-1">
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-content-neutral-500">Paid Date</span>
+                            <span className="text-content-neutral-500">
+                              Paid Date
+                            </span>
                             <span className="font-mono text-content-neutral-900">
                               {selectedWorkOrder.paidAt
-                                ? new Date(selectedWorkOrder.paidAt).toLocaleDateString()
+                                ? new Date(
+                                    selectedWorkOrder.paidAt,
+                                  ).toLocaleDateString()
                                 : "Recorded"}
                             </span>
                           </div>
@@ -1404,31 +1555,48 @@ export default function OutsourcingView() {
                                   size="small"
                                   type="button"
                                   disabled={isAttachingReceipt}
-                                  onClick={() => handleAttachReceipt(selectedWorkOrder.payoutId!)}
+                                  onClick={() =>
+                                    handleAttachReceipt(
+                                      selectedWorkOrder.payoutId!,
+                                    )
+                                  }
                                   className="text-xs h-6 px-2"
                                 >
-                                  {isAttachingReceipt ? "Attaching..." : "+ Attach Receipt"}
+                                  {isAttachingReceipt
+                                    ? "Attaching..."
+                                    : "+ Attach Receipt"}
                                 </Button>
                               )}
                             </div>
 
                             {isLoadingPayoutAttachments ? (
-                              <p className="text-[11px] text-content-neutral-400 italic">Loading receipts...</p>
+                              <p className="text-[11px] text-content-neutral-400 italic">
+                                Loading receipts...
+                              </p>
                             ) : payoutAttachments.length === 0 ? (
-                              <p className="text-[11px] text-content-neutral-400 italic">No receipt slip attached yet.</p>
+                              <p className="text-[11px] text-content-neutral-400 italic">
+                                No receipt slip attached yet.
+                              </p>
                             ) : (
                               <div className="payout-receipt-list">
                                 {payoutAttachments.map((att) => (
-                                  <div key={att.id} className="payout-receipt-item">
+                                  <div
+                                    key={att.id}
+                                    className="payout-receipt-item"
+                                  >
                                     <div className="flex items-center gap-2 truncate">
                                       <FileText className="w-3.5 h-3.5 text-accent shrink-0" />
-                                      <span className="font-medium truncate text-content-neutral-800">{att.originalName}</span>
+                                      <span className="font-medium truncate text-content-neutral-800">
+                                        {att.originalName}
+                                      </span>
                                     </div>
                                     <Button
                                       variant="secondary"
                                       size="small"
                                       type="button"
-                                      onClick={() => handleOpenAttachment(att.id)}
+                                      onClick={() =>
+                                        handleOpenAttachment(att.id)
+                                      }
                                       className="text-[11px] h-6 px-2 shrink-0 ml-2"
                                     >
                                       View Slip
@@ -1444,7 +1612,9 @@ export default function OutsourcingView() {
                               variant="ghost"
                               size="small"
                               type="button"
-                              onClick={() => handleRemovePayout(selectedWorkOrder.id)}
+                              onClick={() =>
+                                handleRemovePayout(selectedWorkOrder.id)
+                              }
                               className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-7"
                             >
                               Revert to Unpaid
@@ -1454,17 +1624,25 @@ export default function OutsourcingView() {
                       ) : (
                         <div className="space-y-2 pt-1">
                           <p className="text-[11.5px] text-content-neutral-600">
-                            Payout has not been recorded for this contractor. Recording a payout settles the ledger entry.
+                            Payout has not been recorded for this contractor.
+                            Recording a payout settles the ledger entry.
                           </p>
                           <div className="flex justify-end pt-1">
                             <Button
                               variant="primary"
                               size="small"
                               type="button"
-                              onClick={() => handleRecordPayout(selectedWorkOrder.id)}
+                              onClick={() =>
+                                handleRecordPayout(selectedWorkOrder.id)
+                              }
                               className="text-xs h-7"
                             >
-                              Record Payout ({formatCents(selectedWorkOrder.feeCents, selectedWorkOrder.currency)})
+                              Record Payout (
+                              {formatCents(
+                                selectedWorkOrder.feeCents,
+                                selectedWorkOrder.currency,
+                              )}
+                              )
                             </Button>
                           </div>
                         </div>
@@ -1487,15 +1665,27 @@ export default function OutsourcingView() {
                           </div>
                         )}
                       </div>
-                      <span className={`vendor-status-pill status-${selectedVendor.status.toLowerCase()}`}>
-                        {selectedVendor.status}
+                      <span
+                        className="record-status"
+                        data-status={selectedVendor.status.toLowerCase()}
+                      >
+                        <span
+                          className="record-status-dot"
+                          aria-hidden="true"
+                        />
+                        {selectedVendor.status === "PAID" ? "Paid" : "Pending"}
                       </span>
                     </div>
 
                     <div className="p-3 rounded-xl bg-surface-neutral-50 border border-line-neutral-200 flex justify-between items-center">
-                      <span className="text-xs text-content-neutral-500">Current Balance</span>
+                      <span className="text-xs text-content-neutral-500">
+                        Current Balance
+                      </span>
                       <span className="font-mono text-sm font-bold text-content-neutral-900">
-                        {formatCurrencyAmount(selectedVendor.currentBalance, activeCurrency)}
+                        {formatCurrencyAmount(
+                          selectedVendor.currentBalance,
+                          activeCurrency,
+                        )}
                       </span>
                     </div>
                   </>
@@ -1521,65 +1711,70 @@ export default function OutsourcingView() {
                   </Button>
                 </div>
               </div>
-            </MotionSurface>
-          </MotionSurface>
+            </div>
+          </Dialog>
         )}
       </MotionPresence>
 
       {/* Modal Dialog: Review Contractor Deliverable & Sync to Task */}
       <MotionPresence>
         {reviewingWorkOrder && (
-          <MotionSurface kind="dialog" className="outsourcing-modal-overlay">
-            <MotionSurface
-              onDismiss={() => setReviewingWorkOrder(null)}
-              kind="panel"
-              className="outsourcing-modal-panel max-w-lg"
-            >
-              <div className="outsourcing-modal-header">
-                <div className="flex items-center gap-2">
-                  <FileCheck className="w-4 h-4 text-accent" />
-                  <h3 className="outsourcing-modal-title">
-                    Review Contractor Deliverable
-                  </h3>
-                </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => setReviewingWorkOrder(null)}
-                >
-                  <X className="text-sm" />
-                </Button>
+          <Dialog onClose={() => setReviewingWorkOrder(null)} width={620}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-accent" />
+                <h3 className="outsourcing-modal-title">
+                  Review Contractor Deliverable
+                </h3>
               </div>
-
-              <form onSubmit={handleSaveReview} className="outsourcing-modal-body">
+            </div>
+            <form onSubmit={handleSaveReview} className="app-dialog-form">
+              <div className="app-dialog-body">
                 <div className="deliverable-review-box">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-content-neutral-500 font-medium">Work Order Scope</span>
-                    <span className="font-semibold text-content-neutral-900">{reviewingWorkOrder.scope}</span>
+                    <span className="text-content-neutral-500 font-medium">
+                      Work Order Scope
+                    </span>
+                    <span className="font-semibold text-content-neutral-900">
+                      {reviewingWorkOrder.scope}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-content-neutral-500 font-medium">Subcontractor</span>
-                    <span className="font-medium text-content-neutral-800">{reviewingWorkOrder.vendorName}</span>
+                    <span className="text-content-neutral-500 font-medium">
+                      Subcontractor
+                    </span>
+                    <span className="font-medium text-content-neutral-800">
+                      {reviewingWorkOrder.vendorName}
+                    </span>
                   </div>
                   {reviewingWorkOrder.taskTitle && (
                     <div className="flex justify-between items-center text-xs pt-1 border-t border-line-neutral-200">
-                      <span className="text-content-neutral-500 font-medium">Original Task</span>
-                      <span className="font-mono text-content-neutral-900">{reviewingWorkOrder.taskTitle}</span>
+                      <span className="text-content-neutral-500 font-medium">
+                        Original Task
+                      </span>
+                      <span className="font-mono text-content-neutral-900">
+                        {reviewingWorkOrder.taskTitle}
+                      </span>
                     </div>
                   )}
                   <div className="flex justify-between items-center text-xs pt-1 border-t border-line-neutral-200">
-                    <span className="text-content-neutral-500 font-medium">Agreed Fee</span>
+                    <span className="text-content-neutral-500 font-medium">
+                      Agreed Fee
+                    </span>
                     <span className="font-mono font-bold text-content-neutral-900">
-                      {formatCents(reviewingWorkOrder.feeCents, reviewingWorkOrder.currency)}
+                      {formatCents(
+                        reviewingWorkOrder.feeCents,
+                        reviewingWorkOrder.currency,
+                      )}
                     </span>
                   </div>
                 </div>
 
                 {/* Contractor Progress Status */}
                 <div className="outsourcing-form-group">
-                  <label className="outsourcing-label">Contractor Work Status</label>
+                  <label className="outsourcing-label">
+                    Contractor Work Status
+                  </label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {[
                       { id: "todo", label: "Assigned" },
@@ -1590,7 +1785,11 @@ export default function OutsourcingView() {
                       <button
                         key={s.id}
                         type="button"
-                        onClick={() => setReviewStatus(s.id as "todo" | "in-progress" | "review" | "done")}
+                        onClick={() =>
+                          setReviewStatus(
+                            s.id as "todo" | "in-progress" | "review" | "done",
+                          )
+                        }
                         className={`px-2 py-1.5 rounded-lg text-xs font-semibold border transition-all text-center ${
                           reviewStatus === s.id
                             ? "bg-accent text-white border-accent shadow-xs"
@@ -1606,7 +1805,9 @@ export default function OutsourcingView() {
                 {/* Deliverable URL */}
                 <div className="outsourcing-form-group">
                   <div className="flex justify-between items-center">
-                    <label className="outsourcing-label">Deliverable URL / Repository / Staging</label>
+                    <label className="outsourcing-label">
+                      Deliverable URL / Repository / Staging
+                    </label>
                     {reviewDeliveryUrl && (
                       <a
                         href={reviewDeliveryUrl}
@@ -1627,13 +1828,16 @@ export default function OutsourcingView() {
                     className="outsourcing-input font-mono text-xs"
                   />
                   <p className="text-[11px] text-content-neutral-400">
-                    Retained with this work order and accessible to the freelancer and client.
+                    Retained with this work order and accessible to the
+                    freelancer and client.
                   </p>
                 </div>
 
                 {/* Delivery Notes */}
                 <div className="outsourcing-form-group">
-                  <label className="outsourcing-label">Handover Notes / Verification Summary</label>
+                  <label className="outsourcing-label">
+                    Handover Notes / Verification Summary
+                  </label>
                   <textarea
                     rows={3}
                     value={reviewNotes}
@@ -1657,78 +1861,69 @@ export default function OutsourcingView() {
                         Update original task in Kanban board after review
                       </span>
                       <span className="text-content-purple-700 text-[11px] mt-0.5 block">
-                        Syncs the delivered URL and sets the linked task to {reviewStatus === "done" ? "Done" : "Under Review"} automatically.
+                        Syncs the delivered URL and sets the linked task to{" "}
+                        {reviewStatus === "done" ? "Done" : "Under Review"}{" "}
+                        automatically.
                       </span>
                     </div>
                   </label>
                 </div>
-
-                <div className="outsourcing-modal-footer">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => setReviewingWorkOrder(null)}
-                    disabled={isSubmittingReview}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    disabled={isSubmittingReview}
-                  >
-                    {isSubmittingReview ? "Saving..." : reviewStatus === "done" ? "Accept & Complete Work" : "Save Review"}
-                  </Button>
-                </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
+              </div>
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setReviewingWorkOrder(null)}
+                  disabled={isSubmittingReview}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={isSubmittingReview}
+                >
+                  {isSubmittingReview
+                    ? "Saving..."
+                    : reviewStatus === "done"
+                      ? "Accept & Complete Work"
+                      : "Save Review"}
+                </Button>
+              </div>
+            </form>
+          </Dialog>
         )}
       </MotionPresence>
 
       {/* Modal Dialog: New Work Order (Prefilled from saved IDs or manually configured) */}
       <MotionPresence>
         {isWorkOrderModalOpen && (
-          <MotionSurface kind="dialog" className="outsourcing-modal-overlay">
-            <MotionSurface
-              onDismiss={() => closeWorkOrderModal()}
-              kind="panel"
-              className="outsourcing-modal-panel max-w-lg"
-            >
-              <div className="outsourcing-modal-header">
-                <div className="flex items-center gap-2">
-                  <GitFork className="w-4 h-4 text-accent" />
-                  <h3 className="outsourcing-modal-title">
-                    Create Outsourcing Work Order
-                  </h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  {hasWorkOrderDraft && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="small"
-                      onClick={handleRestoreWorkOrderDraft}
-                      className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
-                      title="Restore previously typed work order draft"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restore</span>
-                    </Button>
-                  )}
-                  <Button
-                    aria-label="Close"
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    onClick={() => closeWorkOrderModal()}
-                  >
-                    <X className="text-sm" />
-                  </Button>
-                </div>
+          <Dialog onClose={() => closeWorkOrderModal()} width={620}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2">
+                <GitFork className="w-4 h-4 text-accent" />
+                <h3 className="outsourcing-modal-title">
+                  New work order
+                </h3>
               </div>
-
-              <form onSubmit={handleCreateWorkOrder} className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                {hasWorkOrderDraft && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="small"
+                    onClick={handleRestoreWorkOrderDraft}
+                    className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                    title="Restore previously typed work order draft"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Restore</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+            <form onSubmit={handleCreateWorkOrder} className="app-dialog-form">
+              <div className="app-dialog-body">
                 {/* Linked Task & Invoice Banner if prefilled */}
                 {woTaskId && (
                   <div className="p-3 rounded-xl bg-surface-purple-50/50 border border-line-purple-200 flex items-start gap-2.5">
@@ -1738,7 +1933,10 @@ export default function OutsourcingView() {
                         Linked Task: {woTaskTitle || "Sprint Deliverable"}
                       </div>
                       <div className="text-content-neutral-600">
-                        Invoice: <span className="font-mono font-medium">{woInvoiceCode || woInvoiceId}</span>
+                        Invoice:{" "}
+                        <span className="font-mono font-medium">
+                          {woInvoiceCode || woInvoiceId}
+                        </span>
                         {woClientName && <span> · Client: {woClientName}</span>}
                       </div>
                     </div>
@@ -1749,14 +1947,19 @@ export default function OutsourcingView() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[12px] font-semibold text-text-secondary">
-                      Assigned Subcontractor <span className="text-content-rose-500 font-bold">*</span>
+                      Assigned Subcontractor{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <button
                       type="button"
-                      onClick={() => setIsCreatingNewVendorInline(!isCreatingNewVendorInline)}
+                      onClick={() =>
+                        setIsCreatingNewVendorInline(!isCreatingNewVendorInline)
+                      }
                       className="text-[11px] text-accent hover:underline font-semibold"
                     >
-                      {isCreatingNewVendorInline ? "Select Existing Vendor" : "+ Add New Vendor"}
+                      {isCreatingNewVendorInline
+                        ? "Select Existing Vendor"
+                        : "+ Add New Vendor"}
                     </button>
                   </div>
 
@@ -1779,36 +1982,50 @@ export default function OutsourcingView() {
                           {v.name} ({v.service})
                         </option>
                       ))}
-                      <option value="__new__">+ Register New Subcontractor...</option>
+                      <option value="__new__">
+                        + Register New Subcontractor...
+                      </option>
                     </select>
                   ) : (
                     <div className="p-3.5 rounded-xl bg-surface-neutral-50 border border-line-neutral-200 space-y-3">
                       <div>
                         <label className="block text-[11px] font-semibold text-content-neutral-700 mb-1">
-                          Contractor / Agency Name <span className="text-content-rose-500 font-bold">*</span>
+                          Contractor / Agency Name{" "}
+                          <span className="text-content-rose-500 font-bold">
+                            *
+                          </span>
                         </label>
                         <input
                           type="text"
                           placeholder="e.g. Alex WebCraft Labs"
                           value={newVendorInlineName}
-                          onChange={(e) => setNewVendorInlineName(e.target.value)}
+                          onChange={(e) =>
+                            setNewVendorInlineName(e.target.value)
+                          }
                           className="ui-field w-full text-xs px-3 py-1.5 rounded-lg border border-line-neutral-300"
                         />
                         {woFormErrors.newVendorName && (
-                          <p className="text-content-rose-600 text-[10.5px] mt-0.5">{woFormErrors.newVendorName}</p>
+                          <p className="text-content-rose-600 text-[10.5px] mt-0.5">
+                            {woFormErrors.newVendorName}
+                          </p>
                         )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[11px] font-semibold text-content-neutral-700 mb-1">
-                            Primary Specialty <span className="text-content-rose-500 font-bold">*</span>
+                            Primary Specialty{" "}
+                            <span className="text-content-rose-500 font-bold">
+                              *
+                            </span>
                           </label>
                           <input
                             type="text"
                             placeholder="e.g. Frontend Development"
                             value={newVendorInlineService}
-                            onChange={(e) => setNewVendorInlineService(e.target.value)}
+                            onChange={(e) =>
+                              setNewVendorInlineService(e.target.value)
+                            }
                             className="ui-field w-full text-xs px-3 py-1.5 rounded-lg border border-line-neutral-300"
                           />
                         </div>
@@ -1818,7 +2035,11 @@ export default function OutsourcingView() {
                           </label>
                           <select
                             value={newVendorInlineCategory}
-                            onChange={(e) => setNewVendorInlineCategory(e.target.value as VendorItem["iconType"])}
+                            onChange={(e) =>
+                              setNewVendorInlineCategory(
+                                e.target.value as VendorItem["iconType"],
+                              )
+                            }
                             className="ui-field w-full text-xs px-2 py-1.5 rounded-lg border border-line-neutral-300"
                           >
                             <option value="development">Development</option>
@@ -1831,22 +2052,30 @@ export default function OutsourcingView() {
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[11px] font-medium text-content-neutral-600 mb-1">Email</label>
+                          <label className="block text-[11px] font-medium text-content-neutral-600 mb-1">
+                            Email
+                          </label>
                           <input
                             type="email"
                             placeholder="alex@webcraft.io"
                             value={newVendorInlineEmail}
-                            onChange={(e) => setNewVendorInlineEmail(e.target.value)}
+                            onChange={(e) =>
+                              setNewVendorInlineEmail(e.target.value)
+                            }
                             className="ui-field w-full text-xs px-3 py-1.5 rounded-lg border border-line-neutral-300"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-medium text-content-neutral-600 mb-1">Phone</label>
+                          <label className="block text-[11px] font-medium text-content-neutral-600 mb-1">
+                            Phone
+                          </label>
                           <input
                             type="text"
                             placeholder="+94 77 123 4567"
                             value={newVendorInlinePhone}
-                            onChange={(e) => setNewVendorInlinePhone(e.target.value)}
+                            onChange={(e) =>
+                              setNewVendorInlinePhone(e.target.value)
+                            }
                             className="ui-field w-full text-xs px-3 py-1.5 rounded-lg border border-line-neutral-300"
                           />
                         </div>
@@ -1854,7 +2083,9 @@ export default function OutsourcingView() {
                     </div>
                   )}
                   {woFormErrors.vendor && (
-                    <p className="text-content-rose-600 text-[11px] mt-1 font-medium">{woFormErrors.vendor}</p>
+                    <p className="text-content-rose-600 text-[11px] mt-1 font-medium">
+                      {woFormErrors.vendor}
+                    </p>
                   )}
                 </div>
 
@@ -1862,12 +2093,15 @@ export default function OutsourcingView() {
                 {!searchParams.get("taskId") && tasks.length > 0 && (
                   <div>
                     <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                      Sprint Deliverable Task <span className="text-content-rose-500 font-bold">*</span>
+                      Sprint Deliverable Task{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <select
                       value={woTaskId}
                       onChange={(e) => {
-                        const t = tasks.find((item) => item.id === e.target.value);
+                        const t = tasks.find(
+                          (item) => item.id === e.target.value,
+                        );
                         if (t) {
                           setWoTaskId(t.id);
                           setWoTaskTitle(t.title);
@@ -1876,8 +2110,12 @@ export default function OutsourcingView() {
                           setWoClientId(t.clientId || "");
                           setWoClientName(t.clientName || "");
                           setWoDeliveryUrl(t.deliveryUrl || "");
-                          setWoCurrency((t.currency as Currency) || activeCurrency || "LKR");
-                          const inv = invoices.find((i) => i.id === t.invoiceId);
+                          setWoCurrency(
+                            (t.currency as Currency) || activeCurrency || "LKR",
+                          );
+                          const inv = invoices.find(
+                            (i) => i.id === t.invoiceId,
+                          );
                           if (inv) setWoInvoiceCode(inv.code);
                         }
                       }}
@@ -1896,7 +2134,8 @@ export default function OutsourcingView() {
                 {/* Scope Description */}
                 <div>
                   <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                    Deliverable Scope & Task Description <span className="text-content-rose-500 font-bold">*</span>
+                    Deliverable Scope & Task Description{" "}
+                    <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <textarea
                     rows={2}
@@ -1906,7 +2145,9 @@ export default function OutsourcingView() {
                     className="ui-field w-full text-[13px] p-3 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                   {woFormErrors.scope && (
-                    <p className="text-content-rose-600 text-[11px] mt-1">{woFormErrors.scope}</p>
+                    <p className="text-content-rose-600 text-[11px] mt-1">
+                      {woFormErrors.scope}
+                    </p>
                   )}
                 </div>
 
@@ -1914,7 +2155,8 @@ export default function OutsourcingView() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                      Agreed Contractor Fee <span className="text-content-rose-500 font-bold">*</span>
+                      Agreed Contractor Fee{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="number"
@@ -1925,17 +2167,22 @@ export default function OutsourcingView() {
                       className="ui-field w-full text-[13px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus font-mono"
                     />
                     {woFormErrors.fee && (
-                      <p className="text-content-rose-600 text-[11px] mt-1">{woFormErrors.fee}</p>
+                      <p className="text-content-rose-600 text-[11px] mt-1">
+                        {woFormErrors.fee}
+                      </p>
                     )}
                   </div>
 
                   <div>
                     <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                      Payable Currency <span className="text-content-rose-500 font-bold">*</span>
+                      Payable Currency{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <select
                       value={woCurrency}
-                      onChange={(e) => setWoCurrency(e.target.value as Currency)}
+                      onChange={(e) =>
+                        setWoCurrency(e.target.value as Currency)
+                      }
                       className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus font-semibold"
                     >
                       <option value="LKR">LKR (Rs.)</option>
@@ -1989,60 +2236,46 @@ export default function OutsourcingView() {
                     className="ui-field w-full text-[12.5px] p-3 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
-
-                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-line-neutral-100">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={() => closeWorkOrderModal()}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    disabled={isSubmittingWorkOrder}
-                  >
-                    {isSubmittingWorkOrder ? "Creating..." : "Save Work Order"}
-                  </Button>
-                </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
+              </div>
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => closeWorkOrderModal()}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={isSubmittingWorkOrder}
+                >
+                  {isSubmittingWorkOrder ? "Creating..." : "Save Work Order"}
+                </Button>
+              </div>
+            </form>
+          </Dialog>
         )}
       </MotionPresence>
 
       {/* Modal Dialog: Add Reusable Vendor Profile */}
       <MotionPresence>
         {isVendorModalOpen && (
-          <MotionSurface kind="dialog" className="outsourcing-modal-overlay">
-            <MotionSurface
-              onDismiss={() => setIsVendorModalOpen(false)}
-              kind="panel"
-              className="outsourcing-modal-panel"
-            >
-              <div className="outsourcing-modal-header">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-accent" />
-                  <h3 className="outsourcing-modal-title">
-                    Add Reusable Vendor Profile
-                  </h3>
-                </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => setIsVendorModalOpen(false)}
-                >
-                  <X className="text-sm" />
-                </Button>
+          <Dialog onClose={() => setIsVendorModalOpen(false)} width={620}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-accent" />
+                <h3 className="outsourcing-modal-title">
+                  Add Reusable Vendor Profile
+                </h3>
               </div>
-
-              <form onSubmit={handleAddVendor} className="p-6 space-y-4">
+            </div>
+            <form onSubmit={handleAddVendor} className="app-dialog-form">
+              <div className="app-dialog-body">
                 <div>
                   <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                    Vendor / Contractor Name <span className="text-content-rose-500 font-bold">*</span>
+                    Vendor / Contractor Name{" "}
+                    <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -2052,14 +2285,17 @@ export default function OutsourcingView() {
                     className="ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                   {vendorFormErrors.name && (
-                    <p className="text-content-rose-600 text-[11px] mt-1">{vendorFormErrors.name}</p>
+                    <p className="text-content-rose-600 text-[11px] mt-1">
+                      {vendorFormErrors.name}
+                    </p>
                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                      Primary Service / Specialty <span className="text-content-rose-500 font-bold">*</span>
+                      Primary Service / Specialty{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="text"
@@ -2069,7 +2305,9 @@ export default function OutsourcingView() {
                       className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     />
                     {vendorFormErrors.service && (
-                      <p className="text-content-rose-600 text-[11px] mt-1">{vendorFormErrors.service}</p>
+                      <p className="text-content-rose-600 text-[11px] mt-1">
+                        {vendorFormErrors.service}
+                      </p>
                     )}
                   </div>
 
@@ -2079,7 +2317,11 @@ export default function OutsourcingView() {
                     </label>
                     <select
                       value={vendorIconType}
-                      onChange={(e) => setVendorIconType(e.target.value as VendorItem["iconType"])}
+                      onChange={(e) =>
+                        setVendorIconType(
+                          e.target.value as VendorItem["iconType"],
+                        )
+                      }
                       className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     >
                       <option value="development">Software Development</option>
@@ -2130,60 +2372,44 @@ export default function OutsourcingView() {
                     className="ui-field w-full text-[12.5px] p-3 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                 </div>
-
-                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-line-neutral-100">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={() => setIsVendorModalOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    disabled={isSubmittingVendor}
-                  >
-                    {isSubmittingVendor ? "Saving..." : "Save Profile"}
-                  </Button>
-                </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
+              </div>
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setIsVendorModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={isSubmittingVendor}
+                >
+                  {isSubmittingVendor ? "Saving..." : "Save Profile"}
+                </Button>
+              </div>
+            </form>
+          </Dialog>
         )}
       </MotionPresence>
 
       {/* Modal Dialog: Add Client */}
       <MotionPresence>
         {isClientModalOpen && (
-          <MotionSurface kind="dialog" className="outsourcing-modal-overlay">
-            <MotionSurface
-              onDismiss={() => setIsClientModalOpen(false)}
-              kind="panel"
-              className="outsourcing-modal-panel"
-            >
-              <div className="outsourcing-modal-header">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="w-4 h-4 text-accent" />
-                  <h3 className="outsourcing-modal-title">
-                    Add Client Profile
-                  </h3>
-                </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => setIsClientModalOpen(false)}
-                >
-                  <X className="text-sm" />
-                </Button>
+          <Dialog onClose={() => setIsClientModalOpen(false)} width={620}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-accent" />
+                <h3 className="outsourcing-modal-title">Add Client Profile</h3>
               </div>
-
-              <form onSubmit={handleAddClient} className="p-6 space-y-4">
+            </div>
+            <form onSubmit={handleAddClient} className="app-dialog-form">
+              <div className="app-dialog-body">
                 <div>
                   <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                    Client Organization Name <span className="text-content-rose-500 font-bold">*</span>
+                    Client Organization Name{" "}
+                    <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -2193,13 +2419,16 @@ export default function OutsourcingView() {
                     className="ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                   {clientFormErrors.name && (
-                    <p className="text-content-rose-600 text-[11px] mt-1">{clientFormErrors.name}</p>
+                    <p className="text-content-rose-600 text-[11px] mt-1">
+                      {clientFormErrors.name}
+                    </p>
                   )}
                 </div>
 
                 <div>
                   <label className="block text-[12px] font-semibold text-text-secondary mb-1">
-                    Email Address <span className="text-content-rose-500 font-bold">*</span>
+                    Email Address{" "}
+                    <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -2209,7 +2438,9 @@ export default function OutsourcingView() {
                     className="ui-field w-full text-[13px] px-3.5 py-2.5 rounded-xl border border-border-muted focus:outline-none focus:ring-2 focus:ring-focus"
                   />
                   {clientFormErrors.email && (
-                    <p className="text-content-rose-600 text-[11px] mt-1">{clientFormErrors.email}</p>
+                    <p className="text-content-rose-600 text-[11px] mt-1">
+                      {clientFormErrors.email}
+                    </p>
                   )}
                 </div>
 
@@ -2220,7 +2451,9 @@ export default function OutsourcingView() {
                     </label>
                     <select
                       value={clientCurrency}
-                      onChange={(e) => setClientCurrency(e.target.value as Currency)}
+                      onChange={(e) =>
+                        setClientCurrency(e.target.value as Currency)
+                      }
                       className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl"
                     >
                       <option value="USD">USD ($)</option>
@@ -2256,18 +2489,25 @@ export default function OutsourcingView() {
                     className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl"
                   />
                 </div>
-
-                <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-line-neutral-100">
-                  <Button variant="ghost" type="button" onClick={() => setIsClientModalOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary" type="submit" disabled={isSubmittingClient}>
-                    {isSubmittingClient ? "Saving..." : "Save Client"}
-                  </Button>
-                </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
+              </div>
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setIsClientModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={isSubmittingClient}
+                >
+                  {isSubmittingClient ? "Saving..." : "Save Client"}
+                </Button>
+              </div>
+            </form>
+          </Dialog>
         )}
       </MotionPresence>
     </div>

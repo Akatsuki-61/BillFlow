@@ -46,58 +46,137 @@ export function ProfitTrajectoryPlot({ months, metric, currency }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  const rawMaxProfit = Math.max(0, ...months.map(month => month.profitCents));
-  const maximum = metric === "profit" ? rawMaxProfit : 100;
-  const format = (value: number) => metric === "profit" ? formatCents(value, currency) : `${value}%`;
-  const ticks = maximum > 0 ? [maximum, Math.round(maximum / 2), 0] : [0, 0, 0];
+  const values = months.map((month) =>
+    metric === "profit" ? month.profitCents : month.marginPct,
+  );
+  const maximum = Math.max(0, ...values);
+  const minimum = Math.min(0, ...values);
+  const range = maximum - minimum || 1;
+  const format = (value: number) =>
+    metric === "profit" ? formatCents(value, currency) : `${value}%`;
+  const ticks = [maximum, (maximum + minimum) / 2, minimum];
   // Match SVG coordinates to actual pixels so text and circles never stretch.
-  const left = Math.max(64, ...ticks.map(value => format(value).length * 7 + 16));
+  const left = Math.max(
+    64,
+    ...ticks.map((value) => format(value).length * 7 + 16),
+  );
   const right = width - 24;
   const top = 42;
   const bottom = 140;
   const points = months.map((month, index) => ({
     ...month,
     value: metric === "profit" ? month.profitCents : month.marginPct,
-    x: left + (right - left) * (months.length > 1 ? index / (months.length - 1) : 0.5),
-    y: bottom - (maximum > 0 ? Math.min(1, Math.max(0, (metric === "profit" ? month.profitCents : month.marginPct) / maximum)) : 0) * (bottom - top),
+    x:
+      left +
+      (right - left) * (months.length > 1 ? index / (months.length - 1) : 0.5),
+    y:
+      bottom -
+      (((metric === "profit" ? month.profitCents : month.marginPct) - minimum) /
+        range) *
+        (bottom - top),
   }));
   const line = getSmoothPath(points);
   const last = points.at(-1);
   const tagText = last ? format(last.value) : "";
   const tagWidth = Math.max(64, tagText.length * 7 + 20);
-  const tagX = last ? Math.max(tagWidth / 2, Math.min(width - tagWidth / 2, last.x)) : 0;
-  const labelStride = Math.max(1, Math.ceil(months.length * 42 / Math.max(1, right - left)));
+  const tagX = last
+    ? Math.max(tagWidth / 2, Math.min(width - tagWidth / 2, last.x))
+    : 0;
+  const labelStride = Math.max(
+    1,
+    Math.ceil((months.length * 42) / Math.max(1, right - left)),
+  );
 
   return (
     <div className="analytics-creative-canvas-area">
       <div ref={container} className="profit-trajectory-plot">
-        <svg viewBox={`0 0 ${width} 184`} role="img" aria-label={`Monthly ${metric === "profit" ? "net profit" : "profit margin"} trajectory`}>
+        <svg
+          viewBox={`0 0 ${width} 184`}
+          role="img"
+          aria-label={`Monthly ${metric === "profit" ? "net profit" : "profit margin"} trajectory`}
+        >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--theme-accent)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="var(--theme-accent)" stopOpacity="0" />
+              <stop
+                offset="0%"
+                stopColor="var(--theme-accent)"
+                stopOpacity="0.22"
+              />
+              <stop
+                offset="100%"
+                stopColor="var(--theme-accent)"
+                stopOpacity="0"
+              />
             </linearGradient>
           </defs>
           {ticks.map((value, index) => {
-            const y = top + index * (bottom - top) / 2;
-            return <g key={index}>
-              <line x1={left} y1={y} x2={width - 8} y2={y} className="analytics-grid-line" />
-              <text x={left - 12} y={y + 4} textAnchor="end" className="analytics-axis-text">{format(value)}</text>
-            </g>;
+            const y = top + (index * (bottom - top)) / 2;
+            return (
+              <g key={index}>
+                <line
+                  x1={left}
+                  y1={y}
+                  x2={width - 8}
+                  y2={y}
+                  className="analytics-grid-line"
+                />
+                <text
+                  x={left - 12}
+                  y={y + 4}
+                  textAnchor="end"
+                  className="analytics-axis-text"
+                >
+                  {format(value)}
+                </text>
+              </g>
+            );
           })}
-          {last && <path d={`${line} L ${last.x} ${bottom} L ${points[0].x} ${bottom} Z`} fill={`url(#${gradientId})`} />}
+          {last && (
+            <path
+              d={`${line} L ${last.x} ${bottom} L ${points[0].x} ${bottom} Z`}
+              fill={`url(#${gradientId})`}
+            />
+          )}
           {line && <path d={line} className="analytics-spline-path" />}
-          {points.map((point, index) => <g key={index}>
-            <circle cx={point.x} cy={point.y} r={index === points.length - 1 ? 5 : 4} className="analytics-node-dot">
-              <title>{`${point.label} ${metric === "profit" ? "Profit" : "Margin"}: ${format(point.value)}`}</title>
-            </circle>
-            {(index === points.length - 1 || (index % labelStride === 0 && (points.length - 1 - index) * (right - left) / Math.max(1, points.length - 1) >= 42)) &&
-              <text x={point.x} y={168} className={`analytics-month-text ${index === points.length - 1 ? "active" : ""}`}>{point.label.toUpperCase()}</text>}
-          </g>)}
-          {last && <g transform={`translate(${tagX}, ${last.y - 34})`}>
-            <rect x={-tagWidth / 2} width={tagWidth} height={24} rx={6} className="analytics-floating-tag-bg" />
-            <text y={16} className="analytics-floating-tag-text">{tagText}</text>
-          </g>}
+          {points.map((point, index) => (
+            <g key={index}>
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={index === points.length - 1 ? 5 : 4}
+                className="analytics-node-dot"
+              >
+                <title>{`${point.label} ${metric === "profit" ? "Profit" : "Margin"}: ${format(point.value)}`}</title>
+              </circle>
+              {(index === points.length - 1 ||
+                (index % labelStride === 0 &&
+                  ((points.length - 1 - index) * (right - left)) /
+                    Math.max(1, points.length - 1) >=
+                    42)) && (
+                <text
+                  x={point.x}
+                  y={168}
+                  className={`analytics-month-text ${index === points.length - 1 ? "active" : ""}`}
+                >
+                  {point.label.toUpperCase()}
+                </text>
+              )}
+            </g>
+          ))}
+          {last && (
+            <g transform={`translate(${tagX}, ${last.y - 34})`}>
+              <rect
+                x={-tagWidth / 2}
+                width={tagWidth}
+                height={24}
+                rx={6}
+                className="analytics-floating-tag-bg"
+              />
+              <text y={16} className="analytics-floating-tag-text">
+                {tagText}
+              </text>
+            </g>
+          )}
         </svg>
       </div>
     </div>

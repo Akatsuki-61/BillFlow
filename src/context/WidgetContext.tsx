@@ -54,9 +54,9 @@ interface WidgetContextType {
 
 const WidgetContext = createContext<WidgetContextType | null>(null);
 
-const STORAGE_KEY_DASHBOARD = "billflow_dashboard_widgets_v2";
-const STORAGE_KEY_ANALYTICS = "billflow_analytics_widgets_v2";
-const STORAGE_KEY_SIZES = "billflow_widget_sizes_v2";
+const STORAGE_KEY_DASHBOARD = "billflow_dashboard_widgets_v3";
+const STORAGE_KEY_ANALYTICS = "billflow_analytics_widgets_v3";
+const STORAGE_KEY_SIZES = "billflow_widget_sizes_v3";
 
 const subscribeToHydration = () => () => {};
 const clientHydrationSnapshot = () => true;
