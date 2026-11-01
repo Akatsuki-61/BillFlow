@@ -635,6 +635,38 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 .ui-field::placeholder {
   color: var(--ui-placeholder);
 }
+
+/* Ensure all select elements and options respect the application color theme */
+select {
+  color-scheme: light dark;
+}
+:root[data-theme="dark"] select,
+[data-theme="dark"] select,
+.dark select {
+  color-scheme: dark;
+}
+:root[data-theme="light"] select,
+[data-theme="light"] select,
+.light select {
+  color-scheme: light;
+}
+select option {
+  background-color: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #0d0d12);
+  padding: 8px 12px;
+}
+:root[data-theme="dark"] select option,
+[data-theme="dark"] select option,
+.dark select option {
+  background-color: #19191f !important;
+  color: #f4f4f6 !important;
+}
+:root[data-theme="light"] select option,
+[data-theme="light"] select option,
+.light select option {
+  background-color: #ffffff !important;
+  color: #0d0d12 !important;
+}
 .ui-search-input,
 .ui-field-search,
 input.ui-search-input,
@@ -1862,12 +1894,16 @@ input[type="checkbox"] {
   border-radius: 12px;
   background: var(--ui-inset);
   color: var(--ui-secondary);
-  transition: background 160ms ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 .overview-period-picker:hover {
   background: var(--ui-hover);
+  color: var(--foreground);
 }
-.overview-period-picker:focus-within {
+.overview-period-picker:focus-within,
+.overview-period-picker:focus-visible {
   outline: 2px solid var(--theme-accent);
   outline-offset: 3px;
 }

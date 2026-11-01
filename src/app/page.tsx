@@ -36,7 +36,15 @@ import {
 } from "@/lib/data/DataProvider";
 import { issuedInPeriod, localDateKey } from "@/lib/visual-metrics";
 import { formatCents } from "@/lib/format";
+import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
 import { DashboardPeriod } from "@/types/dashboard";
+
+const PERIOD_OPTIONS: SelectOption<DashboardPeriod>[] = [
+  { value: "month", label: "This Month" },
+  { value: "quarter", label: "This Quarter" },
+  { value: "year", label: "This Year" },
+  { value: "all", label: "All Time" },
+];
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -377,23 +385,15 @@ export default function DashboardPage() {
 
         {/* Right: Connected Date Comparison Pill Group + Granularity + Add Widget */}
         <div className="flex items-center gap-2 flex-wrap">
-          <label className="overview-period-picker">
-            <Calendar aria-hidden="true" className="w-3.5 h-3.5" />
-            <select
-              aria-label="Overview period"
-              className="appearance-none"
-              value={period}
-              onChange={(event) =>
-                setPeriod(event.target.value as DashboardPeriod)
-              }
-            >
-              <option value="month">This Month</option>
-              <option value="quarter">This Quarter</option>
-              <option value="year">This Year</option>
-              <option value="all">All Time</option>
-            </select>
-            <ChevronDown aria-hidden="true" className="w-3.5 h-3.5" />
-          </label>
+          <SelectDropdown<DashboardPeriod>
+            value={period}
+            onChange={setPeriod}
+            options={PERIOD_OPTIONS}
+            icon={<Calendar className="w-3.5 h-3.5" />}
+            ariaLabel="Overview period"
+            buttonClassName="overview-period-picker font-sans text-[12.5px] font-medium text-content-neutral-900 cursor-pointer"
+            menuClassName="w-44"
+          />
 
           <button
             type="button"

@@ -213,7 +213,7 @@ export default function Sidebar() {
                 />
               </div>
               <span className="text-[21px] font-semibold tracking-[-0.04em] text-content-neutral-950 leading-none">
-                billflow
+                BillFlow
               </span>
             </Link>
           </div>
