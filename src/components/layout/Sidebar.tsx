@@ -221,7 +221,8 @@ export default function Sidebar() {
           {/* Center: Middle-Aligned Horizontal Navigation */}
           <nav
             aria-label="Main Navigation"
-            className="flex items-center justify-center justify-self-center gap-1.5 overflow-x-auto no-scrollbar py-1 max-w-full"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            className="flex items-center justify-center justify-self-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar py-1 max-w-full"
           >
             {mainNavItems.map((item) => {
               const isActive = isNavActive(pathname, item.href);
@@ -236,14 +237,24 @@ export default function Sidebar() {
                     isHome
                       ? (e) => {
                           e.preventDefault();
-                          setIsHomeDropOver(true);
+                          e.dataTransfer.dropEffect = "copy";
+                          if (!isHomeDropOver) {
+                            setIsHomeDropOver(true);
+                          }
                         }
                       : undefined
                   }
                   onDragLeave={
                     isHome
-                      ? () => {
-                          setIsHomeDropOver(false);
+                      ? (e) => {
+                          const currentTarget = e.currentTarget;
+                          const relatedTarget = e.relatedTarget as Node | null;
+                          if (
+                            !relatedTarget ||
+                            !currentTarget.contains(relatedTarget)
+                          ) {
+                            setIsHomeDropOver(false);
+                          }
                         }
                       : undefined
                   }
@@ -259,15 +270,15 @@ export default function Sidebar() {
                         }
                       : undefined
                   }
-                  className={`workspace-nav-link relative isolate px-4 py-2 rounded-[12px] text-[14px] font-medium whitespace-nowrap cursor-pointer ${
-                    isHomeDropOver
-                      ? "bg-accent-solid text-white ring-2 ring-accent/40 scale-105"
+                  className={`workspace-nav-link relative isolate px-4 py-2 rounded-[12px] text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors ${
+                    isHome && isHomeDropOver
+                      ? "bg-accent-solid text-white ring-2 ring-accent/50 shadow-sm"
                       : isActive
                         ? "text-white dark:text-[#111115]"
                         : "text-content-neutral-700 hover:text-content-neutral-950 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
                   }`}
                 >
-                  {isActive && (
+                  {isActive && !(isHome && isHomeDropOver) && (
                     <motion.span
                       className="nav-active-pill absolute inset-0 -z-10 rounded-[12px] bg-[#1c1c1f] dark:bg-[#f4f4f6]"
                       layoutId="main-nav-active"
