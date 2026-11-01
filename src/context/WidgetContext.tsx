@@ -54,9 +54,9 @@ interface WidgetContextType {
 
 const WidgetContext = createContext<WidgetContextType | null>(null);
 
-const STORAGE_KEY_DASHBOARD = "billflow_dashboard_widgets_v3";
-const STORAGE_KEY_ANALYTICS = "billflow_analytics_widgets_v3";
-const STORAGE_KEY_SIZES = "billflow_widget_sizes_v3";
+const STORAGE_KEY_DASHBOARD = "billflow_dashboard_widgets_v4";
+const STORAGE_KEY_ANALYTICS = "billflow_analytics_widgets_v4";
+const STORAGE_KEY_SIZES = "billflow_widget_sizes_v4";
 
 const subscribeToHydration = () => () => {};
 const clientHydrationSnapshot = () => true;
@@ -118,7 +118,21 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   );
   if (hydrated && !isInitialized) {
     try {
-      const storedDash = localStorage.getItem(STORAGE_KEY_DASHBOARD);
+      let storedDash = localStorage.getItem(STORAGE_KEY_DASHBOARD);
+      if (!storedDash) {
+        const oldDash = localStorage.getItem("billflow_dashboard_widgets_v3");
+        if (oldDash) {
+          try {
+            const parsedOld = JSON.parse(oldDash);
+            if (Array.isArray(parsedOld)) {
+              const upgraded = parsedOld.includes("workspace-insights")
+                ? parsedOld
+                : ["workspace-insights", ...parsedOld];
+              storedDash = JSON.stringify(upgraded);
+            }
+          } catch {}
+        }
+      }
       if (storedDash) {
         const parsed = JSON.parse(storedDash);
         if (Array.isArray(parsed)) {
