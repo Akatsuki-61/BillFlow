@@ -1,5 +1,9 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+
+import { DataBreakdown } from "@/components/ui/DataGraphic";
+
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
@@ -39,21 +43,28 @@ import type { ClientWithStats, Currency } from "@/types/billing";
 function ClientsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { clients, isLoading, createClient, updateClient, deleteClient } = useClients();
+  const { clients, isLoading, createClient, updateClient, deleteClient } =
+    useClients();
   const { createInvoice, invoices: allInvoices } = useInvoices();
   const { activeCurrency, settings } = useData();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const targetClientId = searchParams.get("client");
-  const [previousTargetClientId, setPreviousTargetClientId] = useState(targetClientId);
-  const [historyClientId, setHistoryClientId] = useState<string | null | undefined>();
+  const [previousTargetClientId, setPreviousTargetClientId] =
+    useState(targetClientId);
+  const [historyClientId, setHistoryClientId] = useState<
+    string | null | undefined
+  >();
   if (previousTargetClientId !== targetClientId) {
     setPreviousTargetClientId(targetClientId);
     setHistoryClientId(undefined);
   }
-  const selectedClientForHistory = clients.find(
-    (client) => client.id === (historyClientId === undefined ? targetClientId : historyClientId),
-  ) ?? null;
+  const selectedClientForHistory =
+    clients.find(
+      (client) =>
+        client.id ===
+        (historyClientId === undefined ? targetClientId : historyClientId),
+    ) ?? null;
   const setSelectedClientForHistory = (client: ClientWithStats | null) => {
     setHistoryClientId(client?.id ?? null);
   };
@@ -61,6 +72,30 @@ function ClientsContent() {
     useState<ClientWithStats | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Close active client dropdown menu on click outside or Escape
+  React.useEffect(() => {
+    if (!activeMenuId) return;
+
+    const handleOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("[data-client-menu]")) return;
+      setActiveMenuId(null);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setActiveMenuId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeMenuId]);
 
   // Notifications / Toasts
   const [notification, setNotification] = useState<{
@@ -76,7 +111,9 @@ function ClientsContent() {
     contactRole: "",
     email: "",
     phone: "",
-    currency: (settings?.defaultCurrency || activeCurrency || "USD") as Currency,
+    currency: (settings?.defaultCurrency ||
+      activeCurrency ||
+      "USD") as Currency,
     driveUrl: "",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -86,10 +123,10 @@ function ClientsContent() {
   const isClientFormDirty = () => {
     return Boolean(
       formData.name.trim() ||
-      formData.email.trim() ||
-      formData.phone.trim() ||
-      formData.contactPerson.trim() ||
-      formData.driveUrl.trim()
+        formData.email.trim() ||
+        formData.phone.trim() ||
+        formData.contactPerson.trim() ||
+        formData.driveUrl.trim(),
     );
   };
 
@@ -136,7 +173,9 @@ function ClientsContent() {
   };
 
   // Edit Client Form State
-  const [editingClient, setEditingClient] = useState<ClientWithStats | null>(null);
+  const [editingClient, setEditingClient] = useState<ClientWithStats | null>(
+    null,
+  );
   const [editFormData, setEditFormData] = useState({
     name: "",
     category: "Enterprise",
@@ -144,10 +183,14 @@ function ClientsContent() {
     contactRole: "",
     email: "",
     phone: "",
-    currency: (settings?.defaultCurrency || activeCurrency || "USD") as Currency,
+    currency: (settings?.defaultCurrency ||
+      activeCurrency ||
+      "USD") as Currency,
     driveUrl: "",
   });
-  const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>({});
+  const [editFormErrors, setEditFormErrors] = useState<Record<string, string>>(
+    {},
+  );
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Quick Bill Form State
@@ -179,7 +222,10 @@ function ClientsContent() {
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      showToast(errors.email || errors.name || "Please resolve form errors", "error");
+      showToast(
+        errors.email || errors.name || "Please resolve form errors",
+        "error",
+      );
       return;
     }
 
@@ -205,7 +251,9 @@ function ClientsContent() {
         contactRole: "",
         email: "",
         phone: "",
-        currency: (settings?.defaultCurrency || activeCurrency || "USD") as Currency,
+        currency: (settings?.defaultCurrency ||
+          activeCurrency ||
+          "USD") as Currency,
         driveUrl: "",
       });
       showToast(`Client "${created.name}" added successfully!`);
@@ -250,7 +298,10 @@ function ClientsContent() {
 
     if (Object.keys(errors).length > 0) {
       setEditFormErrors(errors);
-      showToast(errors.email || errors.name || "Please resolve form errors", "error");
+      showToast(
+        errors.email || errors.name || "Please resolve form errors",
+        "error",
+      );
       return;
     }
 
@@ -259,7 +310,8 @@ function ClientsContent() {
       const updated = await updateClient(editingClient.id, {
         name: editFormData.name.trim(),
         category: editFormData.category,
-        contactPerson: editFormData.contactPerson.trim() || editFormData.name.trim(),
+        contactPerson:
+          editFormData.contactPerson.trim() || editFormData.name.trim(),
         contactRole: editFormData.contactRole.trim() || null,
         email: editFormData.email.trim(),
         phone: editFormData.phone.trim() || null,
@@ -373,12 +425,20 @@ function ClientsContent() {
         )}
       </MotionPresence>
 
-      {/* Header Section */}
+      {/* Zentra Header Section */}
       <PageHeader
         title="Clients"
-        description="Manage your client relationships, contracts, and ledger balance."
+        description="Manage permanent client profiles, delivery repositories, and account ledgers."
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => router.push("/invoices?new=1")}
+            className="zentra-control-pill"
+          >
+            <Receipt className="w-3.5 h-3.5 text-accent" />
+            <span>Issue Invoice</span>
+          </button>
           <Button
             variant="primary"
             onClick={() => {
@@ -386,55 +446,162 @@ function ClientsContent() {
               openAddClientModal();
             }}
           >
-            <div className="w-4 h-4 flex items-center justify-center">
-              <UserPlus
-                className="w-4 h-4 text-content-neutral-700 transition-transform duration-200 ease-out group-hover:scale-105 group-hover:-translate-y-px group-hover:text-accent"
-                strokeWidth={2}
-              />
-            </div>
+            <UserPlus className="w-4 h-4" strokeWidth={2} />
             <span>Add Client</span>
           </Button>
         </div>
       </PageHeader>
 
+      {/* =====================================================================
+          ZENTRA 3-CARD CLIENTS BENTO HEADER ROW
+         ===================================================================== */}
+      {(() => {
+        const issued = allInvoices.filter(
+          (invoice) =>
+            invoice.status !== "DRAFT" &&
+            invoice.currency === activeCurrency &&
+            invoice.clientId &&
+            clients.some((client) => client.id === invoice.clientId),
+        );
+        const billed = issued.reduce(
+          (sum, invoice) => sum + invoice.amountCents,
+          0,
+        );
+        const paid = issued.reduce(
+          (sum, invoice) => sum + (invoice.paidCents ?? 0),
+          0,
+        );
+        const active = clients.filter((client) =>
+          issued.some((invoice) => invoice.clientId === client.id),
+        ).length;
+        const linked = clients.filter((client) =>
+          Boolean(client.driveUrl),
+        ).length;
+        const money = (value: number) => formatCents(value, activeCurrency);
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <section className="ui-card p-6 space-y-5">
+              <h2>Client Portfolio</h2>
+              <div>
+                <div className="summary-value">{money(billed)}</div>
+                <p className="summary-caption">
+                  Issued to saved clients · {activeCurrency}
+                </p>
+              </div>
+              <DataBreakdown
+                label="Client portfolio billing"
+                total={billed}
+                rows={[
+                  {
+                    label: "Collected",
+                    value: paid,
+                    display: money(paid),
+                    tone: "green",
+                  },
+                  {
+                    label: "Outstanding",
+                    value: Math.max(0, billed - paid),
+                    display: money(Math.max(0, billed - paid)),
+                    tone: "pink",
+                  },
+                ]}
+              />
+            </section>
+            <section className="ui-card p-6 space-y-5">
+              <h2>Client Relationships</h2>
+              <div>
+                <div className="summary-value">{clients.length}</div>
+                <p className="summary-caption">Saved client profiles</p>
+              </div>
+              <DataBreakdown
+                label="Clients with issued invoices"
+                total={clients.length}
+                rows={[
+                  {
+                    label: `With invoices in ${activeCurrency}`,
+                    value: active,
+                    display: `${active} clients`,
+                  },
+                  {
+                    label: `Without invoices in ${activeCurrency}`,
+                    value: clients.length - active,
+                    display: `${clients.length - active} clients`,
+                    tone: "green",
+                  },
+                ]}
+              />
+            </section>
+            <section className="ui-card p-6 space-y-5">
+              <h2>Delivery Locations</h2>
+              <div>
+                <div className="summary-value">
+                  {linked}/{clients.length}
+                </div>
+                <p className="summary-caption">
+                  Client profiles with a saved delivery link
+                </p>
+              </div>
+              <DataBreakdown
+                label="Delivery link coverage"
+                total={clients.length}
+                rows={[
+                  {
+                    label: "Link saved",
+                    value: linked,
+                    display: `${linked} clients`,
+                    tone: "green",
+                  },
+                  {
+                    label: "No default link",
+                    value: clients.length - linked,
+                    display: `${clients.length - linked} clients`,
+                    tone: "pink",
+                  },
+                ]}
+              />
+            </section>
+          </div>
+        );
+      })()}
+
       {/* Search & Directory Summary */}
       {clients.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
           <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search clients by name, email, contact..."
-              className="ui-field ui-search-input w-full pl-9 pr-8 text-xs rounded-xl"
+              className="ui-field ui-search-input w-full pl-9 pr-8 text-xs !rounded-full"
               style={{ paddingLeft: "38px" }}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5"
                 aria-label="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-          <div className="text-xs text-content-neutral-500 font-medium">
+          <span className="zentra-pill-badge !px-3 !py-1 !text-[12px]">
             Showing {filteredClients.length} of {clients.length} clients
-          </div>
+          </span>
         </div>
       )}
 
       {/* Client Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading ? (
           // Skeleton loading cards
           Array.from({ length: 3 }).map((_, idx) => (
             <div
               key={idx}
-              className="bg-surface-secondary rounded-2xl p-5 border border-line-neutral-200/60 animate-pulse h-64"
+              className="bg-surface-secondary rounded-[24px] p-6 border border-line-neutral-200/60 animate-pulse h-64"
             />
           ))
         ) : clients.length === 0 ? (
@@ -475,53 +642,73 @@ function ClientsContent() {
         ) : (
           filteredClients.map((client) => {
             const letter = client.name.trim().charAt(0).toUpperCase();
+            const clientPaidPct =
+              client.totalBilledCents > 0
+                ? Math.min(
+                    100,
+                    Math.round(
+                      (client.totalPaidCents / client.totalBilledCents) * 100,
+                    ),
+                  )
+                : 0;
+            const clientStripe =
+              clientPaidPct >= 100
+                ? "zentra-stripe-green"
+                : clientPaidPct > 0
+                  ? "zentra-stripe-blue"
+                  : "zentra-stripe-amber";
 
             return (
               <div
                 key={client.id}
-                className="ui-card motion-card relative transition-colors p-5 flex flex-col justify-between group"
+                className="ui-card motion-card relative transition-colors p-6 flex flex-col justify-between group"
               >
                 {/* Top Bar: Avatar, Title, Category, Menu */}
                 <div>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-3.5 min-w-0">
                       {/* Initials Avatar */}
-                      <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center shadow-xs border border-line-neutral-100 shrink-0 transition-transform duration-300 group-hover:scale-105">
-                        <span className="text-base font-bold text-accent">
+                      <div className="w-11 h-11 rounded-full bg-accent-faint dark:bg-accent-soft border border-border-accent/80 dark:border-border-accent/60 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
+                        <span className="text-[15px] font-bold text-accent dark:text-accent">
                           {letter}
                         </span>
                       </div>
 
-                      <div>
-                        <h2 className="text-[17px] font-semibold text-content-neutral-900 tracking-tight leading-snug">
+                      <div className="min-w-0">
+                        <h2 className="text-[17px] font-medium text-content-neutral-950 tracking-[-0.02em] leading-snug truncate">
                           {client.name}
                         </h2>
-                        <div className="flex items-center gap-1.5 text-xs text-content-neutral-500 font-normal mt-0.5">
-                          <FolderClosed className="w-3.5 h-3.5 text-content-neutral-400 shrink-0" />
-                          <span>{client.category}</span>
+                        <div className="flex items-center gap-1.5 text-[11.5px] text-content-neutral-500 mt-0.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-neutral-100 text-content-neutral-600 font-medium">
+                            <FolderClosed className="w-3 h-3 text-content-neutral-400 shrink-0" />
+                            <span>{client.category}</span>
+                          </span>
+                          <span className="text-content-neutral-400 font-mono">
+                            {client.currency}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* 3-dots Context Menu Button */}
-                    <div className="relative">
-                      <Button
-                        variant="secondary"
-                        size="icon"
+                    {/* Circular 3-dots Context Menu Button */}
+                    <div className="relative shrink-0" data-client-menu="true">
+                      <button
+                        type="button"
                         onClick={() =>
                           setActiveMenuId(
                             activeMenuId === client.id ? null : client.id,
                           )
                         }
-
                         aria-label="Options"
+                        aria-expanded={activeMenuId === client.id}
+                        className="zentra-circle-btn zentra-circle-btn--sm"
                       >
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </button>
 
                       {/* Dropdown Menu */}
                       {activeMenuId === client.id && (
-                        <div className="absolute right-0 top-8 z-30 bg-surface rounded-xl shadow-lg border border-line-neutral-200 py-1.5 w-44 text-xs font-medium text-content-neutral-700">
+                        <div className="absolute right-0 top-10 mt-1 z-30 bg-surface/95 dark:bg-[#19191f]/95 backdrop-blur-md rounded-[16px] shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] border border-line-neutral-200/80 dark:border-[#2c2c37] p-1.5 w-48 text-xs font-medium text-content-neutral-700 animate-in fade-in-0 zoom-in-95 duration-150">
                           <Button
                             variant="menu"
                             onClick={() => {
@@ -567,7 +754,7 @@ function ClientsContent() {
                               className="w-full text-left"
                             >
                               <ExternalLink className="w-3.5 h-3.5 text-content-neutral-400" />
-                              <span>Open Drive Folder</span>
+                              <span>Open Delivery Link</span>
                             </Button>
                           )}
                           <div className="my-1 border-t border-line-neutral-100" />
@@ -586,35 +773,53 @@ function ClientsContent() {
                     </div>
                   </div>
 
-                  {/* Financial Metrics Strip */}
-                  <div className="mt-5 pt-4 border-t border-line-neutral-200/70 grid grid-cols-3 gap-2 text-left">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-content-neutral-400 block leading-tight">
-                        TOTAL BILLED
+                  {/* Zentra Diagonal-Striped Collection Progress Bar */}
+                  <div className="mt-4 pt-3.5 border-t border-line-neutral-100">
+                    <div className="flex items-center justify-between text-[11.5px] mb-1.5">
+                      <span className="text-content-neutral-400 font-medium">
+                        Collection progress
                       </span>
-                      <span className="text-[15px] font-bold text-content-neutral-900 mt-1 block leading-tight">
+                      <span className="font-semibold tabular-nums text-content-neutral-900">
+                        {clientPaidPct}% settled
+                      </span>
+                    </div>
+                    <div className="w-full h-[18px] rounded-[6px] bg-surface-neutral-100 p-[2.5px] flex items-center">
+                      <div
+                        style={{ width: `${clientPaidPct}%` }}
+                        className={`h-full rounded-[4px] ${clientStripe} transition-all duration-500`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Financial Metrics Strip */}
+                  <div className="mt-3.5 grid grid-cols-3 gap-2 p-3 rounded-[16px] bg-surface-neutral-50 border border-line-neutral-100 text-left">
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold tracking-wider text-content-neutral-400 block leading-tight">
+                        Billed
+                      </span>
+                      <span className="text-[13.5px] font-semibold tabular-nums text-content-neutral-950 mt-1 block leading-tight truncate">
                         {formatCents(client.totalBilledCents, client.currency)}
                       </span>
                     </div>
 
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-content-neutral-400 block leading-tight">
-                        TOTAL PAID
+                      <span className="text-[10px] uppercase font-semibold tracking-wider text-content-neutral-400 block leading-tight">
+                        Paid
                       </span>
-                      <span className="text-[15px] font-bold text-content-emerald-700 mt-1 block leading-tight">
+                      <span className="text-[13.5px] font-semibold tabular-nums text-emerald-700 dark:text-emerald-400 mt-1 block leading-tight truncate">
                         {formatCents(client.totalPaidCents, client.currency)}
                       </span>
                     </div>
 
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-content-neutral-400 block leading-tight">
-                        OUTSTANDING
+                      <span className="text-[10px] uppercase font-semibold tracking-wider text-content-neutral-400 block leading-tight">
+                        Due
                       </span>
                       <span
-                        className={`text-[15px] font-bold mt-1 block leading-tight ${
+                        className={`text-[13.5px] font-semibold tabular-nums mt-1 block leading-tight truncate ${
                           client.outstandingBalanceCents > 0
-                            ? "text-content-rose-600 font-mono"
-                            : "text-content-neutral-500"
+                            ? "text-rose-600 dark:text-rose-400"
+                            : "text-content-neutral-400"
                         }`}
                       >
                         {formatCents(
@@ -625,8 +830,8 @@ function ClientsContent() {
                     </div>
                   </div>
 
-                  {/* Contact Info Row */}
-                  <div className="mt-4 pt-3.5 border-t border-line-neutral-200/50 space-y-1.5 text-xs text-content-neutral-600 font-normal">
+                  {/* Contact Info & Delivery Link Row */}
+                  <div className="mt-3.5 space-y-1.5 text-xs text-content-neutral-600">
                     <div className="flex items-center gap-2 truncate">
                       <User className="w-3.5 h-3.5 text-content-neutral-400 shrink-0" />
                       <span className="truncate">
@@ -644,12 +849,26 @@ function ClientsContent() {
                         <span className="truncate">{client.phone}</span>
                       </div>
                     )}
+                    {client.driveUrl && (
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={(e) => openExternalLink(client.driveUrl, e)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-faint dark:bg-accent-soft text-accent dark:text-accent text-[11px] font-medium hover:underline cursor-pointer max-w-full truncate"
+                        >
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                          <span className="truncate">
+                            Open Delivery Repository
+                          </span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Bottom Action Footer */}
-                <div className="mt-5 pt-3.5 border-t border-line-neutral-200/70 flex items-center justify-between">
-                  <span className="text-xs text-content-neutral-500 font-medium">
+                <div className="mt-4 pt-3.5 border-t border-line-neutral-100 flex items-center justify-between">
+                  <span className="zentra-pill-badge !px-2.5 !py-0.5 !text-[11px]">
                     {client.invoicesCount}{" "}
                     {client.invoicesCount === 1 ? "invoice" : "invoices"}
                   </span>
@@ -657,6 +876,7 @@ function ClientsContent() {
                   <div className="flex items-center gap-2">
                     <Button
                       variant="secondary"
+                      size="small"
                       onClick={() => setSelectedClientForHistory(client)}
                     >
                       Ledger
@@ -664,12 +884,13 @@ function ClientsContent() {
 
                     <Button
                       variant="primary"
+                      size="small"
                       onClick={() => {
                         setSelectedClientForBill(client);
                         setQuickBillAmount("1500");
                       }}
                     >
-                      <Zap className="w-3.5 h-3.5 fill-white" />
+                      <Zap className="w-3.5 h-3.5 fill-current" />
                       <span>Quick Bill</span>
                     </Button>
                   </div>
@@ -683,61 +904,47 @@ function ClientsContent() {
       {/* Add Client Modal */}
       <MotionPresence>
         {isAddModalOpen && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface onDismiss={() => closeAddClientModal()}
-              kind="panel"
-              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
-                    <Building className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-content-neutral-900">
-                      Add New Client
-                    </h3>
-                    <p className="text-xs text-content-neutral-400">
-                      Create a new client profile in your local directory.
-                    </p>
-                  </div>
+          <Dialog onClose={() => closeAddClientModal()} width={620}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
+                  <Building className="w-4 h-4" />
                 </div>
-                <div className="flex items-center gap-2">
-                  {hasClientDraft && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="small"
-                      onClick={handleRestoreClientDraft}
-                      className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
-                      title="Restore previously typed client draft"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Restore</span>
-                    </Button>
-                  )}
-                  <Button
-                    aria-label="Close"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => closeAddClientModal()}
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
+                <div>
+                  <h3 className="text-base font-semibold text-content-neutral-900">
+                    Add New Client
+                  </h3>
+                  <p className="text-xs text-content-neutral-400">
+                    Create a new client profile in your local directory.
+                  </p>
                 </div>
               </div>
-
-              <form
-                onSubmit={handleAddClient}
-                noValidate
-                className="p-6 space-y-4 text-xs font-medium text-content-neutral-700"
-              >
+              <div className="flex items-center gap-2">
+                {hasClientDraft && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="small"
+                    onClick={handleRestoreClientDraft}
+                    className="text-xs gap-1.5 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                    title="Restore previously typed client draft"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Restore</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+            <form
+              onSubmit={handleAddClient}
+              noValidate
+              className="app-dialog-form"
+            >
+              <div className="app-dialog-body">
                 <div>
                   <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                    Client / Company Name <span className="text-content-rose-500 font-bold">*</span>
+                    Client / Company Name{" "}
+                    <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
@@ -781,7 +988,8 @@ function ClientsContent() {
 
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Billing Currency <span className="text-content-rose-500 font-bold">*</span>
+                      Billing Currency{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <select
                       value={formData.currency}
@@ -843,7 +1051,8 @@ function ClientsContent() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Email Address <span className="text-content-rose-500 font-bold">*</span>
+                      Email Address{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="email"
@@ -896,75 +1105,69 @@ function ClientsContent() {
                     className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
                 </div>
-
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-line-neutral-100">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={() => closeAddClientModal()}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    disabled={isSubmittingClient}
-                  >
-                    {isSubmittingClient ? "Saving..." : "Save Client"}
-                  </Button>
-                </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
+              </div>
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => closeAddClientModal()}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={isSubmittingClient}
+                >
+                  {isSubmittingClient ? "Saving..." : "Save Client"}
+                </Button>
+              </div>
+            </form>
+          </Dialog>
         )}
       </MotionPresence>
 
       {/* Edit Client Modal */}
       <MotionPresence>
         {editingClient && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface onDismiss={() => setEditingClient(null)}
-              kind="panel"
-              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
-                    <Building className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-content-neutral-900">
-                      Edit Client Profile
-                    </h3>
-                    <p className="text-xs text-content-neutral-400">
-                      Update relationship details and default delivery location
-                    </p>
-                  </div>
+          <Dialog onClose={() => setEditingClient(null)} width={620}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
+                  <Building className="w-4 h-4" />
                 </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setEditingClient(null)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+                <div>
+                  <h3 className="text-base font-semibold text-content-neutral-900">
+                    Edit Client Profile
+                  </h3>
+                  <p className="text-xs text-content-neutral-400">
+                    Update relationship details and default delivery location
+                  </p>
+                </div>
               </div>
-
-              <form onSubmit={handleUpdateClient} noValidate className="p-6 space-y-4 text-xs font-medium text-content-neutral-700">
+            </div>
+            <form
+              onSubmit={handleUpdateClient}
+              noValidate
+              className="app-dialog-form"
+            >
+              <div className="app-dialog-body">
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Client Name <span className="text-content-rose-500 font-bold">*</span>
+                      Client Name{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="text"
                       required
                       value={editFormData.name}
-                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          name: e.target.value,
+                        })
+                      }
                       placeholder="e.g. Apex Architecture Ltd"
                       className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 ${
                         editFormErrors.name
@@ -985,7 +1188,12 @@ function ClientsContent() {
                     </label>
                     <select
                       value={editFormData.category}
-                      onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          category: e.target.value,
+                        })
+                      }
                       className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     >
                       <option value="Enterprise">Enterprise</option>
@@ -1005,7 +1213,12 @@ function ClientsContent() {
                     <input
                       type="text"
                       value={editFormData.contactPerson}
-                      onChange={(e) => setEditFormData({ ...editFormData, contactPerson: e.target.value })}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          contactPerson: e.target.value,
+                        })
+                      }
                       placeholder="e.g. Sarah Jenkins"
                       className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
@@ -1018,7 +1231,12 @@ function ClientsContent() {
                     <input
                       type="text"
                       value={editFormData.contactRole}
-                      onChange={(e) => setEditFormData({ ...editFormData, contactRole: e.target.value })}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          contactRole: e.target.value,
+                        })
+                      }
                       placeholder="e.g. Director / CEO"
                       className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
@@ -1028,13 +1246,19 @@ function ClientsContent() {
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Email Address <span className="text-content-rose-500 font-bold">*</span>
+                      Email Address{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
                     </label>
                     <input
                       type="email"
                       required
                       value={editFormData.email}
-                      onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          email: e.target.value,
+                        })
+                      }
                       placeholder="sarah@apexarch.com"
                       className={`ui-field w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 ${
                         editFormErrors.email
@@ -1056,7 +1280,12 @@ function ClientsContent() {
                     <input
                       type="text"
                       value={editFormData.phone}
-                      onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          phone: e.target.value,
+                        })
+                      }
                       placeholder="+1 (555) 284-9102"
                       className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
@@ -1070,73 +1299,64 @@ function ClientsContent() {
                   <input
                     type="url"
                     value={editFormData.driveUrl}
-                    onChange={(e) => setEditFormData({ ...editFormData, driveUrl: e.target.value })}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        driveUrl: e.target.value,
+                      })
+                    }
                     placeholder="https://drive.google.com/drive/folders/..."
                     className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
                   <p className="text-[11px] text-content-neutral-400 mt-1">
-                    Updates default delivery location for future invoices. Existing invoices preserve their historical delivery link and issued snapshot.
+                    Updates default delivery location for future invoices.
+                    Existing invoices preserve their historical delivery link
+                    and issued snapshot.
                   </p>
                 </div>
-
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-line-neutral-100">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={() => setEditingClient(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    disabled={isSubmittingEdit}
-                  >
-                    {isSubmittingEdit ? "Saving..." : "Update Client Profile"}
-                  </Button>
-                </div>
-              </form>
-            </MotionSurface>
-          </MotionSurface>
+              </div>
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => setEditingClient(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={isSubmittingEdit}
+                >
+                  {isSubmittingEdit ? "Saving..." : "Update Client Profile"}
+                </Button>
+              </div>
+            </form>
+          </Dialog>
         )}
       </MotionPresence>
 
       {/* Client Ledger / Invoices Modal */}
       <MotionPresence>
         {selectedClientForHistory && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface onDismiss={() => setSelectedClientForHistory(null)}
-              kind="panel"
-              className="bg-surface rounded-2xl w-full max-w-2xl shadow-2xl border border-line-neutral-200 overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-surface border border-line-neutral-200 flex items-center justify-center font-bold text-accent">
-                    {selectedClientForHistory.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-content-neutral-900">
-                      {selectedClientForHistory.name}
-                    </h3>
-                    <p className="text-xs text-content-neutral-400">
-                      Client Ledger & Transaction History
-                    </p>
-                  </div>
+          <Dialog onClose={() => setSelectedClientForHistory(null)} width={820}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-surface border border-line-neutral-200 flex items-center justify-center font-bold text-accent">
+                  {selectedClientForHistory.name.charAt(0).toUpperCase()}
                 </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSelectedClientForHistory(null)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+                <div>
+                  <h3 className="text-base font-semibold text-content-neutral-900">
+                    {selectedClientForHistory.name}
+                  </h3>
+                  <p className="text-xs text-content-neutral-400">
+                    Client Ledger & Transaction History
+                  </p>
+                </div>
               </div>
-
-              <div className="p-6 space-y-5">
+            </div>
+            <div className="app-dialog-body">
+              <div className="app-dialog-section p-6 space-y-5">
                 {/* 3 Metric Cards */}
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="p-3 bg-surface-neutral-50 rounded-xl border border-line-neutral-100">
@@ -1191,7 +1411,9 @@ function ClientsContent() {
                   {selectedClientForHistory.driveUrl && (
                     <button
                       type="button"
-                      onClick={(e) => openExternalLink(selectedClientForHistory.driveUrl, e)}
+                      onClick={(e) =>
+                        openExternalLink(selectedClientForHistory.driveUrl, e)
+                      }
                       className="inline-flex items-center gap-1.5 text-xs text-accent font-semibold hover:underline bg-transparent border-0 p-0 cursor-pointer"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -1298,56 +1520,40 @@ function ClientsContent() {
                   </div>
                 </div>
               </div>
-
-              <div className="px-6 py-4 bg-surface-neutral-50 border-t border-line-neutral-100 flex justify-end">
-                <Button
-                  variant="primary"
-                  onClick={() => setSelectedClientForHistory(null)}
-                >
-                  Close Ledger
-                </Button>
-              </div>
-            </MotionSurface>
-          </MotionSurface>
+            </div>
+            <div className="app-dialog-footer">
+              <Button
+                variant="primary"
+                onClick={() => setSelectedClientForHistory(null)}
+              >
+                Close Ledger
+              </Button>
+            </div>
+          </Dialog>
         )}
       </MotionPresence>
 
       {/* Instant Quick Bill Modal */}
       <MotionPresence>
         {selectedClientForBill && (
-          <MotionSurface
-            kind="dialog"
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-          >
-            <MotionSurface onDismiss={() => setSelectedClientForBill(null)}
-              kind="panel"
-              className="bg-surface rounded-2xl w-full max-w-lg shadow-2xl border border-line-neutral-200 overflow-hidden"
-            >
-              <div className="px-6 py-5 border-b border-line-neutral-100 flex items-center justify-between bg-surface-neutral-50/60">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center">
-                    <Zap className="w-4 h-4 fill-accent" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-content-neutral-900">
-                      Instant Quick Bill
-                    </h3>
-                    <p className="text-xs text-content-neutral-400">
-                      Issuing to: {selectedClientForBill.name}
-                    </p>
-                  </div>
+          <Dialog onClose={() => setSelectedClientForBill(null)} width={620}>
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center">
+                  <Zap className="w-4 h-4 fill-accent" />
                 </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSelectedClientForBill(null)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+                <div>
+                  <h3 className="text-base font-semibold text-content-neutral-900">
+                    Instant Quick Bill
+                  </h3>
+                  <p className="text-xs text-content-neutral-400">
+                    Issuing to: {selectedClientForBill.name}
+                  </p>
+                </div>
               </div>
-
-              <div className="p-6 space-y-4 text-xs font-medium text-content-neutral-700">
+            </div>
+            <div className="app-dialog-body">
+              <div className="app-dialog-section p-6 space-y-4 text-xs font-medium text-content-neutral-700">
                 <div>
                   <label className="block mb-1.5 text-content-neutral-700 font-semibold">
                     Service Deliverable Title
@@ -1429,8 +1635,8 @@ function ClientsContent() {
                   </Button>
                 </div>
               </div>
-            </MotionSurface>
-          </MotionSurface>
+            </div>
+          </Dialog>
         )}
       </MotionPresence>
     </div>

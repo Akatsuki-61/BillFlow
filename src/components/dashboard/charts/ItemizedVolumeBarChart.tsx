@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { EChartsBarChart, type ChartConfig } from "@/components/evilcharts/charts/echarts-bar-chart";
+import {
+  EChartsBarChart,
+  type ChartConfig,
+} from "@/components/evilcharts/charts/echarts-bar-chart";
 import { useData } from "@/lib/data/DataProvider";
 
 const chartConfig = {
@@ -22,10 +25,15 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function ItemizedVolumeBarChart() {
-  const { tasks, invoices } = useData();
+  const { invoices, activeCurrency } = useData();
 
   const { chartData, hasData } = useMemo(() => {
-    const months: Array<{ month: string; key: string; web: number; ai: number }> = [];
+    const months: Array<{
+      month: string;
+      key: string;
+      web: number;
+      ai: number;
+    }> = [];
     const now = new Date();
 
     // 6 rolling months
@@ -37,29 +45,13 @@ export function ItemizedVolumeBarChart() {
     }
 
     let count = 0;
-    (tasks || []).forEach((t) => {
-      const timeStr = t.completedAt || t.createdAt;
-      if (!timeStr) return;
-      const key = timeStr.slice(0, 7);
-      const target = months.find((m) => m.key === key);
-      if (!target) return;
-
-      const isWeb = t.category === "Development" || /web|software|site|frontend|backend/i.test(t.title);
-      const isAi = t.category === "Client Ops" || t.category === "Design" || /ai|consulting|automation|agent/i.test(t.title);
-
-      if (isWeb) {
-        target.web += 1;
-        count += 1;
-      }
-      if (isAi) {
-        target.ai += 1;
-        count += 1;
-      }
-    });
-
-    // Also factor in non-draft invoices if tasks are not created yet
     (invoices || []).forEach((inv) => {
-      if (inv.status === "DRAFT" || !inv.issueDate) return;
+      if (
+        inv.status === "DRAFT" ||
+        inv.currency !== activeCurrency ||
+        !inv.issueDate
+      )
+        return;
       const key = inv.issueDate.slice(0, 7);
       const target = months.find((m) => m.key === key);
       if (!target) return;
@@ -67,13 +59,15 @@ export function ItemizedVolumeBarChart() {
       if (inv.items && inv.items.length > 0) {
         inv.items.forEach((item) => {
           const desc = `${item.description || ""}`.toLowerCase();
-          const isWeb = /web|software|site|development|frontend|backend/i.test(desc);
-          const isAi = /ai|consulting|automation|agent/i.test(desc);
-          if (isWeb && target.web === 0) {
+          const isWeb = /web|software|site|development|frontend|backend/i.test(
+            desc,
+          );
+          const isAi = /\bai\b|consulting|automation|agent/i.test(desc);
+          if (isWeb && !isAi) {
             target.web += 1;
             count += 1;
           }
-          if (isAi && target.ai === 0) {
+          if (isAi) {
             target.ai += 1;
             count += 1;
           }
@@ -85,11 +79,11 @@ export function ItemizedVolumeBarChart() {
       const isWeb = /web|software|site/i.test(title);
       const isAi = /ai|consulting|automation/i.test(title);
 
-      if (isWeb && target.web === 0) {
+      if (isWeb && !isAi) {
         target.web += 1;
         count += 1;
       }
-      if (isAi && target.ai === 0) {
+      if (isAi) {
         target.ai += 1;
         count += 1;
       }
@@ -99,13 +93,14 @@ export function ItemizedVolumeBarChart() {
       chartData: months.map(({ month, web, ai }) => ({ month, web, ai })),
       hasData: count > 0,
     };
-  }, [tasks, invoices]);
+  }, [invoices, activeCurrency]);
 
   return (
     <div className="flex h-full w-full min-h-[300px] flex-col p-4">
       {!hasData && (
         <div className="mb-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
-          No contract deliverables recorded. Counts update as task items are logged and completed.
+          No contract deliverables recorded. Counts issued invoice items by
+          month; groups are inferred from descriptions.
         </div>
       )}
       <EChartsBarChart
@@ -120,7 +115,9 @@ export function ItemizedVolumeBarChart() {
           tickFormatter={(value) => value.substring(0, 3)}
         />
         <EChartsBarChart.YAxis />
-        <EChartsBarChart.Brush formatLabel={(value) => String(value).substring(0, 3)} />
+        <EChartsBarChart.Brush
+          formatLabel={(value) => String(value).substring(0, 3)}
+        />
         <EChartsBarChart.Legend isClickable />
         <EChartsBarChart.Tooltip />
         <EChartsBarChart.Bar dataKey="web" variant="default" isClickable />

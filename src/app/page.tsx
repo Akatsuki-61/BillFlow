@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  SlidersHorizontal,
   ArrowUpRight,
   Layers,
   CheckCircle2,
@@ -15,18 +14,28 @@ import {
   ArrowLeft,
   ArrowRight,
   Minus,
+  Calendar,
+  Plus,
+  SlidersHorizontal,
 } from "lucide-react";
-import {
-  Button,
-  PageHeader,
-  SegmentedControl,
-} from "@/components/ui/Workspace";
+import { Button } from "@/components/ui/Workspace";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { useWidgetContext } from "@/context/WidgetContext";
-import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
+import {
+  DEFAULT_DASHBOARD_WIDGET_IDS,
+  WIDGET_CATALOG,
+} from "@/lib/widgets/widgetDefinitions";
+import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
 import { DashboardPeriod } from "@/types/dashboard";
+
+const PERIOD_OPTIONS: SelectOption<DashboardPeriod>[] = [
+  { value: "month", label: "This Month" },
+  { value: "quarter", label: "This Quarter" },
+  { value: "year", label: "This Year" },
+  { value: "all", label: "All Time" },
+];
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -35,6 +44,8 @@ export default function DashboardPage() {
     widgetSizes,
     isDashboardEditing,
     setIsDashboardEditing,
+    toggleDashboard,
+    isPinnedToDashboard,
     removeFromDashboard,
     toggleWidgetSize,
     moveDashboardWidget,
@@ -49,11 +60,14 @@ export default function DashboardPage() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  // Global keyboard shortcut: Cmd+Z (macOS) / Ctrl+Z (Windows/Linux) for Dashboard Undo.
-  // Note: Explicitly bypasses text inputs and textareas to avoid interfering with native text editing.
+  // Global keyboard shortcut: Cmd+Z / Ctrl+Z for Dashboard Undo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "z" &&
+        !e.shiftKey
+      ) {
         const target = e.target as HTMLElement | null;
         if (
           target &&
@@ -117,11 +131,11 @@ export default function DashboardPage() {
         {
           label: isTargetCompact
             ? targetWidgetMeta?.size === "metric"
-              ? "Expand to Rectangle"
-              : "Expand to Full Width"
+              ? "Expand to Standard Bento"
+              : "Expand to Wide Bento"
             : targetWidgetMeta?.size === "metric"
-              ? "Shrink to Square"
-              : "Shrink to Half Width",
+              ? "Shrink to Compact Card"
+              : "Toggle Bento Width",
           icon: isTargetCompact ? (
             <Maximize2 className="w-3.5 h-3.5 text-accent" />
           ) : (
@@ -176,63 +190,60 @@ export default function DashboardPage() {
       ]
     : [];
 
+
+
   // Pinned dashboard widgets resolved in current order
   const pinnedWidgets = dashboardWidgets
     .map((id) => WIDGET_CATALOG.find((w) => w.id === id))
     .filter((w): w is NonNullable<typeof w> => Boolean(w));
 
-  const periodLabelMap: Record<DashboardPeriod, string> = {
-    month: "This Month",
-    quarter: "This Quarter",
-    year: "Year to Date",
-    all: "All Time",
-  };
-
-  // Compute responsive column span classes for each widget based on display size
+  // Asymmetric Zentra 12-column Bento Span Assignment for BillFlow widgets
   const getColSpanClass = (widgetId: string, baseSize: string) => {
     const size = widgetSizes[widgetId] || "normal";
     const isCompact = size === "compact";
 
+    if (widgetId === "workspace-insights") {
+      return isCompact ? "col-span-12 lg:col-span-6" : "col-span-12";
+    }
+    if (widgetId === "profit-trajectory-chart") {
+      return isCompact ? "col-span-12" : "col-span-12 lg:col-span-8";
+    }
     if (baseSize === "metric") {
-      // Standard Metric: 4 cols out of 12 (1/3 row, rectangle).
-      // Compact Metric: 2 cols out of 12 (1/6 row, square-like shape!).
       return isCompact
-        ? "col-span-6 sm:col-span-3 md:col-span-3 lg:col-span-2"
-        : "col-span-12 sm:col-span-6 md:col-span-3 lg:col-span-4";
+        ? "col-span-12 sm:col-span-6 lg:col-span-3"
+        : "col-span-12 md:col-span-6 lg:col-span-4";
     }
-
-    if (baseSize === "full" || baseSize === "wide") {
-      // Standard Chart: full 12 cols (100% width).
-      // Compact Chart: 6 cols out of 12 (half of full size, side-by-side!).
+    if (baseSize === "full") {
       return isCompact
-        ? "col-span-12 md:col-span-6 lg:col-span-6"
-        : "col-span-12";
+        ? "col-span-12 lg:col-span-6"
+        : "col-span-12 lg:col-span-8";
     }
-
-    // Medium widgets (recent invoices, sprint tasks, gauges, alerts)
+    if (baseSize === "wide") {
+      return isCompact ? "col-span-12" : "col-span-12 lg:col-span-6";
+    }
     return isCompact
-      ? "col-span-12 md:col-span-6 lg:col-span-6"
+      ? "col-span-12 md:col-span-6 lg:col-span-4"
       : "col-span-12 lg:col-span-6";
   };
 
   return (
-    <div className="workspace-page motion-page">
+    <div className="workspace-page dashboard-page motion-page">
       {/* Toast Notification with Undo Action */}
       <MotionPresence>
         {toastMessage && (
           <MotionSurface
             kind="toast"
-            className="fixed bottom-6 right-6 z-[9999] flex items-center justify-between gap-3 px-4 py-2.5 bg-toast text-white rounded-xl shadow-xl text-[12px] font-medium min-w-[280px]"
+            className="fixed bottom-6 right-6 z-[9999] flex items-center justify-between gap-3 px-4 py-2.5 bg-toast text-white rounded-2xl shadow-xl text-[12.5px] font-medium min-w-[280px]"
           >
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="text-success-bright text-[13px] shrink-0" />
+              <CheckCircle2 className="text-success-bright text-[14px] shrink-0" />
               <span>{toastMessage}</span>
             </div>
             {toastAction && (
               <button
                 type="button"
                 onClick={toastAction.onClick}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer border border-white/25 shrink-0"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11.5px] font-semibold bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer border border-white/25 shrink-0"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>{toastAction.label}</span>
@@ -251,132 +262,159 @@ export default function DashboardPage() {
         items={contextMenuItems}
       />
 
-      {/* Header Section */}
-      <PageHeader
-        title="Dashboard"
-        description="Welcome back. Here is your business health, profit growth, and operations summary."
-      >
+      {/* Zentra Overview Top Sub-Header */}
+      <header className="flex flex-wrap items-center justify-between gap-4 pt-1 pb-1">
+        <div className="flex items-center gap-3">
+          <h1 className="text-[40px] font-medium tracking-[-0.035em] text-content-neutral-950 leading-none">
+            Overview
+          </h1>
+        </div>
+
+        {/* Right: Connected Date Comparison Pill Group + Granularity + Add Widget */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Period Selector */}
-          <SegmentedControl
+          <SelectDropdown<DashboardPeriod>
             value={period}
             onChange={setPeriod}
-            label="Dashboard period"
-            options={(
-              ["month", "quarter", "year", "all"] as DashboardPeriod[]
-            ).map((value) => ({
-              value,
-              label:
-                value === "all"
-                  ? "All"
-                  : value[0].toUpperCase() + value.slice(1),
-            }))}
+            options={PERIOD_OPTIONS}
+            icon={<Calendar className="w-3.5 h-3.5" />}
+            ariaLabel="Overview period"
+            buttonClassName="overview-period-picker font-sans text-[12.5px] font-medium text-content-neutral-900 cursor-pointer"
+            menuClassName="w-44"
           />
 
-          {/* Discreet icon-only customize button: toggles dashboard rearrangement mode */}
-          <Button
-            variant={isDashboardEditing ? "primary" : "ghost"}
-            size="icon"
+          <button
+            type="button"
             onClick={() => setIsDashboardEditing(!isDashboardEditing)}
-            title={
+            className={`zentra-control-pill ${
               isDashboardEditing
-                ? "Done customizing"
-                : "Rearrange and resize widgets"
-            }
-            className={`w-8 h-8 transition-all ${
-              isDashboardEditing
-                ? "bg-accent-solid text-white shadow-xs"
-                : "text-content-neutral-400 hover:text-content-neutral-700 opacity-60 hover:opacity-100"
+                ? "!bg-[#1c1c1f] !text-white dark:!bg-white dark:!text-[#111115]"
+                : ""
             }`}
           >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-          </Button>
+            <span>{isDashboardEditing ? "Done editing" : "Manage Widget"}</span>
+            {isDashboardEditing ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+            )}
+          </button>
         </div>
-      </PageHeader>
+      </header>
 
-      {/* Customization Toolbar when customize mode is active */}
+      {/* Interactive Zentra Widget Drawer & Layout Customizer */}
       <MotionPresence>
         {isDashboardEditing && (
           <MotionSurface
             kind="panel"
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-surface-purple-50/80 border border-line-purple-200/90 shadow-xs"
+            className="flex flex-col gap-4 p-5 rounded-[24px] bg-surface border border-line-neutral-200 shadow-sm"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-accent-solid text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Sparkles className="w-3.5 h-3.5" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-[#1c1c1f] text-white dark:bg-white dark:text-black flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-[14.5px] font-semibold text-content-neutral-950 leading-tight">
+                    Customize BillFlow Overview Bento Grid
+                  </h3>
+                  <p className="text-[12px] text-content-neutral-500 mt-0.5">
+                    Toggle widgets below to pin or unpin them, drag tiles to
+                    reorder, or right-click any card to resize.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xs font-semibold text-content-neutral-900 leading-tight">
-                  Dashboard Rearrange & Resize Mode
-                </h3>
-                <p className="text-[11px] text-content-neutral-500 mt-0.5">
-                  Drag tiles to reorder. Click the resize icon on any card to
-                  toggle between square/half-size and standard.
-                </p>
+
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={undoDashboard}
+                  disabled={!canUndo}
+                  title="Undo last change (Cmd+Z)"
+                  className="gap-1.5"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Undo</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => router.push("/analytics")}
+                  className="gap-1.5"
+                >
+                  <ArrowUpRight className="w-3 h-3" />
+                  <span>Full Analytics Catalog</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={resetToDefaults}
+                  title="Reset to default arrangement"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset</span>
+                </Button>
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={() => setIsDashboardEditing(false)}
+                >
+                  <Check className="w-3 h-3" />
+                  <span>Done</span>
+                </Button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              <Button
-                variant="ghost"
-                size="small"
-                onClick={undoDashboard}
-                disabled={!canUndo}
-                title="Undo last change (Cmd+Z)"
-                className="gap-1.5"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Undo</span>
-              </Button>
-              <Button
-                variant="secondary"
-                size="small"
-                onClick={() => router.push("/analytics")}
-                className="gap-1.5"
-              >
-                <ArrowUpRight className="w-3 h-3" />
-                <span>Manage in Analytics</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="small"
-                onClick={resetToDefaults}
-                title="Reset to default arrangement"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset</span>
-              </Button>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={() => setIsDashboardEditing(false)}
-              >
-                <Check className="w-3 h-3" />
-                <span>Done</span>
-              </Button>
+            {/* Quick Pill Selector for all 24 BillFlow Widgets */}
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-line-neutral-100">
+              {WIDGET_CATALOG.map((w) => {
+                const pinned = isPinnedToDashboard(w.id);
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => toggleDashboard(w.id)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all cursor-pointer border ${
+                      pinned
+                        ? "bg-[#1c1c1f] text-white border-[#1c1c1f] dark:bg-white dark:text-[#111115] dark:border-white"
+                        : "bg-surface-neutral-50 text-content-neutral-600 border-line-neutral-200 hover:border-line-neutral-300"
+                    }`}
+                  >
+                    {pinned ? (
+                      <Check className="w-3 h-3 text-emerald-400 dark:text-emerald-600" />
+                    ) : (
+                      <Plus className="w-3 h-3 text-content-neutral-400" />
+                    )}
+                    <span>{w.title}</span>
+                  </button>
+                );
+              })}
             </div>
           </MotionSurface>
         )}
       </MotionPresence>
 
-      {/* Main Dashboard Widget Feed */}
+      {/* =====================================================================
+          UNIFIED BILLFLOW ZENTRA BENTO GRID
+         ===================================================================== */}
       {pinnedWidgets.length === 0 ? (
-        <div className="p-12 text-center bg-surface rounded-2xl border border-dashed border-line-neutral-300">
+        <div className="p-12 text-center ui-card">
           <Layers className="w-10 h-10 text-content-neutral-400 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-content-neutral-900">
-            No widgets pinned to Dashboard
+          <h3 className="text-base font-medium text-content-neutral-900">
+            No widgets pinned to Overview
           </h3>
           <p className="text-xs text-content-neutral-500 mt-1 max-w-sm mx-auto">
-            Your dashboard is clear. Choose widgets to display or restore previous layout.
+            Add BillFlow widgets using the button above or restore the default
+            bento layout.
           </p>
           <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
             <Button
               variant="primary"
-              onClick={() => router.push("/analytics")}
+              onClick={resetToDefaults}
               className="gap-1.5"
             >
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>Browse in Analytics</span>
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Restore Default Bento Grid</span>
             </Button>
             {canUndo && (
               <Button
@@ -388,88 +426,82 @@ export default function DashboardPage() {
                 <span>Undo Removal</span>
               </Button>
             )}
-            <Button
-              variant="ghost"
-              onClick={resetToDefaults}
-            >
-              Restore Defaults
-            </Button>
           </div>
         </div>
       ) : (
-        <div>
-          <div className="flex items-center justify-between mb-3 text-xs text-content-neutral-500 font-medium">
-            <span>Key Business Metrics ({periodLabelMap[period]})</span>
-            <span className="text-[11px] text-content-neutral-400">
-              {pinnedWidgets.length} widgets active · Hover any card to resize or remove
-            </span>
-          </div>
+        <div
+          className={`dashboard-grid grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 ${!isDashboardEditing && dashboardWidgets.join(",") === DEFAULT_DASHBOARD_WIDGET_IDS.join(",") && dashboardWidgets.every((id) => widgetSizes[id] !== "compact") ? "reference-layout" : ""}`}
+        >
+          {pinnedWidgets.map((w, index) => {
+            const colSpan = getColSpanClass(w.id, w.size);
+            const isCompact = (widgetSizes[w.id] || "normal") === "compact";
+            const isOver = dragOverIndex === index;
 
-          {/* Unified 12-Column Responsive Dashboard Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4">
-            {pinnedWidgets.map((w, index) => {
-              const colSpan = getColSpanClass(w.id, w.size);
-              const isCompact = (widgetSizes[w.id] || "normal") === "compact";
-              const isOver = dragOverIndex === index;
-
-              return (
-                <div
-                  key={w.id}
-                  className={`${colSpan} transition-all duration-200 ${
-                    isOver
-                      ? "ring-2 ring-accent ring-offset-2 rounded-2xl scale-[1.02]"
-                      : ""
-                  }`}
-                  onDragOver={(e) => {
-                    if (isDashboardEditing) {
-                      e.preventDefault();
-                      setDragOverIndex(index);
-                    }
-                  }}
-                  onDragLeave={() => {
-                    if (isDashboardEditing) {
-                      setDragOverIndex((curr) =>
-                        curr === index ? null : curr,
-                      );
-                    }
-                  }}
-                  onDrop={(e) => {
-                    if (isDashboardEditing && draggedIndex !== null) {
-                      e.preventDefault();
-                      moveDashboardWidget(draggedIndex, index);
-                      setDraggedIndex(null);
-                      setDragOverIndex(null);
-                    }
-                  }}
-                >
-                  <WidgetRenderer
-                    widgetId={w.id}
-                    source="dashboard"
-                    period={period}
-                    displaySize={isCompact ? "compact" : "normal"}
-                    isDraggable={isDashboardEditing}
-                    isEditing={isDashboardEditing}
-                    onToggleSize={() => toggleWidgetSize(w.id)}
-                    onMoveLeft={
-                      index > 0
-                        ? () => moveDashboardWidget(index, index - 1)
-                        : undefined
-                    }
-                    onMoveRight={
-                      index < pinnedWidgets.length - 1
-                        ? () => moveDashboardWidget(index, index + 1)
-                        : undefined
-                    }
-                    onRemove={() => removeFromDashboard(w.id)}
-                    onContextMenu={handleContextMenu}
-                  />
-                </div>
-              );
-            })}
-          </div>
+            return (
+              <div
+                key={w.id}
+                data-widget={w.id}
+                draggable={isDashboardEditing}
+                onDragStart={() => {
+                  if (isDashboardEditing) {
+                    setDraggedIndex(index);
+                  }
+                }}
+                onDragEnd={() => {
+                  setDraggedIndex(null);
+                  setDragOverIndex(null);
+                }}
+                className={`${colSpan} transition-all duration-200 ${
+                  isOver
+                    ? "ring-2 ring-accent ring-offset-2 rounded-[24px] scale-[1.01]"
+                    : ""
+                }`}
+                onDragOver={(e) => {
+                  if (isDashboardEditing) {
+                    e.preventDefault();
+                    setDragOverIndex(index);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (isDashboardEditing) {
+                    setDragOverIndex((curr) => (curr === index ? null : curr));
+                  }
+                }}
+                onDrop={(e) => {
+                  if (isDashboardEditing && draggedIndex !== null) {
+                    e.preventDefault();
+                    moveDashboardWidget(draggedIndex, index);
+                    setDraggedIndex(null);
+                    setDragOverIndex(null);
+                  }
+                }}
+              >
+                <WidgetRenderer
+                  widgetId={w.id}
+                  source="dashboard"
+                  period={period}
+                  displaySize={isCompact ? "compact" : "normal"}
+                  isDraggable={isDashboardEditing}
+                  isEditing={isDashboardEditing}
+                  onToggleSize={() => toggleWidgetSize(w.id)}
+                  onMoveLeft={
+                    index > 0
+                      ? () => moveDashboardWidget(index, index - 1)
+                      : undefined
+                  }
+                  onMoveRight={
+                    index < pinnedWidgets.length - 1
+                      ? () => moveDashboardWidget(index, index + 1)
+                      : undefined
+                  }
+                  onRemove={() => removeFromDashboard(w.id)}
+                  onContextMenu={handleContextMenu}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
-

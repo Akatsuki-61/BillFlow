@@ -25,17 +25,22 @@ export function Button({
 export function PageHeader({
   title,
   description,
+  badge,
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
+  badge?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <header className="workspace-header">
       <div className="workspace-heading">
-        <h1>{title}</h1>
-        <p>{description}</p>
+        <div className="workspace-heading-row">
+          <h1>{title}</h1>
+          {badge}
+        </div>
+        {description && <p>{description}</p>}
       </div>
       {children && <div className="workspace-actions">{children}</div>}
     </header>
@@ -97,7 +102,9 @@ export function MetricCard({
         {action}
       </div>
       <div className="ui-metric-value">{value}</div>
-      {footer && <div className="ui-metric-footer">{footer}</div>}
+      <div className="mt-1 flex items-center justify-between gap-3">
+        {footer && <div className="ui-metric-footer">{footer}</div>}
+      </div>
     </div>
   );
 }

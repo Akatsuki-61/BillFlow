@@ -1,6 +1,18 @@
 import { WidgetMeta } from "@/types/widgets";
 
 export const WIDGET_CATALOG: WidgetMeta[] = [
+  // Overview Spotlight Hero Card
+  {
+    id: "workspace-insights",
+    title: "Workspace Insights",
+    description:
+      "Atmospheric spotlight card with live business intelligence and sprint recommendations",
+    category: "activity",
+    size: "full",
+    defaultOnDashboard: true,
+    defaultOnAnalytics: false,
+  },
+
   // 6 Core Financial KPIs
   {
     id: "total-revenue",
@@ -88,7 +100,8 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   {
     id: "cashflow-runway",
     title: "Cashflow Runway",
-    description: "Operating cushion based on collected payments and contractor costs",
+    description:
+      "Operating cushion based on collected payments and contractor costs",
     category: "financial",
     size: "metric",
     defaultOnDashboard: false,
@@ -105,7 +118,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
   {
     id: "effective-hourly-rate",
-    title: "Realized Hourly Yield",
+    title: "Profit per Tracked Hour",
     description: "Effective billing yield per delivery sprint hour",
     category: "operations",
     size: "metric",
@@ -117,7 +130,8 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   {
     id: "revenue-expenses-chart",
     title: "Revenue vs Expenses Chart",
-    description: "Paired monthly bar chart comparing incoming revenue against outgoing expenses",
+    description:
+      "Paired monthly bar chart comparing incoming revenue against outgoing expenses",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
@@ -134,8 +148,9 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
   {
     id: "collection-rate-gauge",
-    title: "On-Time Collection Gauge",
-    description: "Circular donut gauge showing collection efficiency and timeliness",
+    title: "Collection Rate Gauge",
+    description:
+      "Collected amount as a share of billed revenue; counts of settled and open invoices",
     category: "charts",
     size: "medium",
     defaultOnDashboard: false,
@@ -143,8 +158,9 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
   {
     id: "latency-percentiles-chart",
-    title: "Turnaround & Lead Time Percentiles",
-    description: "Deliverable turnaround velocity by SLA distribution (P50, P75, P95, P99 in hours)",
+    title: "Active Time Percentiles",
+    description:
+      "Recorded active-time distribution for completed tasks (P50–P99)",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
@@ -152,8 +168,9 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
   {
     id: "portfolio-comparison-chart",
-    title: "Service Revenue Yield & Retainers",
-    description: "Step-curve comparative yield performance across Web Development and AI Retainers",
+    title: "Service Line-Item Mix",
+    description:
+      "Gross service line-item prices, grouped from their descriptions",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
@@ -161,8 +178,8 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
   {
     id: "growth-benchmark-chart",
-    title: "Billable Capacity Benchmark",
-    description: "Weekly billable milestone velocity tracked against planned target curves",
+    title: "Weekly Completed Work",
+    description: "Completed deliverables by week over the last eight weeks",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
@@ -170,8 +187,9 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
   {
     id: "audience-growth-chart",
-    title: "Delivered Solutions Financial Growth",
-    description: "Monthly realized collections, operating costs, and net profit across client solutions",
+    title: "Collections & Net Cashflow",
+    description:
+      "Recorded payments, contractor payouts and expenses across client solutions",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
@@ -180,7 +198,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   {
     id: "service-trends-line-chart",
     title: "Service Delivery Trends",
-    description: "Monthly web development and AI consulting volume with buffer forecasting",
+    description: "Completed tasks by month and inferred service group",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
@@ -189,7 +207,8 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   {
     id: "itemized-volume-bar-chart",
     title: "Contract Deliverables Volume",
-    description: "Monthly itemized deliverable distribution with interactive timeline brush",
+    description:
+      "Issued invoice items by month and inferred service group with interactive timeline brush",
     category: "charts",
     size: "wide",
     defaultOnDashboard: false,
@@ -200,7 +219,8 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   {
     id: "billing-alerts",
     title: "Active Billing Alerts",
-    description: "Actionable alert list of overdue client accounts requiring reminders",
+    description:
+      "Actionable alert list of overdue client accounts requiring reminders",
     category: "activity",
     size: "medium",
     defaultOnDashboard: false,
@@ -209,7 +229,8 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   {
     id: "recent-invoices",
     title: "Recent Client Invoices",
-    description: "Live feed of recently generated invoices and remittance statuses",
+    description:
+      "Live feed of recently generated invoices and remittance statuses",
     category: "activity",
     size: "wide",
     defaultOnDashboard: true,
@@ -226,9 +247,16 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
   },
 ];
 
-export const DEFAULT_DASHBOARD_WIDGET_IDS = WIDGET_CATALOG.filter(
-  (w) => w.defaultOnDashboard,
-).map((w) => w.id);
+export const DEFAULT_DASHBOARD_WIDGET_IDS = [
+  "workspace-insights",
+  "profit-trajectory-chart",
+  "total-revenue",
+  "net-profit",
+  "pending-receivables",
+  "active-clients",
+  "sprint-tasks",
+  "recent-invoices",
+];
 
 export const DEFAULT_ANALYTICS_WIDGET_IDS = WIDGET_CATALOG.filter(
   (w) => w.defaultOnAnalytics,

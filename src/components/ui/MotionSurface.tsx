@@ -9,6 +9,8 @@ import {
 } from "motion/react";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
+const dialogStack: HTMLDivElement[] = [];
+
 const ease = [0.22, 1, 0.36, 1] as const;
 
 export function MotionPresence({ children }: { children: ReactNode }) {
@@ -51,6 +53,7 @@ export function MotionSurface({
   useEffect(() => {
     const panel = surfaceRef.current;
     if (!isDialog || !isPresent || !panel) return;
+    dialogStack.push(panel);
     const previousFocus =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -78,6 +81,7 @@ export function MotionSurface({
       panel;
     initial.focus({ preventScroll: true });
     const handleKey = (event: KeyboardEvent) => {
+      if (dialogStack.at(-1) !== panel) return;
       if (event.key === "Escape" && dismissRef.current) {
         event.preventDefault();
         dismissRef.current();
@@ -99,6 +103,8 @@ export function MotionSurface({
     document.addEventListener("keydown", handleKey);
     return () => {
       document.removeEventListener("keydown", handleKey);
+      const index = dialogStack.indexOf(panel);
+      if (index !== -1) dialogStack.splice(index, 1);
       if (previousFocus?.isConnected)
         previousFocus.focus({ preventScroll: true });
     };
@@ -130,6 +136,7 @@ export function MotionSurface({
       }}
       style={{
         ...props.style,
+        ...(!isPresent ? { pointerEvents: "none" as const } : {}),
         ...(kind === "toast" ? { zIndex: 9999 } : {}),
         ...(kind === "group" ? { display: "contents" } : {}),
       }}

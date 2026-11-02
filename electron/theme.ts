@@ -7,8 +7,8 @@ let preference: ThemePreference = "system";
 
 export function windowThemeColors() {
   return nativeTheme.shouldUseDarkColors
-    ? { color: "#17171c", symbolColor: "#f4f4f5" }
-    : { color: "#faf9f5", symbolColor: "#111827" };
+    ? { color: "#111115", symbolColor: "#f4f4f6" }
+    : { color: "#f2f2f4", symbolColor: "#0d0d12" };
 }
 
 function applyWindowTheme() {

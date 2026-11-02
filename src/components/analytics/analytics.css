@@ -300,8 +300,8 @@
 .analytics-creative-chart-card {
   background: var(--theme-surface);
   border: 1px solid var(--ui-border);
-  border-radius: 1.25rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  border-radius: var(--ui-radius-card, 24px);
+  box-shadow: var(--ui-shadow);
   transition: all 200ms ease;
   overflow: hidden;
   display: flex;
@@ -311,7 +311,7 @@
 
 .analytics-creative-chart-card:hover {
   border-color: var(--theme-border-muted);
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--ui-shadow-md);
 }
 
 /* Header Section */
@@ -319,7 +319,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
-  padding: 1.25rem 1.5rem 1rem;
+  padding: 1.35rem 1.5rem 1rem;
   border-bottom: 1px solid var(--ui-subtle);
 }
 
@@ -340,28 +340,28 @@
 .analytics-creative-icon-box {
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 0.75rem;
-  background: var(--theme-accent-pale);
-  border: 1px solid var(--theme-accent-soft);
+  border-radius: 9999px;
+  background: var(--ui-subtle);
+  border: 1px solid var(--ui-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--theme-accent);
+  color: var(--ui-text);
   flex-shrink: 0;
 }
 
 .analytics-creative-title {
-  font-size: 0.9375rem;
-  font-weight: 700;
+  font-size: 1.05rem;
+  font-weight: 500;
   color: var(--theme-text-primary);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
   line-height: 1.25;
 }
 
 .analytics-creative-subtitle {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--theme-text-muted);
-  margin-top: 0.125rem;
+  margin-top: 0.15rem;
 }
 
 /* Controls Toolbar */
@@ -375,9 +375,9 @@
 .analytics-pill-toggle {
   display: inline-flex;
   align-items: center;
-  background: var(--ui-subtle);
-  border: 1px solid var(--ui-border);
-  border-radius: 0.625rem;
+  background: var(--ui-inset);
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
   padding: 0.175rem;
   gap: 0.15rem;
 }

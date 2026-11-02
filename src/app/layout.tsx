@@ -72,12 +72,10 @@ export default function RootLayout({
               <AdvanceTrackingPrompt />
               <WidgetProvider>
                 <TitleBar />
-                <div className="flex flex-1 min-h-0 overflow-hidden">
-                  <Sidebar />
-                  <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
-                    {children}
-                  </main>
-                </div>
+                <Sidebar />
+                <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
+                  {children}
+                </main>
               </WidgetProvider>
             </DataProvider>
           </NavProvider>
