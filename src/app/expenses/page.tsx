@@ -23,7 +23,6 @@ import {
   Utensils,
   Package,
   Paperclip,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   X,

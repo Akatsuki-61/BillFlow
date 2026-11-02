@@ -23,7 +23,6 @@ import {
   List,
   GitFork,
   Calendar,
-  ChevronDown,
   X,
   ExternalLink,
   Link2,

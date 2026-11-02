@@ -62,19 +62,17 @@ export function SelectDropdown<T extends string = string>({
     return () => document.removeEventListener("mousedown", handleMouseDown);
   }, [isOpen]);
 
-  // Synchronize highlighted index when menu opens
-  useEffect(() => {
-    if (isOpen) {
-      const idx = options.findIndex((opt) => opt.value === value);
-      setHighlightedIndex(idx >= 0 ? idx : 0);
-    }
-  }, [isOpen, options, value]);
+  const openMenu = () => {
+    const idx = options.findIndex((opt) => opt.value === value);
+    setHighlightedIndex(idx >= 0 ? idx : 0);
+    setIsOpen(true);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
       if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
         e.preventDefault();
-        setIsOpen(true);
+        openMenu();
       }
       return;
     }
@@ -129,7 +127,7 @@ export function SelectDropdown<T extends string = string>({
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={isOpen ? listboxId : undefined}

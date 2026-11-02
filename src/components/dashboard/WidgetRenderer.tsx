@@ -616,7 +616,7 @@ export function WidgetRenderer({
       )
       .reduce((sum, e) => sum + (e.amountCents || 0), 0);
 
-    const netRetainedCents =
+    const billedProfitCents =
       totalBilledCents - contractorCents - generalExpCents;
 
     const collectionRatePct =
@@ -656,11 +656,11 @@ export function WidgetRenderer({
         actionHref: "/clients",
       },
       {
-        metric: formatCents(netRetainedCents, activeCurrency),
+        metric: formatCents(billedProfitCents, activeCurrency),
         title:
-          "Net retained earnings after subcontractor work orders and operating expenses",
+          "Billed profit after agreed contractor fees and operating expenses",
         description:
-          "All figures reflect real recorded payments and contractor payouts in your local SQLite workspace.",
+          "Issued invoice totals less agreed work order fees and recorded expenses. This includes unpaid invoices and contractor fees awaiting payout.",
         actionLabel: "Open Expenses",
         actionHref: "/expenses",
       },
