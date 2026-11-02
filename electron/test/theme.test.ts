@@ -62,7 +62,7 @@ describe("desktop appearance", () => {
     expect(mocks.write).toHaveBeenCalledWith(path.join("/test/userData", "appearance.json.tmp"), '"light"', "utf8");
     expect(mocks.rename).toHaveBeenCalledWith(path.join("/test/userData", "appearance.json.tmp"), path.join("/test/userData", "appearance.json"));
     expect(mocks.nativeTheme.themeSource).toBe("light");
-    expect(mocks.background).toHaveBeenCalledWith("#faf9f5");
+    expect(mocks.background).toHaveBeenCalledWith("#f2f2f4");
   });
   it("rejects invalid preferences and iframe requests without writing", async () => {
     const theme = await setup();
@@ -75,6 +75,6 @@ describe("desktop appearance", () => {
     mocks.nativeTheme.shouldUseDarkColors = true;
     const update = mocks.nativeTheme.on.mock.calls[0][1] as () => void;
     update();
-    expect(mocks.background).toHaveBeenCalledWith("#17171c");
+    expect(mocks.background).toHaveBeenCalledWith("#111115");
   });
 });

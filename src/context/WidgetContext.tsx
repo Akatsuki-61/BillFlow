@@ -15,6 +15,10 @@ import {
   ALL_ANALYTICS_WIDGET_IDS,
 } from "@/lib/widgets/widgetDefinitions";
 import { WidgetDisplaySize } from "@/types/widgets";
+import {
+  loadWidgetPreferences,
+  WIDGET_STORAGE_KEYS,
+} from "@/lib/widgets/widgetStorage";
 
 // Action descriptor for interactive toast notifications (e.g., clickable "Undo" button)
 export interface ToastAction {
@@ -53,10 +57,6 @@ interface WidgetContextType {
 }
 
 const WidgetContext = createContext<WidgetContextType | null>(null);
-
-const STORAGE_KEY_DASHBOARD = "billflow_dashboard_widgets_v2";
-const STORAGE_KEY_ANALYTICS = "billflow_analytics_widgets_v2";
-const STORAGE_KEY_SIZES = "billflow_widget_sizes_v2";
 
 const subscribeToHydration = () => () => {};
 const clientHydrationSnapshot = () => true;
@@ -118,34 +118,10 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   );
   if (hydrated && !isInitialized) {
     try {
-      const storedDash = localStorage.getItem(STORAGE_KEY_DASHBOARD);
-      if (storedDash) {
-        const parsed = JSON.parse(storedDash);
-        if (Array.isArray(parsed)) {
-          setDashboardWidgets(parsed);
-        }
-      }
-      const storedAnalytics = localStorage.getItem(STORAGE_KEY_ANALYTICS);
-      if (storedAnalytics) {
-        const parsed = JSON.parse(storedAnalytics);
-        if (Array.isArray(parsed)) {
-          const activeIds = new Set(parsed);
-          const merged = [...parsed];
-          for (const defaultId of DEFAULT_ANALYTICS_WIDGET_IDS) {
-            if (!activeIds.has(defaultId)) {
-              merged.push(defaultId);
-            }
-          }
-          setAnalyticsWidgets(merged);
-        }
-      }
-      const storedSizes = localStorage.getItem(STORAGE_KEY_SIZES);
-      if (storedSizes) {
-        const parsed = JSON.parse(storedSizes);
-        if (parsed && typeof parsed === "object") {
-          setWidgetSizes(parsed);
-        }
-      }
+      const saved = loadWidgetPreferences(localStorage);
+      setDashboardWidgets(saved.dashboardWidgets);
+      setAnalyticsWidgets(saved.analyticsWidgets);
+      setWidgetSizes(saved.widgetSizes);
     } catch {
       // Fallback to defaults on error
     } finally {
@@ -158,7 +134,7 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
     if (!isInitialized) return;
     try {
       localStorage.setItem(
-        STORAGE_KEY_DASHBOARD,
+        WIDGET_STORAGE_KEYS.dashboard,
         JSON.stringify(dashboardWidgets),
       );
     } catch {
@@ -171,7 +147,7 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
     if (!isInitialized) return;
     try {
       localStorage.setItem(
-        STORAGE_KEY_ANALYTICS,
+        WIDGET_STORAGE_KEYS.analytics,
         JSON.stringify(analyticsWidgets),
       );
     } catch {
@@ -183,7 +159,7 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isInitialized) return;
     try {
-      localStorage.setItem(STORAGE_KEY_SIZES, JSON.stringify(widgetSizes));
+      localStorage.setItem(WIDGET_STORAGE_KEYS.sizes, JSON.stringify(widgetSizes));
     } catch {
       // Ignore write errors
     }

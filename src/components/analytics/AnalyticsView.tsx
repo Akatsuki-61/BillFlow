@@ -1,16 +1,15 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+
 import React, { useState } from "react";
 import {
-  CalendarDays,
   CheckCircle2,
-  ChevronDown,
   SlidersHorizontal,
   Plus,
   Minus,
   EyeOff,
   RotateCcw,
-  X,
   Sparkles,
 } from "lucide-react";
 import {
@@ -26,13 +25,6 @@ import { useWidgetContext } from "@/context/WidgetContext";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { Timeframe } from "@/types/analytics";
 import "./analytics.css";
-
-const quarterOptions = Array.from({ length: 4 }, (_, offset) => {
-  const date = new Date();
-  const quarterIndex =
-    date.getFullYear() * 4 + Math.floor(date.getMonth() / 3) - offset;
-  return `Q${(quarterIndex % 4) + 1} ${Math.floor(quarterIndex / 4)}`;
-});
 
 export default function AnalyticsView() {
   const {
@@ -51,8 +43,6 @@ export default function AnalyticsView() {
 
   // Selected timeframe filter state: Month, Quarter, or Year
   const [timeframe, setTimeframe] = useState<Timeframe>("Quarter");
-  const [selectedQuarter, setSelectedQuarter] = useState(quarterOptions[0]);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
 
   // Context menu state
@@ -171,7 +161,7 @@ export default function AnalyticsView() {
       {/* Top Header */}
       <PageHeader
         title="Analytics & Financial Performance"
-        description="Executive financial intelligence and real-time operational analytics. Monitor cashflow velocity, profit margins, contractor allocations, and collection efficiency across billing cycles."
+        description="Recorded revenue, costs, collections and delivery progress. Historical charts show their own labeled windows."
       >
         <div className="analytics-header-controls">
           <SegmentedControl
@@ -182,45 +172,6 @@ export default function AnalyticsView() {
               (value) => ({ value, label: value }),
             )}
           />
-
-          {/* Quarter Dropdown */}
-          <div className="analytics-dropdown-relative">
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              aria-expanded={isDropdownOpen}
-            >
-              <CalendarDays className="text-[11px] text-text-muted" />
-              <span>{selectedQuarter}</span>
-              <ChevronDown className="motion-chevron text-[9px] text-text-placeholder ml-0.5" />
-            </Button>
-
-            <MotionPresence>
-              {isDropdownOpen && (
-                <MotionSurface
-                  kind="menu"
-                  className="absolute right-0 mt-1.5 w-36 bg-canvas border border-border-muted rounded-xl shadow-lg z-20 py-1 overflow-hidden"
-                >
-                  {quarterOptions.map((q) => (
-                    <Button
-                      variant="menu"
-                      aria-pressed={selectedQuarter === q}
-                      key={q}
-                      type="button"
-                      onClick={() => {
-                        setSelectedQuarter(q);
-                        setIsDropdownOpen(false);
-                        showToast(`Filtered to ${q}`);
-                      }}
-                    >
-                      {q}
-                    </Button>
-                  ))}
-                </MotionSurface>
-              )}
-            </MotionPresence>
-          </div>
 
           {/* Customize Analytics Button */}
           <Button
@@ -242,36 +193,32 @@ export default function AnalyticsView() {
             All analytics widgets are currently hidden
           </h3>
           <p className="text-xs text-content-neutral-500 mt-1 max-w-md mx-auto">
-            You can re-enable any of the {WIDGET_CATALOG.length} business metrics, charts, and feeds
-            from the widget customizer.
+            You can re-enable any of the {WIDGET_CATALOG.length} business
+            metrics, charts, and feeds from the widget customizer.
           </p>
-          <Button
-            variant="primary"
-            onClick={showAllAnalytics}
-            className="mt-4"
-          >
+          <Button variant="primary" onClick={showAllAnalytics} className="mt-4">
             Show All ({WIDGET_CATALOG.length}) Widgets
           </Button>
         </div>
       ) : (
-        <div className="space-y-8">
-          {/* Section 1: KPI Metrics Grid */}
+        <div className="space-y-6">
+          {/* Section 1: KPI Metrics Bento Grid */}
           {metricWidgets.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-3 text-xs">
-                <div>
-                  <h2 className="font-semibold text-content-neutral-800 tracking-tight uppercase text-[11px]">
-                    Key Business Indicators ({selectedQuarter})
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
+                    Key Business Indicators · This {timeframe}
                   </h2>
-                  <p className="text-[11px] text-content-neutral-500 mt-0.5">
-                    Core financial health, active retainers, and operating margins.
-                  </p>
+                  <span className="zentra-pill-badge !px-2.5 !py-0.5 !text-[11px]">
+                    {metricWidgets.length} KPIs active
+                  </span>
                 </div>
-                <span className="text-[11px] text-content-neutral-500 font-medium bg-surface-neutral-100 px-2 py-0.5 rounded-md">
-                  {metricWidgets.length} KPIs active
-                </span>
+                <p className="text-[12px] text-content-neutral-400 hidden sm:block">
+                  Right-click or drag any widget to pin it to your Overview
+                </p>
               </div>
-              <div className="analytics-metrics-grid">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {metricWidgets.map((w) => (
                   <WidgetRenderer
                     key={w.id}
@@ -292,38 +239,45 @@ export default function AnalyticsView() {
             </div>
           )}
 
-          {/* Section 2: Charts & Visualizations (Side-by-Side on Desktop) */}
+          {/* Section 2: Charts & Visualizations */}
           {chartWidgets.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <div>
-                  <h2 className="font-semibold text-content-neutral-800 tracking-tight uppercase text-[11px]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
                     Financial Velocity & Profit Trajectory
                   </h2>
-                  <p className="text-[11px] text-content-neutral-500 mt-0.5">
-                    6-month rolling cashflow intake, contractor disbursements, and retained net earnings.
-                  </p>
+                  <span className="zentra-pill-badge !px-2.5 !py-0.5 !text-[11px]">
+                    Interactive Visualizations
+                  </span>
                 </div>
-                <span className="text-[11px] font-medium text-accent bg-surface-purple-50 border border-line-purple-200/60 px-2 py-0.5 rounded-md">
-                  Interactive Visualizations
-                </span>
+                <p className="text-[12px] text-content-neutral-400 hidden sm:block">
+                  Rolling cashflow intake, contractor disbursements, and
+                  retained net earnings
+                </p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {chartWidgets.map((w) => (
-                  <WidgetRenderer
+                  <div
                     key={w.id}
-                    widgetId={w.id}
-                    source="analytics"
-                    period={
-                      timeframe === "Month"
-                        ? "month"
-                        : timeframe === "Year"
-                          ? "year"
-                          : "quarter"
+                    className={
+                      w.id === "profit-trajectory-chart" ? "lg:col-span-2" : ""
                     }
-                    isDraggable={true}
-                    onContextMenu={handleContextMenu}
-                  />
+                  >
+                    <WidgetRenderer
+                      widgetId={w.id}
+                      source="analytics"
+                      period={
+                        timeframe === "Month"
+                          ? "month"
+                          : timeframe === "Year"
+                            ? "year"
+                            : "quarter"
+                      }
+                      isDraggable={true}
+                      onContextMenu={handleContextMenu}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
@@ -332,20 +286,17 @@ export default function AnalyticsView() {
           {/* Section 3: Operational Feeds, Alerts & Gauges */}
           {otherWidgets.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <div>
-                  <h2 className="font-semibold text-content-neutral-800 tracking-tight uppercase text-[11px]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
                     Operational Feeds & Account Health
                   </h2>
-                  <p className="text-[11px] text-content-neutral-500 mt-0.5">
-                    Recent client invoices, deliverables in sprint, and settlement alerts.
-                  </p>
+                  <span className="zentra-pill-badge !px-2.5 !py-0.5 !text-[11px]">
+                    {otherWidgets.length} Feeds active
+                  </span>
                 </div>
-                <span className="text-[11px] text-content-neutral-500 font-medium bg-surface-neutral-100 px-2 py-0.5 rounded-md">
-                  {otherWidgets.length} Feeds active
-                </span>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {otherWidgets.map((w) => (
                   <WidgetRenderer
                     key={w.id}
@@ -371,52 +322,36 @@ export default function AnalyticsView() {
       {/* CUSTOMIZE ANALYTICS WIDGETS MODAL */}
       <MotionPresence>
         {isCustomizeModalOpen && (
-          <MotionSurface
-            kind="dialog"
-            className="analytics-customize-overlay"
-          >
-            <MotionSurface
-              onDismiss={() => setIsCustomizeModalOpen(false)}
-              kind="panel"
-              className="analytics-customize-panel"
-            >
-              {/* Modal Header */}
-              <div className="analytics-customize-header">
-                <div>
-                  <h2 className="analytics-customize-title text-lg font-serif">
-                    Customize Analytics Widgets
-                  </h2>
-                  <p className="text-xs text-content-neutral-500 mt-0.5">
-                    Toggle which metrics appear in your Analytics storage and
-                    see which are on your Dashboard.
-                  </p>
-                </div>
-                <Button
-                  aria-label="Close"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsCustomizeModalOpen(false)}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
+          <Dialog onClose={() => setIsCustomizeModalOpen(false)} width={960}>
+            <div className="app-dialog-header">
+              <div>
+                <h2 className="analytics-customize-title text-lg font-medium tracking-[-0.02em]">
+                  Customize Analytics Widgets
+                </h2>
+                <p className="text-xs text-content-neutral-500 mt-0.5">
+                  Toggle which metrics appear in your Analytics catalog and see
+                  which are pinned to your Overview.
+                </p>
               </div>
-
+            </div>
+            <div className="app-dialog-body">
               {/* Central Widget Storage Banner shown inside Customize modal */}
-              <div className="mx-6 mt-4 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-surface-purple-50/80 border border-line-purple-200/70 text-xs text-content-purple-950">
+              <div className="mx-6 mt-4 flex items-center justify-between px-4 py-3 rounded-2xl bg-accent-faint/80 dark:bg-accent-soft/40 border border-border-accent/70 dark:border-border-accent/50 text-xs text-content-neutral-900">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-accent shrink-0" />
                   <span>
-                    <strong>Central Widget Storage:</strong> Drag any card to the{" "}
-                    <strong>Dashboard</strong> in the left sidebar, or right-click to pin instantly.
+                    <strong>Central Widget Catalog:</strong> Drag any card to{" "}
+                    <strong>Home</strong> in the top navigation bar, or
+                    right-click to pin instantly.
                   </span>
                 </div>
-                <span className="text-[11px] text-content-purple-800 font-medium whitespace-nowrap ml-2">
+                <span className="text-[11px] text-accent font-semibold whitespace-nowrap ml-2">
                   {visibleWidgets.length} active
                 </span>
               </div>
 
               {/* Widget List */}
-              <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto divide-y divide-line-neutral-100">
+              <div className="app-dialog-section p-6 space-y-3 max-h-[60vh] overflow-y-auto divide-y divide-line-neutral-100">
                 {WIDGET_CATALOG.map((widget) => {
                   const isVisible = analyticsWidgets.includes(widget.id);
                   const isPinned = dashboardWidgets.includes(widget.id);
@@ -431,12 +366,12 @@ export default function AnalyticsView() {
                           <span className="text-sm font-semibold text-content-neutral-900 group-hover:text-accent transition-colors">
                             {widget.title}
                           </span>
-                          <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 bg-surface-neutral-100 text-content-neutral-600 rounded">
+                          <span className="text-[10px] font-medium uppercase px-2 py-0.5 bg-surface-neutral-100 text-content-neutral-600 rounded-full">
                             {widget.category}
                           </span>
                           {isPinned && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-surface-purple-100 text-content-purple-700 rounded-md">
-                              On Dashboard
+                            <span className="text-[10px] font-semibold px-2 py-0.5 bg-accent-faint text-accent dark:bg-accent-soft dark:text-accent rounded-full">
+                              On Overview
                             </span>
                           )}
                         </div>
@@ -456,7 +391,11 @@ export default function AnalyticsView() {
                               pinToDashboard(widget.id);
                             }
                           }}
-                          title={isPinned ? "Remove from Dashboard" : "Add to Dashboard"}
+                          title={
+                            isPinned
+                              ? "Remove from Dashboard"
+                              : "Add to Dashboard"
+                          }
                         >
                           {isPinned ? "Unpin" : "+ Pin"}
                         </Button>
@@ -472,38 +411,38 @@ export default function AnalyticsView() {
               </div>
 
               {/* Modal Actions */}
-              <div className="analytics-customize-footer">
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={resetToDefaults}
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset Defaults</span>
-                </Button>
+            </div>
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={resetToDefaults}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Defaults</span>
+              </Button>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={showAllAnalytics}
-                  >
-                    Show All ({WIDGET_CATALOG.length})
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="button"
-                    onClick={() => {
-                      setIsCustomizeModalOpen(false);
-                      showToast("Analytics preferences updated");
-                    }}
-                  >
-                    Done
-                  </Button>
-                </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={showAllAnalytics}
+                >
+                  Show All ({WIDGET_CATALOG.length})
+                </Button>
+                <Button
+                  variant="primary"
+                  type="button"
+                  onClick={() => {
+                    setIsCustomizeModalOpen(false);
+                    showToast("Analytics preferences updated");
+                  }}
+                >
+                  Done
+                </Button>
               </div>
-            </MotionSurface>
-          </MotionSurface>
+            </div>
+          </Dialog>
         )}
       </MotionPresence>
     </div>

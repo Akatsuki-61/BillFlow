@@ -1,5 +1,11 @@
 "use client";
 
+import { MotionPresence } from "@/components/ui/MotionSurface";
+import { Dialog } from "@/components/ui/Dialog";
+
+import { formatCents } from "@/lib/format";
+import { DataBreakdown } from "@/components/ui/DataGraphic";
+
 import React, { useState, useRef } from "react";
 import {
   Upload,
@@ -20,13 +26,14 @@ import {
   CheckCircle2,
   RotateCcw,
 } from "lucide-react";
-import { useCatalog, useClients, useInvoices, useData } from "@/lib/data/DataProvider";
+import {
+  useCatalog,
+  useClients,
+  useInvoices,
+  useData,
+} from "@/lib/data/DataProvider";
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
-import type {
-  CatalogItem,
-  CatalogIconType,
-  Currency,
-} from "@/types/billing";
+import type { CatalogItem, CatalogIconType, Currency } from "@/types/billing";
 import "./catalog.css";
 import { parseCatalogCsv } from "@/lib/catalog-import";
 
@@ -76,11 +83,12 @@ export default function CatalogView() {
   const { createInvoice } = useInvoices();
   const { activeCurrency, settings } = useData();
 
-  const [saving,setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
   const createRequest = useRef<string | null>(null);
   const invoiceRequest = useRef<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<Category>("All Items");
+  const [selectedCategory, setSelectedCategory] =
+    useState<Category>("All Items");
 
   // Notifications / Toast
   const [notification, setNotification] = useState<{
@@ -88,7 +96,10 @@ export default function CatalogView() {
     type: "success" | "error";
   } | null>(null);
 
-  const showToast = (message: string, type: "success" | "error" = "success") => {
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3600);
   };
@@ -97,16 +108,22 @@ export default function CatalogView() {
   const [showNewItemModal, setShowNewItemModal] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [showImportInfoModal, setShowImportInfoModal] = useState(false);
-  const [activeGuideTab, setActiveGuideTab] = useState<"table" | "csv" | "excel">("table");
+  const [activeGuideTab, setActiveGuideTab] = useState<
+    "table" | "csv" | "excel"
+  >("table");
   const [copied, setCopied] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
 
   // Quick Create Invoice from Catalog Item State
-  const [quickInvoiceItem, setQuickInvoiceItem] = useState<CatalogItem | null>(null);
+  const [quickInvoiceItem, setQuickInvoiceItem] = useState<CatalogItem | null>(
+    null,
+  );
   const [invoiceClientId, setInvoiceClientId] = useState<string>("");
   const [invoiceAmount, setInvoiceAmount] = useState<string>("");
-  const [invoiceCurrency, setInvoiceCurrency] = useState<string>(settings?.defaultCurrency || activeCurrency || "LKR");
+  const [invoiceCurrency, setInvoiceCurrency] = useState<string>(
+    settings?.defaultCurrency || activeCurrency || "LKR",
+  );
   const [invoiceDueDate, setInvoiceDueDate] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -138,25 +155,36 @@ export default function CatalogView() {
       `"Cloud Infrastructure Assessment","Consulting","CONS-AUD-03",60000.00,"LKR","audit","Security, Docker deployment, and database performance review"\n` +
       `"Enterprise Software License","Licensing","LIC-PRO-04",350000.00,"LKR","year","Multi-seat business software license with ongoing updates"`;
 
-    void navigator.clipboard.writeText(csvText).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);}).catch(()=>showToast("Could not copy CSV. Download the template instead.","error"));
+    void navigator.clipboard
+      .writeText(csvText)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() =>
+        showToast(
+          "Could not copy CSV. Download the template instead.",
+          "error",
+        ),
+      );
   };
 
   // New Item Form state
   const [newTitle, setNewTitle] = useState("");
-  const [newCategory, setNewCategory] = useState<"Development" | "Design" | "Consulting" | "Licensing">("Development");
+  const [newCategory, setNewCategory] = useState<
+    "Development" | "Design" | "Consulting" | "Licensing"
+  >("Development");
   const [newSku, setNewSku] = useState("DEV-002");
   const [newPrice, setNewPrice] = useState("");
-  const [newCurrency, setNewCurrency] = useState(settings?.defaultCurrency || activeCurrency || "LKR");
+  const [newCurrency, setNewCurrency] = useState(
+    settings?.defaultCurrency || activeCurrency || "LKR",
+  );
   const [newUnit, setNewUnit] = useState("/ Hourly");
   const [newDescription, setNewDescription] = useState("");
   const [hasCatalogDraft, setHasCatalogDraft] = useState(false);
 
   const isCatalogFormDirty = () => {
-    return Boolean(
-      newTitle.trim() ||
-      newPrice.trim() ||
-      newDescription.trim()
-    );
+    return Boolean(newTitle.trim() || newPrice.trim() || newDescription.trim());
   };
 
   const saveCatalogDraft = () => {
@@ -194,7 +222,8 @@ export default function CatalogView() {
       if (draft.newPrice !== undefined) setNewPrice(draft.newPrice);
       if (draft.newCurrency !== undefined) setNewCurrency(draft.newCurrency);
       if (draft.newUnit !== undefined) setNewUnit(draft.newUnit);
-      if (draft.newDescription !== undefined) setNewDescription(draft.newDescription);
+      if (draft.newDescription !== undefined)
+        setNewDescription(draft.newDescription);
       showToast("Draft restored");
     } catch {}
   };
@@ -218,7 +247,9 @@ export default function CatalogView() {
 
   // Edit Item Form state
   const [editTitle, setEditTitle] = useState("");
-  const [editCategory, setEditCategory] = useState<"Development" | "Design" | "Consulting" | "Licensing">("Development");
+  const [editCategory, setEditCategory] = useState<
+    "Development" | "Design" | "Consulting" | "Licensing"
+  >("Development");
   const [editSku, setEditSku] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editCurrency, setEditCurrency] = useState("LKR");
@@ -238,7 +269,8 @@ export default function CatalogView() {
 
   const categoryCounts: Record<string, number> = {
     "All Items": catalogItems.length,
-    Development: catalogItems.filter((i) => i.category === "Development").length,
+    Development: catalogItems.filter((i) => i.category === "Development")
+      .length,
     Design: catalogItems.filter((i) => i.category === "Design").length,
     Consulting: catalogItems.filter((i) => i.category === "Consulting").length,
     Licensing: catalogItems.filter((i) => i.category === "Licensing").length,
@@ -256,11 +288,12 @@ export default function CatalogView() {
       Consulting: "consulting",
     };
 
-    if(saving)return; setSaving(true);
+    if (saving) return;
+    setSaving(true);
     createRequest.current ||= crypto.randomUUID();
     try {
       await createCatalogItem({
-        requestId:createRequest.current,
+        requestId: createRequest.current,
         title: newTitle.trim() || "New Catalog Item",
         category: newCategory,
         sku: newSku.trim() || `SKU-${Date.now().toString().slice(-4)}`,
@@ -270,13 +303,18 @@ export default function CatalogView() {
         unit: newUnit,
         iconType: iconTypeMap[newCategory] || "code",
       });
-      createRequest.current=null;
+      createRequest.current = null;
       showToast("Catalog item created successfully!");
     } catch (err) {
       console.error("Failed to create catalog item:", err);
-      showToast(err instanceof Error ? err.message : "Failed to create catalog item", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to create catalog item",
+        "error",
+      );
       return;
-    } finally {setSaving(false);}
+    } finally {
+      setSaving(false);
+    }
 
     clearCatalogDraft();
     closeNewItemModal(false);
@@ -313,7 +351,8 @@ export default function CatalogView() {
       Consulting: "consulting",
     };
 
-    if(saving)return;setSaving(true);
+    if (saving) return;
+    setSaving(true);
     try {
       await updateCatalogItem(editingItem.id, {
         title: editTitle.trim() || editingItem.title,
@@ -328,9 +367,14 @@ export default function CatalogView() {
       showToast("Catalog item updated successfully!");
     } catch (err) {
       console.error("Failed to update item:", err);
-      showToast(err instanceof Error ? err.message : "Failed to update item", "error");
+      showToast(
+        err instanceof Error ? err.message : "Failed to update item",
+        "error",
+      );
       return;
-    } finally {setSaving(false);}
+    } finally {
+      setSaving(false);
+    }
 
     setEditingItem(null);
   };
@@ -342,7 +386,10 @@ export default function CatalogView() {
         showToast("Catalog item deleted successfully!");
       } catch (err) {
         console.error("Failed to delete item:", err);
-        showToast(err instanceof Error ? err.message : "Failed to delete item", "error");
+        showToast(
+          err instanceof Error ? err.message : "Failed to delete item",
+          "error",
+        );
         return;
       }
       setDeletingItem(null);
@@ -350,7 +397,7 @@ export default function CatalogView() {
   };
 
   const handleOpenCreateInvoice = (item: CatalogItem) => {
-    invoiceRequest.current=null;
+    invoiceRequest.current = null;
     setQuickInvoiceItem(item);
     setInvoiceAmount(item.price.replace(/[^0-9.]/g, ""));
     setInvoiceCurrency(item.currency || "LKR");
@@ -372,14 +419,17 @@ export default function CatalogView() {
       return;
     }
 
-    const numericAmount = parseFloat(invoiceAmount.replace(/[^0-9.]/g, "") || "0");
+    const numericAmount = parseFloat(
+      invoiceAmount.replace(/[^0-9.]/g, "") || "0",
+    );
     const amountCents = Math.round(numericAmount * 100);
 
-    if(saving)return;setSaving(true);
+    if (saving) return;
+    setSaving(true);
     invoiceRequest.current ||= crypto.randomUUID();
     try {
       await createInvoice({
-        requestId:invoiceRequest.current,
+        requestId: invoiceRequest.current,
         clientId: invoiceClientId,
         catalogItemId: quickInvoiceItem.id,
         title: quickInvoiceItem.title,
@@ -392,35 +442,74 @@ export default function CatalogView() {
       setQuickInvoiceItem(null);
     } catch (err) {
       console.error("Failed to create invoice from catalog item:", err);
-      showToast(err instanceof Error ? err.message : "Failed to create invoice", "error");
-    } finally {setSaving(false);}
+      showToast(
+        err instanceof Error ? err.message : "Failed to create invoice",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file=e.target.files?.[0]; e.target.value="";
-    if(!file || saving)return;
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || saving) return;
     setSaving(true);
     try {
-      if(!file.name.toLowerCase().endsWith(".csv"))throw new Error("Export Excel as CSV, then select the CSV file.");
-      if(file.size>5*1024*1024)throw new Error("CSV files must be under 5 MB.");
-      const items=parseCatalogCsv(await file.text());
-      const count=await bulkImportCatalogItems(items);
-      showToast(`Imported ${count} new items; identical existing SKUs were skipped.`);
+      if (!file.name.toLowerCase().endsWith(".csv"))
+        throw new Error("Export Excel as CSV, then select the CSV file.");
+      if (file.size > 5 * 1024 * 1024)
+        throw new Error("CSV files must be under 5 MB.");
+      const items = parseCatalogCsv(await file.text());
+      const count = await bulkImportCatalogItems(items);
+      showToast(
+        `Imported ${count} new items; identical existing SKUs were skipped.`,
+      );
       setShowBulkImportModal(false);
-    }catch(error){showToast(error instanceof Error ? error.message : "Could not import Catalog items.","error");} finally {setSaving(false);}
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Could not import Catalog items.",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderIcon = (type: CatalogItem["iconType"]) => {
     switch (type) {
       case "code":
-        return <Code2 className="w-5 h-5 text-content-neutral-700" strokeWidth={1.8} />;
+        return (
+          <Code2
+            className="w-5 h-5 text-content-neutral-700"
+            strokeWidth={1.8}
+          />
+        );
       case "design":
-        return <Pencil className="w-4.5 h-4.5 text-content-neutral-700" strokeWidth={1.8} />;
+        return (
+          <Pencil
+            className="w-4.5 h-4.5 text-content-neutral-700"
+            strokeWidth={1.8}
+          />
+        );
       case "cloud":
-        return <Cloud className="w-5 h-5 text-content-neutral-700" strokeWidth={1.8} />;
+        return (
+          <Cloud
+            className="w-5 h-5 text-content-neutral-700"
+            strokeWidth={1.8}
+          />
+        );
       case "consulting":
       default:
-        return <Briefcase className="w-5 h-5 text-content-neutral-700" strokeWidth={1.8} />;
+        return (
+          <Briefcase
+            className="w-5 h-5 text-content-neutral-700"
+            strokeWidth={1.8}
+          />
+        );
     }
   };
 
@@ -447,7 +536,7 @@ export default function CatalogView() {
       {/* Top Header */}
       <PageHeader
         title="Catalog"
-        description="Manage standardized products, services, and pricing units."
+        description="Your services and default prices, ready for the next invoice."
       >
         <div className="flex items-center gap-3">
           <Button
@@ -473,8 +562,96 @@ export default function CatalogView() {
         </div>
       </PageHeader>
 
-      {/* Search & Category Filter Bar across the top (similar to Tasks page) */}
-      <div className="ui-card p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shrink-0">
+      {/* =====================================================================
+          ZENTRA 3-CARD CATALOG BENTO HEADER ROW
+         ===================================================================== */}
+      {(() => {
+        const items = catalogItems.filter(
+          (item) => item.currency === activeCurrency,
+        );
+        const categories = [...new Set(items.map((item) => item.category))];
+        const rates = items.map((item) =>
+          Math.round(
+            (parseFloat(item.price.replace(/[^0-9.]/g, "")) || 0) * 100,
+          ),
+        );
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <section className="ui-card p-6 space-y-5">
+              <h2>Service Catalog</h2>
+              <div>
+                <div className="summary-value">{items.length}</div>
+                <p className="summary-caption">
+                  Reusable services priced in {activeCurrency}
+                </p>
+              </div>
+              <DataBreakdown
+                label="Services by category"
+                total={items.length}
+                rows={categories.map((category) => ({
+                  label: category,
+                  value: items.filter((item) => item.category === category)
+                    .length,
+                  display: `${items.filter((item) => item.category === category).length} services`,
+                }))}
+              />
+              {!items.length && (
+                <p className="summary-caption">
+                  Add a service to see its category breakdown.
+                </p>
+              )}
+            </section>
+            <section className="ui-card p-6 space-y-5">
+              <h2>Average Listed Price</h2>
+              <div>
+                <div className="summary-value">
+                  {formatCents(
+                    rates.length
+                      ? Math.round(
+                          rates.reduce((sum, rate) => sum + rate, 0) /
+                            rates.length,
+                        )
+                      : 0,
+                    activeCurrency,
+                  )}
+                </div>
+                <p className="summary-caption">
+                  Mean default price across {items.length} services
+                </p>
+              </div>
+              <p className="summary-caption">
+                You can customize a service’s price on each invoice.
+              </p>
+            </section>
+            <section className="ui-card p-6 space-y-5">
+              <h2>Price Range</h2>
+              <div>
+                <div className="summary-value">
+                  {formatCents(
+                    rates.length ? Math.min(...rates) : 0,
+                    activeCurrency,
+                  )}
+                </div>
+                <p className="summary-caption">Lowest listed price</p>
+              </div>
+              <div>
+                <div className="text-xl font-medium text-content-neutral-950">
+                  {formatCents(
+                    rates.length ? Math.max(...rates) : 0,
+                    activeCurrency,
+                  )}
+                </div>
+                <p className="summary-caption">
+                  Highest listed price · {activeCurrency}
+                </p>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
+
+      {/* Search & Category Filter Bar across the top */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shrink-0">
         {/* Search Input */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -483,7 +660,7 @@ export default function CatalogView() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search deliverables by name, SKU, or description..."
-            className="ui-field ui-search-input w-full pl-10 pr-9 border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-sm"
+            className="ui-field ui-search-input w-full pl-10 pr-9 !rounded-full border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-xs"
             style={{ paddingLeft: "40px" }}
           />
           {searchQuery && (
@@ -508,192 +685,129 @@ export default function CatalogView() {
                 key={category}
                 type="button"
                 onClick={() => setSelectedCategory(category)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                aria-pressed={isActive}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   isActive
-                    ? "bg-accent-solid text-white shadow-xs"
+                    ? "bg-[#1c1c1f] text-white dark:bg-white dark:text-[#111115] shadow-xs"
                     : "bg-surface-neutral-50 text-content-neutral-600 hover:bg-surface-neutral-100 hover:text-content-neutral-900 border border-line-neutral-200/80"
                 }`}
               >
-                {category} <span className="opacity-75 font-normal">({categoryCounts[category]})</span>
+                {category}{" "}
+                <span className="opacity-75 font-normal">
+                  ({categoryCounts[category]})
+                </span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Catalog Details Table in a Box (similar to Expenses page) */}
-      <div className="ui-card overflow-hidden flex flex-col flex-1 min-h-[420px] shadow-sm">
-        {/* Box Top Bar */}
-        <div className="px-6 py-3.5 border-b border-line-neutral-200/80 bg-surface-neutral-50/60 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-content-neutral-500">
-              Catalog Deliverables
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-neutral-100 text-content-neutral-700 border border-line-neutral-200">
-              {filteredItems.length} {filteredItems.length === 1 ? "deliverable" : "deliverables"}
-            </span>
+      <section aria-label="Catalog deliverables" className="catalog-card-grid">
+        {filteredItems.length === 0 ? (
+          <div className="ui-card col-span-full">
+            <EmptyState
+              title={
+                catalogItems.length === 0
+                  ? "No catalog deliverables yet"
+                  : "No deliverables match search"
+              }
+              description={
+                catalogItems.length === 0
+                  ? "Create reusable services and deliverables to auto-fill invoices."
+                  : "Try another search or category."
+              }
+              icon={<FileSpreadsheet />}
+            >
+              {catalogItems.length === 0 && (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    createRequest.current = null;
+                    openNewItemModal();
+                  }}
+                  className="mt-4"
+                >
+                  <Plus className="w-4 h-4" /> Create First Item
+                </Button>
+              )}
+            </EmptyState>
           </div>
-          <span className="text-xs text-content-neutral-400 font-medium hidden sm:inline">
-            Standardized deliverables, services, and pricing units
-          </span>
-        </div>
-
-        {/* Scrollable List Body: ONLY this section scrolls */}
-        <div className="overflow-y-auto overflow-x-auto flex-1 max-h-[calc(100vh-270px)]">
-          {filteredItems.length === 0 ? (
-            <div className="py-20 text-center">
-              <EmptyState
-                title={catalogItems.length === 0 ? "No catalog deliverables yet" : "No deliverables match search"}
-                description={
-                  catalogItems.length === 0
-                    ? "Create reusable services and deliverables to auto-fill invoices."
-                    : "Try adjusting your search query or selecting a different category."
-                }
-                icon={<FileSpreadsheet className="w-8 h-8 text-content-neutral-400" />}
-              >
-                {catalogItems.length === 0 && (
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      createRequest.current = null;
-                      openNewItemModal();
-                    }}
-                    className="mt-4 gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Create First Item</span>
-                  </Button>
+        ) : (
+          filteredItems.map((item) => (
+            <article
+              key={item.id}
+              className="ui-card catalog-service-card motion-card"
+            >
+              <div className="catalog-service-topline">
+                <div className="catalog-service-icon">
+                  {renderIcon(item.iconType)}
+                </div>
+                <span className="record-category">{item.category}</span>
+              </div>
+              <div className="catalog-service-copy">
+                <h2>{item.title}</h2>
+                {item.description && <p>{item.description}</p>}
+              </div>
+              <div className="catalog-service-price">
+                <div>
+                  <strong>
+                    {formatPriceWithCurrency(item.price, item.currency)}
+                  </strong>
+                  <span>
+                    {item.currency}
+                    {item.unit
+                      ? ` / ${item.unit.replace(/^\s*\/\s*/, "")}`
+                      : ""}
+                  </span>
+                </div>
+                {item.sku && (
+                  <span className="catalog-service-sku" title="SKU">
+                    {item.sku}
+                  </span>
                 )}
-              </EmptyState>
-            </div>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead className="sticky top-0 z-10 bg-surface-neutral-50/95 backdrop-blur-xs border-b border-line-neutral-200/80 shadow-xs">
-                <tr className="text-[11px] font-bold uppercase tracking-wider text-content-neutral-400">
-                  <th className="py-3.5 pl-6 pr-3 w-12">
-                    <span className="sr-only">Icon</span>
-                  </th>
-                  <th className="py-3.5 px-4 font-bold">Deliverable & Description</th>
-                  <th className="py-3.5 px-4 font-bold">Category</th>
-                  <th className="py-3.5 px-4 font-bold">SKU</th>
-                  <th className="py-3.5 px-4 font-bold">Unit</th>
-                  <th className="py-3.5 px-4 font-bold">Price</th>
-                  <th className="py-3.5 pr-6 pl-4 text-right w-44">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line-neutral-100/80">
-                {filteredItems.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="group hover:bg-surface-soft transition-colors"
+              </div>
+              <div className="catalog-service-footer">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => handleOpenCreateInvoice(item)}
+                  title={`Create invoice with ${item.title}`}
+                >
+                  <FileText className="w-3.5 h-3.5" /> Create invoice
+                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleOpenEdit(item)}
+                    title={`Edit ${item.title}`}
                   >
-                    {/* Icon */}
-                    <td className="py-4 pl-6 pr-3 align-top w-12">
-                      <div className="w-9 h-9 rounded-xl bg-surface-neutral-50 border border-line-neutral-200/80 flex items-center justify-center shrink-0 shadow-2xs group-hover:border-line-neutral-300 transition-colors">
-                        {renderIcon(item.iconType)}
-                      </div>
-                    </td>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeletingItem(item)}
+                    title={`Delete ${item.title}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </article>
+          ))
+        )}
+      </section>
 
-                    {/* Deliverable Title & Description */}
-                    <td className="py-4 px-4 align-top max-w-md">
-                      <div className="font-semibold text-sm text-content-neutral-900 leading-snug">
-                        {item.title}
-                      </div>
-                      {item.description ? (
-                        <div
-                          className="text-xs text-content-neutral-500 mt-1 line-clamp-2 leading-relaxed"
-                          title={item.description}
-                        >
-                          {item.description}
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-content-neutral-400 italic mt-0.5">
-                          No description provided
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Category */}
-                    <td className="py-4 px-4 align-top whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wider bg-surface-neutral-100 border border-line-neutral-200/80 text-content-neutral-700">
-                        {item.category}
-                      </span>
-                    </td>
-
-                    {/* SKU */}
-                    <td className="py-4 px-4 align-top whitespace-nowrap">
-                      <span className="text-xs font-mono font-medium text-content-neutral-600 bg-surface-neutral-50 px-2 py-0.5 rounded border border-line-neutral-200/60">
-                        {item.sku}
-                      </span>
-                    </td>
-
-                    {/* Unit */}
-                    <td className="py-4 px-4 align-top whitespace-nowrap">
-                      <span className="text-xs text-content-neutral-500 font-medium">
-                        {item.unit || "—"}
-                      </span>
-                    </td>
-
-                    {/* Price */}
-                    <td className="py-4 px-4 align-top whitespace-nowrap">
-                      <div className="text-sm font-bold text-content-neutral-900 font-mono leading-tight">
-                        {formatPriceWithCurrency(item.price, item.currency)}
-                      </div>
-                      <div className="text-[10px] text-content-neutral-400 mt-0.5 uppercase tracking-wider font-sans">
-                        {item.currency}
-                      </div>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="py-4 pr-6 pl-4 align-top text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="secondary"
-                          size="small"
-                          onClick={() => handleOpenCreateInvoice(item)}
-                          title={`Create invoice with ${item.title}`}
-                          className="text-xs gap-1.5 font-medium"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-accent" />
-                          <span>Bill Item</span>
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenEdit(item)}
-                          title="Edit catalog item"
-                          className="text-content-neutral-500 hover:text-content-neutral-800"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeletingItem(item)}
-                          title="Delete catalog item"
-                          className="text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* Edit Item Modal */}
-      {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-surface w-full max-w-lg rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-line-neutral-100">
+      <MotionPresence>
+        {/* Edit Item Modal */}
+        {editingItem && (
+          <Dialog
+            key="catalog-edit"
+            onClose={() => setEditingItem(null)}
+            width={620}
+          >
+            <div className="app-dialog-header">
               <div>
                 <h3 className="text-lg font-semibold text-content-neutral-900">
                   Edit Catalog Item
@@ -702,152 +816,157 @@ export default function CatalogView() {
                   Update item specifications, price, currency, or description.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setEditingItem(null)}
-                className="text-content-neutral-400 hover:text-content-neutral-600 p-1.5 rounded-lg hover:bg-surface-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
-
-            <form onSubmit={handleSaveEdit} className="mt-5 space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Item Title <span className="text-content-rose-500 font-bold">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSaveEdit} className="app-dialog-form">
+              <div className="app-dialog-body">
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Category
-                  </label>
-                  <select
-                    value={editCategory}
-                    onChange={(e) =>
-                      setEditCategory(
-                        e.target.value as "Development" | "Design" | "Consulting" | "Licensing"
-                      )
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
-                  >
-                    <option value="Development">Development</option>
-                    <option value="Design">Design</option>
-                    <option value="Consulting">Consulting</option>
-                    <option value="Licensing">Licensing</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    SKU Code <span className="text-content-rose-500 font-bold">*</span> <span className="normal-case font-normal text-content-neutral-400">(Stock Keeping Unit)</span>
+                    Item Title{" "}
+                    <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    value={editSku}
-                    onChange={(e) => setEditSku(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Price <span className="text-content-rose-500 font-bold">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    value={editCurrency}
-                    onChange={(e) => setEditCurrency(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
-                  >
-                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
-                    <option value="USD">USD ($ US Dollar)</option>
-                    <option value="EUR">EUR (€ Euro)</option>
-                    <option value="GBP">GBP (£ British Pound)</option>
-                    <option value="CAD">CAD ($ Canadian Dollar)</option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Category
+                    </label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) =>
+                        setEditCategory(
+                          e.target.value as
+                            | "Development"
+                            | "Design"
+                            | "Consulting"
+                            | "Licensing",
+                        )
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
+                    >
+                      <option value="Development">Development</option>
+                      <option value="Design">Design</option>
+                      <option value="Consulting">Consulting</option>
+                      <option value="Licensing">Licensing</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      SKU Code{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>{" "}
+                      <span className="normal-case font-normal text-content-neutral-400">
+                        (Stock Keeping Unit)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editSku}
+                      onChange={(e) => setEditSku(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Price{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Currency
+                    </label>
+                    <select
+                      value={editCurrency}
+                      onChange={(e) => setEditCurrency(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
+                    >
+                      <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                      <option value="USD">USD ($ US Dollar)</option>
+                      <option value="EUR">EUR (€ Euro)</option>
+                      <option value="GBP">GBP (£ British Pound)</option>
+                      <option value="CAD">CAD ($ Canadian Dollar)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Pricing Unit
+                    </label>
+                    <select
+                      value={editUnit}
+                      onChange={(e) => setEditUnit(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
+                    >
+                      <option value="/ Hourly">/ Hourly</option>
+                      <option value="/ Daily">/ Daily</option>
+                      <option value="/ Unit">/ Unit</option>
+                      <option value="/ Monthly">/ Monthly</option>
+                      <option value="/ Project">/ Project</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Pricing Unit
+                    Item Description{" "}
+                    <span className="text-[10px] font-normal text-content-neutral-400 lowercase">
+                      (optional)
+                    </span>
                   </label>
-                  <select
-                    value={editUnit}
-                    onChange={(e) => setEditUnit(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
-                  >
-                    <option value="/ Hourly">/ Hourly</option>
-                    <option value="/ Daily">/ Daily</option>
-                    <option value="/ Unit">/ Unit</option>
-                    <option value="/ Monthly">/ Monthly</option>
-                    <option value="/ Project">/ Project</option>
-                  </select>
+                  <textarea
+                    rows={3}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Describe the scope, deliverables, or specifications of this item..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
+                  />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Item Description <span className="text-[10px] font-normal text-content-neutral-400 lowercase">(optional)</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="Describe the scope, deliverables, or specifications of this item..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100">
-                <button
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => setEditingItem(null)}
-                  className="px-4 py-2 text-sm text-content-neutral-600 hover:bg-surface-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit" disabled={saving}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
+                </Button>
+                <Button variant="primary" type="submit" disabled={saving}>
                   Save Changes
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </Dialog>
+        )}
 
-      {/* Delete Item Confirmation Modal */}
-      {deletingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-surface w-full max-w-md rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center gap-3 text-red-600 dark:text-red-400 mb-3">
+        {/* Delete Item Confirmation Modal */}
+        {deletingItem && (
+          <Dialog
+            key="catalog-delete"
+            onClose={() => setDeletingItem(null)}
+            width={560}
+          >
+            <div className="app-dialog-header">
               <div className="w-10 h-10 rounded-full bg-surface-rose-100 flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
               </div>
@@ -856,40 +975,52 @@ export default function CatalogView() {
                   Delete Catalog Item?
                 </h3>
                 <p className="text-xs text-content-neutral-500">
-                  This action will permanently remove this item from your catalog.
+                  This action will permanently remove this item from your
+                  catalog.
                 </p>
               </div>
             </div>
-
-            <p className="text-sm text-content-neutral-600 mt-2">
-              Are you sure you want to delete <strong className="text-content-neutral-900">{deletingItem.title}</strong> ({deletingItem.sku}) valued at <strong className="text-content-neutral-900">{deletingItem.price} {deletingItem.unit}</strong>?
-            </p>
-
-            <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-line-neutral-100">
-              <button
+            <div className="app-dialog-body">
+              <p className="text-sm text-content-neutral-600 mt-2">
+                Are you sure you want to delete{" "}
+                <strong className="text-content-neutral-900">
+                  {deletingItem.title}
+                </strong>{" "}
+                ({deletingItem.sku}) valued at{" "}
+                <strong className="text-content-neutral-900">
+                  {deletingItem.price} {deletingItem.unit}
+                </strong>
+                ?
+              </p>
+            </div>
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
                 type="button"
                 onClick={() => setDeletingItem(null)}
-                className="px-4 py-2 text-sm text-content-neutral-600 hover:bg-surface-neutral-100 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 type="button"
-                disabled={saving} onClick={handleConfirmDelete}
-                className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+                disabled={saving}
+                onClick={handleConfirmDelete}
               >
                 Delete Item
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </Dialog>
+        )}
 
-      {/* New Item Modal */}
-      {showNewItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-surface w-full max-w-lg rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-line-neutral-100">
+        {/* New Item Modal */}
+        {showNewItemModal && (
+          <Dialog
+            key="catalog-create"
+            onClose={() => closeNewItemModal()}
+            width={620}
+          >
+            <div className="app-dialog-header">
               <div>
                 <h3 className="text-lg font-semibold text-content-neutral-900">
                   New Catalog Item
@@ -912,156 +1043,163 @@ export default function CatalogView() {
                     <span>Restore</span>
                   </Button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => closeNewItemModal()}
-                  className="text-content-neutral-400 hover:text-content-neutral-600 p-1.5 rounded-lg hover:bg-surface-neutral-100 transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
               </div>
             </div>
-
-            <form onSubmit={handleCreateItem} className="mt-5 space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Item Title <span className="text-content-rose-500 font-bold">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Senior Full-Stack Development"
-                  className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleCreateItem} className="app-dialog-form">
+              <div className="app-dialog-body">
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Category
-                  </label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) =>
-                      setNewCategory(
-                        e.target.value as "Development" | "Design" | "Consulting" | "Licensing"
-                      )
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
-                  >
-                    <option value="Development">Development</option>
-                    <option value="Design">Design</option>
-                    <option value="Consulting">Consulting</option>
-                    <option value="Licensing">Licensing</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    SKU Code <span className="text-content-rose-500 font-bold">*</span> <span className="normal-case font-normal text-content-neutral-400">(Stock Keeping Unit)</span>
+                    Item Title{" "}
+                    <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    value={newSku}
-                    onChange={(e) => setNewSku(e.target.value)}
-                    placeholder="e.g. DEV-001"
-                    className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Price <span className="text-content-rose-500 font-bold">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    placeholder="45000.00"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g. Senior Full-Stack Development"
                     className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    value={newCurrency}
-                    onChange={(e) => setNewCurrency(e.target.value as Currency)}
-                    className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
-                  >
-                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
-                    <option value="USD">USD ($ US Dollar)</option>
-                    <option value="EUR">EUR (€ Euro)</option>
-                    <option value="GBP">GBP (£ British Pound)</option>
-                    <option value="CAD">CAD ($ Canadian Dollar)</option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Category
+                    </label>
+                    <select
+                      value={newCategory}
+                      onChange={(e) =>
+                        setNewCategory(
+                          e.target.value as
+                            | "Development"
+                            | "Design"
+                            | "Consulting"
+                            | "Licensing",
+                        )
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
+                    >
+                      <option value="Development">Development</option>
+                      <option value="Design">Design</option>
+                      <option value="Consulting">Consulting</option>
+                      <option value="Licensing">Licensing</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      SKU Code{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>{" "}
+                      <span className="normal-case font-normal text-content-neutral-400">
+                        (Stock Keeping Unit)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newSku}
+                      onChange={(e) => setNewSku(e.target.value)}
+                      placeholder="e.g. DEV-001"
+                      className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Price{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={newPrice}
+                      onChange={(e) => setNewPrice(e.target.value)}
+                      placeholder="45000.00"
+                      className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Currency
+                    </label>
+                    <select
+                      value={newCurrency}
+                      onChange={(e) =>
+                        setNewCurrency(e.target.value as Currency)
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
+                    >
+                      <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                      <option value="USD">USD ($ US Dollar)</option>
+                      <option value="EUR">EUR (€ Euro)</option>
+                      <option value="GBP">GBP (£ British Pound)</option>
+                      <option value="CAD">CAD ($ Canadian Dollar)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Pricing Unit
+                    </label>
+                    <select
+                      value={newUnit}
+                      onChange={(e) => setNewUnit(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
+                    >
+                      <option value="/ Hourly">/ Hourly</option>
+                      <option value="/ Daily">/ Daily</option>
+                      <option value="/ Unit">/ Unit</option>
+                      <option value="/ Monthly">/ Monthly</option>
+                      <option value="/ Project">/ Project</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Pricing Unit
+                    Item Description{" "}
+                    <span className="text-[10px] font-normal text-content-neutral-400 lowercase">
+                      (optional)
+                    </span>
                   </label>
-                  <select
-                    value={newUnit}
-                    onChange={(e) => setNewUnit(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
-                  >
-                    <option value="/ Hourly">/ Hourly</option>
-                    <option value="/ Daily">/ Daily</option>
-                    <option value="/ Unit">/ Unit</option>
-                    <option value="/ Monthly">/ Monthly</option>
-                    <option value="/ Project">/ Project</option>
-                  </select>
+                  <textarea
+                    rows={3}
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Describe the scope, deliverables, or specifications of this item..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
+                  />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Item Description <span className="text-[10px] font-normal text-content-neutral-400 lowercase">(optional)</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Describe the scope, deliverables, or specifications of this item..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100">
-                <button
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => closeNewItemModal()}
-                  className="px-4 py-2 text-sm text-content-neutral-600 hover:bg-surface-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit" disabled={saving}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
+                </Button>
+                <Button variant="primary" type="submit" disabled={saving}>
                   Create Item
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </Dialog>
+        )}
 
-      {/* Bulk Import Modal */}
-      {showBulkImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-surface w-full max-w-md rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-line-neutral-100">
+        {/* Bulk Import Modal */}
+        {showBulkImportModal && (
+          <Dialog
+            key="catalog-import"
+            onClose={() => setShowBulkImportModal(false)}
+            width={560}
+          >
+            <div className="app-dialog-header">
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-semibold text-content-neutral-900">
                   Bulk Import Items
@@ -1075,209 +1213,211 @@ export default function CatalogView() {
                   <Info className="w-4 h-4" />
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowBulkImportModal(false)}
-                className="text-content-neutral-400 hover:text-content-neutral-600 p-1.5 rounded-lg hover:bg-surface-neutral-100 transition-colors cursor-pointer"
+            </div>
+            <div className="app-dialog-body">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept=".csv"
+                className="hidden"
+              />
+
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-4 p-8 border-2 border-dashed border-line-neutral-200 rounded-2xl text-center hover:border-line-purple-400 hover:bg-surface-purple-50/20 transition-all cursor-pointer group"
               >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+                <FileSpreadsheet className="w-10 h-10 text-content-neutral-400 group-hover:text-content-purple-600 mx-auto mb-2 transition-colors" />
+                <p className="text-sm font-semibold text-content-neutral-800 group-hover:text-content-purple-700 transition-colors">
+                  Upload CSV or Excel file
+                </p>
+                <p className="text-xs text-content-neutral-400 mt-1">
+                  Drag and drop your catalog spreadsheet here or click to browse
+                </p>
+              </div>
 
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".csv"
-              className="hidden"
-            />
-
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="mt-4 p-8 border-2 border-dashed border-line-neutral-200 rounded-2xl text-center hover:border-line-purple-400 hover:bg-surface-purple-50/20 transition-all cursor-pointer group"
-            >
-              <FileSpreadsheet className="w-10 h-10 text-content-neutral-400 group-hover:text-content-purple-600 mx-auto mb-2 transition-colors" />
-              <p className="text-sm font-semibold text-content-neutral-800 group-hover:text-content-purple-700 transition-colors">
-                Upload CSV or Excel file
-              </p>
-              <p className="text-xs text-content-neutral-400 mt-1">
-                Drag and drop your catalog spreadsheet here or click to browse
+              <p className="mt-3 px-1 text-xs text-content-neutral-500">
+                Supports CSV; export Excel sheets as CSV first.
               </p>
             </div>
-
-            <p className="mt-3 px-1 text-xs text-content-neutral-500">
-              Supports CSV; export Excel sheets as CSV first.
-            </p>
-
-            <div className="flex justify-end gap-3 pt-5 mt-4 border-t border-line-neutral-100">
-              <button
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
                 type="button"
                 onClick={() => setShowBulkImportModal(false)}
-                className="px-4 py-2 text-sm text-content-neutral-600 hover:bg-surface-neutral-100 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] rounded-xl shadow-xs transition-colors cursor-pointer"
               >
                 Choose File to Import
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </Dialog>
+        )}
 
-      {/* Quick Create Invoice for Catalog Item Modal */}
-      {quickInvoiceItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-surface w-full max-w-lg rounded-2xl border border-line-neutral-200 shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in-95 duration-150 font-sans">
-            <div className="flex items-center justify-between pb-4 border-b border-line-neutral-100">
+        {/* Quick Create Invoice for Catalog Item Modal */}
+        {quickInvoiceItem && (
+          <Dialog
+            key="catalog-invoice"
+            onClose={() => setQuickInvoiceItem(null)}
+            width={620}
+          >
+            <div className="app-dialog-header">
               <div>
                 <h3 className="text-lg font-semibold text-content-neutral-900">
                   Create Invoice from Catalog Item
                 </h3>
                 <p className="text-xs text-content-neutral-400 mt-0.5">
-                  Generate a draft invoice linked to this standardized service/product.
+                  Generate a draft invoice linked to this standardized
+                  service/product.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setQuickInvoiceItem(null)}
-                className="text-content-neutral-400 hover:text-content-neutral-600 p-1.5 rounded-lg hover:bg-surface-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
-
-            <form onSubmit={handleCreateInvoiceSubmit} className="mt-5 space-y-4">
-              {/* Item Summary Info Box */}
-              <div className="p-3.5 bg-surface-neutral-50 rounded-xl border border-line-neutral-200/80 flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-surface border border-line-neutral-200 flex items-center justify-center shrink-0">
-                  {renderIcon(quickInvoiceItem.iconType)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-content-neutral-900 truncate">
-                    {quickInvoiceItem.title}
+            <form
+              onSubmit={handleCreateInvoiceSubmit}
+              className="app-dialog-form"
+            >
+              <div className="app-dialog-body">
+                {/* Item Summary Info Box */}
+                <div className="p-3.5 bg-surface-neutral-50 rounded-xl border border-line-neutral-200/80 flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-surface border border-line-neutral-200 flex items-center justify-center shrink-0">
+                    {renderIcon(quickInvoiceItem.iconType)}
                   </div>
-                  <div className="text-xs text-content-neutral-500 flex items-center gap-2 mt-0.5">
-                    <span>SKU: {quickInvoiceItem.sku}</span>
-                    <span>•</span>
-                    <span className="font-medium text-content-neutral-700">
-                      Standard: {formatPriceWithCurrency(quickInvoiceItem.price, quickInvoiceItem.currency)} {quickInvoiceItem.unit}
-                    </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-content-neutral-900 truncate">
+                      {quickInvoiceItem.title}
+                    </div>
+                    <div className="text-xs text-content-neutral-500 flex items-center gap-2 mt-0.5">
+                      <span>SKU: {quickInvoiceItem.sku}</span>
+                      <span>•</span>
+                      <span className="font-medium text-content-neutral-700">
+                        Standard:{" "}
+                        {formatPriceWithCurrency(
+                          quickInvoiceItem.price,
+                          quickInvoiceItem.currency,
+                        )}{" "}
+                        {quickInvoiceItem.unit}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Client Selection */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500">
-                    Billed Client <span className="text-content-rose-500 font-bold">*</span>
-                  </label>
-                  <a
-                    href="/clients"
-                    className="text-xs text-content-purple-600 hover:text-content-purple-700 hover:underline"
-                  >
-                    + Manage Clients
-                  </a>
-                </div>
-                {clients.length === 0 ? (
-                  <div className="p-3 bg-surface-amber-50 border border-line-amber-200 rounded-xl text-xs text-content-amber-800">
-                    No clients found. Please add a client first to create invoices.
+                {/* Client Selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500">
+                      Billed Client{" "}
+                      <span className="text-content-rose-500 font-bold">*</span>
+                    </label>
+                    <a
+                      href="/clients"
+                      className="text-xs text-content-purple-600 hover:text-content-purple-700 hover:underline"
+                    >
+                      + Manage Clients
+                    </a>
                   </div>
-                ) : (
-                  <select
-                    required
-                    value={invoiceClientId}
-                    onChange={(e) => setInvoiceClientId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
-                  >
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.category ? `(${c.category})` : ""} {c.email ? `• ${c.email}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+                  {clients.length === 0 ? (
+                    <div className="p-3 bg-surface-amber-50 border border-line-amber-200 rounded-xl text-xs text-content-amber-800">
+                      No clients found. Please add a client first to create
+                      invoices.
+                    </div>
+                  ) : (
+                    <select
+                      required
+                      value={invoiceClientId}
+                      onChange={(e) => setInvoiceClientId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
+                    >
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.category ? `(${c.category})` : ""}{" "}
+                          {c.email ? `• ${c.email}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
 
-              {/* Price and Currency */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Price and Currency */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Invoice Amount
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={invoiceAmount}
+                      onChange={(e) => setInvoiceAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      Currency
+                    </label>
+                    <select
+                      value={invoiceCurrency}
+                      onChange={(e) => setInvoiceCurrency(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
+                    >
+                      <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
+                      <option value="USD">USD ($ US Dollar)</option>
+                      <option value="EUR">EUR (€ Euro)</option>
+                      <option value="GBP">GBP (£ British Pound)</option>
+                      <option value="CAD">CAD ($ Canadian Dollar)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Due Date */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Invoice Amount
+                    Due Date
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={invoiceAmount}
-                    onChange={(e) => setInvoiceAmount(e.target.value)}
-                    placeholder="0.00"
+                    type="date"
+                    value={invoiceDueDate}
+                    onChange={(e) => setInvoiceDueDate(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    value={invoiceCurrency}
-                    onChange={(e) => setInvoiceCurrency(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 bg-surface focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
-                  >
-                    <option value="LKR">LKR (Rs. Sri Lankan Rupee)</option>
-                    <option value="USD">USD ($ US Dollar)</option>
-                    <option value="EUR">EUR (€ Euro)</option>
-                    <option value="GBP">GBP (£ British Pound)</option>
-                    <option value="CAD">CAD ($ Canadian Dollar)</option>
-                  </select>
-                </div>
               </div>
-
-              {/* Due Date */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  value={invoiceDueDate}
-                  onChange={(e) => setInvoiceDueDate(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-line-neutral-100">
-                <button
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => setQuickInvoiceItem(null)}
-                  className="px-4 py-2 text-sm text-content-neutral-600 hover:bg-surface-neutral-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit" disabled={saving || clients.length === 0}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-xs transition-colors cursor-pointer"
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={saving || clients.length === 0}
                 >
                   Generate Invoice
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </Dialog>
+        )}
 
-      {/* Bulk Import Information / Guide Modal */}
-      {showImportInfoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="import-guide-modal animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-line-neutral-100">
+        {/* Bulk Import Information / Guide Modal */}
+        {showImportInfoModal && (
+          <Dialog
+            key="catalog-import-guide"
+            onClose={() => setShowImportInfoModal(false)}
+            width={960}
+          >
+            <div className="app-dialog-header">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-surface-purple-50 text-content-purple-600 flex items-center justify-center border border-line-purple-100 shrink-0">
                   <FileSpreadsheet className="w-5 h-5" />
@@ -1287,267 +1427,423 @@ export default function CatalogView() {
                     Bulk Import File Format Guide
                   </h3>
                   <p className="text-xs text-content-neutral-500 mt-0.5">
-                    How to structure CSV files, including sheets exported from Excel.
+                    How to structure CSV files, including sheets exported from
+                    Excel.
                   </p>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowImportInfoModal(false)}
-                className="text-content-neutral-400 hover:text-content-neutral-600 p-1.5 rounded-lg hover:bg-surface-neutral-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Guide Tabs */}
-            <div className="mt-4">
-              <div className="import-guide-tab-bar">
-                <button
-                  type="button"
-                  onClick={() => setActiveGuideTab("table")}
-                  className={`import-guide-tab ${activeGuideTab === "table" ? "import-guide-tab-active" : ""}`}
-                >
-                  Column Structure & Rules
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveGuideTab("csv")}
-                  className={`import-guide-tab ${activeGuideTab === "csv" ? "import-guide-tab-active" : ""}`}
-                >
-                  Sample CSV Format
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveGuideTab("excel")}
-                  className={`import-guide-tab ${activeGuideTab === "excel" ? "import-guide-tab-active" : ""}`}
-                >
-                  Excel → CSV Guidelines
-                </button>
               </div>
             </div>
-
-            {/* Tab 1: Column Structure & Rules */}
-            {activeGuideTab === "table" && (
-              <div className="mt-5 space-y-4">
-                <div className="overflow-x-auto rounded-xl border border-line-neutral-200">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-surface-neutral-50 border-b border-line-neutral-200 text-content-neutral-600 font-semibold uppercase tracking-wider text-[11px]">
-                        <th className="py-2.5 px-3">Column Name</th>
-                        <th className="py-2.5 px-3">Required</th>
-                        <th className="py-2.5 px-3">Type</th>
-                        <th className="py-2.5 px-3">Example Values</th>
-                        <th className="py-2.5 px-3">Description & Valid Values</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line-neutral-100 text-content-neutral-700">
-                      <tr>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">title</td>
-                        <td className="py-2.5 px-3">
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-emerald-100 text-content-emerald-800">
-                            REQUIRED
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-content-neutral-500">Text</td>
-                        <td className="py-2.5 px-3 font-medium text-content-neutral-900">Full-Stack Sprint</td>
-                        <td className="py-2.5 px-3 text-content-neutral-600">The product or service name displayed in catalog.</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">category</td>
-                        <td className="py-2.5 px-3">
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-emerald-100 text-content-emerald-800">
-                            REQUIRED
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-content-neutral-500">Option</td>
-                        <td className="py-2.5 px-3 font-medium text-content-purple-700">Development</td>
-                        <td className="py-2.5 px-3 text-content-neutral-600">
-                          Must be one of: <strong className="text-content-neutral-900">Development</strong>, <strong className="text-content-neutral-900">Design</strong>, <strong className="text-content-neutral-900">Consulting</strong>, <strong className="text-content-neutral-900">Licensing</strong>.
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">sku</td>
-                        <td className="py-2.5 px-3">
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-emerald-100 text-content-emerald-800">
-                            REQUIRED
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-content-neutral-500">Text</td>
-                        <td className="py-2.5 px-3 font-mono text-content-neutral-800">DEV-FS-01</td>
-                        <td className="py-2.5 px-3 text-content-neutral-600">
-                          Stock Keeping Unit code (unique product code identifier).
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">price</td>
-                        <td className="py-2.5 px-3">
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-emerald-100 text-content-emerald-800">
-                            REQUIRED
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-content-neutral-500">Number</td>
-                        <td className="py-2.5 px-3 font-semibold text-content-neutral-900">250000.00</td>
-                        <td className="py-2.5 px-3 text-content-neutral-600">
-                          Plain numeric amount. Do not include currency symbols ($ or Rs.).
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">currency</td>
-                        <td className="py-2.5 px-3">
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-neutral-100 text-content-neutral-600">
-                            OPTIONAL
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-content-neutral-500">Code (3-letter)</td>
-                        <td className="py-2.5 px-3 font-medium text-content-neutral-900">LKR</td>
-                        <td className="py-2.5 px-3 text-content-neutral-600">
-                          Currency code: <strong className="text-content-neutral-900">LKR</strong> (Sri Lankan Rupees), <strong className="text-content-neutral-900">USD</strong>, <strong className="text-content-neutral-900">EUR</strong>, <strong className="text-content-neutral-900">GBP</strong>, <strong className="text-content-neutral-900">CAD</strong>. Defaults to LKR.
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">unit</td>
-                        <td className="py-2.5 px-3">
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-neutral-100 text-content-neutral-600">
-                            OPTIONAL
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-content-neutral-500">Text</td>
-                        <td className="py-2.5 px-3 font-medium text-content-neutral-900">sprint</td>
-                        <td className="py-2.5 px-3 text-content-neutral-600">
-                          e.g. <span className="font-mono">/ Hourly</span>, <span className="font-mono">package</span>, <span className="font-mono">sprint</span>, <span className="font-mono">month</span>, <span className="font-mono">license</span>. Defaults to / Hourly.
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">description</td>
-                        <td className="py-2.5 px-3">
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-neutral-100 text-content-neutral-600">
-                            OPTIONAL
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-content-neutral-500">Text</td>
-                        <td className="py-2.5 px-3 text-content-neutral-700">Scope deliverable details...</td>
-                        <td className="py-2.5 px-3 text-content-neutral-600">
-                          Detailed description of the deliverables and scope.
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="p-3.5 bg-surface-purple-50/70 border border-line-purple-200/80 rounded-xl text-xs text-content-purple-900 space-y-1">
-                  <p className="font-semibold flex items-center gap-1.5">
-                    <Info className="w-4 h-4 text-content-purple-600 shrink-0" />
-                    Important Header Row Requirement
-                  </p>
-                  <p className="text-content-purple-800">
-                    Row 1 of your spreadsheet must contain the exact column names above (in any case). Data rows start immediately on Row 2.
-                  </p>
+            <div className="app-dialog-body">
+              {/* Guide Tabs */}
+              <div className="mt-4">
+                <div className="import-guide-tab-bar">
+                  <button
+                    type="button"
+                    onClick={() => setActiveGuideTab("table")}
+                    className={`import-guide-tab ${activeGuideTab === "table" ? "import-guide-tab-active" : ""}`}
+                  >
+                    Column Structure & Rules
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveGuideTab("csv")}
+                    className={`import-guide-tab ${activeGuideTab === "csv" ? "import-guide-tab-active" : ""}`}
+                  >
+                    Sample CSV Format
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveGuideTab("excel")}
+                    className={`import-guide-tab ${activeGuideTab === "excel" ? "import-guide-tab-active" : ""}`}
+                  >
+                    Excel → CSV Guidelines
+                  </button>
                 </div>
               </div>
-            )}
 
-            {/* Tab 2: Sample CSV Format */}
-            {activeGuideTab === "csv" && (
-              <div className="mt-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-content-neutral-700">
-                    Raw CSV Text Example (.csv)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={copySampleCSV}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line-neutral-200 text-xs font-medium text-content-neutral-700 hover:bg-surface-neutral-50 transition-colors cursor-pointer"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-content-emerald-600" />
-                          <span className="text-content-emerald-700 font-semibold">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5 text-content-neutral-500" />
-                          <span>Copy CSV</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={downloadSampleCSV}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold text-white transition-colors cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download Sample CSV Template</span>
-                    </button>
+              {/* Tab 1: Column Structure & Rules */}
+              {activeGuideTab === "table" && (
+                <div className="mt-5 space-y-4">
+                  <div className="overflow-x-auto rounded-xl border border-line-neutral-200">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-surface-neutral-50 border-b border-line-neutral-200 text-content-neutral-600 font-semibold uppercase tracking-wider text-[11px]">
+                          <th className="py-2.5 px-3">Column Name</th>
+                          <th className="py-2.5 px-3">Required</th>
+                          <th className="py-2.5 px-3">Type</th>
+                          <th className="py-2.5 px-3">Example Values</th>
+                          <th className="py-2.5 px-3">
+                            Description & Valid Values
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line-neutral-100 text-content-neutral-700">
+                        <tr>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">
+                            title
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-emerald-100 text-content-emerald-800">
+                              REQUIRED
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-500">
+                            Text
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-content-neutral-900">
+                            Full-Stack Sprint
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-600">
+                            The product or service name displayed in catalog.
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">
+                            category
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-emerald-100 text-content-emerald-800">
+                              REQUIRED
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-500">
+                            Option
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-content-purple-700">
+                            Development
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-600">
+                            Must be one of:{" "}
+                            <strong className="text-content-neutral-900">
+                              Development
+                            </strong>
+                            ,{" "}
+                            <strong className="text-content-neutral-900">
+                              Design
+                            </strong>
+                            ,{" "}
+                            <strong className="text-content-neutral-900">
+                              Consulting
+                            </strong>
+                            ,{" "}
+                            <strong className="text-content-neutral-900">
+                              Licensing
+                            </strong>
+                            .
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">
+                            sku
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-emerald-100 text-content-emerald-800">
+                              REQUIRED
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-500">
+                            Text
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-content-neutral-800">
+                            DEV-FS-01
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-600">
+                            Stock Keeping Unit code (unique product code
+                            identifier).
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">
+                            price
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-emerald-100 text-content-emerald-800">
+                              REQUIRED
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-500">
+                            Number
+                          </td>
+                          <td className="py-2.5 px-3 font-semibold text-content-neutral-900">
+                            250000.00
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-600">
+                            Plain numeric amount. Do not include currency
+                            symbols ($ or Rs.).
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">
+                            currency
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-neutral-100 text-content-neutral-600">
+                              OPTIONAL
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-500">
+                            Code (3-letter)
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-content-neutral-900">
+                            LKR
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-600">
+                            Currency code:{" "}
+                            <strong className="text-content-neutral-900">
+                              LKR
+                            </strong>{" "}
+                            (Sri Lankan Rupees),{" "}
+                            <strong className="text-content-neutral-900">
+                              USD
+                            </strong>
+                            ,{" "}
+                            <strong className="text-content-neutral-900">
+                              EUR
+                            </strong>
+                            ,{" "}
+                            <strong className="text-content-neutral-900">
+                              GBP
+                            </strong>
+                            ,{" "}
+                            <strong className="text-content-neutral-900">
+                              CAD
+                            </strong>
+                            . Defaults to LKR.
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">
+                            unit
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-neutral-100 text-content-neutral-600">
+                              OPTIONAL
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-500">
+                            Text
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-content-neutral-900">
+                            sprint
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-600">
+                            e.g. <span className="font-mono">/ Hourly</span>,{" "}
+                            <span className="font-mono">package</span>,{" "}
+                            <span className="font-mono">sprint</span>,{" "}
+                            <span className="font-mono">month</span>,{" "}
+                            <span className="font-mono">license</span>. Defaults
+                            to / Hourly.
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-content-neutral-900 bg-surface-neutral-50/50">
+                            description
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-surface-neutral-100 text-content-neutral-600">
+                              OPTIONAL
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-500">
+                            Text
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-700">
+                            Scope deliverable details...
+                          </td>
+                          <td className="py-2.5 px-3 text-content-neutral-600">
+                            Detailed description of the deliverables and scope.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="p-3.5 bg-surface-purple-50/70 border border-line-purple-200/80 rounded-xl text-xs text-content-purple-900 space-y-1">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <Info className="w-4 h-4 text-content-purple-600 shrink-0" />
+                      Important Header Row Requirement
+                    </p>
+                    <p className="text-content-purple-800">
+                      Row 1 of your spreadsheet must contain the exact column
+                      names above (in any case). Data rows start immediately on
+                      Row 2.
+                    </p>
                   </div>
                 </div>
+              )}
 
-                <pre className="import-guide-code-box">
-{`title,category,sku,price,currency,unit,description
+              {/* Tab 2: Sample CSV Format */}
+              {activeGuideTab === "csv" && (
+                <div className="mt-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-content-neutral-700">
+                      Raw CSV Text Example (.csv)
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={copySampleCSV}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line-neutral-200 text-xs font-medium text-content-neutral-700 hover:bg-surface-neutral-50 transition-colors cursor-pointer"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-content-emerald-600" />
+                            <span className="text-content-emerald-700 font-semibold">
+                              Copied!
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-content-neutral-500" />
+                            <span>Copy CSV</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={downloadSampleCSV}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold text-white transition-colors cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download Sample CSV Template</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <pre className="import-guide-code-box">
+                    {`title,category,sku,price,currency,unit,description
 "Full-Stack Web Application","Development","DEV-FS-01",250000.00,"LKR","sprint","Complete Next.js, Node.js and SQLite development sprint"
 "Brand Identity & Design System","Design","DSGN-UI-02",95000.00,"LKR","package","Logo system, Figma UI kit, and typography standards"
 "Cloud Infrastructure Assessment","Consulting","CONS-AUD-03",60000.00,"LKR","audit","Security, Docker deployment, and database performance review"
 "Enterprise Software License","Licensing","LIC-PRO-04",350000.00,"LKR","year","Multi-seat business software license with ongoing updates"`}
-                </pre>
+                  </pre>
 
-                <div className="p-3 bg-surface-neutral-50 border border-line-neutral-200 rounded-xl text-xs text-content-neutral-600 space-y-1">
-                  <p className="font-semibold text-content-neutral-800">CSV Formatting Best Practices:</p>
-                  <ul className="list-disc list-inside space-y-0.5 text-content-neutral-600">
-                    <li>Wrap text containing commas or special characters in double quotation marks <code className="bg-surface-neutral-200 px-1 py-0.5 rounded">&quot;...&quot;</code>.</li>
-                    <li>Ensure UTF-8 encoding so international symbols and characters preserve cleanly.</li>
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Tab 3: Excel → CSV Guidelines */}
-            {activeGuideTab === "excel" && (
-              <div className="mt-5 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/60 space-y-2">
-                    <span className="text-xs font-bold text-content-neutral-900 uppercase tracking-wider block">
-                      Excel Spreadsheet Layout — Save as CSV (UTF-8) before importing
-                    </span>
-                    <ul className="text-xs text-content-neutral-600 space-y-1.5">
-                      <li>• <strong>Column A:</strong> <span className="font-mono text-content-neutral-800">title</span> (Product or service name)</li>
-                      <li>• <strong>Column B:</strong> <span className="font-mono text-content-neutral-800">category</span> (Development, Design, Consulting, Licensing)</li>
-                      <li>• <strong>Column C:</strong> <span className="font-mono text-content-neutral-800">sku</span> (Unique code, e.g. DEV-001)</li>
-                      <li>• <strong>Column D:</strong> <span className="font-mono text-content-neutral-800">price</span> (Numeric value only)</li>
-                      <li>• <strong>Column E:</strong> <span className="font-mono text-content-neutral-800">currency</span> (LKR, USD, EUR, GBP, CAD)</li>
-                      <li>• <strong>Column F:</strong> <span className="font-mono text-content-neutral-800">unit</span> (/ Hourly, sprint, package, etc.)</li>
-                      <li>• <strong>Column G:</strong> <span className="font-mono text-content-neutral-800">description</span> (Detailed scope)</li>
-                    </ul>
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/60 space-y-2">
-                    <span className="text-xs font-bold text-content-neutral-900 uppercase tracking-wider block">
-                      Do&apos;s and Don&apos;ts in Excel
-                    </span>
-                    <ul className="text-xs space-y-1.5 text-content-neutral-600">
-                      <li className="text-content-emerald-700">✓ <strong>DO</strong> format the Price column as General or Number.</li>
-                      <li className="text-content-emerald-700">✓ <strong>DO</strong> start your data on row 2 right after headers.</li>
-                      <li className="text-content-rose-700">✗ <strong>DO NOT</strong> type currency signs like &quot;Rs.&quot; or &quot;$&quot; inside the Price cell.</li>
-                      <li className="text-content-rose-700">✗ <strong>DO NOT</strong> merge cells or leave empty rows between items.</li>
+                  <div className="p-3 bg-surface-neutral-50 border border-line-neutral-200 rounded-xl text-xs text-content-neutral-600 space-y-1">
+                    <p className="font-semibold text-content-neutral-800">
+                      CSV Formatting Best Practices:
+                    </p>
+                    <ul className="list-disc list-inside space-y-0.5 text-content-neutral-600">
+                      <li>
+                        Wrap text containing commas or special characters in
+                        double quotation marks{" "}
+                        <code className="bg-surface-neutral-200 px-1 py-0.5 rounded">
+                          &quot;...&quot;
+                        </code>
+                        .
+                      </li>
+                      <li>
+                        Ensure UTF-8 encoding so international symbols and
+                        characters preserve cleanly.
+                      </li>
                     </ul>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end pt-5 mt-6 border-t border-line-neutral-100">
-              <button
+              {/* Tab 3: Excel → CSV Guidelines */}
+              {activeGuideTab === "excel" && (
+                <div className="mt-5 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/60 space-y-2">
+                      <span className="text-xs font-bold text-content-neutral-900 uppercase tracking-wider block">
+                        Excel Spreadsheet Layout — Save as CSV (UTF-8) before
+                        importing
+                      </span>
+                      <ul className="text-xs text-content-neutral-600 space-y-1.5">
+                        <li>
+                          • <strong>Column A:</strong>{" "}
+                          <span className="font-mono text-content-neutral-800">
+                            title
+                          </span>{" "}
+                          (Product or service name)
+                        </li>
+                        <li>
+                          • <strong>Column B:</strong>{" "}
+                          <span className="font-mono text-content-neutral-800">
+                            category
+                          </span>{" "}
+                          (Development, Design, Consulting, Licensing)
+                        </li>
+                        <li>
+                          • <strong>Column C:</strong>{" "}
+                          <span className="font-mono text-content-neutral-800">
+                            sku
+                          </span>{" "}
+                          (Unique code, e.g. DEV-001)
+                        </li>
+                        <li>
+                          • <strong>Column D:</strong>{" "}
+                          <span className="font-mono text-content-neutral-800">
+                            price
+                          </span>{" "}
+                          (Numeric value only)
+                        </li>
+                        <li>
+                          • <strong>Column E:</strong>{" "}
+                          <span className="font-mono text-content-neutral-800">
+                            currency
+                          </span>{" "}
+                          (LKR, USD, EUR, GBP, CAD)
+                        </li>
+                        <li>
+                          • <strong>Column F:</strong>{" "}
+                          <span className="font-mono text-content-neutral-800">
+                            unit
+                          </span>{" "}
+                          (/ Hourly, sprint, package, etc.)
+                        </li>
+                        <li>
+                          • <strong>Column G:</strong>{" "}
+                          <span className="font-mono text-content-neutral-800">
+                            description
+                          </span>{" "}
+                          (Detailed scope)
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/60 space-y-2">
+                      <span className="text-xs font-bold text-content-neutral-900 uppercase tracking-wider block">
+                        Do&apos;s and Don&apos;ts in Excel
+                      </span>
+                      <ul className="text-xs space-y-1.5 text-content-neutral-600">
+                        <li className="text-content-emerald-700">
+                          ✓ <strong>DO</strong> format the Price column as
+                          General or Number.
+                        </li>
+                        <li className="text-content-emerald-700">
+                          ✓ <strong>DO</strong> start your data on row 2 right
+                          after headers.
+                        </li>
+                        <li className="text-content-rose-700">
+                          ✗ <strong>DO NOT</strong> type currency signs like
+                          &quot;Rs.&quot; or &quot;$&quot; inside the Price
+                          cell.
+                        </li>
+                        <li className="text-content-rose-700">
+                          ✗ <strong>DO NOT</strong> merge cells or leave empty
+                          rows between items.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Footer */}
+            </div>
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
                 type="button"
                 onClick={() => setShowImportInfoModal(false)}
-                className="px-5 py-2 text-xs font-semibold text-content-neutral-700 bg-surface-neutral-100 hover:bg-surface-neutral-200 rounded-xl transition-colors cursor-pointer"
               >
                 Got it, Close
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </Dialog>
+        )}
+      </MotionPresence>
     </div>
   );
 }

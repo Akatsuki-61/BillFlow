@@ -53,16 +53,16 @@
 
 /* Vendor Directory Card */
 .vendor-directory-card {
-  margin-top: 1.75rem;
+  margin-top: 1.25rem;
   overflow: hidden;
-  border-radius: 1rem;
-  border: 1px solid var(--theme-line-neutral-200);
+  border-radius: var(--ui-radius-card, 24px);
+  border: 1px solid var(--ui-border);
   background-color: var(--theme-surface);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+  box-shadow: var(--ui-shadow);
 }
 
 .vendor-directory-header {
-  padding: 1rem 1.5rem;
+  padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--theme-surface-neutral-100);
   display: flex;
   flex-direction: column;
@@ -78,14 +78,14 @@
 }
 
 .vendor-directory-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 500;
   color: var(--theme-text-primary);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .vendor-directory-subtitle {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--theme-text-subtle);
   margin-top: 0.125rem;
   font-weight: 400;
@@ -106,7 +106,7 @@
   width: 0.875rem;
   height: 0.875rem;
   position: absolute;
-  left: 0.625rem;
+  left: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
   color: var(--theme-text-placeholder);
@@ -114,14 +114,14 @@
 }
 
 .vendor-search-input {
-  padding-left: 2rem;
+  padding-left: 2.125rem;
   padding-right: 0.75rem;
-  padding-top: 0.375rem;
-  padding-bottom: 0.375rem;
-  font-size: 0.75rem;
-  background-color: var(--theme-surface-neutral-50);
-  border: 1px solid var(--theme-line-neutral-200);
-  border-radius: 0.5rem;
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+  font-size: 12.5px;
+  background-color: var(--ui-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
   width: 12rem;
   color: var(--theme-text-primary);
   transition: border-color 150ms ease, box-shadow 150ms ease;
@@ -129,29 +129,29 @@
 
 @media (min-width: 640px) {
   .vendor-search-input {
-    width: 14rem;
+    width: 15rem;
   }
 }
 
 .vendor-search-input:focus {
   outline: none;
   border-color: var(--theme-focus);
-  box-shadow: 0 0 0 1px var(--theme-focus);
+  box-shadow: 0 0 0 2px var(--theme-accent-soft);
 }
 
 .vendor-status-filter {
   display: flex;
   align-items: center;
-  background-color: var(--theme-surface-neutral-100);
-  padding: 0.125rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--theme-line-neutral-200);
-  font-size: 0.75rem;
+  background-color: var(--ui-inset);
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 12px;
 }
 
 .vendor-filter-btn {
-  padding: 0.25rem 0.625rem;
-  border-radius: 0.375rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 7px;
   font-weight: 500;
   color: var(--theme-text-muted);
   transition: all 150ms ease;
@@ -167,7 +167,7 @@
 .vendor-filter-btn.active {
   background-color: var(--theme-surface);
   color: var(--theme-text-primary);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: var(--ui-shadow);
 }
 
 /* Vendor List Container & Rows */
@@ -176,7 +176,7 @@
 }
 
 .vendor-list-row {
-  padding: 1rem 1.5rem;
+  padding: 1.1rem 1.5rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -197,7 +197,7 @@
 }
 
 .vendor-list-row:hover {
-  background-color: var(--theme-canvas);
+  background-color: var(--ui-subtle);
 }
 
 .vendor-info-group {
@@ -209,8 +209,9 @@
 .vendor-avatar-icon {
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 0.75rem;
-  background-color: var(--theme-surface-muted);
+  border-radius: 9999px;
+  background-color: var(--ui-subtle);
+  border: 1px solid var(--ui-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -225,21 +226,22 @@
 }
 
 .vendor-name-heading {
-  font-weight: 700;
-  font-size: 13.5px;
+  font-weight: 600;
+  font-size: 14px;
   color: var(--theme-text-primary);
   line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .vendor-client-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: 0.375rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
   background-color: var(--theme-accent-pale);
   color: var(--theme-accent);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
   border: 1px solid var(--theme-accent-soft);
   text-decoration: none;
@@ -251,7 +253,7 @@
 }
 
 .vendor-service-desc {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--theme-text-subtle);
   margin-top: 0.125rem;
   font-weight: 400;
@@ -277,7 +279,7 @@
 }
 
 .vendor-balance-label {
-  font-size: 9.5px;
+  font-size: 10.5px;
   color: var(--theme-text-subtle);
   font-weight: 400;
   display: block;
@@ -285,46 +287,13 @@
 }
 
 .vendor-balance-amount {
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 14.5px;
+  font-weight: 600;
   color: var(--theme-text-primary);
   margin-top: 0.125rem;
   display: block;
-  font-family: monospace;
-}
-
-/* Status Pill */
-.vendor-status-pill {
-  padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  transition: background-color 150ms ease;
-}
-
-.vendor-status-pill.status-paid {
-  color: var(--theme-success);
-  background-color: var(--theme-success-faint);
-}
-
-.vendor-status-pill.status-paid:hover {
-  background-color: var(--theme-success-soft);
-}
-
-.vendor-status-pill.status-pending {
-  color: var(--theme-text-body);
-  background-color: var(--theme-surface-muted);
-}
-
-.vendor-status-pill.status-pending:hover {
-  background-color: var(--theme-surface-strong);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 /* Modals Overlay & Common Layout */
@@ -336,15 +305,15 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(5px);
 }
 
 .outsourcing-modal-panel {
   background-color: var(--theme-surface);
-  border-radius: 1rem;
+  border-radius: var(--ui-radius-card, 24px);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--theme-border-muted);
+  border: 1px solid var(--ui-border);
   width: 100%;
   max-width: 32rem;
   overflow: hidden;
@@ -403,7 +372,7 @@
 .outsourcing-input-field:focus {
   outline: none;
   border-color: var(--theme-focus);
-  box-shadow: 0 0 0 2px rgba(113, 51, 245, 0.2);
+  box-shadow: 0 0 0 2px var(--theme-accent-soft);
 }
 
 .outsourcing-input-field.input-error {
@@ -470,45 +439,6 @@
   font-size: 12px;
 }
 
-/* Contractor Work Status Pills */
-.wo-status-pill {
-  padding: 0.25rem 0.625rem;
-  border-radius: 9999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border: 1px solid transparent;
-  transition: all 150ms ease;
-}
-
-.wo-status-pill.status-todo {
-  color: var(--theme-content-neutral-700);
-  background-color: var(--theme-surface-neutral-100);
-  border-color: var(--theme-line-neutral-200);
-}
-
-.wo-status-pill.status-in-progress {
-  color: var(--theme-content-blue-700);
-  background-color: var(--theme-surface-blue-50);
-  border-color: var(--theme-line-blue-200);
-}
-
-.wo-status-pill.status-review {
-  color: var(--theme-content-amber-800);
-  background-color: var(--theme-surface-amber-50);
-  border-color: var(--theme-line-amber-200);
-}
-
-.wo-status-pill.status-done {
-  color: var(--theme-content-emerald-800);
-  background-color: var(--theme-surface-emerald-50);
-  border-color: var(--theme-line-emerald-200);
-}
-
 /* Review Dialog and Deliverables Box */
 .deliverable-review-box {
   padding: 0.875rem;
@@ -537,3 +467,10 @@
   border: 1px solid var(--theme-line-neutral-200);
   font-size: 11.5px;
 }
+
+.work-order-table { min-width: 880px; }
+.work-order-scope { width: 40%; }
+.vendor-directory-header { flex-wrap: wrap; gap: 20px; padding-block: 24px; border-bottom: 0; }
+.vendor-directory-subtitle { margin-top: 10px; line-height: 1.6; }
+.vendor-controls-group { flex-wrap: wrap; margin-left: auto; }
+.work-order-table .record-actions { padding-left: 8px; }

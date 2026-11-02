@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { getAboutIconPath, buildMenuTemplate } from "../menu";
-import type { MenuItemConstructorOptions, MenuItem, KeyboardEvent } from "electron";
+import type {
+  MenuItemConstructorOptions,
+  MenuItem,
+  KeyboardEvent,
+} from "electron";
 import fs from "fs";
 
 describe("macOS Menu & About Panel Configuration", () => {
@@ -26,16 +30,28 @@ describe("macOS Menu & About Panel Configuration", () => {
 
   it("builds the macOS Application Menu with BillFlow, File, Edit, View, Tabs, Window", () => {
     const navigatedRoutes: string[] = [];
-    const template = buildMenuTemplate((route) => navigatedRoutes.push(route), true);
+    const template = buildMenuTemplate(
+      (route) => navigatedRoutes.push(route),
+      true,
+    );
 
     const menuLabels = template.map((m) => m.label);
-    expect(menuLabels).toEqual(["BillFlow", "File", "Edit", "View", "Tabs", "Window"]);
+    expect(menuLabels).toEqual([
+      "BillFlow",
+      "File",
+      "Edit",
+      "View",
+      "Tabs",
+      "Window",
+    ]);
 
     // 1. App Menu items
     const appMenu = template.find((m) => m.label === "BillFlow");
     expect(appMenu).toBeDefined();
     const appSubmenu = appMenu!.submenu as MenuItemConstructorOptions[];
-    const appLabels = appSubmenu.map((i) => i.label || (i.role ? `role:${i.role}` : "separator"));
+    const appLabels = appSubmenu.map(
+      (i) => i.label || (i.role ? `role:${i.role}` : "separator"),
+    );
 
     expect(appLabels).toContain("About BillFlow");
     expect(appLabels).toContain("Settings...");
@@ -67,7 +83,11 @@ describe("macOS Menu & About Panel Configuration", () => {
       { label: "Clients", accelerator: "CmdOrCtrl+3", route: "/clients" },
       { label: "Catalog", accelerator: "CmdOrCtrl+4", route: "/catalog" },
       { label: "Expenses", accelerator: "CmdOrCtrl+5", route: "/expenses" },
-      { label: "Outsourcing", accelerator: "CmdOrCtrl+6", route: "/outsourcing" },
+      {
+        label: "Outsourcing",
+        accelerator: "CmdOrCtrl+6",
+        route: "/outsourcing",
+      },
       { label: "Tasks", accelerator: "CmdOrCtrl+7", route: "/tasks" },
       { label: "Analytics", accelerator: "CmdOrCtrl+8", route: "/analytics" },
       { label: "Support", route: "/support" },
@@ -86,10 +106,12 @@ describe("macOS Menu & About Panel Configuration", () => {
   });
 
   it("widget definitions contain updated financial title and description for audience-growth-chart", async () => {
-    const { WIDGET_CATALOG } = await import("../../src/lib/widgets/widgetDefinitions");
+    const { WIDGET_CATALOG } = await import(
+      "../../src/lib/widgets/widgetDefinitions"
+    );
     const chart = WIDGET_CATALOG.find((w) => w.id === "audience-growth-chart");
     expect(chart).toBeDefined();
-    expect(chart?.title).toBe("Delivered Solutions Financial Growth");
-    expect(chart?.description).toContain("profit");
+    expect(chart?.title).toBe("Collections & Net Cashflow");
+    expect(chart?.description).toContain("Recorded payments");
   });
 });
