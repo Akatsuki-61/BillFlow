@@ -124,6 +124,10 @@ contextBridge.exposeInMainWorld("billflow", {
       ipcRenderer.invoke("workOrders:setPayoutStatus", id, status),
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("workOrders:remove", id),
+    exportPdf: (id: string): Promise<{ success: boolean; filePath: string }> =>
+      ipcRenderer.invoke("workOrders:exportPdf", id),
+    openPdf: (filePath: string, reveal?: boolean): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("workOrders:openPdf", filePath, reveal),
   },
   analytics: {
     summary: (

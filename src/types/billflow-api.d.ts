@@ -99,6 +99,8 @@ export interface BillFlowAPI extends WorkflowAPI {
     removePayout: (workOrderId: string) => Promise<WorkOrderItem>;
     setPayoutStatus: (id: string, status: "PENDING" | "PAID") => Promise<WorkOrderItem>;
     remove: (id: string) => Promise<{ success: boolean }>;
+    exportPdf: (id: string) => Promise<{ success: boolean; filePath: string }>;
+    openPdf: (filePath: string, reveal?: boolean) => Promise<{ success: boolean }>;
   };
   analytics: {
     summary: (

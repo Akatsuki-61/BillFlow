@@ -123,6 +123,8 @@ interface DataContextType {
   removeWorkOrderPayout: (workOrderId: string) => Promise<WorkOrderItem>;
   setWorkOrderPayoutStatus: (id: string, status: "PENDING" | "PAID") => Promise<WorkOrderItem>;
   deleteWorkOrder: (id: string) => Promise<void>;
+  exportWorkOrderPdf: (id: string) => Promise<{ success: boolean; filePath: string }>;
+  openWorkOrderPdf: (filePath: string, reveal?: boolean) => Promise<void>;
   getAnalyticsSummary: (
     period?: string,
     currency?: string,
@@ -978,6 +980,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const exportWorkOrderPdf = async (id: string): Promise<{ success: boolean; filePath: string }> => {
+    if (checkIsElectron() && window.billflow?.workOrders) {
+      return await window.billflow.workOrders.exportPdf(id);
+    }
+    return { success: true, filePath: "" };
+  };
+
+  const openWorkOrderPdf = async (filePath: string, reveal = false): Promise<void> => {
+    if (checkIsElectron() && window.billflow?.workOrders) {
+      await window.billflow.workOrders.openPdf(filePath, reveal);
+    }
+  };
+
   const getAnalyticsSummary = useCallback(
     async (
       period?: string,
@@ -1410,6 +1425,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         removeWorkOrderPayout,
         setWorkOrderPayoutStatus,
         deleteWorkOrder,
+        exportWorkOrderPdf,
+        openWorkOrderPdf,
         getAnalyticsSummary,
         updateSettings,
         getDbPath,
@@ -1554,6 +1571,8 @@ export function useWorkOrders() {
     removeWorkOrderPayout,
     setWorkOrderPayoutStatus,
     deleteWorkOrder,
+    exportWorkOrderPdf,
+    openWorkOrderPdf,
     refresh,
   } = useData();
 
@@ -1568,6 +1587,8 @@ export function useWorkOrders() {
     removeWorkOrderPayout,
     setWorkOrderPayoutStatus,
     deleteWorkOrder,
+    exportWorkOrderPdf,
+    openWorkOrderPdf,
     refresh,
   };
 }

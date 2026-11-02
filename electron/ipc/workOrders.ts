@@ -18,6 +18,9 @@ import {
   recordWorkOrderPayoutSchema,
 } from "../validation";
 import { AppError, formatError } from "./errors";
+import { generateWorkOrderPdfBuffer } from "../pdf-generator";
+import { saveWorkOrderPdf, openWorkOrderPdf } from "./files";
+import { getOrCreateSettings } from "./settings";
 import type {
   WorkOrderItem,
   NewWorkOrderInput,
@@ -512,6 +515,56 @@ export function removeWorkOrder(
 }
 
 /**
+ * Generates and saves a formal PDF voucher for a work order.
+ */
+export async function exportWorkOrderPdf(id: string): Promise<string> {
+  const wo = getWorkOrder(id);
+  if (!wo) throw new AppError("NOT_FOUND", "Work order not found");
+
+  const db = getDb();
+  const task = db.select().from(tasks).where(eq(tasks.id, wo.taskId)).get();
+  const profile = getOrCreateSettings();
+
+  const pdfBuffer = await generateWorkOrderPdfBuffer({
+    voucherNumber: wo.id.slice(-8).toUpperCase(),
+    scope: wo.scope,
+    feeCents: wo.feeCents,
+    currency: wo.currency,
+    status: wo.status,
+    payoutStatus: wo.payoutStatus || "PENDING",
+    dueDate: wo.dueDate,
+    completedAt: wo.completedAt,
+    paidAt: wo.paidAt,
+    deliveryUrl: wo.deliveryUrl,
+    notes: wo.notes,
+    vendor: {
+      name: wo.vendorName || "Contractor",
+      service: wo.vendorService,
+      email: wo.vendorEmail,
+      phone: wo.vendorPhone,
+    },
+    task: {
+      title: task?.title || wo.taskTitle,
+      category: task?.category,
+    },
+    parentInvoice: {
+      code: wo.invoiceCode,
+      clientName: wo.clientName,
+    },
+    business: {
+      businessName: profile.businessName,
+      professionalTitle: profile.professionalTitle,
+      email: profile.email,
+      phone: profile.phone,
+      website: profile.website,
+      address: profile.address,
+    },
+  });
+
+  return saveWorkOrderPdf(wo.id, pdfBuffer);
+}
+
+/**
  * Registers work order IPC handlers on the electron main process.
  */
 export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
@@ -605,6 +658,24 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle("workOrders:remove", async (_event, id: string) => {
     try {
       return removeWorkOrder(id, broadcastDataChanged);
+    } catch (err) {
+      throw formatError(err);
+    }
+  });
+
+  ipcMain.handle("workOrders:exportPdf", async (_event, id: string) => {
+    try {
+      const filePath = await exportWorkOrderPdf(id);
+      return { success: true, filePath };
+    } catch (err) {
+      throw formatError(err);
+    }
+  });
+
+  ipcMain.handle("workOrders:openPdf", async (_event, filePath: string, reveal?: boolean) => {
+    try {
+      await openWorkOrderPdf(filePath, reveal);
+      return { success: true };
     } catch (err) {
       throw formatError(err);
     }

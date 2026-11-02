@@ -63,6 +63,8 @@ Access code repositories, staging URLs, or documentation folders directly from c
 
 ### 8. Subcontractor Outsourcing
 Delegate tasks directly from Kanban cards. BillFlow prefills a work order with the task scope, linked client, invoice, and deliverable repository. Subcontractor deliverable reviews and financial payouts stay strictly separate so you never pay a vendor before approving the build.
+- **Offline Vector PDF Vouchers**: Export formal work order vouchers directly to your configured directory via `pdf-lib` and Electron IPC.
+- **Direct WhatsApp Task Dispatch**: Send clean, structured task delegation briefs to subcontractors directly via WhatsApp web/desktop intent links (`wa.me`) with automatic phone number normalization.
 
 ### 9. Final Payment Settlement
 Log the remaining milestone payment and attach final receipts. An invoice is marked fully paid only when total collections cover the complete balance.
@@ -81,8 +83,8 @@ Review accurate financial summaries with no artificial zero-clamping or syntheti
 | **Styling & Motion** | Tailwind CSS v4, Motion | Newsreader serif + Inter typography, layered neutral shadows. |
 | **Database & ORM** | SQLite 3 via `better-sqlite3`, Drizzle ORM | WAL mode, foreign key cascades, versioned schema migrations. |
 | **Analytics & Charts** | Apache ECharts 6 | Freelance turnaround velocity, retainer yields, capacity benchmarks. |
-| **Document Engine** | `pdf-lib` | Offline vector PDF invoice generation with embedded layouts. |
-| **Test Suite** | Vitest | 17 test suites, 109 unit and integration test assertions. |
+| **Document Engine** | `pdf-lib` | Offline vector PDF invoice and work order voucher generation with embedded layouts. |
+| **Test Suite** | Vitest | 20 test suites, 126 unit and integration test assertions. |
 
 ### Architecture Overview
 
