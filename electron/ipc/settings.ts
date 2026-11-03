@@ -1,7 +1,7 @@
 import { ipcMain, shell } from "electron";
 import { eq, sql } from "drizzle-orm";
-import { getDb, getDatabasePath } from "../db";
-import { settings } from "../db/schema";
+import { getDb, getDatabasePath, getRootDb, getActiveProfileId } from "../db";
+import { settings, userProfiles } from "../db/schema";
 import { updateSettingsSchema } from "../validation";
 import { formatError } from "./errors";
 import type { AppSettings, UpdateSettingsInput, ExportDataPayload } from "../../src/types/settings";
@@ -58,6 +58,27 @@ export function updateSettings(patch: UpdateSettingsInput): AppSettings {
     .run();
 
   const updated = db.select().from(settings).where(eq(settings.id, "default")).get();
+
+  try {
+    const activeId = getActiveProfileId();
+    const rootDb = getRootDb();
+    const profilePatch: Record<string, unknown> = {};
+    if (validated.defaultCurrency) profilePatch.defaultCurrency = validated.defaultCurrency;
+    if (validated.invoicePrefix) profilePatch.invoicePrefix = validated.invoicePrefix;
+    if (validated.professionalTitle && validated.professionalTitle.trim()) {
+      profilePatch.subtitle = validated.professionalTitle.trim();
+    }
+    if (Object.keys(profilePatch).length > 0) {
+      rootDb
+        .update(userProfiles)
+        .set({ ...profilePatch, updatedAt: new Date().toISOString() })
+        .where(eq(userProfiles.id, activeId))
+        .run();
+    }
+  } catch {
+    // Non-fatal if root profile registry is not yet initialized
+  }
+
   return updated as unknown as AppSettings;
 }
 

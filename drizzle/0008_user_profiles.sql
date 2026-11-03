@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `user_profiles` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`role` text DEFAULT 'software-engineering' NOT NULL,
+	`subtitle` text DEFAULT 'Full-Stack & Systems' NOT NULL,
+	`avatar` text DEFAULT 'code' NOT NULL,
+	`accent` text DEFAULT 'blue' NOT NULL,
+	`theme_preference` text DEFAULT 'system' NOT NULL,
+	`default_currency` text DEFAULT 'USD' NOT NULL,
+	`invoice_prefix` text DEFAULT 'SE-' NOT NULL,
+	`password_hash` text,
+	`password_salt` text,
+	`password_hint` text,
+	`is_active` integer DEFAULT false NOT NULL,
+	`is_onboarded` integer DEFAULT false NOT NULL,
+	`position` integer DEFAULT 0 NOT NULL,
+	`last_active_at` text DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+	`created_at` text DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+	`updated_at` text DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+);

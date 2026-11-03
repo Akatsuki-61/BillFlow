@@ -17,6 +17,7 @@ import { registerExpenseHandlers } from "./ipc/expenses";
 
 import { registerThemeHandlers, windowThemeColors } from "./theme";
 import { registerCatalogHandlers } from "./ipc/catalog";
+import { registerProfileHandlers, listProfilesState } from "./ipc/profiles";
 import { setupAboutPanel, createApplicationMenu } from "./menu";
 
 const testProfile = process.env.BILLFLOW_USER_DATA;
@@ -167,12 +168,16 @@ function createWindow() {
 app.whenReady().then(() => {
   if (process.platform === "darwin") app.dock?.setIcon(appIconPath());
   // Initialize database and migrations
-  try { initDatabase(); } catch (error) {
+  try {
+    initDatabase();
+    listProfilesState();
+  } catch (error) {
     dialog.showErrorBox("BillFlow database upgrade failed", error instanceof Error ? error.message : String(error));
     app.quit(); return;
   }
 
   // Register IPC handlers
+  registerProfileHandlers(broadcastDataChanged);
   registerClientHandlers(broadcastDataChanged);
   registerInvoiceHandlers(broadcastDataChanged);
   registerDashboardHandlers();

@@ -13,16 +13,30 @@ import { catalogPriceSchema } from "../validation";
 
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let sqliteInstance: Database.Database | null = null;
+let rootDbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let rootSqliteInstance: Database.Database | null = null;
+let rootDbPath: string | null = null;
 let activePath: string | null = null;
+let activeProfileId = "default";
+let activeCustomMigrations: string | null = null;
 let startupError: Error | null = null;
 
-export function getDatabasePath(): string {
-  if (activePath) return activePath;
+export function getRootDatabasePath(): string {
+  if (rootDbPath) return rootDbPath;
   const override = process.env.BILLFLOW_USER_DATA;
   if (override && !path.isAbsolute(override)) throw new Error("BILLFLOW_USER_DATA must be absolute.");
   const directory = override || (app?.getPath ? app.getPath("userData") : path.join(process.cwd(), ".billflow-dev"));
   fs.mkdirSync(directory, { recursive: true });
   return path.join(directory, "billflow.db");
+}
+
+export function getDatabasePath(): string {
+  if (activePath) return activePath;
+  return getRootDatabasePath();
+}
+
+export function getActiveProfileId(): string {
+  return activeProfileId;
 }
 
 export function migrationFolder(customMigrations?: string): string {
@@ -138,6 +152,30 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
     }
   }
 
+  // Ensure user_profiles table exists on all databases (including reconciled dev databases)
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS "user_profiles" (
+      "id" text PRIMARY KEY NOT NULL,
+      "name" text NOT NULL,
+      "role" text DEFAULT 'software-engineering' NOT NULL,
+      "subtitle" text DEFAULT 'Full-Stack & Systems' NOT NULL,
+      "avatar" text DEFAULT 'code' NOT NULL,
+      "accent" text DEFAULT 'blue' NOT NULL,
+      "theme_preference" text DEFAULT 'system' NOT NULL,
+      "default_currency" text DEFAULT 'USD' NOT NULL,
+      "invoice_prefix" text DEFAULT 'SE-' NOT NULL,
+      "password_hash" text,
+      "password_salt" text,
+      "password_hint" text,
+      "is_active" integer DEFAULT false NOT NULL,
+      "is_onboarded" integer DEFAULT false NOT NULL,
+      "position" integer DEFAULT 0 NOT NULL,
+      "last_active_at" text DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+      "created_at" text DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+      "updated_at" text DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+    );
+  `);
+
   if ((sqlite.pragma("foreign_key_check") as unknown[]).length) {
     throw new Error("Database relationships failed validation after migration.");
   }
@@ -146,20 +184,109 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
 export function initDatabase(customPath?: string, customMigrations?: string) {
   startupError = null;
   if (dbInstance && sqliteInstance) return { db: dbInstance, sqlite: sqliteInstance };
-  const dbPath = customPath || getDatabasePath();
+  const dbPath = customPath || getRootDatabasePath();
   const sqlite = new Database(dbPath);
   try {
     sqlite.pragma("journal_mode = WAL");
     sqlite.pragma("foreign_keys = ON");
     migrateDatabase(sqlite, customMigrations);
-    dbInstance = drizzle(sqlite, { schema });
+    const initializedDb = drizzle(sqlite, { schema });
+    rootDbInstance = initializedDb;
+    rootSqliteInstance = sqlite;
+    rootDbPath = dbPath;
+    dbInstance = initializedDb;
     sqliteInstance = sqlite;
     activePath = dbPath;
+    activeProfileId = "default";
+    activeCustomMigrations = customMigrations || null;
     return { db: dbInstance, sqlite };
   } catch (error) {
     sqlite.close();
     startupError = new Error(`Database upgrade failed. Business writes are disabled. ${error instanceof Error ? error.message : String(error)}`);
     throw startupError;
+  }
+}
+
+export function getRootDb() {
+  if (startupError) throw startupError;
+  if (!rootDbInstance) initDatabase();
+  return rootDbInstance!;
+}
+
+export function getRootSqlite() {
+  if (startupError) throw startupError;
+  if (!rootSqliteInstance) initDatabase();
+  return rootSqliteInstance!;
+}
+
+export function switchWorkspaceDatabase(profileId: string) {
+  if (startupError) throw startupError;
+  if (!/^[a-zA-Z0-9_-]+$/.test(profileId)) {
+    throw new Error("Invalid profile identifier.");
+  }
+  if (!rootDbInstance || !rootSqliteInstance || !rootDbPath) {
+    initDatabase();
+  }
+
+  if (profileId === "default") {
+    if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
+      sqliteInstance.close();
+    }
+    dbInstance = rootDbInstance;
+    sqliteInstance = rootSqliteInstance;
+    activePath = rootDbPath;
+    activeProfileId = "default";
+    return { db: dbInstance!, sqlite: sqliteInstance!, dbPath: activePath! };
+  }
+
+  const rootDir = path.dirname(rootDbPath!);
+  const profileDir = path.join(rootDir, "profiles", profileId);
+  fs.mkdirSync(profileDir, { recursive: true });
+  const targetDbPath = path.join(profileDir, "billflow.db");
+
+  if (activePath === targetDbPath && dbInstance && sqliteInstance) {
+    activeProfileId = profileId;
+    return { db: dbInstance, sqlite: sqliteInstance, dbPath: activePath };
+  }
+
+  const sqlite = new Database(targetDbPath);
+  try {
+    sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("foreign_keys = ON");
+    migrateDatabase(sqlite, activeCustomMigrations || undefined);
+    const nextDb = drizzle(sqlite, { schema });
+    if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
+      sqliteInstance.close();
+    }
+    sqliteInstance = sqlite;
+    dbInstance = nextDb;
+    activePath = targetDbPath;
+    activeProfileId = profileId;
+    return { db: dbInstance, sqlite: sqliteInstance, dbPath: targetDbPath };
+  } catch (error) {
+    sqlite.close();
+    throw new Error(
+      `Failed to open workspace database for profile "${profileId}": ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+export function deleteWorkspaceDatabaseFiles(profileId: string) {
+  if (profileId === "default") {
+    throw new Error("Cannot delete the primary default workspace database.");
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(profileId)) {
+    throw new Error("Invalid profile identifier.");
+  }
+  if (activeProfileId === profileId) {
+    switchWorkspaceDatabase("default");
+  }
+  const rootDir = path.dirname(getRootDatabasePath());
+  const profileDir = path.join(rootDir, "profiles", profileId);
+  if (fs.existsSync(profileDir)) {
+    fs.rmSync(profileDir, { recursive: true, force: true });
   }
 }
 
@@ -174,9 +301,17 @@ export function getSqlite() {
 }
 
 export function closeDatabaseForTesting() {
-  sqliteInstance?.close();
+  if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
+    sqliteInstance.close();
+  }
+  rootSqliteInstance?.close();
   sqliteInstance = null;
   dbInstance = null;
+  rootSqliteInstance = null;
+  rootDbInstance = null;
+  rootDbPath = null;
   activePath = null;
+  activeProfileId = "default";
+  activeCustomMigrations = null;
   startupError = null;
 }

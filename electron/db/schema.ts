@@ -263,3 +263,29 @@ export const invoicePdfExports = sqliteTable("invoice_pdf_exports", {
   filePath: text("file_path").notNull(),
   exportedAt: text("exported_at").notNull(),
 });
+
+export const userProfiles = sqliteTable("user_profiles", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("software-engineering"),
+  subtitle: text("subtitle").notNull().default("Full-Stack & Systems"),
+  avatar: text("avatar").notNull().default("code"),
+  accent: text("accent").notNull().default("blue"),
+  themePreference: text("theme_preference").notNull().default("system"),
+  defaultCurrency: text("default_currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
+    .notNull()
+    .default("USD"),
+  invoicePrefix: text("invoice_prefix").notNull().default("SE-"),
+  passwordHash: text("password_hash"),
+  passwordSalt: text("password_salt"),
+  passwordHint: text("password_hint"),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
+  isOnboarded: integer("is_onboarded", { mode: "boolean" }).notNull().default(false),
+  position: integer("position").notNull().default(0),
+  lastActiveAt: text("last_active_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+export type UserProfileRow = typeof userProfiles.$inferSelect;
+export type InsertUserProfileRow = typeof userProfiles.$inferInsert;

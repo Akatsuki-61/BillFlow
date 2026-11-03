@@ -32,6 +32,12 @@ import type { AnalyticsSummaryPayload } from "./analytics";
 import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "./expenses";
 
 import type { ThemePreference } from "../lib/theme";
+import type {
+  CreateProfileInput,
+  UpdateProfileInput,
+  CompleteOnboardingInput,
+  ProfileListResponse,
+} from "./profiles";
 
 import type { WorkflowAPI } from "./workflow";
 
@@ -42,6 +48,15 @@ export interface BillFlowAPI extends WorkflowAPI {
   theme: {
     initialPreference: ThemePreference;
     setPreference: (preference: ThemePreference) => Promise<void>;
+  };
+  profiles: {
+    list: () => Promise<ProfileListResponse>;
+    create: (input: CreateProfileInput) => Promise<ProfileListResponse>;
+    update: (id: string, patch: UpdateProfileInput) => Promise<ProfileListResponse>;
+    switch: (id: string, password?: string) => Promise<ProfileListResponse>;
+    verifyPassword: (id: string, password: string) => Promise<{ valid: boolean }>;
+    remove: (id: string, password?: string) => Promise<ProfileListResponse>;
+    completeOnboarding: (input: CompleteOnboardingInput) => Promise<ProfileListResponse>;
   };
   expenses: {
     list: (filter?: { category?: string; invoiceId?: string }) => Promise<ExpenseItem[]>;
