@@ -13,6 +13,8 @@ import { NavProvider } from "@/context/NavContext";
 import { DataProvider } from "@/lib/data/DataProvider";
 import { WidgetProvider } from "@/context/WidgetContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { ProfileProvider } from "@/context/ProfileContext";
+import { ProfileGateModal } from "@/components/profiles/ProfileGateModal";
 import { themeBootstrap } from "@/lib/theme";
 import "./globals.css";
 
@@ -29,7 +31,7 @@ const geistMono = Geist_Mono({
 const playfair = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const inter = Inter({
@@ -69,14 +71,17 @@ export default function RootLayout({
         <ThemeProvider>
           <NavProvider>
             <DataProvider>
-              <AdvanceTrackingPrompt />
-              <WidgetProvider>
-                <TitleBar />
-                <Sidebar />
-                <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
-                  {children}
-                </main>
-              </WidgetProvider>
+              <ProfileProvider>
+                <AdvanceTrackingPrompt />
+                <ProfileGateModal />
+                <WidgetProvider>
+                  <TitleBar />
+                  <Sidebar />
+                  <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
+                    {children}
+                  </main>
+                </WidgetProvider>
+              </ProfileProvider>
             </DataProvider>
           </NavProvider>
         </ThemeProvider>

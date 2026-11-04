@@ -10,6 +10,15 @@ export const WIDGET_STORAGE_KEYS = {
   sizes: "billflow_widget_sizes_v4",
 } as const;
 
+export function getScopedWidgetStorageKeys(profileId?: string) {
+  if (!profileId || profileId === "default") return WIDGET_STORAGE_KEYS;
+  return {
+    dashboard: `${WIDGET_STORAGE_KEYS.dashboard}_${profileId}`,
+    analytics: `${WIDGET_STORAGE_KEYS.analytics}_${profileId}`,
+    sizes: `${WIDGET_STORAGE_KEYS.sizes}_${profileId}`,
+  };
+}
+
 type PreferenceStorage = Pick<Storage, "getItem">;
 
 function readPreference<T>(
@@ -21,7 +30,10 @@ function readPreference<T>(
   // Current preferences win; otherwise recover the latest valid older version.
   for (const version of [4, 3, 2]) {
     try {
-      const stored = storage.getItem(key.replace(/_v4$/, `_v${version}`));
+      const candidateKey = key.includes("_v4")
+        ? key.replace("_v4", `_v${version}`)
+        : key;
+      const stored = storage.getItem(candidateKey);
       if (stored === null) continue;
       const parsed: unknown = JSON.parse(stored);
       if (isValid(parsed)) return parsed;
@@ -45,18 +57,19 @@ function isWidgetSizes(value: unknown): value is Record<string, WidgetDisplaySiz
   );
 }
 
-export function loadWidgetPreferences(storage: PreferenceStorage) {
+export function loadWidgetPreferences(storage: PreferenceStorage, profileId?: string) {
+  const keys = getScopedWidgetStorageKeys(profileId);
   return {
     dashboardWidgets: readPreference(
-      storage, WIDGET_STORAGE_KEYS.dashboard, isWidgetList,
+      storage, keys.dashboard, isWidgetList,
       [...DEFAULT_DASHBOARD_WIDGET_IDS],
     ),
     analyticsWidgets: readPreference(
-      storage, WIDGET_STORAGE_KEYS.analytics, isWidgetList,
+      storage, keys.analytics, isWidgetList,
       [...DEFAULT_ANALYTICS_WIDGET_IDS],
     ),
     widgetSizes: readPreference(
-      storage, WIDGET_STORAGE_KEYS.sizes, isWidgetSizes, {},
+      storage, keys.sizes, isWidgetSizes, {},
     ),
   };
 }

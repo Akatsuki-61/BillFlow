@@ -32,6 +32,12 @@ import type {
 import type { AnalyticsSummaryPayload } from "../src/types/analytics";
 
 import type { ThemePreference } from "../src/lib/theme";
+import type {
+  CreateProfileInput,
+  UpdateProfileInput,
+  CompleteOnboardingInput,
+  ProfileListResponse,
+} from "../src/types/profiles";
 
 import type { TaskCreateInput, TaskPatchInput, AttachmentOwner } from "../src/types/workflow";
 import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "../src/types/expenses";
@@ -42,6 +48,21 @@ contextBridge.exposeInMainWorld("billflow", {
   theme: {
     initialPreference: ipcRenderer.sendSync("theme:initial") as ThemePreference,
     setPreference: (preference: ThemePreference): Promise<void> => ipcRenderer.invoke("theme:set", preference),
+  },
+  profiles: {
+    list: (): Promise<ProfileListResponse> => ipcRenderer.invoke("profiles:list"),
+    create: (input: CreateProfileInput): Promise<ProfileListResponse> =>
+      ipcRenderer.invoke("profiles:create", input),
+    update: (id: string, patch: UpdateProfileInput): Promise<ProfileListResponse> =>
+      ipcRenderer.invoke("profiles:update", id, patch),
+    switch: (id: string, password?: string): Promise<ProfileListResponse> =>
+      ipcRenderer.invoke("profiles:switch", id, password),
+    verifyPassword: (id: string, password: string): Promise<{ valid: boolean }> =>
+      ipcRenderer.invoke("profiles:verifyPassword", id, password),
+    remove: (id: string, password?: string): Promise<ProfileListResponse> =>
+      ipcRenderer.invoke("profiles:remove", id, password),
+    completeOnboarding: (input: CompleteOnboardingInput): Promise<ProfileListResponse> =>
+      ipcRenderer.invoke("profiles:completeOnboarding", input),
   },
   expenses: {
     list: (filter?: { category?: string; invoiceId?: string }): Promise<ExpenseItem[]> => ipcRenderer.invoke("expenses:list", filter),

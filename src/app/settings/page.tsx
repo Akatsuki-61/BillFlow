@@ -32,10 +32,17 @@ import {
   Sun,
   Moon,
   Monitor,
+  Lock,
+  Plus,
+  Sparkles,
+  UsersRound,
+  Pencil,
 } from "lucide-react";
 import { useSettings, useData } from "@/lib/data/DataProvider";
 import type { UpdateSettingsInput, ExportDataPayload } from "@/types/settings";
 import { useTheme } from "@/context/ThemeContext";
+import { useProfiles } from "@/context/ProfileContext";
+import { ProfileAvatarTile } from "@/components/profiles/ProfileAvatarTile";
 import { useSearchParams } from "next/navigation";
 import type { Currency } from "@/types/billing";
 import { getCurrencySymbol } from "@/lib/format";
@@ -70,6 +77,14 @@ function SettingsContent() {
     : "profile";
   const { workflow, isElectron, error: dataError } = useData();
   const { preference, setPreference, accent, setAccent, ready } = useTheme();
+  const {
+    profiles,
+    activeProfile,
+    maxProfiles,
+    openProfileGate,
+    lockCurrentProfile,
+    switchProfile,
+  } = useProfiles();
   const {
     settings,
     isLoading,
@@ -160,12 +175,12 @@ function SettingsContent() {
     }
   }
 
-  // Load live DB path
+  // Load live DB path (re-evaluate when active profile changes)
   useEffect(() => {
     getDbPath()
       .then(setDbPath)
       .catch(() => setDbPath("Local database file"));
-  }, [getDbPath]);
+  }, [getDbPath, activeProfile.id]);
 
   // Determine dirty state
   const isDirty = useMemo(() => {
@@ -667,6 +682,144 @@ function SettingsContent() {
               {/* TAB 1: MY PROFILE */}
               {activeTab === "profile" && (
                 <div className="settings-section space-y-6">
+                  {/* Role Profiles & Password Locks Card */}
+                  <div className="ui-card p-6 space-y-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-sm font-semibold text-content-neutral-900">
+                            Role Profiles & Password Locks
+                          </h2>
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-neutral-100 text-content-neutral-700">
+                            {profiles.length} / {maxProfiles} Profiles
+                          </span>
+                        </div>
+                        <p className="text-xs text-content-neutral-500 mt-0.5 max-w-[65ch]">
+                          Keep Software Engineering, AI Development, and
+                          Technical Consulting in separate workspaces. Each
+                          profile has its own SQLite ledger, invoice sequence,
+                          and optional password lock.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openProfileGate("onboarding")}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-line-neutral-200 bg-surface hover:bg-surface-neutral-100 text-content-neutral-800 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          Role Setup Wizard
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openProfileGate("select")}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-line-neutral-200 bg-surface hover:bg-surface-neutral-100 text-content-neutral-800 cursor-pointer"
+                        >
+                          <UsersRound className="w-3.5 h-3.5" />
+                          Switch Profile Screen
+                        </button>
+                        {profiles.length < maxProfiles && (
+                          <button
+                            type="button"
+                            onClick={() => openProfileGate("create")}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-accent-solid text-white hover:opacity-95 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Add Profile
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                      {profiles.map((prof) => {
+                        const isCurrent = prof.id === activeProfile.id;
+                        return (
+                          <div
+                            key={prof.id}
+                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-colors ${
+                              isCurrent
+                                ? "bg-surface-neutral-50 border-content-neutral-900/30 ring-1 ring-content-neutral-900/15"
+                                : "bg-surface border-line-neutral-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <ProfileAvatarTile
+                                avatar={prof.avatar}
+                                accent={prof.accent}
+                                size="sm"
+                                hasPassword={prof.hasPassword}
+                                isActive={isCurrent}
+                              />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-semibold text-content-neutral-900 truncate">
+                                    {prof.name}
+                                  </span>
+                                  {isCurrent && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-content-neutral-500 truncate">
+                                  {prof.subtitle}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="text-[10px] font-mono text-content-neutral-600 bg-surface-neutral-100 px-1.5 py-0.5 rounded">
+                                    {prof.invoicePrefix} · {prof.defaultCurrency}
+                                  </span>
+                                  <span className="text-[10px] text-content-neutral-500">
+                                    {prof.hasPassword
+                                      ? "Password Locked"
+                                      : "Unlocked"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {!isCurrent && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (prof.hasPassword) {
+                                      openProfileGate("select");
+                                    } else {
+                                      void switchProfile(prof.id);
+                                    }
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-surface-neutral-100 hover:bg-surface-neutral-200 text-content-neutral-800 cursor-pointer"
+                                >
+                                  Use
+                                </button>
+                              )}
+                              {isCurrent && prof.hasPassword && (
+                                <button
+                                  type="button"
+                                  onClick={lockCurrentProfile}
+                                  title="Lock this profile now"
+                                  className="p-1.5 rounded-lg hover:bg-surface-neutral-100 text-content-neutral-600 cursor-pointer"
+                                >
+                                  <Lock className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => openProfileGate("manage", prof)}
+                                title="Edit profile & password lock"
+                                className="p-1.5 rounded-lg hover:bg-surface-neutral-100 text-content-neutral-600 cursor-pointer"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Live Preview Card */}
                   <div className="ui-card from-surface-purple-50/70 to-surface-neutral-50 border-line-purple-200/70 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">

@@ -17,7 +17,7 @@ import {
 import { WidgetDisplaySize } from "@/types/widgets";
 import {
   loadWidgetPreferences,
-  WIDGET_STORAGE_KEYS,
+  getScopedWidgetStorageKeys,
 } from "@/lib/widgets/widgetStorage";
 
 // Action descriptor for interactive toast notifications (e.g., clickable "Undo" button)
@@ -81,6 +81,7 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   // History stack for dashboard layout operations (tracks up to 15 prior states for undo)
   const [dashboardHistory, setDashboardHistory] = useState<string[][]>([]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [activeProfileScope, setActiveProfileScope] = useState<string>("default");
 
   /**
    * Dispatches an interactive toast notification with optional action button (e.g. Undo).
@@ -118,7 +119,7 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   );
   if (hydrated && !isInitialized) {
     try {
-      const saved = loadWidgetPreferences(localStorage);
+      const saved = loadWidgetPreferences(localStorage, activeProfileScope);
       setDashboardWidgets(saved.dashboardWidgets);
       setAnalyticsWidgets(saved.analyticsWidgets);
       setWidgetSizes(saved.widgetSizes);
@@ -129,41 +130,66 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Reload scoped widget preferences whenever the active profile switches
+  useEffect(() => {
+    const handleProfileSwitch = (event: Event) => {
+      const detail = (event as CustomEvent<{ profileId?: string }>).detail;
+      const nextScope = detail?.profileId || "default";
+      setActiveProfileScope(nextScope);
+      try {
+        const saved = loadWidgetPreferences(localStorage, nextScope);
+        setDashboardWidgets(saved.dashboardWidgets);
+        setAnalyticsWidgets(saved.analyticsWidgets);
+        setWidgetSizes(saved.widgetSizes);
+        setDashboardHistory([]);
+      } catch {
+        // Ignore read error
+      }
+    };
+    window.addEventListener("billflow:profile-switched", handleProfileSwitch);
+    return () => {
+      window.removeEventListener("billflow:profile-switched", handleProfileSwitch);
+    };
+  }, []);
+
   // Persist dashboard widgets changes
   useEffect(() => {
     if (!isInitialized) return;
     try {
+      const keys = getScopedWidgetStorageKeys(activeProfileScope);
       localStorage.setItem(
-        WIDGET_STORAGE_KEYS.dashboard,
+        keys.dashboard,
         JSON.stringify(dashboardWidgets),
       );
     } catch {
       // Ignore write errors
     }
-  }, [dashboardWidgets, isInitialized]);
+  }, [dashboardWidgets, isInitialized, activeProfileScope]);
 
   // Persist analytics widgets changes
   useEffect(() => {
     if (!isInitialized) return;
     try {
+      const keys = getScopedWidgetStorageKeys(activeProfileScope);
       localStorage.setItem(
-        WIDGET_STORAGE_KEYS.analytics,
+        keys.analytics,
         JSON.stringify(analyticsWidgets),
       );
     } catch {
       // Ignore write errors
     }
-  }, [analyticsWidgets, isInitialized]);
+  }, [analyticsWidgets, isInitialized, activeProfileScope]);
 
   // Persist widget sizes
   useEffect(() => {
     if (!isInitialized) return;
     try {
-      localStorage.setItem(WIDGET_STORAGE_KEYS.sizes, JSON.stringify(widgetSizes));
+      const keys = getScopedWidgetStorageKeys(activeProfileScope);
+      localStorage.setItem(keys.sizes, JSON.stringify(widgetSizes));
     } catch {
       // Ignore write errors
     }
-  }, [widgetSizes, isInitialized]);
+  }, [widgetSizes, isInitialized, activeProfileScope]);
 
   /**
    * Adds a widget to the dashboard layout.

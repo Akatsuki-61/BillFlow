@@ -24,12 +24,16 @@ import {
   BarChart3,
   LayoutGrid,
   X,
+  Lock,
+  UsersRound,
 } from "lucide-react";
 
 import { isNavActive } from "@/lib/navigation";
 import { useData } from "@/lib/data/DataProvider";
 import { useTheme } from "@/context/ThemeContext";
 import { useWidgetContext } from "@/context/WidgetContext";
+import { useProfiles } from "@/context/ProfileContext";
+import { PROFILE_AVATAR_ICONS } from "@/components/profiles/ProfileAvatarTile";
 import { formatCents } from "@/lib/format";
 
 interface NavItem {
@@ -58,8 +62,16 @@ const mainNavItems: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { invoices, clients, tasks, settings } = useData();
+  const { invoices, clients, tasks } = useData();
   const { preference, setPreference } = useTheme();
+  const {
+    profiles,
+    activeProfile,
+    maxProfiles,
+    openProfileGate,
+    lockCurrentProfile,
+  } = useProfiles();
+  const ActiveProfileIcon = PROFILE_AVATAR_ICONS[activeProfile.avatar] ?? UsersRound;
   const { pinToDashboard } = useWidgetContext();
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -175,15 +187,6 @@ export default function Sidebar() {
         .slice(0, 4),
     };
   }, [searchQuery, invoices, clients]);
-
-  const businessInitials = useMemo(() => {
-    const name = settings?.businessName?.trim() || "BillFlow";
-    const parts = name.split(/\s+/);
-    if (parts.length >= 2) {
-      return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  }, [settings?.businessName]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -578,7 +581,7 @@ export default function Sidebar() {
               </MotionPresence>
             </div>
 
-            {/* Profile / Settings Avatar with Gradient Ring */}
+            {/* Profile / Settings Rounded Icon Button (matches Search & Notification buttons) */}
             <div className="relative" ref={profileRef}>
               <button
                 type="button"
@@ -589,18 +592,16 @@ export default function Sidebar() {
                 }}
                 aria-expanded={profileOpen}
                 aria-controls="profile-popover"
-                aria-label="Workspace settings and appearance"
-                title="Settings & Appearance"
-                className={`w-10 h-10 rounded-full p-[2px] profile-accent-ring shadow-xs cursor-pointer transition-transform hover:scale-105 ${
+                aria-label="Profile and workspace settings"
+                title={`${activeProfile.name} · ${activeProfile.subtitle}`}
+                className={`relative w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer ${
                   isNavActive(pathname, "/settings") ||
                   isNavActive(pathname, "/support")
                     ? "ring-2 ring-content-neutral-900 ring-offset-2 ring-offset-canvas"
                     : ""
                 }`}
               >
-                <span className="w-full h-full rounded-full bg-surface flex items-center justify-center text-[12px] font-semibold tracking-tight text-content-neutral-900">
-                  {businessInitials}
-                </span>
+                <ActiveProfileIcon className="w-[17px] h-[17px]" strokeWidth={1.9} />
               </button>
 
               <MotionPresence>
@@ -613,10 +614,10 @@ export default function Sidebar() {
                   >
                     <div className="px-2.5 py-2 border-b border-line-neutral-100">
                       <div className="text-[13.5px] font-semibold text-content-neutral-950 truncate">
-                        {settings?.businessName || "BillFlow Studio"}
+                        {activeProfile.name}
                       </div>
                       <div className="text-[11.5px] text-content-neutral-500 truncate">
-                        {settings?.email || "Freelance Operations Hub"}
+                        {activeProfile.subtitle}
                       </div>
                     </div>
 
@@ -655,6 +656,39 @@ export default function Sidebar() {
                     </div>
 
                     <div className="pt-1.5 space-y-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          openProfileGate("select");
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13px] font-medium text-content-neutral-700 hover:bg-surface-neutral-100 text-left cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <UsersRound className="w-4 h-4 text-content-neutral-500" />
+                          Switch Profile
+                        </span>
+                        <span className="text-[11px] font-medium text-content-neutral-400">
+                          {profiles.length}/{maxProfiles}
+                        </span>
+                      </button>
+
+                      {activeProfile.hasPassword && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileOpen(false);
+                            lockCurrentProfile();
+                          }}
+                          className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13px] font-medium text-content-neutral-700 hover:bg-surface-neutral-100 text-left cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <Lock className="w-4 h-4 text-content-neutral-500" />
+                            Lock Profile
+                          </span>
+                        </button>
+                      )}
+
                       <Link
                         href="/settings"
                         onClick={() => setProfileOpen(false)}
