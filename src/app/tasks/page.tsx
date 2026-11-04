@@ -29,6 +29,7 @@ import {
   CheckSquare,
   Trash2,
   RotateCcw,
+  CheckCircle2,
 } from "lucide-react";
 import {
   TaskItem,
@@ -42,6 +43,7 @@ import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/tasks/TaskTiming";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 import EventModal from "@/components/tasks/EventModal";
+import SubmitWorkModal from "@/components/tasks/SubmitWorkModal";
 import Link from "next/link";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
@@ -155,6 +157,7 @@ function TasksContent() {
   const [selectedEventToEdit, setSelectedEventToEdit] = useState<CalendarEventItem | null>(null);
   const [calendarTargetDate, setCalendarTargetDate] = useState<string>("");
   const [calendarTargetTaskId, setCalendarTargetTaskId] = useState<string>("");
+  const [taskForSubmitWork, setTaskForSubmitWork] = useState<TaskItem | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const selectedTaskForDetail =
     tasks.find((task) => task.id === selectedTaskId) || null;
@@ -283,6 +286,23 @@ function TasksContent() {
     }
   };
 
+  const handleSubmitWork = async (patch: TaskPatchInput) => {
+    if (!taskForSubmitWork) return;
+    const currentId = taskForSubmitWork.id;
+    const currentTitle = taskForSubmitWork.title;
+    const success = await saveTask(currentId, patch);
+    if (success) {
+      showToast(
+        `Deliverable "${currentTitle.length > 24 ? currentTitle.slice(0, 24) + "..." : currentTitle}" marked Done`,
+      );
+      setTaskForSubmitWork(null);
+    }
+  };
+
+  const handleCloseSubmitWork = () => {
+    setTaskForSubmitWork(null);
+  };
+
   // Search and Filter logic
   const trimmedSearchQuery = searchQuery.trim().toLowerCase();
   const isSearching = trimmedSearchQuery.length > 0;
@@ -366,6 +386,16 @@ function TasksContent() {
     setDragOverColumn(null);
     const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
     if (!taskId) return;
+
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    // Moving to 'done' triggers the Submit Work popup before completing
+    if (targetStatus === "done" && task.status !== "done") {
+      setTaskForSubmitWork(task);
+      setDraggedTaskId(null);
+      return;
+    }
 
     void saveTask(taskId, { status: targetStatus });
     setDraggedTaskId(null);
@@ -574,8 +604,7 @@ function TasksContent() {
         </div>
       </PageHeader>
 
-      {/* =====================================================================
-          ZENTRA 3-CARD SPRINT BENTO HEADER ROW
+      {/* ==============================================================          ZENTRA 3-CARD SPRINT BENTO HEADER ROW
          ===================================================================== */}
       <div className="task-overview grid grid-cols-1 lg:grid-cols-3 gap-4">
         <section className="ui-card p-6 space-y-5">
@@ -952,6 +981,35 @@ function TasksContent() {
                             </span>
 
                             <div className="flex items-center gap-1.5">
+                              {task.status !== "done" ? (
+                                <Button
+                                  variant="ghost"
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTaskForSubmitWork(task);
+                                  }}
+                                  title="Submit work and move deliverable to Done"
+                                  className="text-[11px] text-content-emerald-700 dark:text-content-emerald-400 hover:bg-surface-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-1 font-medium"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Submit</span>
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTaskForSubmitWork(task);
+                                  }}
+                                  title="View handover details or update link"
+                                  className="text-[11px] text-content-emerald-700 dark:text-content-emerald-400 hover:bg-surface-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-1 font-medium"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Handover</span>
+                                </Button>
+                              )}
                               {(() => {
                                 const resolved = resolveDeliveryUrl(task, {
                                   invoices,
@@ -1112,19 +1170,40 @@ function TasksContent() {
                         {task.dueDate || "No due date"}
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <Button
-                          variant="secondary"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOutsourceTask(task);
-                          }}
-                        >
-                          <GitFork className="w-3.5 h-3.5" />
-                          <span>
-                            {task.isOutsourced ? "Outsourced" : "Outsource"}
-                          </span>
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTaskForSubmitWork(task);
+                            }}
+                            className="text-xs text-content-emerald-700 dark:text-content-emerald-400 hover:bg-surface-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-1 font-medium"
+                            title={
+                              task.status === "done"
+                                ? "View handover details"
+                                : "Submit work and complete deliverable"
+                            }
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>
+                              {task.status === "done" ? "Handover" : "Submit"}
+                            </span>
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOutsourceTask(task);
+                            }}
+                          >
+                            <GitFork className="w-3.5 h-3.5" />
+                            <span>
+                              {task.isOutsourced ? "Outsourced" : "Outsource"}
+                            </span>
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1423,9 +1502,29 @@ function TasksContent() {
                     </span>
                   )}
                 </div>
-                <h2 className="text-xl font-semibold text-content-neutral-900 leading-snug">
-                  {selectedTaskForDetail.title}
-                </h2>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold text-content-neutral-900 leading-snug">
+                    {selectedTaskForDetail.title}
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    onClick={() => setTaskForSubmitWork(selectedTaskForDetail)}
+                    className="shrink-0 text-xs text-content-emerald-700 dark:text-content-emerald-400 hover:bg-surface-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-1.5 font-medium border border-line-emerald-200/80"
+                    title={
+                      selectedTaskForDetail.status === "done"
+                        ? "View deliverable handover details"
+                        : "Submit work and mark deliverable Done"
+                    }
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-content-emerald-600" />
+                    <span>
+                      {selectedTaskForDetail.status === "done"
+                        ? "Handover Details"
+                        : "Submit Work"}
+                    </span>
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="app-dialog-body">
@@ -1644,11 +1743,19 @@ function TasksContent() {
                     <select
                       value={selectedTaskForDetail.status}
                       disabled={saving}
-                      onChange={(e) =>
-                        void saveTask(selectedTaskForDetail.id, {
-                          status: e.target.value as TaskStatus,
-                        })
-                      }
+                      onChange={(e) => {
+                        const newStatus = e.target.value as TaskStatus;
+                        if (
+                          newStatus === "done" &&
+                          selectedTaskForDetail.status !== "done"
+                        ) {
+                          setTaskForSubmitWork(selectedTaskForDetail);
+                        } else {
+                          void saveTask(selectedTaskForDetail.id, {
+                            status: newStatus,
+                          });
+                        }
+                      }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     >
                       <option value="todo">To Do</option>
@@ -1728,6 +1835,18 @@ function TasksContent() {
         initialTaskId={calendarTargetTaskId}
         onSaved={(msg) => showToast(msg)}
       />
+      {/* SUBMIT WORK POPUP MODAL */}
+      <MotionPresence>
+        {taskForSubmitWork && (
+          <SubmitWorkModal
+            task={taskForSubmitWork}
+            isOpen={Boolean(taskForSubmitWork)}
+            onClose={handleCloseSubmitWork}
+            onSubmit={handleSubmitWork}
+            saving={saving}
+          />
+        )}
+      </MotionPresence>
     </div>
   );
 }
