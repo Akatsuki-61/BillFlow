@@ -64,6 +64,13 @@
       "when": 1791250000000,
       "tag": "0008_user_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791251000000,
+      "tag": "0009_calendar_events",
+      "breakpoints": true
     }
   ]
 }

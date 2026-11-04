@@ -49,5 +49,10 @@ describe("navigation active state and normalization", () => {
     expect(isNavActive("/tasks", "/tasks")).toBe(true);
     expect(isNavActive("/tasks", "/")).toBe(false);
     expect(isNavActive("/tasks", "/invoices")).toBe(false);
+
+    // When on Calendar page
+    expect(isNavActive("/calendar", "/calendar")).toBe(true);
+    expect(isNavActive("/calendar", "/tasks")).toBe(false);
+    expect(isNavActive("/calendar", "/")).toBe(false);
   });
 });

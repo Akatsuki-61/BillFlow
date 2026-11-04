@@ -50,14 +50,21 @@ Record deposit collections against an invoice. Attach client payment receipts (P
 ### 5. Automatic Task Generation
 When an invoice status switches to `ADVANCE_PAID`, BillFlow displays an automatic tracking prompt with a 5-second countdown. Confirming converts invoice deliverables directly into linked Kanban tasks—no manual re-entry required.
 
-### 6. Focused Kanban Execution
-Move tasks through `To Do`, `In Progress`, `Review`, and `Done`. Active working duration tracks in the background, keeping cards clean while recording delivery velocity.
+### 6. Focused Kanban Execution & Local Calendar Integration
+- **Tri-View Task Management**: Seamlessly switch between **Kanban Board**, **List View**, and **Calendar View** on `/tasks` or via `/calendar`.
+- **Sprint Kanban & Background Timing**: Move tasks through `To Do`, `In Progress`, `Review`, and `Done`. Active working duration tracks in the background, keeping cards clean while recording delivery velocity.
+- **Local Calendar & User Events Engine**: Track sprint task due dates alongside user local events (client meetings, AI consulting sessions, project milestones, deliverable reviews, and deadlines) with local SQLite persistence.
+- **Interactive Drag-and-Drop Rescheduling**: Drag tasks between calendar dates to reschedule deadlines on the fly.
+- **Direct Relational Linking**: Link calendar events directly to client accounts and sprint Kanban deliverables, with location/meeting link shortcuts.
+- **Quick Day Scheduling**: Click any day cell or hover to quickly schedule a task or event for that specific day.
 
 ### 7. Deliverable Handoff
 Access code repositories, staging URLs, or documentation folders directly from client cards, invoices, and sprint tasks. Deliver work to clients through your chosen channel without re-entering URLs.
 
 ### 8. Subcontractor Outsourcing
 Delegate tasks directly from Kanban cards. BillFlow prefills a work order with the task scope, linked client, invoice, and deliverable repository. Subcontractor deliverable reviews and financial payouts stay strictly separate so you never pay a vendor before approving the build.
+- **Offline Vector PDF Vouchers**: Export formal work order vouchers directly to your configured directory via `pdf-lib` and Electron IPC.
+- **Direct WhatsApp Task Dispatch**: Send clean, structured task delegation briefs to subcontractors directly via WhatsApp web/desktop intent links (`wa.me`) with automatic phone number normalization.
 
 ### 9. Final Payment Settlement
 Log the remaining milestone payment and attach final receipts. An invoice is marked fully paid only when total collections cover the complete balance.
@@ -76,8 +83,8 @@ Review accurate financial summaries with no artificial zero-clamping or syntheti
 | **Styling & Motion** | Tailwind CSS v4, Motion | Newsreader serif + Inter typography, layered neutral shadows. |
 | **Database & ORM** | SQLite 3 via `better-sqlite3`, Drizzle ORM | WAL mode, foreign key cascades, versioned schema migrations. |
 | **Analytics & Charts** | Apache ECharts 6 | Freelance turnaround velocity, retainer yields, capacity benchmarks. |
-| **Document Engine** | `pdf-lib` | Offline vector PDF invoice generation with embedded layouts. |
-| **Test Suite** | Vitest | 12 test suites, 86 unit and integration test assertions. |
+| **Document Engine** | `pdf-lib` | Offline vector PDF invoice and work order voucher generation with embedded layouts. |
+| **Test Suite** | Vitest | 20 test suites, 126 unit and integration test assertions. |
 
 ### Architecture Overview
 
@@ -141,7 +148,7 @@ Opens at `http://localhost:3000`. Uses an in-memory data provider fallback.
 ### 4. Run Test Suite & Linting
 
 ```bash
-# Run unit and integration tests (86 tests)
+# Run unit and integration tests (109 tests)
 npm test
 
 # Type checking

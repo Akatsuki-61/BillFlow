@@ -86,6 +86,32 @@ export function saveInvoicePdf(invoiceId: string, bytes: Buffer) {
   } finally { fs.rmSync(temporary, { force: true }); }
   return filePath;
 }
+
+export function saveWorkOrderPdf(workOrderId: string, bytes: Buffer): string {
+  if (bytes.subarray(0, 5).toString() !== "%PDF-") throw new Error("Voucher exporter did not produce a PDF.");
+  const safeId = workOrderId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(-12);
+  const name = `VOUCHER-${safeId}-${createHash("sha256").update(workOrderId).digest("hex").slice(0, 8)}.pdf`;
+  const filePath = path.join(pdfOutputDirectory(), name);
+  const temporary = `${filePath}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporary, bytes, { flag: "wx" });
+    fs.renameSync(temporary, filePath);
+  } finally {
+    fs.rmSync(temporary, { force: true });
+  }
+  return filePath;
+}
+
+export async function openWorkOrderPdf(filePath: string, reveal = false): Promise<void> {
+  if (!fs.existsSync(filePath)) throw new Error("Voucher PDF file not found. Export it again.");
+  if (path.extname(filePath).toLowerCase() !== ".pdf") throw new Error("Invalid voucher PDF path.");
+  if (reveal) shell.showItemInFolder(filePath);
+  else {
+    const error = await shell.openPath(filePath);
+    if (error) throw new Error(error);
+  }
+}
+
 export async function openInvoicePdf(invoiceId: string, reveal = false) {
   if (typeof reveal !== "boolean") throw new Error("Invalid reveal option.");
   const record = getDb().select().from(invoicePdfExports).where(eq(invoicePdfExports.invoiceId, recordId.parse(invoiceId))).get();

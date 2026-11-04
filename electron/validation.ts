@@ -298,3 +298,27 @@ export const recordWorkOrderPayoutSchema = z.object({
   paidAt: z.string().trim().optional(),
 });
 
+/**
+ * Validation schema for user local calendar events.
+ */
+export const newCalendarEventSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().trim().min(1, "Event title is required").max(150),
+  description: z.string().trim().max(1000).optional().default(""),
+  startDate: z.string().trim().min(1, "Start date is required"),
+  endDate: z.string().trim().nullable().optional(),
+  startTime: z.string().trim().nullable().optional(),
+  endTime: z.string().trim().nullable().optional(),
+  isAllDay: z.boolean().optional().default(false),
+  category: z.enum(["meeting", "milestone", "review", "deadline", "reminder", "general"]).default("general"),
+  color: z.enum(["blue", "emerald", "amber", "purple", "rose", "cyan"]).default("blue"),
+  clientId: z.string().trim().nullable().optional(),
+  clientName: z.string().trim().nullable().optional(),
+  taskId: z.string().trim().nullable().optional(),
+  taskTitle: z.string().trim().nullable().optional(),
+  location: z.string().trim().max(300).nullable().optional(),
+});
+
+export const calendarEventPatchSchema = newCalendarEventSchema.partial();
+
+

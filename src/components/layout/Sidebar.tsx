@@ -21,6 +21,7 @@ import {
   Shapes,
   CreditCard,
   GitFork,
+  CalendarDays,
   BarChart3,
   LayoutGrid,
   X,
@@ -47,15 +48,16 @@ const mainNavItems: NavItem[] = [
   { id: "dashboard", name: "Home", href: "/", icon: LayoutGrid },
   { id: "invoices", name: "Invoices", href: "/invoices", icon: Receipt },
   { id: "clients", name: "Clients", href: "/clients", icon: Users },
-  { id: "tasks", name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { id: "catalog", name: "Catalog", href: "/catalog", icon: Shapes },
+  { id: "expenses", name: "Expenses", href: "/expenses", icon: CreditCard },
   {
     id: "outsourcing",
     name: "Outsourcing",
     href: "/outsourcing",
     icon: GitFork,
   },
-  { id: "catalog", name: "Catalog", href: "/catalog", icon: Shapes },
-  { id: "expenses", name: "Expenses", href: "/expenses", icon: CreditCard },
+  { id: "tasks", name: "Tasks", href: "/tasks", icon: ClipboardList },
+  { id: "calendar", name: "Calendar", href: "/calendar", icon: CalendarDays },
   { id: "analytics", name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
 

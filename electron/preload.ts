@@ -41,6 +41,11 @@ import type {
 
 import type { TaskCreateInput, TaskPatchInput, AttachmentOwner } from "../src/types/workflow";
 import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "../src/types/expenses";
+import type {
+  CalendarEventItem,
+  NewCalendarEventInput,
+  CalendarEventPatchInput,
+} from "../src/types/calendar";
 
 contextBridge.exposeInMainWorld("billflow", {
   isElectron: true,
@@ -69,6 +74,15 @@ contextBridge.exposeInMainWorld("billflow", {
     create: (input: NewExpenseInput): Promise<ExpenseItem> => ipcRenderer.invoke("expenses:create", input),
     update: (id: string, patch: ExpensePatchInput): Promise<ExpenseItem> => ipcRenderer.invoke("expenses:update", id, patch),
     remove: (id: string): Promise<{ success: boolean }> => ipcRenderer.invoke("expenses:remove", id),
+  },
+  events: {
+    list: (filter?: { startDate?: string; endDate?: string; category?: string; taskId?: string }): Promise<CalendarEventItem[]> =>
+      ipcRenderer.invoke("events:list", filter),
+    get: (id: string): Promise<CalendarEventItem> => ipcRenderer.invoke("events:get", id),
+    create: (input: NewCalendarEventInput): Promise<CalendarEventItem> => ipcRenderer.invoke("events:create", input),
+    update: (id: string, patch: CalendarEventPatchInput): Promise<CalendarEventItem> =>
+      ipcRenderer.invoke("events:update", id, patch),
+    remove: (id: string): Promise<{ success: boolean }> => ipcRenderer.invoke("events:remove", id),
   },
   clients: {
     list: (): Promise<ClientWithStats[]> => ipcRenderer.invoke("clients:list"),
@@ -131,6 +145,10 @@ contextBridge.exposeInMainWorld("billflow", {
       ipcRenderer.invoke("workOrders:setPayoutStatus", id, status),
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("workOrders:remove", id),
+    exportPdf: (id: string): Promise<{ success: boolean; filePath: string }> =>
+      ipcRenderer.invoke("workOrders:exportPdf", id),
+    openPdf: (filePath: string, reveal?: boolean): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("workOrders:openPdf", filePath, reveal),
   },
   analytics: {
     summary: (

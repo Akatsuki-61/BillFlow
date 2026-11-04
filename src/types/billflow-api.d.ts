@@ -30,6 +30,11 @@ import type {
 } from "./outsourcing";
 import type { AnalyticsSummaryPayload } from "./analytics";
 import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "./expenses";
+import type {
+  CalendarEventItem,
+  NewCalendarEventInput,
+  CalendarEventPatchInput,
+} from "./calendar";
 
 import type { ThemePreference } from "../lib/theme";
 import type {
@@ -62,6 +67,13 @@ export interface BillFlowAPI extends WorkflowAPI {
     list: (filter?: { category?: string; invoiceId?: string }) => Promise<ExpenseItem[]>;
     create: (input: NewExpenseInput) => Promise<ExpenseItem>;
     update: (id: string, patch: ExpensePatchInput) => Promise<ExpenseItem>;
+    remove: (id: string) => Promise<{ success: boolean }>;
+  };
+  events: {
+    list: (filter?: { startDate?: string; endDate?: string; category?: string; taskId?: string }) => Promise<CalendarEventItem[]>;
+    get: (id: string) => Promise<CalendarEventItem>;
+    create: (input: NewCalendarEventInput) => Promise<CalendarEventItem>;
+    update: (id: string, patch: CalendarEventPatchInput) => Promise<CalendarEventItem>;
     remove: (id: string) => Promise<{ success: boolean }>;
   };
   clients: {
@@ -102,6 +114,8 @@ export interface BillFlowAPI extends WorkflowAPI {
     removePayout: (workOrderId: string) => Promise<WorkOrderItem>;
     setPayoutStatus: (id: string, status: "PENDING" | "PAID") => Promise<WorkOrderItem>;
     remove: (id: string) => Promise<{ success: boolean }>;
+    exportPdf: (id: string) => Promise<{ success: boolean; filePath: string }>;
+    openPdf: (filePath: string, reveal?: boolean) => Promise<{ success: boolean }>;
   };
   analytics: {
     summary: (

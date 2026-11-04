@@ -12,7 +12,11 @@ import {
   reviewWorkOrder,
   recordWorkOrderPayout,
   removeWorkOrderPayout,
+  exportWorkOrderPdf,
 } from "../ipc/workOrders";
+import { updateSettings } from "../ipc/settings";
+import { saveWorkOrderPdf } from "../ipc/files";
+import { generateWorkOrderPdfBuffer } from "../pdf-generator";
 import { getAnalyticsSummary } from "../ipc/analytics";
 import {
   newVendorSchema,
@@ -1156,6 +1160,134 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       const cashSummary = getAnalyticsSummary("all", "LKR", "cash");
       expect(cashSummary.netProfitCents).toBe(5500000);
       expect(cashSummary.cashProfitCents).toBe(5500000);
+    });
+
+    it("generates and exports a valid offline vector PDF voucher for an outsourced work order", async () => {
+      const db = getDb();
+      db.delete(workOrders).run();
+      db.delete(vendorPayouts).run();
+      db.delete(tasks).run();
+      db.delete(invoices).run();
+      db.delete(vendors).run();
+      db.delete(clients).run();
+
+      const exportDir = path.join(tempDir, "vouchers");
+      fs.mkdirSync(exportDir, { recursive: true });
+      updateSettings({
+        businessName: "Chethaka Freelance Engineering",
+        professionalTitle: "Full-Stack & AI Solutions Consultant",
+        email: "chethaka@billflow.dev",
+        phone: "+94 77 123 4567",
+        address: "Colombo, Sri Lanka",
+        pdfExportDirectory: exportDir,
+      });
+
+      const clientId = "cli-pdf-1";
+      db.insert(clients).values({
+        id: clientId,
+        name: "Lanka Retail Systems",
+        contactPerson: "Nimal Perera",
+        email: "nimal@lankaretail.lk",
+        currency: "LKR",
+      }).run();
+
+      const invoiceId = "inv-pdf-1";
+      db.insert(invoices).values({
+        id: invoiceId,
+        code: "INV-2026-PDF",
+        clientId,
+        amountCents: 9000000,
+        currency: "LKR",
+        issueDate: "2026-10-01",
+        status: "ADVANCE_PAID",
+      }).run();
+
+      const taskId = "task-pdf-1";
+      db.insert(tasks).values({
+        id: taskId,
+        title: "Business Website Development",
+        clientId,
+        invoiceId,
+        status: "in-progress",
+        priority: "high",
+        category: "Development",
+        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
+        createdAt: "2026-10-02T10:00:00Z",
+        updatedAt: "2026-10-02T10:00:00Z",
+      }).run();
+
+      const vendorId = "vnd-pdf-1";
+      db.insert(vendors).values({
+        id: vendorId,
+        name: "Kasun Jayasuriya",
+        service: "Frontend Engineering",
+        email: "kasun@webcraft.lk",
+        phone: "+94 71 987 6543",
+        balanceCents: 3000000,
+        status: "PENDING",
+      }).run();
+
+      const createdWo = createWorkOrder({
+        vendorId,
+        taskId,
+        invoiceId,
+        scope: "Responsive Next.js landing page with Tailwind and dynamic contact inquiry form",
+        feeCents: 3000000, // 30,000 LKR
+        currency: "LKR",
+        dueDate: "2026-10-15",
+        status: "in-progress",
+      });
+
+      // 1. Direct PDF Buffer Generation
+      const pdfBuffer = await generateWorkOrderPdfBuffer({
+        voucherNumber: createdWo.id.slice(-8).toUpperCase(),
+        scope: createdWo.scope,
+        feeCents: createdWo.feeCents,
+        currency: createdWo.currency,
+        status: createdWo.status,
+        payoutStatus: createdWo.payoutStatus,
+        dueDate: createdWo.dueDate,
+        vendor: {
+          name: "Kasun Jayasuriya",
+          service: "Frontend Engineering",
+          email: "kasun@webcraft.lk",
+          phone: "+94 71 987 6543",
+        },
+        task: {
+          title: "Business Website Development",
+          category: "Development",
+        },
+        parentInvoice: {
+          code: "INV-2026-PDF",
+          clientName: "Lanka Retail Systems",
+        },
+        business: {
+          businessName: "Chethaka Freelance Engineering",
+          professionalTitle: "Full-Stack & AI Solutions Consultant",
+          email: "chethaka@billflow.dev",
+          phone: "+94 77 123 4567",
+          address: "Colombo, Sri Lanka",
+        },
+      });
+
+      expect(pdfBuffer).toBeInstanceOf(Buffer);
+      expect(pdfBuffer.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(pdfBuffer.length).toBeGreaterThan(1000);
+
+      // 2. Export via IPC helper to configured directory
+      const savedPath = await exportWorkOrderPdf(createdWo.id);
+      expect(fs.existsSync(savedPath)).toBe(true);
+      expect(savedPath.startsWith(exportDir)).toBe(true);
+      expect(savedPath.endsWith(".pdf")).toBe(true);
+
+      const savedBytes = fs.readFileSync(savedPath);
+      expect(savedBytes.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(savedBytes.length).toBeGreaterThan(1000);
+
+      // 3. Rejection on non-PDF bytes in saveWorkOrderPdf
+      expect(() => saveWorkOrderPdf(createdWo.id, Buffer.from("invalid-binary-data"))).toThrow(
+        "Voucher exporter did not produce a PDF."
+      );
     });
   });
 });

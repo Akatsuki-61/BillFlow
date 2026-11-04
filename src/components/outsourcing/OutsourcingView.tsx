@@ -25,6 +25,8 @@ import {
   Paperclip,
   FileCheck,
   RotateCcw,
+  MessageCircle,
+  Share2,
 } from "lucide-react";
 
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
@@ -43,6 +45,7 @@ import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import type { VendorItem, WorkOrderItem } from "@/types/outsourcing";
 import type { Currency } from "@/types/billing";
 import type { AttachmentItem } from "@/types/workflow";
+import { generateWhatsAppLink, createWhatsAppPayloadFromWorkOrder } from "@/lib/whatsapp";
 import "./outsourcing.css";
 
 export type { VendorItem, WorkOrderItem };
@@ -51,7 +54,7 @@ export default function OutsourcingView() {
   const searchParams = useSearchParams();
   const { clients, createClient } = useClients();
   const { invoices } = useInvoices();
-  const { tasks, workflow } = useData();
+  const { tasks, workflow, settings } = useData();
   const { vendors, createVendor, setVendorStatus } = useVendors();
   const {
     workOrders,
@@ -59,6 +62,8 @@ export default function OutsourcingView() {
     reviewWorkOrder,
     recordWorkOrderPayout,
     removeWorkOrderPayout,
+    exportWorkOrderPdf,
+    openWorkOrderPdf,
   } = useWorkOrders();
   const { activeCurrency } = useActiveCurrency();
 
@@ -99,6 +104,7 @@ export default function OutsourcingView() {
   const [isLoadingPayoutAttachments, setIsLoadingPayoutAttachments] =
     useState(false);
   const [isAttachingReceipt, setIsAttachingReceipt] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // Add Client Form States with explicit validation
   const [clientName, setClientName] = useState("");
@@ -460,6 +466,34 @@ export default function OutsourcingView() {
         err instanceof Error ? err.message : "Failed to remove payout";
       showToast(msg, "error");
     }
+  };
+
+  // Export PDF Voucher
+  const handleExportWorkOrderPdf = async (workOrderId: string) => {
+    try {
+      setIsExportingPdf(true);
+      const res = await exportWorkOrderPdf(workOrderId);
+      if (res?.filePath) {
+        showToast("Work Order PDF Voucher generated successfully!");
+        await openWorkOrderPdf(res.filePath, false);
+      } else {
+        if (typeof window !== "undefined") window.print();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to export PDF";
+      showToast(msg, "error");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  // Send Task to Contractor via WhatsApp
+  const handleSendToWhatsApp = (wo: WorkOrderItem) => {
+    const freelancerName = settings?.businessName || "Chethaka";
+    const payload = createWhatsAppPayloadFromWorkOrder(wo, freelancerName);
+    const link = generateWhatsAppLink(payload);
+    openExternalLink(link);
+    showToast(`Opening WhatsApp to dispatch task to ${wo.vendorName || "contractor"}...`);
   };
 
   // Attach receipt slip to payout
@@ -1179,6 +1213,15 @@ export default function OutsourcingView() {
                           <td>
                             <div className="record-actions">
                               <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleSendToWhatsApp(wo)}
+                                title={`Send task to ${wo.vendorName || "contractor"} on WhatsApp`}
+                                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </Button>
+                              <Button
                                 variant="secondary"
                                 size="small"
                                 onClick={() => handleOpenReviewModal(wo)}
@@ -1691,24 +1734,55 @@ export default function OutsourcingView() {
                   </>
                 ) : null}
 
-                <div className="pt-3 border-t border-line-neutral-100 flex items-center justify-end gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      if (typeof window !== "undefined") window.print();
-                    }}
-                  >
-                    Print Voucher
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      setSelectedWorkOrder(null);
-                      setSelectedVendor(null);
-                    }}
-                  >
-                    Close
-                  </Button>
+                <div className="pt-3 border-t border-line-neutral-100 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {selectedWorkOrder && (
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        type="button"
+                        onClick={() => handleSendToWhatsApp(selectedWorkOrder)}
+                        title="Send task details to contractor via WhatsApp"
+                        className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Send to WhatsApp</span>
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedWorkOrder && (
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        disabled={isExportingPdf}
+                        onClick={() => handleExportWorkOrderPdf(selectedWorkOrder.id)}
+                        title="Export and view vector PDF voucher"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{isExportingPdf ? "Exporting..." : "Download PDF Voucher"}</span>
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      onClick={() => {
+                        if (typeof window !== "undefined") window.print();
+                      }}
+                    >
+                      Print
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="small"
+                      onClick={() => {
+                        setSelectedWorkOrder(null);
+                        setSelectedVendor(null);
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

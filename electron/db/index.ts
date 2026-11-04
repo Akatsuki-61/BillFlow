@@ -99,7 +99,7 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
           fs.readFileSync(path.join(folder, "meta/_journal.json"), "utf8")
         ).entries;
         for (const entry of journalEntries) {
-          if (!existingTimestamps.has(entry.when)) {
+          if (entry.when <= 1791240000000 && !existingTimestamps.has(entry.when)) {
             sqlite.prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)").run("reconciled", entry.when);
           }
         }
