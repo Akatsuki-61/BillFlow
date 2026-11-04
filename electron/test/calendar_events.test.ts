@@ -11,6 +11,8 @@ import {
   getCalendarEvent,
 } from "../ipc/calendar";
 import { tasks, clients } from "../db/schema";
+import { exportWorkspace, importWorkspace, resetWorkspace } from "../backup";
+import { createProfile, listProfilesState, switchProfile } from "../ipc/profiles";
 
 let directory: string;
 let databasePath: string;
@@ -34,6 +36,41 @@ function restart() {
 }
 
 describe("Calendar Events SQLite Persistence & Integration", () => {
+  it("backs up, resets, and restores calendar links while accepting older backups", () => {
+    getDb().insert(clients).values({
+      id: "calendar-client", name: "Website client", contactPerson: "Client", email: "client@example.com",
+    }).run();
+    const event = createCalendarEvent({
+      title: "Website handover", startDate: "2026-11-10", clientId: "calendar-client",
+    });
+    const backup = exportWorkspace();
+    expect(backup.records?.calendar_events).toHaveLength(1);
+    resetWorkspace();
+    expect(listCalendarEvents()).toEqual([]);
+    importWorkspace(backup);
+    restart();
+    expect(getCalendarEvent(event.id).clientId).toBe("calendar-client");
+
+    const legacyBackup = exportWorkspace();
+    delete legacyBackup.records!.calendar_events;
+    importWorkspace(legacyBackup);
+    expect(listCalendarEvents()).toEqual([]);
+  });
+
+  it("isolates calendar data between profiles and preserves the active profile on restart", () => {
+    const state = createProfile({ name: "AI consulting", role: "consulting", seedRoleCatalog: false });
+    const profile = state.profiles.find(p => p.id !== "default")!;
+    const primaryEvent = createCalendarEvent({ title: "Website review", startDate: "2026-11-10" });
+    switchProfile(profile.id);
+    expect(listCalendarEvents()).toEqual([]);
+    const consultingEvent = createCalendarEvent({ title: "AI session", startDate: "2026-11-11" });
+    restart();
+    expect(listProfilesState().activeProfileId).toBe(profile.id);
+    expect(listCalendarEvents().map(e => e.id)).toEqual([consultingEvent.id]);
+    switchProfile("default");
+    expect(listCalendarEvents().map(e => e.id)).toEqual([primaryEvent.id]);
+  });
+
   it("creates, retrieves, and lists calendar events with restart persistence", () => {
     const event = createCalendarEvent({
       title: "Client Kickoff Meeting",

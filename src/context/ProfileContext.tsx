@@ -388,7 +388,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const current = loadBrowserFallbackState();
       const passwords = getBrowserPasswords();
       if (patch.password !== undefined) {
-        if (passwords[id] && patch.currentPassword !== undefined) {
+        if (passwords[id]) {
           if (passwords[id] !== patch.currentPassword) {
             throw new Error("Current password is incorrect.");
           }

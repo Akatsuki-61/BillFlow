@@ -795,7 +795,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle("invoices:exportPdf", async (_event, invoiceId: string) => {
     try {
       const filePath = await exportInvoicePdf(invoiceId);
-      return filePath;
+      return { success: true, filePath };
     } catch (err) {
       throw formatError(err);
     }

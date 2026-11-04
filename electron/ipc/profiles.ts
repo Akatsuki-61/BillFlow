@@ -467,10 +467,10 @@ export function updateProfile(id: string, patch: UpdateProfileInput): ProfileLis
     value.passwordHint !== undefined ? value.passwordHint : existing.passwordHint;
 
   if (value.password !== undefined) {
-    if (existing.passwordHash && existing.passwordSalt && value.currentPassword !== undefined) {
+    if (existing.passwordHash && existing.passwordSalt) {
       if (
         !verifyProfilePasswordHash(
-          value.currentPassword,
+          value.currentPassword ?? "",
           existing.passwordHash,
           existing.passwordSalt,
         )

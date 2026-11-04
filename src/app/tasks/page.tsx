@@ -1839,6 +1839,7 @@ function TasksContent() {
       <MotionPresence>
         {taskForSubmitWork && (
           <SubmitWorkModal
+            key={taskForSubmitWork.id}
             task={taskForSubmitWork}
             isOpen={Boolean(taskForSubmitWork)}
             onClose={handleCloseSubmitWork}

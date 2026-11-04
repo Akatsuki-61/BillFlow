@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
 import {
@@ -9,7 +9,6 @@ import {
   Copy,
   Check,
   Link2,
-  AlertCircle,
   Sparkles,
   Send,
   Building2,
@@ -49,25 +48,12 @@ export default function SubmitWorkModal({
     [task, clients, invoices],
   );
 
-  const [deliveryUrlInput, setDeliveryUrlInput] = useState("");
+  const [deliveryUrlInput, setDeliveryUrlInput] = useState(() => task.deliveryUrl?.trim() || resolved.url || "");
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [completeAllSubtasks, setCompleteAllSubtasks] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
-
-  // Sync state whenever task changes or modal opens
-  useEffect(() => {
-    if (isOpen && task) {
-      const initialUrl = task.deliveryUrl?.trim() || resolved.url || "";
-      setDeliveryUrlInput(initialUrl);
-      setDeliveryNotes("");
-      setCompleteAllSubtasks(true);
-      setUrlError(null);
-      setCopiedLink(false);
-      setCopiedMessage(false);
-    }
-  }, [isOpen, task, resolved.url]);
 
   if (!isOpen || !task) return null;
 

@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import { createHash } from "crypto";
 import { getTableColumns } from "drizzle-orm";
-import { updateSettingsSchema } from "./validation";
+import { newCalendarEventSchema, updateSettingsSchema } from "./validation";
 import { z } from "zod";
 import { getDb, getSqlite, migrateDatabase } from "./db";
 import { clients, invoices, settings, catalogItems, vendors } from "./db/schema";
@@ -12,7 +12,7 @@ import { managedAttachmentPath, MAX_RECEIPT_BYTES, receiptFormat, publishManaged
 import { createTaskSchema, deliveryLink, currencySchema, taskStatus } from "./workflow-validation";
 
 // Parent-first order; deleting uses the reverse order.
-export const backupTables = ["settings", "clients", "vendors", "catalog_items", "catalog_services", "invoices", "invoice_items", "invoice_payments", "tasks", "subtasks", "task_history", "expenses", "work_orders", "vendor_payouts", "attachments", "invoice_pdf_exports"] as const;
+export const backupTables = ["settings", "clients", "vendors", "catalog_items", "catalog_services", "invoices", "invoice_items", "invoice_payments", "tasks", "calendar_events", "subtasks", "task_history", "expenses", "work_orders", "vendor_payouts", "attachments", "invoice_pdf_exports"] as const;
 type Row = Record<string, string | number | null>;
 const backupSchema = z.object({
   version: z.literal("2"), exportedAt: z.string().datetime(), settings: z.unknown(), clients: z.array(z.unknown()), invoices: z.array(z.unknown()),
@@ -81,6 +81,17 @@ function validateRows(database: Database.Database, table: string, rows: Row[]) {
       createTaskSchema.parse({ id: row.id, title: row.title, description: row.description, status: row.status, priority: row.priority, category: row.category, assignee: JSON.parse(String(row.assignee)), dueDate: row.due_date, subtasks: [], deliveryUrl: row.delivery_url, currency: row.currency, outsourceBudgetCents: row.outsource_budget ?? undefined });
       if (Number(row.active_milliseconds) < 0 || ((row.status === "in-progress" && row.deleted_at === null) !== (row.active_since !== null))) throw new Error("Invalid task working-time state.");
     }
+    if (table === "calendar_events") {
+      newCalendarEventSchema.parse({
+        id: row.id, title: row.title, description: row.description,
+        startDate: row.start_date, endDate: row.end_date,
+        startTime: row.start_time, endTime: row.end_time,
+        isAllDay: Boolean(row.is_all_day), category: row.category, color: row.color,
+        clientId: row.client_id, clientName: row.client_name,
+        taskId: row.task_id, taskTitle: row.task_title, location: row.location,
+      });
+      if (![0, 1].includes(Number(row.is_all_day))) throw new Error("Invalid calendar all-day value.");
+    }
     if (table === "task_history") { taskStatus.parse(row.to_status); if (row.from_status !== null) taskStatus.parse(row.from_status); }
     if (table === "subtasks" && ![0,1].includes(Number(row.completed))) throw new Error("Invalid subtask completion.");
   }
@@ -94,6 +105,8 @@ function insertRows(database: Database.Database, table: string, rows: Row[]) {
 export function importWorkspace(input: ExportDataPayload) {
   if (input?.version !== "2") throw new Error("This backup predates complete workflow backups. Use the previous app version to restore it, then export a version 2 backup.");
   const payload = backupSchema.parse(input);
+  // Backups from before the calendar feature have no events.
+  payload.records.calendar_events ??= [];
   if (Object.keys(payload.records).length !== backupTables.length || backupTables.some(t => !Array.isArray(payload.records[t]))) throw new Error("Backup is missing required workflow tables.");
   if (payload.records.invoice_pdf_exports.length) throw new Error("Backup must not restore machine-local PDF paths.");
   const sandbox = new Database(":memory:");

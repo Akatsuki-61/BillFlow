@@ -1245,7 +1245,7 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
         feeCents: createdWo.feeCents,
         currency: createdWo.currency,
         status: createdWo.status,
-        payoutStatus: createdWo.payoutStatus,
+        payoutStatus: createdWo.payoutStatus || "PENDING",
         dueDate: createdWo.dueDate,
         vendor: {
           name: "Kasun Jayasuriya",

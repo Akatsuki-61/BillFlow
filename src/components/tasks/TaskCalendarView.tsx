@@ -9,23 +9,16 @@ import {
   Plus,
   CheckCircle2,
   AlertCircle,
-  Flag,
   MapPin,
-  ExternalLink,
   Link2,
-  Video,
   List,
   Grid3X3,
   CalendarDays,
-  Filter,
-  Layers,
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import type { TaskItem, TaskStatus, TaskPriority } from "@/types/tasks";
 import type { CalendarEventItem, EventCategory, EventColor } from "@/types/calendar";
-import { useData } from "@/lib/data/DataProvider";
 
 interface TaskCalendarViewProps {
   tasks: TaskItem[];

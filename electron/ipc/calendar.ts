@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { getDb } from "../db";
 import { calendarEvents, clients, tasks } from "../db/schema";

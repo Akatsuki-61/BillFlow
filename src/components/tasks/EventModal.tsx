@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { MotionSurface } from "@/components/ui/MotionSurface";
 import { useData } from "@/lib/data/DataProvider";
 import type {
   CalendarEventItem,
@@ -39,8 +39,7 @@ const COLOR_OPTIONS: { id: EventColor; label: string; bgClass: string; borderCla
   { id: "cyan", label: "Cyan", bgClass: "bg-surface-cyan-500", borderClass: "border-line-cyan-400" },
 ];
 
-export default function EventModal({
-  isOpen,
+function EventForm({
   onClose,
   eventToEdit,
   initialDate,
@@ -49,56 +48,20 @@ export default function EventModal({
 }: EventModalProps) {
   const { clients, tasks, createEvent, updateEvent, deleteEvent } = useData();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [isAllDay, setIsAllDay] = useState(false);
-  const [category, setCategory] = useState<EventCategory>("meeting");
-  const [color, setColor] = useState<EventColor>("blue");
-  const [clientId, setClientId] = useState<string>("");
-  const [taskId, setTaskId] = useState<string>("");
-  const [location, setLocation] = useState("");
+  const [title, setTitle] = useState(eventToEdit?.title || "");
+  const [description, setDescription] = useState(eventToEdit?.description || "");
+  const [startDate, setStartDate] = useState(() => eventToEdit?.startDate || initialDate || new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState(eventToEdit?.endDate || "");
+  const [startTime, setStartTime] = useState(eventToEdit ? eventToEdit.startTime || "" : "10:00");
+  const [endTime, setEndTime] = useState(eventToEdit ? eventToEdit.endTime || "" : "11:00");
+  const [isAllDay, setIsAllDay] = useState(eventToEdit?.isAllDay || false);
+  const [category, setCategory] = useState<EventCategory>(eventToEdit?.category || "meeting");
+  const [color, setColor] = useState<EventColor>(eventToEdit?.color || "blue");
+  const [clientId, setClientId] = useState(eventToEdit?.clientId || "");
+  const [taskId, setTaskId] = useState(eventToEdit?.taskId || initialTaskId || "");
+  const [location, setLocation] = useState(eventToEdit?.location || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      if (eventToEdit) {
-        setTitle(eventToEdit.title);
-        setDescription(eventToEdit.description || "");
-        setStartDate(eventToEdit.startDate);
-        setEndDate(eventToEdit.endDate || "");
-        setStartTime(eventToEdit.startTime || "");
-        setEndTime(eventToEdit.endTime || "");
-        setIsAllDay(eventToEdit.isAllDay);
-        setCategory(eventToEdit.category);
-        setColor(eventToEdit.color);
-        setClientId(eventToEdit.clientId || "");
-        setTaskId(eventToEdit.taskId || "");
-        setLocation(eventToEdit.location || "");
-      } else {
-        const todayStr = initialDate || new Date().toISOString().split("T")[0];
-        setTitle("");
-        setDescription("");
-        setStartDate(todayStr);
-        setEndDate("");
-        setStartTime("10:00");
-        setEndTime("11:00");
-        setIsAllDay(false);
-        setCategory("meeting");
-        setColor("blue");
-        setClientId("");
-        setTaskId(initialTaskId || "");
-        setLocation("");
-      }
-      setError(null);
-    }
-  }, [isOpen, eventToEdit, initialDate, initialTaskId]);
-
-  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -449,4 +412,9 @@ export default function EventModal({
       </MotionSurface>
     </div>
   );
+}
+
+export default function EventModal(props: EventModalProps) {
+  if (!props.isOpen) return null;
+  return <EventForm key={props.eventToEdit?.id || `${props.initialDate}-${props.initialTaskId}`} {...props} />;
 }

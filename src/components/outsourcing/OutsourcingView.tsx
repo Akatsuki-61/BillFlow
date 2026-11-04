@@ -26,7 +26,6 @@ import {
   FileCheck,
   RotateCcw,
   MessageCircle,
-  Share2,
 } from "lucide-react";
 
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";

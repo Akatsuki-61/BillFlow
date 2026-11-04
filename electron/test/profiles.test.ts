@@ -174,6 +174,13 @@ describe("Netflix-Style Multi-Profile Engine, Password Locks & Role Onboarding",
     )!;
     expect(opsProfile.hasPassword).toBe(true);
 
+    expect(() => updateProfile(opsProfile.id, { password: null })).toThrow(
+      /Current password is incorrect/,
+    );
+    expect(() => updateProfile(opsProfile.id, { password: "replacement" })).toThrow(
+      /Current password is incorrect/,
+    );
+
     // Updating password with wrong currentPassword fails
     expect(() =>
       updateProfile(opsProfile.id, {
