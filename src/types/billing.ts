@@ -126,6 +126,9 @@ export interface Invoice {
 export interface InvoiceWithClient extends Invoice {
   clientName: string;
   clientEmail?: string;
+  clientPhone?: string | null;
+  clientContactPerson?: string | null;
+  clientCategory?: string | null;
   items?: InvoiceItem[];
   payments?: InvoicePayment[];
 }

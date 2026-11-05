@@ -1702,7 +1702,13 @@ export function WidgetRenderer({
             </div>
 
             <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between text-[12px] text-content-neutral-500">
-              <span>Actionable collection queue</span>
+              <Link
+                href="/invoices?view=overdue-summary"
+                className="text-rose-600 dark:text-rose-400 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Aging Breakdown</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
               <Link
                 href="/invoices"
                 className="text-content-neutral-900 font-medium hover:underline inline-flex items-center gap-1"

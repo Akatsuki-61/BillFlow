@@ -3,7 +3,7 @@
 import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
-import { recentMonths, isPastDue } from "@/lib/visual-metrics";
+import { recentMonths, isPastDue, localDateKey } from "@/lib/visual-metrics";
 
 import {
   Button,
@@ -34,7 +34,16 @@ import {
   ChevronDown,
   RotateCcw,
   Upload,
+  AlertTriangle,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
+import { OverdueSummaryDialog } from "./OverdueSummaryDialog";
+import {
+  generateInvoicesCsv,
+  generateOverdueSummaryCsv,
+  downloadCsvFile,
+} from "@/lib/csv-export";
 import {
   useInvoices,
   useClients,
@@ -233,6 +242,57 @@ export default function InvoicesView() {
     );
     return () => clearTimeout(timer);
   }, [invoiceHighlightParam]);
+
+  // Overdue Summary Modal state
+  const [showOverdueSummary, setShowOverdueSummary] = useState(false);
+
+  // Check URL search parameters for overdue summary view
+  const viewParam = searchParams.get("view");
+  const summaryParam = searchParams.get("summary");
+  useEffect(() => {
+    if (viewParam === "overdue-summary" || summaryParam === "overdue") {
+      setShowOverdueSummary(true);
+    }
+  }, [viewParam, summaryParam]);
+
+  // Export Invoices CSV handler
+  const handleExportInvoicesCsv = (
+    type: "current" | "selected" | "overdue" | "all",
+  ) => {
+    try {
+      const todayStr = localDateKey();
+      if (type === "selected") {
+        const selected = allInvoices.filter((inv) =>
+          selectedIds.includes(inv.id),
+        );
+        if (selected.length === 0) {
+          showToast("No invoices selected for export", "error");
+          return;
+        }
+        const csv = generateInvoicesCsv(selected, { includeSummaryRow: true });
+        downloadCsvFile(`invoices-selected-${todayStr}.csv`, csv);
+        showToast(`Exported ${selected.length} selected invoices to CSV.`);
+      } else if (type === "overdue") {
+        const csv = generateOverdueSummaryCsv(allInvoices);
+        downloadCsvFile(`overdue-invoices-summary-${todayStr}.csv`, csv);
+        showToast("Exported overdue invoices summary to CSV.");
+      } else if (type === "all") {
+        const csv = generateInvoicesCsv(allInvoices, {
+          includeSummaryRow: true,
+        });
+        downloadCsvFile(`invoices-all-${todayStr}.csv`, csv);
+        showToast(`Exported all ${allInvoices.length} invoices to CSV.`);
+      } else {
+        const csv = generateInvoicesCsv(filteredInvoices, {
+          includeSummaryRow: true,
+        });
+        downloadCsvFile(`invoices-filtered-${todayStr}.csv`, csv);
+        showToast(`Exported ${filteredInvoices.length} invoices to CSV.`);
+      }
+    } catch {
+      showToast("Failed to generate CSV export file", "error");
+    }
+  };
 
   const linkedClient = clients.find(
     (client) => client.id === clientFilterParam,
@@ -1342,24 +1402,41 @@ export default function InvoicesView() {
             <section className="lg:col-span-3 ui-card p-6 space-y-5">
               <div className="flex items-center justify-between gap-3">
                 <h2>Overdue</h2>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setActiveTab(
-                      activeTab === "Overdue" ? "All Invoices" : "Overdue",
-                    )
-                  }
-                  className="zentra-circle-btn zentra-circle-btn--sm"
-                  aria-label="Filter overdue invoices"
-                >
-                  <AlertCircle className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleExportInvoicesCsv("overdue")}
+                    className="zentra-circle-btn zentra-circle-btn--sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                    aria-label="Export overdue invoices to CSV"
+                    title="Export Overdue Invoices to CSV"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowOverdueSummary(true)}
+                    className="zentra-circle-btn zentra-circle-btn--sm text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                    aria-label="View Overdue Summary and Aging"
+                    title="View Overdue Summary and Aging Breakdown"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <div>
                 <div className="summary-value">{money(pastDue)}</div>
-                <p className="summary-caption">
-                  {overdue.length} invoices with a past-due balance
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="summary-caption">
+                    {overdue.length} invoices with a past-due balance
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowOverdueSummary(true)}
+                    className="text-[11.5px] text-accent hover:underline font-medium cursor-pointer"
+                  >
+                    Breakdown →
+                  </button>
+                </div>
               </div>
               <MonthlyBars
                 label="Unpaid balance by due month"
@@ -1408,28 +1485,66 @@ export default function InvoicesView() {
               ] as FilterTab[]
             ).map((value) => ({ value, label: value }))}
           />
+
+          {activeTab === "Overdue" && (
+            <Button
+              variant="secondary"
+              size="small"
+              type="button"
+              onClick={() => setShowOverdueSummary(true)}
+              className="text-rose-700 bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900"
+              title="Open Overdue Summary & Aging Analysis"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Overdue Summary</span>
+            </Button>
+          )}
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search invoices, clients, deliverables..."
-            className="ui-field ui-search-input w-full pl-9 pr-8 text-xs !rounded-full"
-            style={{ paddingLeft: "38px" }}
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5"
-              aria-label="Clear search"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search invoices, clients..."
+              className="ui-field ui-search-input w-full pl-9 pr-8 text-xs !rounded-full"
+              style={{ paddingLeft: "38px" }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <Button
+            variant="secondary"
+            size="small"
+            type="button"
+            onClick={() =>
+              handleExportInvoicesCsv(
+                activeTab === "Overdue" ? "overdue" : "current",
+              )
+            }
+            title={
+              activeTab === "Overdue"
+                ? "Export overdue summary report to CSV"
+                : "Export currently filtered invoices to CSV"
+            }
+            className="shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>
+              {activeTab === "Overdue" ? "Export Overdue CSV" : "Export CSV"}
+            </span>
+          </Button>
         </div>
       </div>
 
@@ -1446,9 +1561,22 @@ export default function InvoicesView() {
             </span>
           </div>
           {selectedIds.length > 0 && (
-            <span className="text-[12px] font-medium text-accent">
-              {selectedIds.length} selected
-            </span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-[12px] font-medium text-accent">
+                {selectedIds.length} selected
+              </span>
+              <Button
+                variant="secondary"
+                size="small"
+                type="button"
+                onClick={() => handleExportInvoicesCsv("selected")}
+                className="!text-xs !py-1 text-accent"
+                title="Export selected invoices to CSV"
+              >
+                <Download className="w-3 h-3" />
+                <span>Export Selected to CSV</span>
+              </Button>
+            </div>
           )}
         </div>
 
@@ -3156,6 +3284,19 @@ export default function InvoicesView() {
           </Dialog>
         )}
       </MotionPresence>
+
+      {/* Overdue Invoices Summary & Collections Modal */}
+      <OverdueSummaryDialog
+        isOpen={showOverdueSummary}
+        onClose={() => setShowOverdueSummary(false)}
+        invoices={allInvoices}
+        primaryCurrency={primaryCurrency}
+        freelancerName={settings?.businessName || "Chethaka"}
+        paymentInstructions={settings?.paymentDetails}
+        onFilterToOverdue={() => setActiveTab("Overdue")}
+        onInspectInvoice={(inv) => setInspectingInvoice(inv)}
+        showToast={showToast}
+      />
 
       {/* Floating Backdrop for outside clicks */}
       {(actionMenu || statusMenu) && (
