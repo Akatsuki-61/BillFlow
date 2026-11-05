@@ -1287,7 +1287,16 @@ export default function InvoicesView() {
         title="Invoices"
         description="Create invoices, record deposits and keep every payment in view."
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowOverdueSummary(true)}
+            className="zentra-control-pill"
+            title="Open Overdue Invoices Summary & Professional CSV Template Table"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Overdue Summary & CSV Template</span>
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab("Advance Paid")}
