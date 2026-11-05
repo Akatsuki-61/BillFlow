@@ -47,6 +47,15 @@ if (process.env.BILLFLOW_USER_DATA) {
   app.setPath("userData", process.env.BILLFLOW_USER_DATA);
 }
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    showMainWindow();
+  });
+}
+
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 

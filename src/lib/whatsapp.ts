@@ -15,6 +15,19 @@ export interface WhatsAppTaskPayload {
   freelancerName?: string;
 }
 
+export interface WhatsAppInvoicePayload {
+  clientName: string;
+  clientPhone?: string | null;
+  invoiceCode: string;
+  totalFormatted: string;
+  advanceFormatted?: string | null;
+  balanceFormatted: string;
+  dueDate?: string | null;
+  deliveryUrl?: string | null;
+  paymentDetails?: string | null;
+  businessName?: string;
+}
+
 /**
  * Normalizes phone numbers to standard E.164 digits for WhatsApp links.
  * Strips out spaces, dashes, parentheses, and leading plus sign.
@@ -73,6 +86,96 @@ export function generateWhatsAppLink(data: WhatsAppTaskPayload): string {
   const message = buildContractorWhatsAppMessage(data);
   const encoded = encodeURIComponent(message);
   return phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+}
+
+/**
+ * Builds a professional invoice delivery message for client via WhatsApp.
+ */
+export function buildInvoiceWhatsAppMessage(data: WhatsAppInvoicePayload): string {
+  const parts: string[] = [];
+  parts.push(`Hi ${data.clientName.trim()}, here is your invoice summary:`);
+  parts.push("");
+  parts.push(`📄 *Invoice Ref:* ${data.invoiceCode}`);
+  parts.push(`💰 *Total Amount:* ${data.totalFormatted}`);
+  if (data.advanceFormatted) {
+    parts.push(`💳 *Required Advance:* ${data.advanceFormatted}`);
+  }
+  parts.push(`⚖️ *Balance Due:* ${data.balanceFormatted}`);
+  if (data.dueDate) {
+    parts.push(`📅 *Due Date:* ${data.dueDate}`);
+  }
+  if (data.deliveryUrl) {
+    parts.push(`🔗 *Project Workspace / Delivery Link:* ${data.deliveryUrl}`);
+  }
+  if (data.paymentDetails) {
+    parts.push("");
+    parts.push(`🏦 *Payment Instructions:*`);
+    parts.push(data.paymentDetails);
+  }
+  parts.push("");
+  parts.push("Thank you for your business! Please reply or share the payment confirmation once transferred.");
+  if (data.businessName) {
+    parts.push(`— ${data.businessName}`);
+  }
+  return parts.join("\n");
+}
+
+/**
+ * Generates a WhatsApp sharing link for an invoice.
+ */
+export function generateInvoiceWhatsAppLink(data: WhatsAppInvoicePayload): string {
+  const phone = normalizeWhatsAppPhone(data.clientPhone);
+  const message = buildInvoiceWhatsAppMessage(data);
+  const encoded = encodeURIComponent(message);
+  return phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+}
+
+/**
+ * Generates an email `mailto:` link for sharing an invoice with pre-filled subject and body.
+ */
+export function generateInvoiceEmailLink(data: {
+  clientEmail?: string | null;
+  clientName: string;
+  invoiceCode: string;
+  totalFormatted: string;
+  advanceFormatted?: string | null;
+  balanceFormatted: string;
+  dueDate?: string | null;
+  deliveryUrl?: string | null;
+  paymentDetails?: string | null;
+  businessName?: string;
+}): string {
+  const subject = encodeURIComponent(`Invoice ${data.invoiceCode} from ${data.businessName || "BillFlow"}`);
+  const lines: string[] = [
+    `Hi ${data.clientName},`,
+    "",
+    `Here is the summary for invoice ${data.invoiceCode}:`,
+    "",
+    `Total Amount: ${data.totalFormatted}`,
+  ];
+  if (data.advanceFormatted) {
+    lines.push(`Required Advance: ${data.advanceFormatted}`);
+  }
+  lines.push(`Balance Due: ${data.balanceFormatted}`);
+  if (data.dueDate) {
+    lines.push(`Due Date: ${data.dueDate}`);
+  }
+  if (data.deliveryUrl) {
+    lines.push(`Project Workspace / Delivery Link: ${data.deliveryUrl}`);
+  }
+  if (data.paymentDetails) {
+    lines.push("");
+    lines.push("Payment Instructions:");
+    lines.push(data.paymentDetails);
+  }
+  lines.push("");
+  lines.push("Thank you for your business!");
+  if (data.businessName) {
+    lines.push(`— ${data.businessName}`);
+  }
+
+  const body = encodeURIComponent(lines.join("\n"));
+  return `mailto:${data.clientEmail || ""}?subject=${subject}&body=${body}`;
 }
 
 /**

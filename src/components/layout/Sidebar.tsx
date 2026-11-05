@@ -21,7 +21,6 @@ import {
   Shapes,
   CreditCard,
   GitFork,
-  CalendarDays,
   BarChart3,
   LayoutGrid,
   X,
@@ -57,7 +56,6 @@ const mainNavItems: NavItem[] = [
     icon: GitFork,
   },
   { id: "tasks", name: "Tasks", href: "/tasks", icon: ClipboardList },
-  { id: "calendar", name: "Calendar", href: "/calendar", icon: CalendarDays },
   { id: "analytics", name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
 
@@ -192,15 +190,15 @@ export default function Sidebar() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <header className="workspace-nav w-full shrink-0 bg-canvas select-none z-30 app-no-drag">
-        <div className="max-w-[1440px] mx-auto px-8 h-[68px] grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4">
+      <header className="workspace-nav w-full shrink-0 bg-canvas select-none z-30 app-drag-region">
+        <div className="max-w-[1440px] mx-auto px-8 h-[68px] grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4 app-drag-region">
           {/* Left: Brand Identity */}
-          <div className="flex items-center justify-self-start">
+          <div className="flex items-center justify-self-start app-drag-region">
             <Link
               href="/"
-              className="flex items-center gap-2.5 shrink-0 group focus:outline-none"
+              className="flex items-center gap-2.5 shrink-0 group focus:outline-none app-drag-region cursor-default"
             >
-              <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105">
+              <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 pointer-events-none">
                 <Image
                   src="/brand/logo-color.png"
                   alt=""
@@ -217,7 +215,7 @@ export default function Sidebar() {
                   className="hidden dark:block"
                 />
               </div>
-              <span className="text-[21px] font-semibold tracking-[-0.04em] text-content-neutral-950 leading-none">
+              <span className="text-[21px] font-semibold tracking-[-0.04em] text-content-neutral-950 leading-none pointer-events-none">
                 BillFlow
               </span>
             </Link>
@@ -227,7 +225,7 @@ export default function Sidebar() {
           <nav
             aria-label="Main Navigation"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            className="flex items-center justify-center justify-self-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar py-1 max-w-full"
+            className="flex items-center justify-center justify-self-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar py-1 max-w-full app-no-drag"
           >
             {mainNavItems.map((item) => {
               const isActive = isNavActive(pathname, item.href);
@@ -301,7 +299,7 @@ export default function Sidebar() {
           </nav>
 
           {/* Right: Circular Utility Controls (Search, Activity/Support, Profile/Settings) */}
-          <div className="flex items-center justify-self-end gap-2.5 shrink-0">
+          <div className="flex items-center justify-self-end gap-2.5 shrink-0 app-no-drag">
             {/* Quick Search Popover */}
             <div className="relative" ref={searchRef}>
               <button

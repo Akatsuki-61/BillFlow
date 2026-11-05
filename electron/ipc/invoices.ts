@@ -1,4 +1,5 @@
-import { ipcMain } from "electron";
+import { ipcMain, dialog, BrowserWindow } from "electron";
+import fs from "fs";
 import crypto from "crypto";
 import { eq, desc, asc } from "drizzle-orm";
 import { getDb } from "../db";
@@ -23,7 +24,7 @@ import { newInvoiceSchema, invoicePatchSchema, recordPaymentSchema, promoteInvoi
 import { getOrCreateSettings } from "./settings";
 import { AppError, formatError } from "./errors";
 import { saveInvoicePdf } from "./files";
-import { generateInvoicePdfBuffer } from "../pdf-generator";
+import { generateInvoiceHtmlPdfBuffer } from "../pdf-generator";
 import {
   InvoiceWithClient,
   NewInvoiceInput,
@@ -124,7 +125,41 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
   });
 }
 
-export async function exportInvoicePdf(invoiceId: string): Promise<string> {
+export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string): Promise<{ invoice: any; pdfBuffer: Buffer }> {
+  const profile = getOrCreateSettings();
+
+  if (invoiceId === "sample-preview" || invoiceId === "draft-preview") {
+    const payload = {
+      code: "INV-2026-001",
+      issueDate: new Date().toISOString().split("T")[0],
+      dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+      currency: profile.defaultCurrency || "USD",
+      status: "ADVANCE_PAID",
+      items: [
+        { description: "Business Website Development & Integration", quantity: 1, unitPriceCents: 8000000 },
+        { description: "AI Consulting Session & Support Automation Roadmap", quantity: 1, unitPriceCents: 2000000 }
+      ],
+      amountCents: 9000000,
+      advanceCents: 4500000,
+      paidCents: 4500000,
+      discountCents: 1000000,
+      taxCents: 0,
+      deliveryUrl: "https://github.com/Chethaka/acme-web-platform",
+      notes: "Milestone 1 begins upon advance receipt. Full code and deployment upon final settlement.",
+      client: { name: "Acme Cloud Corp", email: "billing@acmecloud.com" },
+      business: {
+        businessName: profile.businessName,
+        professionalTitle: profile.professionalTitle,
+        email: profile.email,
+        phone: profile.phone,
+        taxId: profile.taxId,
+        paymentDetails: profile.paymentDetails,
+      }
+    };
+    const pdfBuffer = await generateInvoiceHtmlPdfBuffer(payload);
+    return { invoice: payload, pdfBuffer };
+  }
+
   const db = getDb();
   const invoice = db.select().from(invoices).where(eq(invoices.id, invoiceId)).get();
   if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
@@ -136,7 +171,6 @@ export async function exportInvoicePdf(invoiceId: string): Promise<string> {
     ? JSON.parse(invoice.clientSnapshot)
     : { name: client?.name || "Client", email: client?.email };
 
-  const profile = getOrCreateSettings();
   const items = db
     .select()
     .from(invoiceItems)
@@ -144,7 +178,7 @@ export async function exportInvoicePdf(invoiceId: string): Promise<string> {
     .orderBy(asc(invoiceItems.position))
     .all();
 
-  const pdfBuffer = await generateInvoicePdfBuffer({
+  const pdfBuffer = await generateInvoiceHtmlPdfBuffer({
     code: invoice.code,
     issueDate: invoice.issueDate,
     dueDate: invoice.dueDate,
@@ -166,7 +200,44 @@ export async function exportInvoicePdf(invoiceId: string): Promise<string> {
     business: profile,
   });
 
+  return { invoice, pdfBuffer };
+}
+
+export async function exportInvoicePdf(invoiceId: string): Promise<string> {
+  const { pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(invoiceId);
   return saveInvoicePdf(invoiceId, pdfBuffer);
+}
+
+export async function saveInvoicePdfAs(invoiceId: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> {
+  const { invoice, pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(invoiceId);
+  const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+  const defaultName = `Invoice-${(invoice.code || "INV").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+  const options = {
+    title: "Save Invoice as PDF",
+    defaultPath: defaultName,
+    filters: [{ name: "PDF Documents", extensions: ["pdf"] }],
+  };
+  const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+
+  if (result.canceled || !result.filePath) {
+    return { success: false, canceled: true };
+  }
+
+  const chosenPath = result.filePath;
+  fs.writeFileSync(chosenPath, pdfBuffer);
+
+  if (invoiceId !== "sample-preview" && invoiceId !== "draft-preview") {
+    const db = getDb();
+    db.insert(invoicePdfExports)
+      .values({ invoiceId, filePath: chosenPath, exportedAt: new Date().toISOString() })
+      .onConflictDoUpdate({
+        target: invoicePdfExports.invoiceId,
+        set: { filePath: chosenPath, exportedAt: new Date().toISOString() },
+      })
+      .run();
+  }
+
+  return { success: true, canceled: false, filePath: chosenPath };
 }
 
 export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
@@ -796,6 +867,14 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
     try {
       const filePath = await exportInvoicePdf(invoiceId);
       return { success: true, filePath };
+    } catch (err) {
+      throw formatError(err);
+    }
+  });
+
+  ipcMain.handle("invoices:savePdfAs", async (_event, invoiceId: string) => {
+    try {
+      return await saveInvoicePdfAs(invoiceId);
     } catch (err) {
       throw formatError(err);
     }

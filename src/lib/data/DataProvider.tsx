@@ -98,6 +98,7 @@ interface DataContextType {
   recordPayment: (input: RecordPaymentInput) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
   listPayments: (invoiceId: string) => Promise<InvoicePayment[]>;
   exportInvoicePdf: (invoiceId: string) => Promise<{ success: boolean; filePath: string }>;
+  saveInvoicePdfAs: (invoiceId: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
   openInvoicePdf: (invoiceId: string, reveal?: boolean) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
   getNextInvoiceCode: () => Promise<string>;
@@ -516,6 +517,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       return await window.billflow.invoices.exportPdf(invoiceId);
     }
     return { success: true, filePath: "invoice.pdf" };
+  };
+
+  const saveInvoicePdfAs = async (invoiceId: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> => {
+    if (checkIsElectron() && window.billflow?.invoices?.savePdfAs) {
+      return await window.billflow.invoices.savePdfAs(invoiceId);
+    }
+    window.print();
+    return { success: true, canceled: false };
   };
 
   const openInvoicePdf = async (invoiceId: string, reveal?: boolean): Promise<void> => {
@@ -1404,6 +1413,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         recordPayment,
         listPayments,
         exportInvoicePdf,
+        saveInvoicePdfAs,
         openInvoicePdf,
         deleteInvoice,
         getNextInvoiceCode,
@@ -1472,6 +1482,7 @@ export function useInvoices(filter?: { clientId?: string }) {
     recordPayment,
     listPayments,
     exportInvoicePdf,
+    saveInvoicePdfAs,
     openInvoicePdf,
     deleteInvoice,
     getNextInvoiceCode,
@@ -1496,6 +1507,7 @@ export function useInvoices(filter?: { clientId?: string }) {
     recordPayment,
     listPayments,
     exportInvoicePdf,
+    saveInvoicePdfAs,
     openInvoicePdf,
     deleteInvoice,
     getNextInvoiceCode,

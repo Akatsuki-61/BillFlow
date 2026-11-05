@@ -4,6 +4,9 @@ import {
   buildContractorWhatsAppMessage,
   generateWhatsAppLink,
   createWhatsAppPayloadFromWorkOrder,
+  buildInvoiceWhatsAppMessage,
+  generateInvoiceWhatsAppLink,
+  generateInvoiceEmailLink,
 } from "../whatsapp";
 import type { WorkOrderItem } from "@/types/outsourcing";
 
@@ -82,5 +85,44 @@ describe("Contractor WhatsApp Integration", () => {
     expect(payload.feeFormatted).toBe("Rs. 30,000.00");
     expect(payload.voucherNumber).toBe("10ABCDEF");
     expect(payload.freelancerName).toBe("Chethaka");
+  });
+
+  it("builds and encodes invoice WhatsApp message and link", () => {
+    const link = generateInvoiceWhatsAppLink({
+      clientName: "Alice Cooper",
+      clientPhone: "0771234567",
+      invoiceCode: "SE-2026-002",
+      totalFormatted: "$1,500.00",
+      advanceFormatted: "$750.00",
+      balanceFormatted: "$1,500.00",
+      dueDate: "2026-11-11",
+      deliveryUrl: "https://github.com/client/repo",
+      paymentDetails: "Commercial Bank A/C 12345678",
+      businessName: "Chethaka Lakshitha",
+    });
+
+    expect(link.startsWith("https://wa.me/94771234567?text=")).toBe(true);
+    const decoded = decodeURIComponent(link);
+    expect(decoded).toContain("Hi Alice Cooper");
+    expect(decoded).toContain("SE-2026-002");
+    expect(decoded).toContain("$1,500.00");
+    expect(decoded).toContain("$750.00");
+    expect(decoded).toContain("Commercial Bank A/C 12345678");
+  });
+
+  it("generates mailto link for invoice", () => {
+    const mailto = generateInvoiceEmailLink({
+      clientEmail: "alice@example.com",
+      clientName: "Alice",
+      invoiceCode: "INV-500",
+      totalFormatted: "$800.00",
+      balanceFormatted: "$800.00",
+      businessName: "Studio X",
+    });
+
+    expect(mailto.startsWith("mailto:alice@example.com?subject=")).toBe(true);
+    const decoded = decodeURIComponent(mailto);
+    expect(decoded).toContain("Invoice INV-500 from Studio X");
+    expect(decoded).toContain("Total Amount: $800.00");
   });
 });

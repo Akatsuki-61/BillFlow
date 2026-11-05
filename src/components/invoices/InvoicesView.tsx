@@ -34,6 +34,7 @@ import {
   ChevronDown,
   RotateCcw,
   Upload,
+  Eye,
 } from "lucide-react";
 import {
   useInvoices,
@@ -56,6 +57,7 @@ import type {
 import type { AttachmentItem } from "@/types/workflow";
 
 import "./invoices.css";
+import InvoiceDocumentSheet from "./InvoiceDocumentSheet";
 
 type FilterTab =
   | "All Invoices"
@@ -127,6 +129,59 @@ export default function InvoicesView() {
   const [expiredInvoiceHighlight, setExpiredInvoiceHighlight] = useState<
     string | null
   >(null);
+
+  // Document Design Preview Sheet Modal
+  const [previewInvoice, setPreviewInvoice] = useState<InvoiceWithClient | null>(null);
+
+  const getSampleInvoice = (): InvoiceWithClient => ({
+    id: "sample-preview",
+    code: "INV-2026-001",
+    clientName: "Acme Cloud Corp",
+    clientEmail: "billing@acmecloud.com",
+    clientId: null,
+    currency: (settings?.defaultCurrency as Currency) || "USD",
+    status: "ADVANCE_PAID",
+    issueDate: new Date().toISOString(),
+    dueDate: new Date(Date.now() + 14 * 86400000).toISOString(),
+    amountCents: 9000000,
+    advanceCents: 4500000,
+    paidCents: 4500000,
+    taxCents: 0,
+    discountCents: 1000000,
+    notes: "Milestone 1 (Website staging) begins upon advance receipt. Full code and deployment upon final settlement.",
+    deliveryUrl: "https://github.com/Chethaka/acme-web-platform",
+    items: [
+      {
+        id: "it-1",
+        invoiceId: "sample-preview",
+        description: "Business Website Development & Integration",
+        quantity: 1,
+        unitPriceCents: 8000000,
+        position: 0,
+      },
+      {
+        id: "it-2",
+        invoiceId: "sample-preview",
+        description: "AI Consulting Session & Support Automation Roadmap",
+        quantity: 1,
+        unitPriceCents: 2000000,
+        position: 1,
+      },
+    ],
+    payments: [
+      {
+        id: "pay-1",
+        invoiceId: "sample-preview",
+        amountCents: 4500000,
+        currency: (settings?.defaultCurrency as Currency) || "USD",
+        receivedAt: new Date().toISOString(),
+        reference: "50% upfront project deposit",
+        requestId: "req-1",
+      },
+    ],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
 
   // Add Invoice Modal state
   const [showAddInvoiceModal, setShowAddInvoiceModal] =
@@ -1230,6 +1285,19 @@ export default function InvoicesView() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
+            onClick={() => {
+              const target =
+                allInvoices.length > 0 ? allInvoices[0] : getSampleInvoice();
+              setPreviewInvoice(target);
+            }}
+            className="zentra-control-pill hover:border-[#00A887] text-[#00A887]"
+            title="Preview the geometric EPS invoice design template"
+          >
+            <Eye className="w-3.5 h-3.5 text-[#00A887]" />
+            <span>Preview Template</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab("Advance Paid")}
             className="zentra-control-pill"
           >
@@ -1495,14 +1563,24 @@ export default function InvoicesView() {
                       icon={<Receipt />}
                     >
                       {allInvoices.length === 0 && (
-                        <Button
-                          variant="primary"
-                          onClick={handleOpenAddModal}
-                          className="mt-4"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>New Invoice</span>
-                        </Button>
+                        <div className="flex items-center gap-2.5 mt-4">
+                          <Button
+                            variant="primary"
+                            onClick={handleOpenAddModal}
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>New Invoice</span>
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() =>
+                              setPreviewInvoice(getSampleInvoice())
+                            }
+                          >
+                            <Eye className="w-4 h-4 text-[#00A887]" />
+                            <span>Preview Template Design</span>
+                          </Button>
+                        </div>
                       )}
                     </EmptyState>
                   </td>
@@ -1559,10 +1637,16 @@ export default function InvoicesView() {
                             ) : (
                               <p className="record-title">{inv.clientName}</p>
                             )}
-                            <p className="record-meta">
-                              {inv.code}
-                              {!inv.clientId ? " · Temporary client" : ""}
-                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewInvoice(inv)}
+                              className="record-meta hover:text-[#00A887] hover:underline font-mono cursor-pointer text-left inline-flex items-center gap-1.5"
+                              title={`View invoice design ${inv.code}`}
+                            >
+                              <span>{inv.code}</span>
+                              <Eye className="w-3 h-3 text-[#00A887]/70" />
+                              {!inv.clientId ? " · Temporary" : ""}
+                            </button>
                             {(() => {
                               const resolved = resolveDeliveryUrl(inv, {
                                 clients,
@@ -1675,6 +1759,18 @@ export default function InvoicesView() {
                               <CreditCard className="w-4 h-4" />
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setActionMenu(null);
+                              setStatusMenu(null);
+                              setPreviewInvoice(inv);
+                            }}
+                            title={`View invoice design ${inv.code}`}
+                          >
+                            <Eye className="w-4 h-4 text-[#00A887]" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -2237,6 +2333,54 @@ export default function InvoicesView() {
                   onClick={() => closeAddInvoiceModal()}
                 >
                   Cancel
+                </Button>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => {
+                    const targetClient = clients.find(
+                      (c) => c.id === newClientId,
+                    );
+                    const draftPreview: InvoiceWithClient = {
+                      id: "draft-preview",
+                      code: newCode || "INV-DRAFT",
+                      clientName:
+                        targetClient?.name || clientName || "Client Name",
+                      clientEmail: targetClient?.email || clientEmail || "",
+                      clientId: newClientId || null,
+                      currency: newCurrency,
+                      status: newStatus,
+                      issueDate: new Date().toISOString(),
+                      dueDate:
+                        newDueDate ||
+                        new Date(Date.now() + 14 * 86400000).toISOString(),
+                      amountCents: Math.round(calculatedTotal * 100),
+                      advanceCents: requireAdvance
+                        ? Math.round(advanceAmountDue * 100)
+                        : 0,
+                      paidCents: 0,
+                      taxCents: Math.round(taxVal * 100),
+                      discountCents: Math.round(discountVal * 100),
+                      notes: newNotes,
+                      deliveryUrl: newDeliveryUrl,
+                      items: newLineItems.map((li, idx) => ({
+                        id: li.id || `it-${idx}`,
+                        invoiceId: "draft-preview",
+                        description: li.description || "Service item",
+                        quantity: li.quantity || 1,
+                        unitPriceCents: parseAmountToCents(li.unitPrice),
+                        position: idx,
+                      })),
+                      payments: [],
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    };
+                    setPreviewInvoice(draftPreview);
+                  }}
+                  className="gap-1.5"
+                >
+                  <Eye className="w-3.5 h-3.5 text-[#00A887]" />
+                  <span>Preview Design</span>
                 </Button>
                 <Button
                   variant="primary"
@@ -3280,6 +3424,20 @@ export default function InvoicesView() {
             onClick={() => {
               const inv = actionMenu.invoice;
               setActionMenu(null);
+              setPreviewInvoice(inv);
+            }}
+            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors text-content-neutral-900 font-semibold"
+          >
+            <Eye className="w-3.5 h-3.5 text-[#00A887]" />
+            <span>View Invoice Design</span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              const inv = actionMenu.invoice;
+              setActionMenu(null);
               void handleOpenPdf(inv);
             }}
             className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
@@ -3401,6 +3559,29 @@ export default function InvoicesView() {
             <span>Delete Invoice</span>
           </button>
         </div>
+      )}
+
+      {/* Visual Invoice Document Sheet Modal (from EPS template) */}
+      {previewInvoice && (
+        <InvoiceDocumentSheet
+          invoice={previewInvoice}
+          onClose={() => setPreviewInvoice(null)}
+          onOpenPdf={() => {
+            const inv = previewInvoice;
+            if (inv.id === "sample-preview" || inv.id === "draft-preview") {
+              window.print();
+            } else {
+              void handleOpenPdf(inv);
+            }
+          }}
+          onRecordPayment={() => {
+            const inv = previewInvoice;
+            setPreviewInvoice(null);
+            if (inv.id !== "sample-preview" && inv.id !== "draft-preview") {
+              handleOpenPayment(inv);
+            }
+          }}
+        />
       )}
     </div>
   );

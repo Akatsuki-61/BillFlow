@@ -69,6 +69,7 @@ export function ProfileGateModal() {
     profiles,
     activeProfile,
     maxProfiles,
+    needsOnboarding,
     isGateOpen,
     isLocked,
     modalMode,
@@ -210,6 +211,9 @@ export function ProfileGateModal() {
     if (!isGateOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isLocked && !busy) {
+        if (view === "onboarding" || modalMode === "onboarding" || needsOnboarding) {
+          return;
+        }
         if (view === "unlock" || view === "form") {
           setView("select");
           setErrorMsg(null);
@@ -457,7 +461,14 @@ export function ProfileGateModal() {
       aria-modal="true"
       aria-label="Workspace Profiles"
       onClick={(e) => {
-        if (e.target === e.currentTarget && !isLocked && !busy) {
+        if (
+          e.target === e.currentTarget &&
+          !isLocked &&
+          !busy &&
+          view !== "onboarding" &&
+          modalMode !== "onboarding" &&
+          !needsOnboarding
+        ) {
           closeProfileGate();
         }
       }}
@@ -943,7 +954,7 @@ export function ProfileGateModal() {
                 Select the roles you want to keep in separate workspaces (up to 5).
               </p>
             </div>
-            {!isLocked && (
+            {!isLocked && !needsOnboarding && (
               <button
                 type="button"
                 onClick={() => setView("select")}
@@ -1058,13 +1069,17 @@ export function ProfileGateModal() {
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-line-neutral-100">
-              <button
-                type="button"
-                onClick={() => setView("select")}
-                className="ui-button ui-button--secondary ui-button--small"
-              >
-                Cancel
-              </button>
+              {!needsOnboarding ? (
+                <button
+                  type="button"
+                  onClick={() => setView("select")}
+                  className="ui-button ui-button--secondary ui-button--small"
+                >
+                  Cancel
+                </button>
+              ) : (
+                <div />
+              )}
               <button
                 type="button"
                 disabled={busy}
