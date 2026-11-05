@@ -15,6 +15,7 @@ import {
   Table2,
   Users,
   FileText,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
@@ -31,9 +32,14 @@ import {
   generateOverdueSummaryCsv,
   generateProfessionalOverdueTemplateCsv,
   generateOverdueTsvForClipboard,
+  generateOverdueExcelWorkbook,
+  convertCsvToExcelWorkbook,
   consolidateOverdueByClient,
   centsToDecimalString,
   downloadCsvFile,
+  downloadExcelFile,
+  type ExportFileFormat,
+  type ExportTemplateMode,
 } from "@/lib/csv-export";
 import {
   generateWhatsAppReminderLink,
@@ -54,7 +60,6 @@ interface OverdueSummaryDialogProps {
 }
 
 type SummaryViewTab = "ledger" | "clients" | "template";
-type CsvTemplateMode = "executive" | "flat";
 
 export function OverdueSummaryDialog({
   isOpen,
@@ -69,8 +74,9 @@ export function OverdueSummaryDialog({
 }: OverdueSummaryDialogProps) {
   const [selectedBucket, setSelectedBucket] = useState<string>("All");
   const [activeViewTab, setActiveViewTab] = useState<SummaryViewTab>("ledger");
+  const [exportFormat, setExportFormat] = useState<ExportFileFormat>("excel");
   const [csvTemplateMode, setCsvTemplateMode] =
-    useState<CsvTemplateMode>("executive");
+    useState<ExportTemplateMode>("executive");
   const [copiedType, setCopiedType] = useState<"tsv" | "csv" | null>(null);
 
   const todayStr = useMemo(() => localDateKey(), []);
@@ -193,24 +199,45 @@ export function OverdueSummaryDialog({
     return generateOverdueSummaryCsv(overdueList);
   }, [overdueList, csvTemplateMode, freelancerName, primaryCurrency]);
 
-  // CSV Export Handlers
-  const handleExportCsv = (mode: CsvTemplateMode = csvTemplateMode) => {
+  // Unified Export Dispatcher (CSV or Excel via Convert Engine)
+  const handleExportData = (
+    format: ExportFileFormat = exportFormat,
+    mode: ExportTemplateMode = csvTemplateMode,
+  ) => {
     try {
-      const csv =
-        mode === "executive"
-          ? generateProfessionalOverdueTemplateCsv(overdueList, {
-              businessName: freelancerName,
-              primaryCurrency,
-            })
-          : generateOverdueSummaryCsv(overdueList);
       const suffix = mode === "executive" ? "executive-statement" : "register";
-      const filename = `overdue-invoices-${suffix}-${todayStr}.csv`;
-      downloadCsvFile(filename, csv);
-      showToast(
-        `Exported ${overdueList.length} overdue invoices (${mode === "executive" ? "Executive Template" : "Standard CSV"})!`,
-      );
+
+      if (format === "excel") {
+        const workbookXml =
+          mode === "executive"
+            ? generateOverdueExcelWorkbook(overdueList, {
+                businessName: freelancerName,
+                primaryCurrency,
+              })
+            : convertCsvToExcelWorkbook(generateOverdueSummaryCsv(overdueList), {
+                sheetName: "Overdue Register",
+              });
+        const filename = `overdue-invoices-${suffix}-${todayStr}.xls`;
+        downloadExcelFile(filename, workbookXml);
+        showToast(
+          `Converted & exported ${overdueList.length} overdue invoices to Excel Workbook (.xls)!`,
+        );
+      } else {
+        const csv =
+          mode === "executive"
+            ? generateProfessionalOverdueTemplateCsv(overdueList, {
+                businessName: freelancerName,
+                primaryCurrency,
+              })
+            : generateOverdueSummaryCsv(overdueList);
+        const filename = `overdue-invoices-${suffix}-${todayStr}.csv`;
+        downloadCsvFile(filename, csv);
+        showToast(
+          `Exported ${overdueList.length} overdue invoices to CSV (.csv)!`,
+        );
+      }
     } catch {
-      showToast("Failed to generate CSV export file", "error");
+      showToast("Failed to export file", "error");
     }
   };
 
@@ -312,49 +339,70 @@ export function OverdueSummaryDialog({
             <div>
               <div className="flex items-center gap-2.5">
                 <h2 className="text-[20px] font-newspaper font-bold text-content-neutral-950 tracking-[-0.02em]">
-                  Overdue Invoices Summary & Statement Template
+                  Overdue Invoices Summary & Export Engine
                 </h2>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
                   {overdueList.length} past due
                 </span>
               </div>
               <p className="text-[12.5px] text-content-neutral-500 mt-0.5">
-                Executive accounts receivable aging table, client consolidation,
-                and Excel/CSV template export.
+                Accounts receivable aging statement with built-in CSV &harr;
+                Excel Workbook conversion engine.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="small"
-              type="button"
-              onClick={() => handleCopyClipboard("tsv")}
-              disabled={overdueList.length === 0}
-              title="Copy formatted table to paste directly into Excel, Google Sheets, or Notion"
+          {/* Header Format Choice & Export Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Format Choice Pill: CSV vs Excel */}
+            <div
+              className="inline-flex p-0.5 rounded-xl bg-surface-neutral-100 border border-line-neutral-200"
+              role="group"
+              aria-label="Choose export file format"
             >
-              {copiedType === "tsv" ? (
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-              ) : (
-                <Copy className="w-3.5 h-3.5" />
-              )}
-              <span>
-                {copiedType === "tsv" ? "Copied Table!" : "Copy for Excel"}
-              </span>
-            </Button>
+              <button
+                type="button"
+                onClick={() => setExportFormat("csv")}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  exportFormat === "csv"
+                    ? "bg-surface text-content-neutral-950 shadow-2xs border border-line-neutral-200/80"
+                    : "text-content-neutral-500 hover:text-content-neutral-800"
+                }`}
+              >
+                CSV (.csv)
+              </button>
+              <button
+                type="button"
+                onClick={() => setExportFormat("excel")}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  exportFormat === "excel"
+                    ? "bg-emerald-600 text-white shadow-2xs"
+                    : "text-content-neutral-500 hover:text-content-neutral-800"
+                }`}
+              >
+                Excel (.xls)
+              </button>
+            </div>
 
             <Button
               variant="secondary"
               size="small"
               type="button"
-              onClick={() => handleExportCsv("executive")}
+              onClick={() => handleExportData(exportFormat, csvTemplateMode)}
               disabled={overdueList.length === 0}
               className="!border-emerald-600/30 !bg-emerald-50 dark:!bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:!bg-emerald-100"
-              title="Download structured Executive Accounting Statement CSV"
+              title={
+                exportFormat === "excel"
+                  ? "Convert and download multi-sheet Microsoft Excel Workbook (.xls)"
+                  : "Download RFC 4180 CSV file (.csv)"
+              }
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Export Executive CSV</span>
+              <span>
+                {exportFormat === "excel"
+                  ? "Export Excel (.xls)"
+                  : "Export CSV (.csv)"}
+              </span>
             </Button>
           </div>
         </div>
@@ -528,8 +576,8 @@ export function OverdueSummaryDialog({
                   : "text-content-neutral-500 hover:text-content-neutral-800"
               }`}
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Spreadsheet / CSV Template</span>
+              <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-600" />
+              <span>CSV &harr; Excel Convert Engine</span>
             </button>
           </div>
 
@@ -858,71 +906,140 @@ export function OverdueSummaryDialog({
           </div>
         )}
 
-        {/* TAB 3: SPREADSHEET & CSV TEMPLATE PREVIEW */}
+        {/* TAB 3: CSV <-> EXCEL CONVERT ENGINE & TEMPLATE PREVIEW */}
         {activeViewTab === "template" && (
           <div className="space-y-4">
-            {/* Template Mode Controls */}
-            <div className="p-4 rounded-2xl bg-surface-neutral-50 border border-line-neutral-200/80 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-content-neutral-700">
-                  CSV Template Format:
-                </span>
-                <div className="inline-flex p-0.5 rounded-lg bg-surface border border-line-neutral-200">
-                  <button
+            {/* Convert Engine Control Panel */}
+            <div className="p-4 rounded-2xl bg-surface-neutral-50 border border-line-neutral-200/80 space-y-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Choice 1: File Format */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-content-neutral-500">
+                      1. Output Format:
+                    </span>
+                    <div className="inline-flex p-0.5 rounded-lg bg-surface border border-line-neutral-200">
+                      <button
+                        type="button"
+                        onClick={() => setExportFormat("csv")}
+                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                          exportFormat === "csv"
+                            ? "bg-accent text-white"
+                            : "text-content-neutral-600 hover:text-content-neutral-900"
+                        }`}
+                      >
+                        CSV Format (.csv)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExportFormat("excel")}
+                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                          exportFormat === "excel"
+                            ? "bg-emerald-600 text-white"
+                            : "text-content-neutral-600 hover:text-content-neutral-900"
+                        }`}
+                      >
+                        Excel Workbook (.xls)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Choice 2: Template Layout */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-content-neutral-500">
+                      2. Template Structure:
+                    </span>
+                    <div className="inline-flex p-0.5 rounded-lg bg-surface border border-line-neutral-200">
+                      <button
+                        type="button"
+                        onClick={() => setCsvTemplateMode("executive")}
+                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                          csvTemplateMode === "executive"
+                            ? "bg-accent text-white"
+                            : "text-content-neutral-600 hover:text-content-neutral-900"
+                        }`}
+                      >
+                        Executive Multi-Block
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCsvTemplateMode("flat")}
+                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                          csvTemplateMode === "flat"
+                            ? "bg-accent text-white"
+                            : "text-content-neutral-600 hover:text-content-neutral-900"
+                        }`}
+                      >
+                        Standard Flat Register
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="small"
                     type="button"
-                    onClick={() => setCsvTemplateMode("executive")}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                      csvTemplateMode === "executive"
-                        ? "bg-accent text-white"
-                        : "text-content-neutral-600 hover:text-content-neutral-900"
-                    }`}
+                    onClick={() => handleCopyClipboard("tsv")}
+                    title="Copy tab-separated cells to paste directly into Excel or Google Sheets"
                   >
-                    Executive Multi-Block Statement
-                  </button>
-                  <button
+                    {copiedType === "tsv" ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {copiedType === "tsv"
+                        ? "Copied Cells!"
+                        : "Copy for Excel"}
+                    </span>
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    size="small"
                     type="button"
-                    onClick={() => setCsvTemplateMode("flat")}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                      csvTemplateMode === "flat"
-                        ? "bg-accent text-white"
-                        : "text-content-neutral-600 hover:text-content-neutral-900"
-                    }`}
+                    onClick={() =>
+                      handleExportData(exportFormat, csvTemplateMode)
+                    }
                   >
-                    Standard Flat Register
-                  </button>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>
+                      {exportFormat === "excel"
+                        ? "Convert & Download Excel (.xls)"
+                        : "Download CSV (.csv)"}
+                    </span>
+                  </Button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="small"
-                  type="button"
-                  onClick={() => handleCopyClipboard("csv")}
-                >
-                  {copiedType === "csv" ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+              {/* Convert Engine Info Strip */}
+              <div className="text-[11.5px] text-content-neutral-600 bg-surface px-3.5 py-2 rounded-xl border border-line-neutral-200/70 flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {exportFormat === "excel" ? (
+                    <>
+                      <strong className="text-emerald-700 dark:text-emerald-400">
+                        Excel Convert Engine Active:
+                      </strong>{" "}
+                      Converts RFC 4180 CSV into a styled Microsoft Excel XML
+                      Workbook (<code>.xls</code>) with{" "}
+                      {csvTemplateMode === "executive"
+                        ? "2 worksheets (Overdue Aging Ledger + Client Consolidation), "
+                        : "auto-fitted columns, "}
+                      emerald headers, and numeric <code>#,##0.00</code> cells.
+                    </>
                   ) : (
-                    <Copy className="w-3.5 h-3.5" />
+                    <>
+                      <strong className="text-accent">
+                        RFC 4180 CSV Engine Active:
+                      </strong>{" "}
+                      Generates UTF-8 comma-separated values (
+                      <code>.csv</code>) with escaped quotes and summary totals.
+                    </>
                   )}
-                  <span>
-                    {copiedType === "csv" ? "Copied CSV!" : "Copy Raw CSV"}
-                  </span>
-                </Button>
-                <Button
-                  variant="primary"
-                  size="small"
-                  type="button"
-                  onClick={() => handleExportCsv(csvTemplateMode)}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>
-                    Download{" "}
-                    {csvTemplateMode === "executive"
-                      ? "Executive Template (.csv)"
-                      : "Standard CSV (.csv)"}
-                  </span>
-                </Button>
+                </span>
               </div>
             </div>
 
@@ -936,11 +1053,13 @@ export function OverdueSummaryDialog({
                     {csvTemplateMode === "executive"
                       ? "executive-statement"
                       : "register"}
-                    -{todayStr}.csv
+                    -{todayStr}.{exportFormat === "excel" ? "xls" : "csv"}
                   </span>
                 </div>
                 <span className="text-[11px] text-emerald-300">
-                  RFC 4180 UTF-8 Spreadsheet Preview
+                  {exportFormat === "excel"
+                    ? "Excel Workbook Grid Preview (Sheet 1: Overdue Aging Ledger)"
+                    : "RFC 4180 UTF-8 Spreadsheet Preview"}
                 </span>
               </div>
 
@@ -1082,9 +1201,15 @@ export function OverdueSummaryDialog({
               <div className="flex items-center justify-between text-[11px] text-content-neutral-500">
                 <span className="font-semibold flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5" />
-                  Raw RFC 4180 CSV Output Preview
+                  Raw RFC 4180 CSV Source (Input to Excel Convert Engine)
                 </span>
-                <span>UTF-8 Encoded · Ready for Excel / Google Sheets</span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyClipboard("csv")}
+                  className="text-accent hover:underline font-medium cursor-pointer"
+                >
+                  {copiedType === "csv" ? "Copied!" : "Copy Raw CSV Text"}
+                </button>
               </div>
               <pre className="p-3.5 rounded-xl bg-neutral-950 text-neutral-200 font-mono text-[11px] overflow-x-auto max-h-[150px] leading-relaxed border border-line-neutral-800">
                 {previewCsvText}
@@ -1115,25 +1240,25 @@ export function OverdueSummaryDialog({
               variant="secondary"
               size="small"
               type="button"
-              onClick={() => handleExportCsv("flat")}
+              onClick={() => handleExportData("csv", csvTemplateMode)}
               disabled={overdueList.length === 0}
-              title="Download standard flat CSV table"
+              title="Download RFC 4180 CSV (.csv)"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Standard CSV</span>
+              <span>Export CSV (.csv)</span>
             </Button>
 
             <Button
               variant="secondary"
               size="small"
               type="button"
-              onClick={() => handleExportCsv("executive")}
+              onClick={() => handleExportData("excel", csvTemplateMode)}
               disabled={overdueList.length === 0}
               className="!border-emerald-600/30 !bg-emerald-50 dark:!bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
-              title="Download multi-section Executive Statement Template CSV"
+              title="Convert & download Microsoft Excel Workbook (.xls)"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Executive Statement CSV</span>
+              <span>Export Excel (.xls)</span>
             </Button>
 
             {onFilterToOverdue && (

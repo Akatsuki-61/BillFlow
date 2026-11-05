@@ -9,6 +9,10 @@ import {
   consolidateOverdueByClient,
   generateProfessionalOverdueTemplateCsv,
   generateOverdueTsvForClipboard,
+  parseRfc4180Csv,
+  convertCsvToExcelWorkbook,
+  generateOverdueExcelWorkbook,
+  generateInvoicesExcelWorkbook,
 } from "../csv-export";
 import type { InvoiceWithClient } from "@/types/billing";
 
@@ -328,6 +332,45 @@ describe("CSV Export & Overdue Analysis Engine", () => {
       expect(tsvLines.length).toBe(4); // Header + 2 rows + TOTAL row
       expect(tsvLines[0]).toContain("Invoice Number\tClient Name");
       expect(tsvLines[3]).toContain("TOTAL\t2 Invoices");
+    });
+
+    it("parses RFC 4180 CSV and converts CSV into styled Microsoft Excel XML Workbooks (.xls)", () => {
+      const sampleCsv =
+        'Invoice Number,Client Name,Balance Due,Notes\r\nINV-2026-001,"Acme, Inc.",45000.00,"Includes ""express"" delivery"\r\nGRAND TOTAL,1 Invoice,45000.00,';
+
+      const parsed = parseRfc4180Csv(sampleCsv);
+      expect(parsed.length).toBe(3);
+      expect(parsed[1][1]).toBe("Acme, Inc.");
+      expect(parsed[1][3]).toBe('Includes "express" delivery');
+
+      const workbookXml = convertCsvToExcelWorkbook(sampleCsv, {
+        sheetName: "Overdue Aging",
+      });
+      expect(workbookXml).toContain('<?mso-application progid="Excel.Sheet"?>');
+      expect(workbookXml).toContain('<Worksheet ss:Name="Overdue Aging">');
+      expect(workbookXml).toContain('<Style ss:ID="TableHeader">');
+      expect(workbookXml).toContain('<Data ss:Type="Number">45000.00</Data>');
+      expect(workbookXml).toContain("Acme, Inc.");
+
+      const multiSheetWorkbook = generateOverdueExcelWorkbook(mockInvoices, {
+        referenceDate: fixedNow,
+        businessName: "Chethaka Freelance Studio",
+        primaryCurrency: "LKR",
+        includeClientRollup: true,
+      });
+      expect(multiSheetWorkbook).toContain(
+        '<Worksheet ss:Name="Overdue Aging Ledger">',
+      );
+      expect(multiSheetWorkbook).toContain(
+        '<Worksheet ss:Name="Client Consolidation">',
+      );
+
+      const generalWorkbook = generateInvoicesExcelWorkbook(mockInvoices, {
+        referenceDate: fixedNow,
+        sheetName: "All Invoices",
+      });
+      expect(generalWorkbook).toContain('<Worksheet ss:Name="All Invoices">');
+      expect(generalWorkbook).toContain("INV-2026-001");
     });
   });
 });

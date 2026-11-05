@@ -1,6 +1,9 @@
 import type { InvoiceWithClient } from "@/types/billing";
 import { localDateKey, remainingBalance, isPastDue } from "@/lib/visual-metrics";
 
+export type ExportFileFormat = "csv" | "excel";
+export type ExportTemplateMode = "executive" | "flat";
+
 /**
  * Escapes a single CSV value following the RFC 4180 specification.
  * - Null or undefined values become empty strings.
@@ -21,6 +24,19 @@ export function escapeCsvField(value: unknown): string {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
+}
+
+/**
+ * Escapes special XML characters for Excel SpreadsheetML output.
+ */
+export function escapeXml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 /**
@@ -691,15 +707,443 @@ export function generateOverdueTsvForClipboard(
 }
 
 /**
+ * Parses an RFC 4180 CSV string into a 2D array of rows and cell values.
+ * Used by the CSV <-> Excel Conversion Engine.
+ */
+export function parseRfc4180Csv(csvText: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i];
+    const next = csvText[i + 1];
+
+    if (inQuotes) {
+      if (char === '"' && next === '"') {
+        field += '"';
+        i++;
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        field += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ",") {
+        row.push(field);
+        field = "";
+      } else if (char === "\r" && next === "\n") {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = "";
+        i++;
+      } else if (char === "\n" || char === "\r") {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = "";
+      } else {
+        field += char;
+      }
+    }
+  }
+
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+const EXCEL_WORKBOOK_STYLES = `
+  <Styles>
+    <Style ss:ID="Default" ss:Name="Normal">
+      <Alignment ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#18181B"/>
+    </Style>
+    <Style ss:ID="TitleBanner">
+      <Alignment ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1" ss:Color="#FFFFFF"/>
+      <Interior ss:Color="#0F172A" ss:Pattern="Solid"/>
+    </Style>
+    <Style ss:ID="MetaLabel">
+      <Alignment ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#475569"/>
+      <Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/>
+    </Style>
+    <Style ss:ID="MetaValue">
+      <Alignment ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#0F172A"/>
+      <Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/>
+    </Style>
+    <Style ss:ID="TableHeader">
+      <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+      <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
+      <Interior ss:Color="#065F46" ss:Pattern="Solid"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#064E3B"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="SectionHeader">
+      <Alignment ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#1E293B"/>
+      <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
+    </Style>
+    <Style ss:ID="DataCell">
+      <Alignment ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="10" ss:Color="#1E293B"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="CodeCell">
+      <Alignment ss:Vertical="Center"/>
+      <Font ss:FontName="Consolas" ss:Size="10" ss:Bold="1" ss:Color="#4F46E5"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="CurrencyCell">
+      <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="10" ss:Color="#0F172A"/>
+      <NumberFormat ss:Format="#,##0.00"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="OverdueCurrencyCell">
+      <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#E11D48"/>
+      <NumberFormat ss:Format="#,##0.00"/>
+      <Interior ss:Color="#FFF1F2" ss:Pattern="Solid"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FECDD3"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="DaysOverdueCell">
+      <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#BE123C"/>
+      <NumberFormat ss:Format="0"/>
+      <Borders>
+        <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="TotalRowLabel">
+      <Alignment ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#0F172A"/>
+      <Interior ss:Color="#FEF3C7" ss:Pattern="Solid"/>
+      <Borders>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#D97706"/>
+        <Border ss:Position="Bottom" ss:LineStyle="Double" ss:Weight="3" ss:Color="#D97706"/>
+      </Borders>
+    </Style>
+    <Style ss:ID="TotalRowAmount">
+      <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#BE123C"/>
+      <NumberFormat ss:Format="#,##0.00"/>
+      <Interior ss:Color="#FEF3C7" ss:Pattern="Solid"/>
+      <Borders>
+        <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#D97706"/>
+        <Border ss:Position="Bottom" ss:LineStyle="Double" ss:Weight="3" ss:Color="#D97706"/>
+      </Borders>
+    </Style>
+  </Styles>
+`;
+
+/**
+ * Conversion Engine: Converts any RFC 4180 CSV string into a styled Excel XML Workbook (.xls).
+ * Automatically detects numeric decimals, headers, and summary rows.
+ */
+export function convertCsvToExcelWorkbook(
+  csvText: string,
+  options?: { sheetName?: string },
+): string {
+  const rows = parseRfc4180Csv(csvText);
+  const sheetName = escapeXml(
+    (options?.sheetName || "BillFlow Export").slice(0, 31),
+  );
+
+  const maxCols = rows.reduce((max, r) => Math.max(max, r.length), 0);
+  const colDefs = Array.from(
+    { length: maxCols },
+    (_, idx) =>
+      `<Column ss:Index="${idx + 1}" ss:AutoFitWidth="1" ss:Width="${idx <= 2 ? 150 : 110}"/>`,
+  ).join("\n      ");
+
+  const xmlRows = rows
+    .map((cells, rowIdx) => {
+      if (cells.length === 0 || (cells.length === 1 && cells[0] === "")) {
+        return `<Row ss:Height="14"/>`;
+      }
+
+      const firstCell = (cells[0] || "").toUpperCase();
+      const isHeader =
+        rowIdx === 0 ||
+        firstCell === "INVOICE NUMBER" ||
+        firstCell === "ROW #" ||
+        firstCell === "EXECUTIVE KPI METRIC" ||
+        firstCell === "AGING BUCKET TIER";
+      const isTotalRow =
+        firstCell.includes("TOTAL") || firstCell === "GRAND TOTAL SUMMARY";
+      const isMetaRow =
+        firstCell === "STATEMENT TITLE" ||
+        firstCell === "PREPARED BY" ||
+        firstCell === "STATEMENT DATE" ||
+        firstCell === "REPORTING CURRENCY";
+
+      const rowHeight = isHeader ? 24 : isTotalRow ? 22 : 18;
+
+      const xmlCells = cells
+        .map((val, colIdx) => {
+          const trimmed = val.trim();
+          const isNumericDecimal = /^-?\d+\.\d{2}$/.test(trimmed);
+          const isInteger =
+            /^\d+$/.test(trimmed) &&
+            !trimmed.startsWith("0") &&
+            trimmed.length < 9;
+
+          let styleId = "DataCell";
+          if (isHeader) styleId = "TableHeader";
+          else if (isTotalRow)
+            styleId = isNumericDecimal ? "TotalRowAmount" : "TotalRowLabel";
+          else if (isMetaRow) styleId = colIdx === 0 ? "MetaLabel" : "MetaValue";
+          else if (isNumericDecimal) styleId = "CurrencyCell";
+          else if (colIdx === 0 && trimmed.startsWith("INV-"))
+            styleId = "CodeCell";
+
+          if (
+            !isHeader &&
+            !isMetaRow &&
+            (isNumericDecimal || (isInteger && colIdx > 0))
+          ) {
+            return `<Cell ss:StyleID="${styleId}"><Data ss:Type="Number">${escapeXml(trimmed)}</Data></Cell>`;
+          }
+          return `<Cell ss:StyleID="${styleId}"><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`;
+        })
+        .join("");
+
+      return `<Row ss:Height="${rowHeight}">${xmlCells}</Row>`;
+    })
+    .join("\n        ");
+
+  return [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<?mso-application progid="Excel.Sheet"?>`,
+    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"`,
+    ` xmlns:o="urn:schemas-microsoft-com:office:office"`,
+    ` xmlns:x="urn:schemas-microsoft-com:office:excel"`,
+    ` xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">`,
+    EXCEL_WORKBOOK_STYLES,
+    `  <Worksheet ss:Name="${sheetName}">`,
+    `    <Table>`,
+    `      ${colDefs}`,
+    `      ${xmlRows}`,
+    `    </Table>`,
+    `  </Worksheet>`,
+    `</Workbook>`,
+  ].join("\n");
+}
+
+/**
+ * Generates a dedicated multi-worksheet Excel Workbook (.xls) for Overdue Invoices:
+ * - Worksheet 1: "Overdue Aging Ledger" (Executive KPIs + Aging Matrix + Itemized Overdue Table)
+ * - Worksheet 2: "Client Consolidation" (Grouped by Client Account)
+ */
+export function generateOverdueExcelWorkbook(
+  invoices: InvoiceWithClient[],
+  options?: {
+    referenceDate?: Date;
+    businessName?: string;
+    primaryCurrency?: string;
+    includeClientRollup?: boolean;
+  },
+): string {
+  const refDate = options?.referenceDate || new Date();
+  const execCsv = generateProfessionalOverdueTemplateCsv(invoices, options);
+  const clientGroups = consolidateOverdueByClient(invoices, refDate);
+  const currency =
+    options?.primaryCurrency || clientGroups[0]?.currency || "LKR";
+
+  // Build Worksheet 1 rows from Executive Template CSV via conversion engine
+  const sheet1Workbook = convertCsvToExcelWorkbook(execCsv, {
+    sheetName: "Overdue Aging Ledger",
+  });
+
+  if (options?.includeClientRollup === false) {
+    return sheet1Workbook;
+  }
+
+  // Build Worksheet 2 for Client Consolidation
+  const clientHeaders = [
+    "Rank",
+    "Client Name",
+    "Contact Person",
+    "Client Email",
+    "Client Phone",
+    "Overdue Invoices Count",
+    "Invoice Codes",
+    "Oldest Due Date",
+    "Max Days Overdue",
+    "Aging Bucket",
+    "Currency",
+    "Total Billed",
+    "Total Paid",
+    "Consolidated Overdue Balance",
+  ];
+
+  const clientHeaderXml = `<Row ss:Height="24">${clientHeaders
+    .map(
+      (h) =>
+        `<Cell ss:StyleID="TableHeader"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`,
+    )
+    .join("")}</Row>`;
+
+  const clientRowsXml = clientGroups
+    .map((c, idx) => {
+      return [
+        `<Row ss:Height="19">`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="Number">${idx + 1}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.clientName)}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.contactPerson || "-")}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.email || "-")}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.phone || "-")}</Data></Cell>`,
+        `<Cell ss:StyleID="DaysOverdueCell"><Data ss:Type="Number">${c.invoicesCount}</Data></Cell>`,
+        `<Cell ss:StyleID="CodeCell"><Data ss:Type="String">${escapeXml(c.invoiceCodes.join(", "))}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.oldestDueDate)}</Data></Cell>`,
+        `<Cell ss:StyleID="DaysOverdueCell"><Data ss:Type="Number">${c.maxDaysOverdue}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.agingBucket)}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.currency)}</Data></Cell>`,
+        `<Cell ss:StyleID="CurrencyCell"><Data ss:Type="Number">${centsToDecimalString(c.totalBilledCents)}</Data></Cell>`,
+        `<Cell ss:StyleID="CurrencyCell"><Data ss:Type="Number">${centsToDecimalString(c.totalPaidCents)}</Data></Cell>`,
+        `<Cell ss:StyleID="OverdueCurrencyCell"><Data ss:Type="Number">${centsToDecimalString(c.totalOverdueCents)}</Data></Cell>`,
+        `</Row>`,
+      ].join("");
+    })
+    .join("\n        ");
+
+  const grandBilled = clientGroups.reduce((s, c) => s + c.totalBilledCents, 0);
+  const grandPaid = clientGroups.reduce((s, c) => s + c.totalPaidCents, 0);
+  const grandOverdue = clientGroups.reduce(
+    (s, c) => s + c.totalOverdueCents,
+    0,
+  );
+  const totalInvoicesCount = clientGroups.reduce(
+    (s, c) => s + c.invoicesCount,
+    0,
+  );
+
+  const clientTotalXml =
+    clientGroups.length > 0
+      ? [
+          `<Row ss:Height="22">`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String">TOTAL</Data></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String">${clientGroups.length} Delinquent Clients</Data></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String"/></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String"/></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String"/></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="Number">${totalInvoicesCount}</Data></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String"/></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String"/></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String"/></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String"/></Cell>`,
+          `<Cell ss:StyleID="TotalRowLabel"><Data ss:Type="String">${escapeXml(currency)}</Data></Cell>`,
+          `<Cell ss:StyleID="TotalRowAmount"><Data ss:Type="Number">${centsToDecimalString(grandBilled)}</Data></Cell>`,
+          `<Cell ss:StyleID="TotalRowAmount"><Data ss:Type="Number">${centsToDecimalString(grandPaid)}</Data></Cell>`,
+          `<Cell ss:StyleID="TotalRowAmount"><Data ss:Type="Number">${centsToDecimalString(grandOverdue)}</Data></Cell>`,
+          `</Row>`,
+        ].join("")
+      : "";
+
+  const sheet2Xml = [
+    `  <Worksheet ss:Name="Client Consolidation">`,
+    `    <Table>`,
+    `      <Column ss:Index="1" ss:Width="55"/>`,
+    `      <Column ss:Index="2" ss:Width="170"/>`,
+    `      <Column ss:Index="3" ss:Width="130"/>`,
+    `      <Column ss:Index="4" ss:Width="160"/>`,
+    `      <Column ss:Index="5" ss:Width="115"/>`,
+    `      <Column ss:Index="6" ss:Width="120"/>`,
+    `      <Column ss:Index="7" ss:Width="150"/>`,
+    `      <Column ss:Index="8" ss:Width="100"/>`,
+    `      <Column ss:Index="9" ss:Width="110"/>`,
+    `      <Column ss:Index="10" ss:Width="100"/>`,
+    `      <Column ss:Index="11" ss:Width="75"/>`,
+    `      <Column ss:Index="12" ss:Width="120"/>`,
+    `      <Column ss:Index="13" ss:Width="120"/>`,
+    `      <Column ss:Index="14" ss:Width="150"/>`,
+    `      ${clientHeaderXml}`,
+    `      ${clientRowsXml}`,
+    `      ${clientTotalXml}`,
+    `    </Table>`,
+    `  </Worksheet>`,
+  ].join("\n");
+
+  return sheet1Workbook.replace(
+    "</Workbook>",
+    `${sheet2Xml}\n</Workbook>`,
+  );
+}
+
+/**
+ * Generates an Excel Workbook (.xls) for a general list of invoices via the CSV->Excel conversion engine.
+ */
+export function generateInvoicesExcelWorkbook(
+  invoices: InvoiceWithClient[],
+  options?: {
+    referenceDate?: Date;
+    sheetName?: string;
+    includeSummaryRow?: boolean;
+  },
+): string {
+  const csv = generateInvoicesCsv(invoices, {
+    referenceDate: options?.referenceDate,
+    includeSummaryRow: options?.includeSummaryRow ?? true,
+  });
+  return convertCsvToExcelWorkbook(csv, {
+    sheetName: options?.sheetName || "Invoices Register",
+  });
+}
+
+/**
  * Initiates download of a CSV file in the user's browser or Electron desktop environment.
  */
 export function downloadCsvFile(filename: string, csvContent: string): void {
   if (typeof window === "undefined") return;
+  const normalizedName = filename.toLowerCase().endsWith(".csv")
+    ? filename
+    : `${filename}.csv`;
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  link.setAttribute("download", filename);
+  link.setAttribute("download", normalizedName);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Initiates download of a styled Excel SpreadsheetML Workbook (.xls) in browser or Electron.
+ */
+export function downloadExcelFile(filename: string, workbookXml: string): void {
+  if (typeof window === "undefined") return;
+  const normalizedName = filename.toLowerCase().endsWith(".xls")
+    ? filename
+    : `${filename.replace(/\.csv$/i, "")}.xls`;
+  const blob = new Blob([workbookXml], {
+    type: "application/vnd.ms-excel;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", normalizedName);
   link.style.visibility = "hidden";
   document.body.appendChild(link);
   link.click();
