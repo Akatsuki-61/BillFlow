@@ -28,7 +28,7 @@ import {
   X,
   CheckCircle2,
   DollarSign,
-  Sparkles,
+  Cpu,
   Server,
   Search,
   Receipt,
@@ -40,6 +40,67 @@ import type { ExpenseItem } from "@/types/expenses";
 import type { Currency } from "@/types/billing";
 import { formatCents, formatDateDisplay } from "@/lib/format";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
+
+function AdobeBrandIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`${className} shrink-0`}
+    >
+      <path
+        d="M14.86 3H22v18l-7.14-18ZM9.14 3H2v18L9.14 3ZM12 9.66 16.57 21h-3.12l-1.38-3.6H8.95L12 9.66Z"
+        fill="#EB1000"
+      />
+    </svg>
+  );
+}
+
+function AnthropicBrandIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`${className} shrink-0`}
+    >
+      <path
+        d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96Zm-7.258 0h3.767L16.906 20.48h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522Zm4.132 10.595L8.453 7.687l-2.248 6.428h4.496Z"
+        fill="#D97757"
+      />
+    </svg>
+  );
+}
+
+function OpenAIBrandIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`${className} shrink-0`}
+    >
+      <path
+        d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729Zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944Zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464ZM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872Zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667Zm2.0107-3.0231-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66ZM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3975.6813Zm1.0976-2.3654 2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"
+        fill="#10A37F"
+      />
+    </svg>
+  );
+}
+
+function VercelBrandIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`${className} shrink-0`}
+    >
+      <path d="M12 2 24 22.7846H0L12 2Z" fill="currentColor" />
+    </svg>
+  );
+}
 
 const EXPENSE_CATEGORY_OPTIONS: SelectOption[] = [
   { value: "All Categories", label: "All Categories" },
@@ -260,7 +321,16 @@ export default function ExpensesPage() {
     window.print();
   };
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryIcon = (category: string, merchant?: string) => {
+    const m = (merchant || "").toLowerCase();
+    if (m.includes("adobe")) return <AdobeBrandIcon className="w-4 h-4" />;
+    if (m.includes("anthropic") || m.includes("claude"))
+      return <AnthropicBrandIcon className="w-4 h-4" />;
+    if (m.includes("openai") || m.includes("chatgpt"))
+      return <OpenAIBrandIcon className="w-4 h-4" />;
+    if (m.includes("vercel"))
+      return <VercelBrandIcon className="w-3.5 h-3.5" />;
+
     const cat = category.toUpperCase();
     if (cat.includes("TRAVEL")) return <Plane className="w-4.5 h-4.5" />;
     if (cat.includes("MEALS") || cat.includes("FOOD"))
@@ -268,7 +338,7 @@ export default function ExpensesPage() {
     if (cat.includes("OFFICE") || cat.includes("HARDWARE"))
       return <Package className="w-4.5 h-4.5" />;
     if (cat.includes("AI"))
-      return <Sparkles className="w-4.5 h-4.5 text-accent" />;
+      return <Cpu className="w-4.5 h-4.5 text-accent" />;
     if (cat.includes("HOSTING") || cat.includes("SERVER"))
       return <Server className="w-4.5 h-4.5" />;
     if (cat.includes("SOFTWARE") || cat.includes("DEV"))
@@ -531,7 +601,7 @@ export default function ExpensesPage() {
                       {/* Icon */}
                       <td className="py-4 px-6">
                         <div className="w-10 h-10 rounded-xl bg-surface-neutral-100/90 border border-line-neutral-200/60 flex items-center justify-center text-content-neutral-600 transition-all duration-300 group-hover:bg-accent-faint group-hover:border-border-accent group-hover:text-accent">
-                          {getCategoryIcon(item.category)}
+                          {getCategoryIcon(item.category, item.merchant)}
                         </div>
                       </td>
 
@@ -732,8 +802,10 @@ export default function ExpensesPage() {
                         currency: "USD",
                       })
                     }
+                    className="justify-start gap-2.5 px-3"
                   >
-                    🎨 Adobe CC ($54.99)
+                    <AdobeBrandIcon className="w-4 h-4" />
+                    <span>Adobe CC ($54.99)</span>
                   </Button>
                   <Button
                     variant="secondary"
@@ -747,8 +819,10 @@ export default function ExpensesPage() {
                         currency: "USD",
                       })
                     }
+                    className="justify-start gap-2.5 px-3"
                   >
-                    ⚡ Claude AI API ($42.50)
+                    <AnthropicBrandIcon className="w-4 h-4" />
+                    <span>Claude AI API ($42.50)</span>
                   </Button>
                   <Button
                     variant="secondary"
@@ -762,8 +836,10 @@ export default function ExpensesPage() {
                         currency: "USD",
                       })
                     }
+                    className="justify-start gap-2.5 px-3"
                   >
-                    🤖 OpenAI API ($30.00)
+                    <OpenAIBrandIcon className="w-4 h-4" />
+                    <span>OpenAI API ($30.00)</span>
                   </Button>
                   <Button
                     variant="secondary"
@@ -777,8 +853,10 @@ export default function ExpensesPage() {
                         currency: "USD",
                       })
                     }
+                    className="justify-start gap-2.5 px-3"
                   >
-                    ▲ Vercel Pro ($20.00)
+                    <VercelBrandIcon className="w-3.5 h-3.5" />
+                    <span>Vercel Pro ($20.00)</span>
                   </Button>
                 </div>
               </div>

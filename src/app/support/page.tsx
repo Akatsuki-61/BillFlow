@@ -20,7 +20,6 @@ import {
   HardDrive,
   Bug,
   BookOpen,
-  Sparkles,
 } from "lucide-react";
 import { PageHeader, Button } from "@/components/ui/Workspace";
 import { useData } from "@/lib/data/DataProvider";
@@ -318,7 +317,7 @@ export default function SupportPage() {
       <div className="ui-card p-6 md:p-8 rounded-2xl border border-line-neutral-200/80 bg-surface shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06)] relative overflow-hidden">
         <div className="relative z-10 max-w-2xl space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-tinted border border-line-purple-200/60 text-[11px] font-semibold text-accent uppercase tracking-wider">
-            <Sparkles className="w-3 h-3 text-accent" />
+            <BookOpen className="w-3 h-3 text-accent" />
             <span>Freelance Knowledge Base</span>
           </div>
 

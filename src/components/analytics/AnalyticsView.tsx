@@ -10,7 +10,6 @@ import {
   Minus,
   EyeOff,
   RotateCcw,
-  Sparkles,
 } from "lucide-react";
 import {
   Button,
@@ -338,7 +337,7 @@ export default function AnalyticsView() {
               {/* Central Widget Storage Banner shown inside Customize modal */}
               <div className="mx-6 mt-4 flex items-center justify-between px-4 py-3 rounded-2xl bg-accent-faint/80 dark:bg-accent-soft/40 border border-border-accent/70 dark:border-border-accent/50 text-xs text-content-neutral-900">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-accent shrink-0" />
+                  <SlidersHorizontal className="w-4 h-4 text-accent shrink-0" />
                   <span>
                     <strong>Central Widget Catalog:</strong> Drag any card to{" "}
                     <strong>Home</strong> in the top navigation bar, or

@@ -9,7 +9,6 @@ import {
   Copy,
   Check,
   Link2,
-  Sparkles,
   Send,
   Building2,
   Receipt,
@@ -419,7 +418,7 @@ export default function SubmitWorkModal({
 
           {/* Workflow Notice */}
           <div className="p-3 rounded-xl bg-accent-faint/60 dark:bg-accent-soft/20 border border-border-accent/60 dark:border-border-accent/40 flex items-start gap-2.5 text-xs text-content-neutral-400">
-            <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-accent shrink-0 mt-0.5" />
             <p className="leading-relaxed">
               Moving this task to{" "}
               <strong className="text-content-neutral-900 dark:text-content-neutral-100 font-semibold">

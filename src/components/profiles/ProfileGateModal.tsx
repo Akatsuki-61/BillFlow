@@ -10,7 +10,10 @@ import {
   X,
   ArrowLeft,
   Trash2,
-  Pencil,
+  SlidersHorizontal,
+  KeyRound,
+  Hash,
+  Type,
 } from "lucide-react";
 import { useProfiles } from "@/context/ProfileContext";
 import {
@@ -25,12 +28,14 @@ import {
 import {
   ProfileAvatarTile,
   PROFILE_ACCENT_STYLES,
+  PROFILE_AVATAR_ICONS,
 } from "./ProfileAvatarTile";
 import type { AccentPreference } from "@/lib/theme";
 import type { Currency } from "@/types/billing";
 import { useData } from "@/lib/data/DataProvider";
 
 type InternalView = "select" | "unlock" | "form" | "onboarding";
+type LockInputMode = "pin" | "alphanumeric";
 
 const ACCENT_OPTIONS: AccentPreference[] = [
   "blue",
@@ -39,6 +44,17 @@ const ACCENT_OPTIONS: AccentPreference[] = [
   "rose",
   "amber",
   "indigo",
+];
+
+const AVATAR_OPTIONS: ProfileAvatar[] = [
+  "code",
+  "cpu",
+  "terminal",
+  "compass",
+  "layers",
+  "briefcase",
+  "globe",
+  "shield",
 ];
 
 const CURRENCY_OPTIONS: Currency[] = ["USD", "LKR", "EUR", "GBP", "CAD"];
@@ -53,7 +69,7 @@ function createDefaultOnboardingSlots(
       preset.role === "consulting",
     name: preset.defaultName,
     role: preset.role,
-    subtitle: preset.subtitle,
+    subtitle: preset.label,
     avatar: preset.avatar,
     accent: preset.accent,
     defaultCurrency,
@@ -84,26 +100,57 @@ export function ProfileGateModal() {
 
   const [view, setView] = useState<InternalView>("select");
   const [isManageMode, setIsManageMode] = useState(false);
+  const [hoveredAccent, setHoveredAccent] = useState<AccentPreference | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Unlock view state
   const [unlockTarget, setUnlockTarget] = useState<UserProfile | null>(null);
+  const [unlockMode, setUnlockMode] = useState<LockInputMode>("pin");
+  const [unlockPinDigits, setUnlockPinDigits] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+  ]);
   const [unlockPassword, setUnlockPassword] = useState("");
   const [showUnlockPassword, setShowUnlockPassword] = useState(false);
+  const unlockPinRefs = useRef<Array<HTMLInputElement | null>>([
+    null,
+    null,
+    null,
+    null,
+  ]);
   const unlockInputRef = useRef<HTMLInputElement | null>(null);
 
   // Create / Edit form state
   const [formTargetId, setFormTargetId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formRole, setFormRole] = useState<ProfileRole>("software-engineering");
-  const [formSubtitle, setFormSubtitle] = useState("");
+  const [formCustomRoleText, setFormCustomRoleText] = useState("");
   const [formAvatar, setFormAvatar] = useState<ProfileAvatar>("code");
   const [formAccent, setFormAccent] = useState<AccentPreference>("blue");
   const [formCurrency, setFormCurrency] = useState<Currency>("USD");
   const [formInvoicePrefix, setFormInvoicePrefix] = useState("SE-");
   const [formSeedCatalog, setFormSeedCatalog] = useState(true);
+
+  // Passcode Lock state (supports 4-digit PIN or alphanumeric password)
   const [formEnablePassword, setFormEnablePassword] = useState(false);
+  const [formLockMode, setFormLockMode] = useState<LockInputMode>("pin");
+  const [formPinDigits, setFormPinDigits] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+  ]);
+  const formPinRefs = useRef<Array<HTMLInputElement | null>>([
+    null,
+    null,
+    null,
+    null,
+  ]);
   const [formCurrentPassword, setFormCurrentPassword] = useState("");
   const [formNewPassword, setFormNewPassword] = useState("");
   const [showFormPassword, setShowFormPassword] = useState(false);
@@ -123,19 +170,21 @@ export function ProfileGateModal() {
     setDeletePassword("");
     setFormCurrentPassword("");
     setFormNewPassword("");
+    setFormPinDigits(["", "", "", ""]);
     setShowFormPassword(false);
 
     if (profile) {
       setFormTargetId(profile.id);
       setFormName(profile.name);
       setFormRole(profile.role);
-      setFormSubtitle(profile.subtitle);
+      setFormCustomRoleText(profile.subtitle);
       setFormAvatar(profile.avatar);
       setFormAccent(profile.accent);
       setFormCurrency(profile.defaultCurrency);
       setFormInvoicePrefix(profile.invoicePrefix);
       setFormSeedCatalog(false);
       setFormEnablePassword(profile.hasPassword);
+      setFormLockMode(profile.lockType === "password" ? "alphanumeric" : "pin");
     } else {
       const usedRoles = new Set(profiles.map((p) => p.role));
       const nextPreset =
@@ -145,7 +194,7 @@ export function ProfileGateModal() {
       setFormTargetId(null);
       setFormName(nextPreset.defaultName);
       setFormRole(nextPreset.role);
-      setFormSubtitle(nextPreset.subtitle);
+      setFormCustomRoleText(nextPreset.label);
       setFormAvatar(nextPreset.avatar);
       setFormAccent(nextPreset.accent);
       setFormCurrency(
@@ -156,6 +205,7 @@ export function ProfileGateModal() {
       setFormInvoicePrefix(nextPreset.invoicePrefix);
       setFormSeedCatalog(true);
       setFormEnablePassword(false);
+      setFormLockMode("pin");
     }
   };
 
@@ -190,6 +240,10 @@ export function ProfileGateModal() {
         setIsManageMode(false);
         if (isLocked && activeProfile.hasPassword && profiles.length === 1) {
           setUnlockTarget(activeProfile);
+          setUnlockMode(
+            activeProfile.lockType === "password" ? "alphanumeric" : "pin",
+          );
+          setUnlockPinDigits(["", "", "", ""]);
           setUnlockPassword("");
           setView("unlock");
         } else {
@@ -201,10 +255,16 @@ export function ProfileGateModal() {
 
   useEffect(() => {
     if (view === "unlock") {
-      const timer = setTimeout(() => unlockInputRef.current?.focus(), 50);
+      const timer = setTimeout(() => {
+        if (unlockMode === "pin") {
+          unlockPinRefs.current[0]?.focus();
+        } else {
+          unlockInputRef.current?.focus();
+        }
+      }, 60);
       return () => clearTimeout(timer);
     }
-  }, [view]);
+  }, [view, unlockMode]);
 
   useEffect(() => {
     if (!isGateOpen) return;
@@ -224,6 +284,15 @@ export function ProfileGateModal() {
 
   if (!isGateOpen) return null;
 
+  const openUnlockForProfile = (profile: UserProfile) => {
+    setUnlockTarget(profile);
+    setUnlockMode(profile.lockType === "password" ? "alphanumeric" : "pin");
+    setUnlockPinDigits(["", "", "", ""]);
+    setUnlockPassword("");
+    setShowUnlockPassword(false);
+    setView("unlock");
+  };
+
   const handleTileClick = async (profile: UserProfile) => {
     setErrorMsg(null);
     if (isManageMode) {
@@ -233,10 +302,7 @@ export function ProfileGateModal() {
     }
 
     if (profile.hasPassword) {
-      setUnlockTarget(profile);
-      setUnlockPassword("");
-      setShowUnlockPassword(false);
-      setView("unlock");
+      openUnlockForProfile(profile);
       return;
     }
 
@@ -252,34 +318,89 @@ export function ProfileGateModal() {
     }
   };
 
-  const handleUnlockSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitUnlockPasscode = async (code: string) => {
     if (!unlockTarget) return;
-    if (!unlockPassword.trim()) {
-      setErrorMsg("Enter the password for this profile.");
+    if (!code.trim()) {
+      setErrorMsg("Enter your passcode to unlock this profile.");
       return;
     }
     try {
       setBusy(true);
       setErrorMsg(null);
-      await switchProfile(unlockTarget.id, unlockPassword);
+      await switchProfile(unlockTarget.id, code);
       setUnlockPassword("");
+      setUnlockPinDigits(["", "", "", ""]);
     } catch (err) {
       setErrorMsg(
-        err instanceof Error ? err.message : "Incorrect password. Try again.",
+        err instanceof Error ? err.message : "Incorrect passcode. Try again.",
       );
+      if (unlockMode === "pin") {
+        setUnlockPinDigits(["", "", "", ""]);
+        setTimeout(() => unlockPinRefs.current[0]?.focus(), 40);
+      }
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleUnlockFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code =
+      unlockMode === "pin" ? unlockPinDigits.join("") : unlockPassword;
+    await submitUnlockPasscode(code);
+  };
+
+  const handleUnlockPinDigitChange = (index: number, rawValue: string) => {
+    const digit = rawValue.replace(/\D/g, "").slice(-1);
+    const nextDigits = [...unlockPinDigits];
+    nextDigits[index] = digit;
+    setUnlockPinDigits(nextDigits);
+    if (errorMsg) setErrorMsg(null);
+
+    if (digit && index < 3) {
+      unlockPinRefs.current[index + 1]?.focus();
+    }
+
+    if (digit && index === 3 && nextDigits.every((d) => d.length === 1)) {
+      void submitUnlockPasscode(nextDigits.join(""));
+    }
+  };
+
+  const handleUnlockPinKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Backspace" && !unlockPinDigits[index] && index > 0) {
+      unlockPinRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleFormPinDigitChange = (index: number, rawValue: string) => {
+    const digit = rawValue.replace(/\D/g, "").slice(-1);
+    const nextDigits = [...formPinDigits];
+    nextDigits[index] = digit;
+    setFormPinDigits(nextDigits);
+    if (errorMsg) setErrorMsg(null);
+
+    if (digit && index < 3) {
+      formPinRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleFormPinKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Backspace" && !formPinDigits[index] && index > 0) {
+      formPinRefs.current[index - 1]?.focus();
     }
   };
 
   const handleApplyRolePreset = (role: ProfileRole) => {
     const preset = PROFILE_ROLE_PRESETS[role];
     setFormRole(role);
-    if (!formTargetId) {
-      setFormName(preset.defaultName);
-    }
-    setFormSubtitle(preset.subtitle);
+    setFormName(preset.defaultName);
+    setFormCustomRoleText(preset.label);
     setFormAvatar(preset.avatar);
     setFormAccent(preset.accent);
     setFormInvoicePrefix(preset.invoicePrefix);
@@ -294,28 +415,45 @@ export function ProfileGateModal() {
       return;
     }
 
+    const roleSubtitle =
+      formCustomRoleText.trim() || PROFILE_ROLE_PRESETS[formRole].label;
     const existingProfile = formTargetId
       ? profiles.find((p) => p.id === formTargetId)
       : null;
 
+    const resolvedNewSecret =
+      formLockMode === "pin" ? formPinDigits.join("") : formNewPassword.trim();
+
     try {
       setBusy(true);
       if (!formTargetId) {
-        if (formEnablePassword && formNewPassword.trim().length < 4) {
-          setErrorMsg("Password must be at least 4 characters.");
-          setBusy(false);
-          return;
+        if (formEnablePassword) {
+          if (formLockMode === "pin" && !/^\d{4}$/.test(resolvedNewSecret)) {
+            setErrorMsg("Enter all 4 numbers for your 4-digit PIN.");
+            setBusy(false);
+            return;
+          }
+          if (
+            formLockMode === "alphanumeric" &&
+            resolvedNewSecret.length < 4
+          ) {
+            setErrorMsg(
+              "Passcode must be at least 4 characters (letters or numbers).",
+            );
+            setBusy(false);
+            return;
+          }
         }
+
         await createProfile({
           name: trimmedName,
           role: formRole,
-          subtitle:
-            formSubtitle.trim() || PROFILE_ROLE_PRESETS[formRole].subtitle,
+          subtitle: roleSubtitle,
           avatar: formAvatar,
           accent: formAccent,
           defaultCurrency: formCurrency,
           invoicePrefix: formInvoicePrefix.trim() || "INV-",
-          password: formEnablePassword ? formNewPassword.trim() : undefined,
+          password: formEnablePassword ? resolvedNewSecret : undefined,
           seedRoleCatalog: formSeedCatalog,
         });
       } else {
@@ -323,27 +461,37 @@ export function ProfileGateModal() {
         if (!formEnablePassword && existingProfile?.hasPassword) {
           if (!formCurrentPassword.trim()) {
             setErrorMsg(
-              "Enter the current password to remove the password lock.",
+              "Enter the current passcode to remove the profile lock.",
             );
             setBusy(false);
             return;
           }
           passwordPatch = null;
-        } else if (formEnablePassword && formNewPassword.trim().length > 0) {
-          if (formNewPassword.trim().length < 4) {
-            setErrorMsg("New password must be at least 4 characters.");
+        } else if (formEnablePassword && resolvedNewSecret.length > 0) {
+          if (formLockMode === "pin" && !/^\d{4}$/.test(resolvedNewSecret)) {
+            setErrorMsg("Enter all 4 numbers for your new 4-digit PIN.");
+            setBusy(false);
+            return;
+          }
+          if (
+            formLockMode === "alphanumeric" &&
+            resolvedNewSecret.length < 4
+          ) {
+            setErrorMsg("New passcode must be at least 4 characters.");
             setBusy(false);
             return;
           }
           if (existingProfile?.hasPassword && !formCurrentPassword.trim()) {
-            setErrorMsg("Enter the current password to set a new password.");
+            setErrorMsg("Enter your current passcode to set a new one.");
             setBusy(false);
             return;
           }
-          passwordPatch = formNewPassword.trim();
+          passwordPatch = resolvedNewSecret;
         } else if (formEnablePassword && !existingProfile?.hasPassword) {
           setErrorMsg(
-            "Enter a password (at least 4 characters) or turn off password lock.",
+            formLockMode === "pin"
+              ? "Enter a 4-digit PIN or turn off profile lock."
+              : "Enter a passcode (at least 4 characters) or turn off profile lock.",
           );
           setBusy(false);
           return;
@@ -352,8 +500,7 @@ export function ProfileGateModal() {
         await updateProfile(formTargetId, {
           name: trimmedName,
           role: formRole,
-          subtitle:
-            formSubtitle.trim() || PROFILE_ROLE_PRESETS[formRole].subtitle,
+          subtitle: roleSubtitle,
           avatar: formAvatar,
           accent: formAccent,
           defaultCurrency: formCurrency,
@@ -379,7 +526,7 @@ export function ProfileGateModal() {
     if (!formTargetId) return;
     const existingProfile = profiles.find((p) => p.id === formTargetId);
     if (existingProfile?.hasPassword && !deletePassword.trim()) {
-      setErrorMsg("Enter this profile's password to confirm deletion.");
+      setErrorMsg("Enter this profile's passcode to confirm deletion.");
       return;
     }
     try {
@@ -416,7 +563,7 @@ export function ProfileGateModal() {
         slot.password.trim().length < 4
       ) {
         setErrorMsg(
-          `Password for "${slot.name}" must be at least 4 characters (or leave blank).`,
+          `Passcode for "${slot.name}" must be at least 4 characters or digits (or leave blank).`,
         );
         return;
       }
@@ -431,7 +578,7 @@ export function ProfileGateModal() {
         profiles: enabledOnboardingSlots.slice(0, MAX_PROFILES).map((s) => ({
           name: s.name.trim() || PROFILE_ROLE_PRESETS[s.role].defaultName,
           role: s.role,
-          subtitle: s.subtitle.trim() || PROFILE_ROLE_PRESETS[s.role].subtitle,
+          subtitle: s.subtitle.trim() || PROFILE_ROLE_PRESETS[s.role].label,
           avatar: s.avatar,
           accent: s.accent,
           defaultCurrency: studioCurrency,
@@ -451,119 +598,56 @@ export function ProfileGateModal() {
     }
   };
 
+  const ambientAccent =
+    view === "form"
+      ? formAccent
+      : view === "unlock" && unlockTarget
+        ? unlockTarget.accent
+        : hoveredAccent || activeProfile.accent;
+  const ambientStyle =
+    PROFILE_ACCENT_STYLES[ambientAccent] ?? PROFILE_ACCENT_STYLES.blue;
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Workspace Profiles"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isLocked && !busy) {
-          closeProfileGate();
-        }
+      aria-label="BillFlow Profiles"
+      className="fixed inset-0 z-[120] flex flex-col overflow-y-auto select-none text-white"
+      style={{
+        backgroundColor: "rgba(8, 9, 13, 0.985)",
+        backdropFilter: "blur(64px) saturate(140%)",
+        WebkitBackdropFilter: "blur(64px) saturate(140%)",
       }}
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 bg-black/45 backdrop-blur-xs"
     >
-      {/* VIEW 1: SIMPLE PROFILE SWITCHER */}
-      {view === "select" && (
-        <div className="w-full max-w-[680px] rounded-[24px] bg-surface border border-line-neutral-200 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.22)] p-6 sm:p-7">
-          <div className="flex items-start justify-between gap-4 pb-5 border-b border-line-neutral-100">
-            <div>
-              <h2 className="text-[19px] font-semibold tracking-tight text-content-neutral-950">
-                {isManageMode ? "Manage Profiles" : "Switch Profile"}
-              </h2>
-              <p className="text-[13px] text-content-neutral-500 mt-0.5">
-                {isManageMode
-                  ? "Select a profile to edit its role, prefix, or password lock."
-                  : `Choose a workspace profile (${profiles.length} of ${maxProfiles}).`}
-              </p>
-            </div>
-            {!isLocked && (
-              <button
-                type="button"
-                onClick={closeProfileGate}
-                aria-label="Close"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-content-neutral-500 hover:text-content-neutral-900 hover:bg-surface-neutral-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+      {/* Subtle Ambient Radial Glow that responds to active/hovered profile */}
+      <div
+        className="pointer-events-none fixed inset-0 transition-all duration-500"
+        style={{
+          background: `radial-gradient(650px circle at 50% 28%, ${ambientStyle.glow}, transparent 72%)`,
+          opacity: 0.45,
+        }}
+      />
 
-          {errorMsg && (
-            <div className="mt-4 px-3.5 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-300 text-xs font-medium">
-              {errorMsg}
-            </div>
+      {/* Minimal Top Bar */}
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-6 sm:px-10 pt-8 pb-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          {view !== "select" && (
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMsg(null);
+                setView("select");
+              }}
+              className="inline-flex items-center gap-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Profiles
+            </button>
           )}
+        </div>
 
-          {/* Clean Profile Tiles Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 my-6">
-            {profiles.map((profile) => {
-              const isCurrent = profile.id === activeProfile.id;
-              return (
-                <button
-                  key={profile.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void handleTileClick(profile)}
-                  className={`group relative flex flex-col items-center text-center p-4 rounded-[18px] border transition-all cursor-pointer ${
-                    isCurrent && !isManageMode
-                      ? "bg-surface-neutral-100/90 border-content-neutral-900/35"
-                      : "bg-surface-neutral-50/60 hover:bg-surface-neutral-100 border-line-neutral-200"
-                  }`}
-                >
-                  <ProfileAvatarTile
-                    avatar={profile.avatar}
-                    accent={profile.accent}
-                    size="md"
-                    hasPassword={profile.hasPassword}
-                    isActive={isCurrent && !isLocked}
-                    isManageMode={isManageMode}
-                  />
-
-                  <span className="mt-3 text-[13.5px] font-semibold text-content-neutral-950 truncate max-w-full">
-                    {profile.name}
-                  </span>
-                  <span className="text-[11.5px] text-content-neutral-500 truncate max-w-full mt-0.5">
-                    {profile.subtitle}
-                  </span>
-
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <span className="text-[10.5px] font-mono text-content-neutral-500 bg-surface px-2 py-0.5 rounded-md border border-line-neutral-200">
-                      {profile.invoicePrefix} · {profile.defaultCurrency}
-                    </span>
-                  </div>
-
-                  {isCurrent && !isManageMode && (
-                    <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-500" />
-                  )}
-                </button>
-              );
-            })}
-
-            {profiles.length < maxProfiles && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  populateFormFromProfile(null);
-                  setView("form");
-                }}
-                className="flex flex-col items-center justify-center text-center p-4 rounded-[18px] border border-dashed border-line-neutral-300 hover:border-content-neutral-500 hover:bg-surface-neutral-50 transition-colors cursor-pointer min-h-[148px]"
-              >
-                <div className="w-11 h-11 rounded-2xl bg-surface-neutral-100 flex items-center justify-center text-content-neutral-600">
-                  <Plus className="w-5 h-5" />
-                </div>
-                <span className="mt-3 text-[13px] font-semibold text-content-neutral-900">
-                  Add Profile
-                </span>
-                <span className="text-[11px] text-content-neutral-500 mt-0.5">
-                  {maxProfiles - profiles.length} left
-                </span>
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between pt-4 border-t border-line-neutral-100">
+        <div className="flex items-center gap-3">
+          {view === "select" && (
             <button
               type="button"
               onClick={() => {
@@ -572,511 +656,820 @@ export function ProfileGateModal() {
                 );
                 setView("onboarding");
               }}
-              className="text-[12.5px] font-medium text-content-neutral-500 hover:text-content-neutral-900 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors cursor-pointer"
             >
-              Role Setup Wizard
+              <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-300" />
+              Role Setup
             </button>
+          )}
 
+          {!isLocked && (
             <button
               type="button"
-              onClick={() => setIsManageMode((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[11px] text-[12.5px] font-medium border border-line-neutral-200 bg-surface-neutral-50 hover:bg-surface-neutral-100 text-content-neutral-900 cursor-pointer"
+              onClick={closeProfileGate}
+              aria-label="Close profile screen"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 transition-colors cursor-pointer"
             >
-              <Pencil className="w-3.5 h-3.5" />
-              {isManageMode ? "Done" : "Edit Profiles"}
+              <X className="w-4 h-4" />
             </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* VIEW 2: PASSWORD UNLOCK */}
-      {view === "unlock" && unlockTarget && (
-        <div className="w-full max-w-[380px] rounded-[24px] bg-surface border border-line-neutral-200 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.22)] p-6 text-center">
-          <div className="flex justify-start mb-2">
-            <button
-              type="button"
-              onClick={() => {
-                setErrorMsg(null);
-                setView("select");
-              }}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-content-neutral-500 hover:text-content-neutral-900 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back
-            </button>
-          </div>
-
-          <div className="flex flex-col items-center mb-5">
-            <ProfileAvatarTile
-              avatar={unlockTarget.avatar}
-              accent={unlockTarget.accent}
-              size="lg"
-              hasPassword
-            />
-            <h2 className="text-[17px] font-semibold text-content-neutral-950 mt-3">
-              {unlockTarget.name}
-            </h2>
-            <p className="text-xs text-content-neutral-500 mt-0.5">
-              Enter password to unlock this profile
-            </p>
-          </div>
-
-          <form onSubmit={handleUnlockSubmit} className="space-y-3.5 text-left">
-            <div className="relative">
-              <input
-                ref={unlockInputRef}
-                type={showUnlockPassword ? "text" : "password"}
-                value={unlockPassword}
-                onChange={(e) => {
-                  setUnlockPassword(e.target.value);
-                  if (errorMsg) setErrorMsg(null);
-                }}
-                placeholder="Password"
-                className="ui-field w-full pr-9"
-              />
-              <button
-                type="button"
-                onClick={() => setShowUnlockPassword((prev) => !prev)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-800 cursor-pointer"
-                aria-label={
-                  showUnlockPassword ? "Hide password" : "Show password"
-                }
-              >
-                {showUnlockPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-
-            {errorMsg && (
-              <div className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-300 text-xs font-medium">
-                {errorMsg}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="ui-button ui-button--primary ui-button--default w-full justify-center"
-            >
-              {busy ? "Unlocking..." : "Unlock Profile"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* VIEW 3: CLEAN ADD / EDIT PROFILE FORM */}
-      {view === "form" && (
-        <div className="w-full max-w-[520px] rounded-[24px] bg-surface border border-line-neutral-200 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.22)] p-6">
-          <div className="flex items-center justify-between pb-4 border-b border-line-neutral-100 mb-5">
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setErrorMsg(null);
-                  setView("select");
-                }}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-content-neutral-500 hover:text-content-neutral-900 hover:bg-surface-neutral-100 cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <h2 className="text-[17px] font-semibold text-content-neutral-950">
-                {formTargetId ? "Edit Profile" : "New Profile"}
-              </h2>
-            </div>
-            {!isLocked && (
-              <button
-                type="button"
-                onClick={closeProfileGate}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-content-neutral-500 hover:text-content-neutral-900 hover:bg-surface-neutral-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          <form onSubmit={handleSaveProfileForm} className="space-y-4">
-            {/* Role Selector */}
-            <div>
-              <label className="block text-xs font-medium text-content-neutral-600 mb-1.5">
-                Role Template
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {PROFILE_ROLE_LIST.map((preset) => {
-                  const active = formRole === preset.role;
-                  return (
-                    <button
-                      key={preset.role}
-                      type="button"
-                      onClick={() => handleApplyRolePreset(preset.role)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
-                        active
-                          ? "bg-surface-neutral-100 border-content-neutral-900 text-content-neutral-950"
-                          : "bg-surface border-line-neutral-200 text-content-neutral-600 hover:bg-surface-neutral-50"
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-medium text-content-neutral-600 mb-1">
-                  Profile Name
-                </label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="Software Engineering"
-                  maxLength={60}
-                  className="ui-field w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-content-neutral-600 mb-1">
-                  Subtitle
-                </label>
-                <input
-                  type="text"
-                  value={formSubtitle}
-                  onChange={(e) => setFormSubtitle(e.target.value)}
-                  placeholder="Full-Stack & Systems"
-                  maxLength={80}
-                  className="ui-field w-full"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-medium text-content-neutral-600 mb-1">
-                  Default Currency
-                </label>
-                <select
-                  value={formCurrency}
-                  onChange={(e) => setFormCurrency(e.target.value as Currency)}
-                  className="ui-field w-full"
-                >
-                  {CURRENCY_OPTIONS.map((curr) => (
-                    <option key={curr} value={curr}>
-                      {curr}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-content-neutral-600 mb-1">
-                  Invoice Prefix
-                </label>
-                <input
-                  type="text"
-                  value={formInvoicePrefix}
-                  onChange={(e) => setFormInvoicePrefix(e.target.value)}
-                  placeholder="SE-"
-                  maxLength={12}
-                  className="ui-field w-full font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Accent Color */}
-            <div>
-              <label className="block text-xs font-medium text-content-neutral-600 mb-1.5">
-                Accent Color
-              </label>
-              <div className="flex items-center gap-2">
-                {ACCENT_OPTIONS.map((acc) => {
-                  const st = PROFILE_ACCENT_STYLES[acc];
-                  const selected = formAccent === acc;
-                  return (
-                    <button
-                      key={acc}
-                      type="button"
-                      onClick={() => setFormAccent(acc)}
-                      title={st.label}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform cursor-pointer ${
-                        selected ? "scale-110 ring-2 ring-content-neutral-900 ring-offset-2 ring-offset-surface" : "opacity-75 hover:opacity-100"
-                      }`}
-                      style={{ backgroundColor: st.swatch }}
-                    >
-                      {selected && <Check className="w-3.5 h-3.5 text-white" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Optional Password Lock */}
-            <div className="p-3.5 rounded-2xl bg-surface-neutral-50 border border-line-neutral-200 space-y-3">
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="flex items-center gap-2 text-xs font-medium text-content-neutral-900">
-                  <Lock className="w-3.5 h-3.5 text-content-neutral-500" />
-                  Password lock this profile
-                </span>
-                <input
-                  type="checkbox"
-                  checked={formEnablePassword}
-                  onChange={(e) => setFormEnablePassword(e.target.checked)}
-                  className="w-4 h-4 rounded cursor-pointer"
-                />
-              </label>
-
-              {formTargetId &&
-                profiles.find((p) => p.id === formTargetId)?.hasPassword && (
-                  <input
-                    type={showFormPassword ? "text" : "password"}
-                    value={formCurrentPassword}
-                    onChange={(e) => setFormCurrentPassword(e.target.value)}
-                    placeholder="Current password"
-                    className="ui-field w-full text-xs"
-                  />
-                )}
-
-              {formEnablePassword && (
-                <div className="relative">
-                  <input
-                    type={showFormPassword ? "text" : "password"}
-                    value={formNewPassword}
-                    onChange={(e) => setFormNewPassword(e.target.value)}
-                    placeholder={
-                      formTargetId &&
-                      profiles.find((p) => p.id === formTargetId)?.hasPassword
-                        ? "New password (leave blank to keep current)"
-                        : "Password (at least 4 characters)"
-                    }
-                    className="ui-field w-full pr-9 text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowFormPassword((prev) => !prev)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-800 cursor-pointer"
-                  >
-                    {showFormPassword ? (
-                      <EyeOff className="w-3.5 h-3.5" />
-                    ) : (
-                      <Eye className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {errorMsg && (
-              <div className="px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-300 text-xs font-medium">
-                {errorMsg}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-3 border-t border-line-neutral-100">
-              {formTargetId && formTargetId !== "default" ? (
-                !confirmDelete ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-600 hover:underline cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Delete
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    {profiles.find((p) => p.id === formTargetId)
-                      ?.hasPassword && (
-                      <input
-                        type="password"
-                        value={deletePassword}
-                        onChange={(e) => setDeletePassword(e.target.value)}
-                        placeholder="Password"
-                        className="ui-field !h-8 w-28 text-xs"
-                      />
-                    )}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void handleDeleteProfile()}
-                      className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-medium cursor-pointer"
-                    >
-                      Confirm
-                    </button>
-                  </div>
-                )
-              ) : (
-                <div />
-              )}
-
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  type="button"
-                  onClick={() => setView("select")}
-                  className="ui-button ui-button--secondary ui-button--small"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="ui-button ui-button--primary ui-button--small"
-                >
-                  {busy ? "Saving..." : "Save Profile"}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* VIEW 4: SIMPLE SINGLE-CARD ROLE ONBOARDING */}
-      {view === "onboarding" && (
-        <div className="w-full max-w-[580px] rounded-[24px] bg-surface border border-line-neutral-200 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.22)] p-6 sm:p-7">
-          <div className="flex items-start justify-between gap-4 pb-4 border-b border-line-neutral-100 mb-5">
-            <div>
-              <h2 className="text-[19px] font-semibold text-content-neutral-950">
-                Set Up Role Profiles
-              </h2>
-              <p className="text-[13px] text-content-neutral-500 mt-0.5">
-                Select the roles you want to keep in separate workspaces (up to 5).
-              </p>
-            </div>
-            {!isLocked && (
-              <button
-                type="button"
-                onClick={() => setView("select")}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-content-neutral-500 hover:text-content-neutral-900 hover:bg-surface-neutral-100 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+      {/* =====================================================================
+          VIEW 1: AUTHENTIC NETFLIX PROFILE SWITCHER
+         ===================================================================== */}
+      {view === "select" && (
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8 text-center">
+          <h1 className="text-3xl sm:text-5xl font-medium tracking-tight text-white mb-3">
+            {isManageMode ? "Manage Profiles:" : "Who’s working?"}
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mb-10 sm:mb-14">
+            {isManageMode
+              ? "Select a profile to customize its role, invoice prefix, or passcode lock."
+              : "Select your role workspace to load its isolated clients, invoices, and ledger."}
+          </p>
 
           {errorMsg && (
-            <div className="mb-4 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-300 text-xs font-medium">
+            <div className="mb-8 px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium">
               {errorMsg}
             </div>
           )}
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-content-neutral-600 mb-1">
-                  Your Name or Studio
-                </label>
-                <input
-                  type="text"
-                  value={studioName}
-                  onChange={(e) => setStudioName(e.target.value)}
-                  placeholder="Chethaka Lakshitha"
-                  className="ui-field w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-content-neutral-600 mb-1">
-                  Currency
-                </label>
-                <select
-                  value={studioCurrency}
-                  onChange={(e) => {
-                    const curr = e.target.value as Currency;
-                    setStudioCurrency(curr);
-                    setOnboardingSlots((prev) =>
-                      prev.map((s) => ({ ...s, defaultCurrency: curr })),
-                    );
-                  }}
-                  className="ui-field w-full"
+          {/* Netflix Horizontal Profile Row */}
+          <div className="flex flex-wrap items-start justify-center gap-6 sm:gap-9 max-w-5xl mb-12 sm:mb-16">
+            {profiles.map((profile) => {
+              const isCurrent = profile.id === activeProfile.id;
+              return (
+                <button
+                  key={profile.id}
+                  type="button"
+                  disabled={busy}
+                  onMouseEnter={() => setHoveredAccent(profile.accent)}
+                  onMouseLeave={() => setHoveredAccent(null)}
+                  onClick={() => void handleTileClick(profile)}
+                  className="group flex flex-col items-center w-32 sm:w-36 focus:outline-none cursor-pointer"
                 >
-                  {CURRENCY_OPTIONS.map((curr) => (
-                    <option key={curr} value={curr}>
-                      {curr}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-0.5">
-              {onboardingSlots.map((slot, idx) => (
-                <div
-                  key={slot.role}
-                  className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-colors ${
-                    slot.enabled
-                      ? "bg-surface-neutral-50 border-line-neutral-200"
-                      : "bg-surface border-line-neutral-100 opacity-60"
-                  }`}
-                >
-                  <label className="flex items-center gap-3 cursor-pointer min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={slot.enabled}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setOnboardingSlots((prev) =>
-                          prev.map((item, i) =>
-                            i === idx ? { ...item, enabled: checked } : item,
-                          ),
-                        );
-                      }}
-                      className="w-4 h-4 rounded cursor-pointer"
-                    />
+                  <div className="transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.04]">
                     <ProfileAvatarTile
-                      avatar={slot.avatar}
-                      accent={slot.accent}
-                      size="xs"
+                      avatar={profile.avatar}
+                      accent={profile.accent}
+                      size="xl"
+                      hasPassword={profile.hasPassword}
+                      isActive={isCurrent && !isLocked && !isManageMode}
+                      isManageMode={isManageMode}
+                      interactiveHover
                     />
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold text-content-neutral-950 truncate">
-                        {slot.name}
-                      </div>
-                      <div className="text-[11px] text-content-neutral-500 truncate">
-                        {slot.subtitle} · {slot.invoicePrefix}
-                      </div>
-                    </div>
-                  </label>
+                  </div>
 
-                  {slot.enabled && (
-                    <input
-                      type="password"
-                      value={slot.password || ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setOnboardingSlots((prev) =>
-                          prev.map((item, i) =>
-                            i === idx ? { ...item, password: val } : item,
-                          ),
-                        );
-                      }}
-                      placeholder="Optional password"
-                      className="ui-field !h-8 sm:w-44 text-xs"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
+                  <span className="mt-3.5 text-sm sm:text-[16px] font-normal text-zinc-400 group-hover:text-white transition-colors truncate max-w-full">
+                    {profile.name}
+                  </span>
 
-            <div className="flex items-center justify-between pt-3 border-t border-line-neutral-100">
-              <button
-                type="button"
-                onClick={() => setView("select")}
-                className="ui-button ui-button--secondary ui-button--small"
-              >
-                Cancel
-              </button>
+                  <span className="text-[11.5px] text-zinc-500 group-hover:text-zinc-400 transition-colors truncate max-w-full mt-0.5">
+                    {profile.subtitle}
+                  </span>
+
+                  {/* Netflix-style centered padlock icon below locked profiles */}
+                  <div className="h-5 flex items-center justify-center mt-1.5">
+                    {profile.hasPassword ? (
+                      <Lock
+                        className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors"
+                        strokeWidth={2}
+                      />
+                    ) : isCurrent && !isLocked ? (
+                      <span className="text-[10px] font-medium uppercase tracking-widest text-emerald-400/90">
+                        Active
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Netflix "Add Profile" Tile */}
+            {profiles.length < maxProfiles && (
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void handleCompleteOnboarding()}
-                className="ui-button ui-button--primary ui-button--small"
+                onClick={() => {
+                  populateFormFromProfile(null);
+                  setView("form");
+                }}
+                className="group flex flex-col items-center w-32 sm:w-36 focus:outline-none cursor-pointer"
               >
-                {busy
-                  ? "Saving..."
-                  : `Create ${enabledOnboardingSlots.length} Profile${
-                      enabledOnboardingSlots.length === 1 ? "" : "s"
-                    }`}
+                <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-[16px] bg-white/[0.03] group-hover:bg-white/[0.12] border border-white/10 group-hover:border-white flex items-center justify-center transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.04]">
+                  <div className="w-14 h-14 rounded-full bg-white/[0.06] group-hover:bg-white/20 flex items-center justify-center text-zinc-400 group-hover:text-white transition-colors">
+                    <Plus className="w-8 h-8" strokeWidth={1.8} />
+                  </div>
+                </div>
+                <span className="mt-3.5 text-sm sm:text-[16px] font-normal text-zinc-400 group-hover:text-white transition-colors">
+                  Add Profile
+                </span>
+                <span className="text-[11.5px] text-zinc-600 mt-0.5">
+                  {maxProfiles - profiles.length} left
+                </span>
               </button>
+            )}
+          </div>
+
+          {/* Iconic Netflix Bottom Action Button */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsManageMode((prev) => !prev)}
+              className={`px-7 py-2.5 text-xs sm:text-[13px] tracking-[0.18em] uppercase transition-all cursor-pointer ${
+                isManageMode
+                  ? "bg-white text-zinc-950 font-bold hover:bg-zinc-200 rounded-md"
+                  : "bg-transparent border border-zinc-500/80 hover:border-white text-zinc-400 hover:text-white font-medium rounded-md"
+              }`}
+            >
+              {isManageMode ? "Done" : "Manage Profiles"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          VIEW 2: NETFLIX PROFILE LOCK / PASSCODE UNLOCK STAGE
+         ===================================================================== */}
+      {view === "unlock" && unlockTarget && (
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8 text-center max-w-lg mx-auto w-full">
+          <ProfileAvatarTile
+            avatar={unlockTarget.avatar}
+            accent={unlockTarget.accent}
+            size="lg"
+            hasPassword
+          />
+
+          <div className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
+            {unlockTarget.name} · {unlockTarget.subtitle}
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-medium text-white mt-3 mb-2">
+            Profile Lock is currently on.
+          </h2>
+          <p className="text-sm text-zinc-400 mb-8">
+            {unlockMode === "pin"
+              ? "Enter your 4-digit PIN to access this workspace."
+              : "Enter your passcode to access this workspace."}
+          </p>
+
+          <form onSubmit={handleUnlockFormSubmit} className="w-full space-y-6">
+            {unlockMode === "pin" ? (
+              <div className="flex items-center justify-center gap-3.5">
+                {[0, 1, 2, 3].map((idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => {
+                      unlockPinRefs.current[idx] = el;
+                    }}
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={unlockPinDigits[idx]}
+                    onChange={(e) =>
+                      handleUnlockPinDigitChange(idx, e.target.value)
+                    }
+                    onKeyDown={(e) => handleUnlockPinKeyDown(idx, e)}
+                    aria-label={`PIN digit ${idx + 1}`}
+                    className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-white/[0.05] border-2 border-white/20 focus:border-white focus:bg-white/[0.09] text-center text-2xl font-mono text-white outline-none transition-all"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="relative max-w-xs mx-auto">
+                <input
+                  ref={unlockInputRef}
+                  type={showUnlockPassword ? "text" : "password"}
+                  value={unlockPassword}
+                  onChange={(e) => {
+                    setUnlockPassword(e.target.value);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
+                  placeholder="Enter letters or numbers"
+                  className="w-full h-12 pl-4 pr-11 rounded-xl bg-white/[0.06] border border-white/20 focus:border-white text-sm text-white placeholder:text-zinc-500 outline-none transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowUnlockPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
+                >
+                  {showUnlockPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div className="px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium max-w-xs mx-auto">
+                {errorMsg}
+              </div>
+            )}
+
+            <div className="flex flex-col items-center gap-3 pt-2">
+              {unlockMode === "alphanumeric" && (
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="px-8 py-2.5 rounded-lg bg-white text-zinc-950 font-semibold text-xs uppercase tracking-[0.14em] hover:bg-zinc-200 transition-colors cursor-pointer"
+                >
+                  {busy ? "Unlocking..." : "Unlock Profile"}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg(null);
+                  setUnlockMode((prev) =>
+                    prev === "pin" ? "alphanumeric" : "pin",
+                  );
+                }}
+                className="text-xs text-zinc-400 hover:text-white underline underline-offset-4 cursor-pointer"
+              >
+                {unlockMode === "pin"
+                  ? "Use alphanumeric password instead"
+                  : "Use 4-digit PIN pad instead"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* =====================================================================
+          VIEW 3: PREMIUM EDITORIAL PROFILE CREATOR / EDITOR
+         ===================================================================== */}
+      {view === "form" && (
+        <div className="relative z-10 flex-1 flex items-center justify-center px-6 py-6">
+          <div className="w-full max-w-3xl">
+            <div className="border-b border-white/10 pb-5 mb-7">
+              <h1 className="text-2xl sm:text-4xl font-medium tracking-tight text-white">
+                {formTargetId ? "Edit Profile" : "Add Profile"}
+              </h1>
+              <p className="text-xs sm:text-sm text-zinc-400 mt-1.5">
+                Each profile runs an isolated workspace with its own clients,
+                invoices, catalog, and ledger.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveProfileForm}>
+              <div className="grid grid-cols-1 md:grid-cols-[210px_1fr] gap-8 items-start">
+                {/* Left Column: Live Netflix Tile Preview & Style Controls */}
+                <div className="flex flex-col items-center md:items-start space-y-5">
+                  <div className="flex flex-col items-center">
+                    <ProfileAvatarTile
+                      avatar={formAvatar}
+                      accent={formAccent}
+                      size="xl"
+                      hasPassword={formEnablePassword}
+                    />
+                    <span className="mt-3 text-sm font-medium text-white truncate max-w-[160px]">
+                      {formName.trim() || "Profile Name"}
+                    </span>
+                    <span className="text-xs text-zinc-400 truncate max-w-[160px]">
+                      {formCustomRoleText.trim() || "Custom Role"}
+                    </span>
+                  </div>
+
+                  {/* Accent Swatches */}
+                  <div className="w-full">
+                    <label className="block text-[11px] font-medium uppercase tracking-wider text-zinc-400 mb-2">
+                      Profile Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {ACCENT_OPTIONS.map((acc) => {
+                        const st = PROFILE_ACCENT_STYLES[acc];
+                        const selected = formAccent === acc;
+                        return (
+                          <button
+                            key={acc}
+                            type="button"
+                            onClick={() => setFormAccent(acc)}
+                            title={st.label}
+                            className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform cursor-pointer ${
+                              selected
+                                ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-[#08090D]"
+                                : "opacity-70 hover:opacity-100"
+                            }`}
+                            style={{ background: st.bg }}
+                          >
+                            {selected && (
+                              <Check className="w-3.5 h-3.5 text-white" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Emblem Picker */}
+                  <div className="w-full">
+                    <label className="block text-[11px] font-medium uppercase tracking-wider text-zinc-400 mb-2">
+                      Emblem
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {AVATAR_OPTIONS.map((av) => {
+                        const IconComp = PROFILE_AVATAR_ICONS[av];
+                        const selected = formAvatar === av;
+                        return (
+                          <button
+                            key={av}
+                            type="button"
+                            onClick={() => setFormAvatar(av)}
+                            className={`h-9 rounded-lg flex items-center justify-center border transition-colors cursor-pointer ${
+                              selected
+                                ? "bg-white text-zinc-950 border-white"
+                                : "bg-white/[0.04] text-zinc-400 border-white/10 hover:bg-white/[0.1] hover:text-white"
+                            }`}
+                          >
+                            <IconComp className="w-4 h-4" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Role Templates, Custom Role Input, & Passcode Lock */}
+                <div className="space-y-5">
+                  {/* Optional Quick-Fill Templates */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
+                        Quick-Fill Role Templates (Optional)
+                      </label>
+                      <span className="text-[11px] text-zinc-500">
+                        Click a preset or type your own below
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PROFILE_ROLE_LIST.map((preset) => {
+                        const active =
+                          formRole === preset.role &&
+                          formCustomRoleText === preset.label;
+                        return (
+                          <button
+                            key={preset.role}
+                            type="button"
+                            onClick={() => handleApplyRolePreset(preset.role)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                              active
+                                ? "bg-white text-zinc-950 border-white"
+                                : "bg-white/[0.04] border-white/10 text-zinc-300 hover:bg-white/[0.1] hover:text-white"
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Profile Name & Custom Role Text Box */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                        Profile Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        placeholder="e.g. Chethaka — AI"
+                        maxLength={60}
+                        className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm text-white placeholder:text-zinc-500 outline-none transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                        Role / Specialization (Type any role)
+                      </label>
+                      <input
+                        type="text"
+                        value={formCustomRoleText}
+                        onChange={(e) => setFormCustomRoleText(e.target.value)}
+                        placeholder="e.g. AI Development, Technical Consulting..."
+                        maxLength={80}
+                        className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm text-white placeholder:text-zinc-500 outline-none transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Currency & Invoice Prefix */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                        Default Currency
+                      </label>
+                      <select
+                        value={formCurrency}
+                        onChange={(e) =>
+                          setFormCurrency(e.target.value as Currency)
+                        }
+                        className="w-full h-11 px-3.5 rounded-xl bg-[#12141C] border border-white/15 focus:border-white text-sm text-white outline-none transition-colors"
+                      >
+                        {CURRENCY_OPTIONS.map((curr) => (
+                          <option key={curr} value={curr}>
+                            {curr}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                        Invoice Prefix
+                      </label>
+                      <input
+                        type="text"
+                        value={formInvoicePrefix}
+                        onChange={(e) => setFormInvoicePrefix(e.target.value)}
+                        placeholder="SE-"
+                        maxLength={12}
+                        className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm font-mono text-white outline-none transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Passcode Lock Card (4-Digit PIN OR Alphanumeric Password) */}
+                  <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <div className="flex items-center gap-2.5">
+                        <KeyRound className="w-4 h-4 text-amber-400" />
+                        <div>
+                          <div className="text-xs font-semibold text-white">
+                            Profile Passcode Lock
+                          </div>
+                          <div className="text-[11px] text-zinc-400">
+                            Lock this profile with a 4-digit PIN or a password
+                            (letters & numbers).
+                          </div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formEnablePassword}
+                        onChange={(e) =>
+                          setFormEnablePassword(e.target.checked)
+                        }
+                        className="w-4 h-4 accent-white rounded cursor-pointer"
+                      />
+                    </label>
+
+                    {formTargetId &&
+                      profiles.find((p) => p.id === formTargetId)
+                        ?.hasPassword && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                            Current Passcode
+                          </label>
+                          <input
+                            type={showFormPassword ? "text" : "password"}
+                            value={formCurrentPassword}
+                            onChange={(e) =>
+                              setFormCurrentPassword(e.target.value)
+                            }
+                            placeholder="Enter current PIN or password"
+                            className="w-full h-10 px-3.5 rounded-xl bg-black/40 border border-white/15 focus:border-white text-xs text-white outline-none"
+                          />
+                        </div>
+                      )}
+
+                    {formEnablePassword && (
+                      <div className="space-y-3 pt-1">
+                        {/* Mode Toggle: 4-Digit PIN vs Letters & Numbers */}
+                        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-black/40 border border-white/10">
+                          <button
+                            type="button"
+                            onClick={() => setFormLockMode("pin")}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                              formLockMode === "pin"
+                                ? "bg-white text-zinc-950"
+                                : "text-zinc-400 hover:text-white"
+                            }`}
+                          >
+                            <Hash className="w-3.5 h-3.5" />
+                            4-Digit PIN
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormLockMode("alphanumeric")}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                              formLockMode === "alphanumeric"
+                                ? "bg-white text-zinc-950"
+                                : "text-zinc-400 hover:text-white"
+                            }`}
+                          >
+                            <Type className="w-3.5 h-3.5" />
+                            Letters & Numbers
+                          </button>
+                        </div>
+
+                        {formLockMode === "pin" ? (
+                          <div>
+                            <label className="block text-[11px] text-zinc-400 mb-2">
+                              Enter 4 numbers
+                            </label>
+                            <div className="flex items-center gap-2.5">
+                              {[0, 1, 2, 3].map((idx) => (
+                                <input
+                                  key={idx}
+                                  ref={(el) => {
+                                    formPinRefs.current[idx] = el;
+                                  }}
+                                  type="password"
+                                  inputMode="numeric"
+                                  maxLength={1}
+                                  value={formPinDigits[idx]}
+                                  onChange={(e) =>
+                                    handleFormPinDigitChange(
+                                      idx,
+                                      e.target.value,
+                                    )
+                                  }
+                                  onKeyDown={(e) =>
+                                    handleFormPinKeyDown(idx, e)
+                                  }
+                                  placeholder="•"
+                                  className="w-12 h-12 rounded-xl bg-black/50 border border-white/20 focus:border-white text-center text-lg font-mono text-white outline-none"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <input
+                              type={showFormPassword ? "text" : "password"}
+                              value={formNewPassword}
+                              onChange={(e) =>
+                                setFormNewPassword(e.target.value)
+                              }
+                              placeholder="Enter letters & numbers (min 4 chars)"
+                              className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-black/50 border border-white/20 focus:border-white text-xs text-white placeholder:text-zinc-500 outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShowFormPassword((prev) => !prev)
+                              }
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
+                            >
+                              {showFormPassword ? (
+                                <EyeOff className="w-3.5 h-3.5" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {errorMsg && (
+                    <div className="px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium">
+                      {errorMsg}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Netflix-Style Editorial Footer Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-4 mt-8 pt-6 border-t border-white/10">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="px-7 py-2.5 rounded-md bg-white hover:bg-zinc-200 disabled:opacity-50 text-zinc-950 font-bold text-xs sm:text-[13px] tracking-[0.14em] uppercase transition-colors cursor-pointer"
+                  >
+                    {busy ? "Saving..." : "Save Profile"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMsg(null);
+                      setView("select");
+                    }}
+                    className="px-6 py-2.5 rounded-md border border-zinc-500 hover:border-white text-zinc-400 hover:text-white font-medium text-xs sm:text-[13px] tracking-[0.14em] uppercase transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                {formTargetId && formTargetId !== "default" && (
+                  <div>
+                    {!confirmDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(true)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md border border-zinc-700 hover:border-rose-500 text-zinc-400 hover:text-rose-400 text-xs font-medium tracking-[0.12em] uppercase transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete Profile
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {profiles.find((p) => p.id === formTargetId)
+                          ?.hasPassword && (
+                          <input
+                            type="password"
+                            value={deletePassword}
+                            onChange={(e) => setDeletePassword(e.target.value)}
+                            placeholder="Passcode"
+                            className="h-9 px-3 rounded-md bg-black/50 border border-rose-500/50 text-xs text-white w-28 outline-none"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void handleDeleteProfile()}
+                          className="px-4 py-2 rounded-md bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                        >
+                          Confirm Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          VIEW 4: FULL-SCREEN ROLE ONBOARDING SETUP
+         ===================================================================== */}
+      {view === "onboarding" && (
+        <div className="relative z-10 flex-1 flex items-center justify-center px-6 py-6">
+          <div className="w-full max-w-2xl">
+            <div className="border-b border-white/10 pb-5 mb-6">
+              <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-white">
+                Set Up Your Role Workspaces
+              </h1>
+              <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+                Customize your roles, profile names, and optional 4-digit PINs
+                or passcodes (up to 5 profiles).
+              </p>
+            </div>
+
+            {errorMsg && (
+              <div className="mb-4 px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium">
+                {errorMsg}
+              </div>
+            )}
+
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                    Your Name or Studio Name
+                  </label>
+                  <input
+                    type="text"
+                    value={studioName}
+                    onChange={(e) => setStudioName(e.target.value)}
+                    placeholder="Chethaka Lakshitha"
+                    className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+                    Default Currency
+                  </label>
+                  <select
+                    value={studioCurrency}
+                    onChange={(e) => {
+                      const curr = e.target.value as Currency;
+                      setStudioCurrency(curr);
+                      setOnboardingSlots((prev) =>
+                        prev.map((s) => ({ ...s, defaultCurrency: curr })),
+                      );
+                    }}
+                    className="w-full h-11 px-3.5 rounded-xl bg-[#12141C] border border-white/15 focus:border-white text-sm text-white outline-none"
+                  >
+                    {CURRENCY_OPTIONS.map((curr) => (
+                      <option key={curr} value={curr}>
+                        {curr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                {onboardingSlots.map((slot, idx) => (
+                  <div
+                    key={slot.role}
+                    className={`p-3.5 rounded-2xl border transition-colors ${
+                      slot.enabled
+                        ? "bg-white/[0.05] border-white/20"
+                        : "bg-white/[0.015] border-white/5 opacity-55"
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={slot.enabled}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setOnboardingSlots((prev) =>
+                              prev.map((item, i) =>
+                                i === idx
+                                  ? { ...item, enabled: checked }
+                                  : item,
+                              ),
+                            );
+                          }}
+                          className="w-4 h-4 accent-white rounded cursor-pointer"
+                        />
+                        <ProfileAvatarTile
+                          avatar={slot.avatar}
+                          accent={slot.accent}
+                          size="sm"
+                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1">
+                          <input
+                            type="text"
+                            value={slot.name}
+                            disabled={!slot.enabled}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setOnboardingSlots((prev) =>
+                                prev.map((item, i) =>
+                                  i === idx ? { ...item, name: val } : item,
+                                ),
+                              );
+                            }}
+                            placeholder="Profile Name"
+                            className="h-9 px-2.5 rounded-lg bg-black/40 border border-white/10 focus:border-white text-xs font-medium text-white outline-none"
+                          />
+                          <input
+                            type="text"
+                            value={slot.subtitle}
+                            disabled={!slot.enabled}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setOnboardingSlots((prev) =>
+                                prev.map((item, i) =>
+                                  i === idx
+                                    ? { ...item, subtitle: val }
+                                    : item,
+                                ),
+                              );
+                            }}
+                            placeholder="Custom Role Title"
+                            className="h-9 px-2.5 rounded-lg bg-black/40 border border-white/10 focus:border-white text-xs text-zinc-300 outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {slot.enabled && (
+                        <input
+                          type="password"
+                          value={slot.password || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setOnboardingSlots((prev) =>
+                              prev.map((item, i) =>
+                                i === idx ? { ...item, password: val } : item,
+                              ),
+                            );
+                          }}
+                          placeholder="4-digit PIN or password"
+                          className="h-9 px-3 rounded-lg bg-black/40 border border-white/15 focus:border-white text-xs text-white placeholder:text-zinc-500 sm:w-44 outline-none"
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-5 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setView("select")}
+                  className="px-6 py-2.5 rounded-md border border-zinc-500 hover:border-white text-zinc-400 hover:text-white text-xs font-medium tracking-[0.14em] uppercase transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handleCompleteOnboarding()}
+                  className="px-7 py-2.5 rounded-md bg-white hover:bg-zinc-200 disabled:opacity-50 text-zinc-950 font-bold text-xs tracking-[0.14em] uppercase transition-colors cursor-pointer"
+                >
+                  {busy
+                    ? "Creating..."
+                    : `Create ${enabledOnboardingSlots.length} Profile${
+                        enabledOnboardingSlots.length === 1 ? "" : "s"
+                      }`}
+                </button>
+              </div>
             </div>
           </div>
         </div>

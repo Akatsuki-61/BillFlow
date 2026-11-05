@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Check,
   RotateCcw,
-  Sparkles,
   Maximize2,
   Minimize2,
   ArrowLeft,
@@ -311,7 +310,7 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-[#1c1c1f] text-white dark:bg-white dark:text-black flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4" />
+                  <SlidersHorizontal className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-[14.5px] font-semibold text-content-neutral-950 leading-tight">
