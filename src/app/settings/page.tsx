@@ -34,7 +34,7 @@ import {
   Monitor,
   Lock,
   Plus,
-  Sparkles,
+  SlidersHorizontal,
   UsersRound,
   Pencil,
 } from "lucide-react";
@@ -708,7 +708,7 @@ function SettingsContent() {
                           onClick={() => openProfileGate("onboarding")}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-line-neutral-200 bg-surface hover:bg-surface-neutral-100 text-content-neutral-800 cursor-pointer"
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          <SlidersHorizontal className="w-3.5 h-3.5 text-content-neutral-500" />
                           Role Setup Wizard
                         </button>
                         <button

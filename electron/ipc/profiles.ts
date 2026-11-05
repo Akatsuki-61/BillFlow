@@ -45,7 +45,7 @@ const roleEnum = z.enum([
 
 const avatarEnum = z.enum([
   "code",
-  "sparkles",
+  "terminal",
   "compass",
   "layers",
   "briefcase",
@@ -114,7 +114,9 @@ const completeOnboardingSchema = z.object({
 });
 
 export function hashProfilePassword(password: string): { hash: string; salt: string } {
-  const salt = crypto.randomBytes(16).toString("hex");
+  const isPin = /^\d{4}$/.test(password);
+  const rawSalt = crypto.randomBytes(16).toString("hex");
+  const salt = `${isPin ? "pin" : "pwd"}:${rawSalt}`;
   const hash = crypto.scryptSync(password, salt, 64).toString("hex");
   return { hash, salt };
 }
@@ -137,17 +139,31 @@ export function verifyProfilePasswordHash(
 }
 
 function mapProfileRow(row: UserProfileRow): UserProfile {
+  const hasPassword = Boolean(row.passwordHash && row.passwordSalt);
+  const lockType = !hasPassword
+    ? null
+    : row.passwordSalt?.startsWith("pin:")
+      ? "pin"
+      : "password";
+
+  const role = (row.role as ProfileRole) || "software-engineering";
+  const parsedAvatar = avatarEnum.safeParse(row.avatar);
+  const avatar: ProfileAvatar = parsedAvatar.success
+    ? parsedAvatar.data
+    : PROFILE_ROLE_PRESETS[role]?.avatar || "cpu";
+
   return {
     id: row.id,
     name: row.name,
-    role: (row.role as ProfileRole) || "software-engineering",
+    role,
     subtitle: row.subtitle,
-    avatar: (row.avatar as ProfileAvatar) || "code",
+    avatar,
     accent: (row.accent as AccentPreference) || "blue",
     themePreference: (row.themePreference as ThemePreference) || "system",
     defaultCurrency: (row.defaultCurrency as Currency) || "USD",
     invoicePrefix: row.invoicePrefix || "SE-",
-    hasPassword: Boolean(row.passwordHash && row.passwordSalt),
+    hasPassword,
+    lockType,
     passwordHint: row.passwordHint ?? null,
     isActive: Boolean(row.isActive),
     isOnboarded: Boolean(row.isOnboarded),

@@ -12,7 +12,7 @@ export type ProfileRole =
 
 export type ProfileAvatar =
   | "code"
-  | "sparkles"
+  | "terminal"
   | "compass"
   | "layers"
   | "briefcase"
@@ -31,6 +31,7 @@ export interface UserProfile {
   defaultCurrency: Currency;
   invoicePrefix: string;
   hasPassword: boolean;
+  lockType?: "pin" | "password" | null;
   passwordHint: string | null;
   isActive: boolean;
   isOnboarded: boolean;
@@ -172,7 +173,7 @@ export const PROFILE_ROLE_PRESETS: Record<ProfileRole, ProfileRolePreset> = {
     subtitle: "LLMs, Agents & ML Pipelines",
     description:
       "LLM pipelines, customer-support automation agents, RAG knowledge systems, and model integrations.",
-    avatar: "sparkles",
+    avatar: "cpu",
     accent: "purple",
     invoicePrefix: "AI-",
     starterCatalog: [

@@ -21,7 +21,6 @@ import {
   SlidersHorizontal,
   UserPlus,
   Users,
-  Sparkles,
   Paperclip,
   FileCheck,
   RotateCcw,
@@ -2000,7 +1999,7 @@ export default function OutsourcingView() {
                 {/* Linked Task & Invoice Banner if prefilled */}
                 {woTaskId && (
                   <div className="p-3 rounded-xl bg-surface-purple-50/50 border border-line-purple-200 flex items-start gap-2.5">
-                    <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                    <GitFork className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                     <div className="text-xs space-y-0.5">
                       <div className="font-semibold text-content-neutral-900">
                         Linked Task: {woTaskTitle || "Sprint Deliverable"}

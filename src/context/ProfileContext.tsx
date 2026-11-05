@@ -352,6 +352,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         defaultCurrency: input.defaultCurrency || "USD",
         invoicePrefix: input.invoicePrefix?.trim() || preset.invoicePrefix,
         hasPassword: Boolean(rawPassword),
+        lockType: !rawPassword
+          ? null
+          : /^\d{4}$/.test(rawPassword)
+            ? "pin"
+            : "password",
         passwordHint: rawPassword ? input.passwordHint?.trim() || null : null,
         isActive: false,
         isOnboarded: true,
@@ -402,7 +407,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       }
 
       const now = new Date().toISOString();
-      const updated = current.profiles.map((p) => {
+      const updated = current.profiles.map((p): UserProfile => {
         if (p.id !== id) return p;
         return {
           ...p,
@@ -415,6 +420,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           defaultCurrency: patch.defaultCurrency ?? p.defaultCurrency,
           invoicePrefix: patch.invoicePrefix ?? p.invoicePrefix,
           hasPassword: Boolean(passwords[id]),
+          lockType: !passwords[id]
+            ? null
+            : /^\d{4}$/.test(passwords[id])
+              ? "pin"
+              : "password",
           passwordHint:
             patch.password === null || patch.password === ""
               ? null
@@ -516,6 +526,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
             defaultCurrency: slot.defaultCurrency || input.defaultCurrency,
             invoicePrefix: slot.invoicePrefix,
             hasPassword: Boolean(rawPass),
+            lockType: !rawPass
+              ? null
+              : /^\d{4}$/.test(rawPass)
+                ? "pin"
+                : "password",
             passwordHint: rawPass ? slot.passwordHint?.trim() || null : null,
             isActive: index === 0,
             isOnboarded: true,
