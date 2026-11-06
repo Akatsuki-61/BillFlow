@@ -42,8 +42,12 @@ import {
 import { OverdueSummaryDialog } from "./OverdueSummaryDialog";
 import {
   generateInvoicesCsv,
+  generateInvoicesExcelWorkbook,
   generateOverdueSummaryCsv,
+  generateOverdueExcelWorkbook,
   downloadCsvFile,
+  downloadExcelFile,
+  type ExportFileFormat,
 } from "@/lib/csv-export";
 import {
   useInvoices,
@@ -298,8 +302,9 @@ export default function InvoicesView() {
     return () => clearTimeout(timer);
   }, [invoiceHighlightParam]);
 
-  // Overdue Summary Modal state
+  // Overdue Summary Modal state & Export Format preference
   const [showOverdueSummary, setShowOverdueSummary] = useState(false);
+  const [exportFormat, setExportFormat] = useState<ExportFileFormat>("csv");
 
   // Check URL search parameters for overdue summary view
   const viewParam = searchParams.get("view");
@@ -310,10 +315,13 @@ export default function InvoicesView() {
     }
   }, [viewParam, summaryParam]);
 
-  // Export Invoices CSV handler
+  // Export Invoices CSV / Excel handler using Convert Engine
   const handleExportInvoicesCsv = (
     type: "current" | "selected" | "overdue" | "all",
+    formatOverride?: ExportFileFormat,
   ) => {
+    const activeFmt = formatOverride ?? exportFormat;
+    const isExcel = activeFmt === "excel";
     try {
       const todayStr = localDateKey();
       if (type === "selected") {
@@ -324,28 +332,80 @@ export default function InvoicesView() {
           showToast("No invoices selected for export", "error");
           return;
         }
-        const csv = generateInvoicesCsv(selected, { includeSummaryRow: true });
-        downloadCsvFile(`invoices-selected-${todayStr}.csv`, csv);
-        showToast(`Exported ${selected.length} selected invoices to CSV.`);
+        if (isExcel) {
+          const xls = generateInvoicesExcelWorkbook(selected, {
+            includeSummaryRow: true,
+            sheetName: "Selected Invoices",
+          });
+          downloadExcelFile(`invoices-selected-${todayStr}.xls`, xls);
+          showToast(
+            `Converted & exported ${selected.length} selected invoices to Excel (.xls).`,
+          );
+        } else {
+          const csv = generateInvoicesCsv(selected, {
+            includeSummaryRow: true,
+          });
+          downloadCsvFile(`invoices-selected-${todayStr}.csv`, csv);
+          showToast(
+            `Exported ${selected.length} selected invoices to CSV (.csv).`,
+          );
+        }
       } else if (type === "overdue") {
-        const csv = generateOverdueSummaryCsv(allInvoices);
-        downloadCsvFile(`overdue-invoices-summary-${todayStr}.csv`, csv);
-        showToast("Exported overdue invoices summary to CSV.");
+        if (isExcel) {
+          const xls = generateOverdueExcelWorkbook(allInvoices, {
+            includeClientRollup: true,
+          });
+          downloadExcelFile(`overdue-invoices-summary-${todayStr}.xls`, xls);
+          showToast(
+            "Converted & exported Overdue Aging Workbook to Excel (.xls).",
+          );
+        } else {
+          const csv = generateOverdueSummaryCsv(allInvoices);
+          downloadCsvFile(`overdue-invoices-summary-${todayStr}.csv`, csv);
+          showToast("Exported overdue invoices summary to CSV (.csv).");
+        }
       } else if (type === "all") {
-        const csv = generateInvoicesCsv(allInvoices, {
-          includeSummaryRow: true,
-        });
-        downloadCsvFile(`invoices-all-${todayStr}.csv`, csv);
-        showToast(`Exported all ${allInvoices.length} invoices to CSV.`);
+        if (isExcel) {
+          const xls = generateInvoicesExcelWorkbook(allInvoices, {
+            includeSummaryRow: true,
+            sheetName: "All Invoices",
+          });
+          downloadExcelFile(`invoices-all-${todayStr}.xls`, xls);
+          showToast(
+            `Converted & exported all ${allInvoices.length} invoices to Excel (.xls).`,
+          );
+        } else {
+          const csv = generateInvoicesCsv(allInvoices, {
+            includeSummaryRow: true,
+          });
+          downloadCsvFile(`invoices-all-${todayStr}.csv`, csv);
+          showToast(`Exported all ${allInvoices.length} invoices to CSV (.csv).`);
+        }
       } else {
-        const csv = generateInvoicesCsv(filteredInvoices, {
-          includeSummaryRow: true,
-        });
-        downloadCsvFile(`invoices-filtered-${todayStr}.csv`, csv);
-        showToast(`Exported ${filteredInvoices.length} invoices to CSV.`);
+        if (isExcel) {
+          const xls = generateInvoicesExcelWorkbook(filteredInvoices, {
+            includeSummaryRow: true,
+            sheetName: "Filtered Invoices",
+          });
+          downloadExcelFile(`invoices-filtered-${todayStr}.xls`, xls);
+          showToast(
+            `Converted & exported ${filteredInvoices.length} invoices to Excel (.xls).`,
+          );
+        } else {
+          const csv = generateInvoicesCsv(filteredInvoices, {
+            includeSummaryRow: true,
+          });
+          downloadCsvFile(`invoices-filtered-${todayStr}.csv`, csv);
+          showToast(
+            `Exported ${filteredInvoices.length} invoices to CSV (.csv).`,
+          );
+        }
       }
     } catch {
-      showToast("Failed to generate CSV export file", "error");
+      showToast(
+        `Failed to generate ${isExcel ? "Excel" : "CSV"} export file`,
+        "error",
+      );
     }
   };
 
@@ -1342,7 +1402,16 @@ export default function InvoicesView() {
         title="Invoices"
         description="Create invoices, record deposits and keep every payment in view."
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowOverdueSummary(true)}
+            className="zentra-control-pill"
+            title="Open Overdue Invoices Summary & Professional CSV Template Table"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Overdue Summary & CSV Template</span>
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -1473,10 +1542,19 @@ export default function InvoicesView() {
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => handleExportInvoicesCsv("overdue")}
-                    className="zentra-circle-btn zentra-circle-btn--sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                    onClick={() => handleExportInvoicesCsv("overdue", "csv")}
+                    className="zentra-circle-btn zentra-circle-btn--sm text-content-neutral-600 hover:text-content-neutral-900"
                     aria-label="Export overdue invoices to CSV"
-                    title="Export Overdue Invoices to CSV"
+                    title="Export Overdue Invoices to CSV (.csv)"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportInvoicesCsv("overdue", "excel")}
+                    className="zentra-circle-btn zentra-circle-btn--sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                    aria-label="Export overdue invoices to Excel"
+                    title="Convert & Export Overdue Invoices to Excel (.xls)"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
                   </button>
@@ -1592,6 +1670,33 @@ export default function InvoicesView() {
             )}
           </div>
 
+          <div className="inline-flex items-center rounded-full border border-border-subtle bg-surface-neutral-100/80 dark:bg-surface-neutral-900 p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setExportFormat("csv")}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                exportFormat === "csv"
+                  ? "bg-surface-card text-content-neutral-950 shadow-xs"
+                  : "text-content-neutral-500 hover:text-content-neutral-800"
+              }`}
+              title="Set export format to RFC 4180 CSV (.csv)"
+            >
+              CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setExportFormat("excel")}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                exportFormat === "excel"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-content-neutral-500 hover:text-content-neutral-800"
+              }`}
+              title="Set export format to Microsoft Excel Workbook (.xls) via Convert Engine"
+            >
+              Excel
+            </button>
+          </div>
+
           <Button
             variant="secondary"
             size="small"
@@ -1603,14 +1708,28 @@ export default function InvoicesView() {
             }
             title={
               activeTab === "Overdue"
-                ? "Export overdue summary report to CSV"
-                : "Export currently filtered invoices to CSV"
+                ? `Export overdue summary report to ${exportFormat === "excel" ? "Excel (.xls)" : "CSV (.csv)"}`
+                : `Export currently filtered invoices to ${exportFormat === "excel" ? "Excel (.xls)" : "CSV (.csv)"}`
             }
-            className="shrink-0"
+            className={`shrink-0 ${
+              exportFormat === "excel"
+                ? "!border-emerald-300 dark:!border-emerald-800 !text-emerald-700 dark:!text-emerald-300"
+                : ""
+            }`}
           >
-            <Download className="w-3.5 h-3.5" />
+            {exportFormat === "excel" ? (
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
             <span>
-              {activeTab === "Overdue" ? "Export Overdue CSV" : "Export CSV"}
+              {activeTab === "Overdue"
+                ? exportFormat === "excel"
+                  ? "Export Overdue Excel"
+                  : "Export Overdue CSV"
+                : exportFormat === "excel"
+                  ? "Export Excel (.xls)"
+                  : "Export CSV (.csv)"}
             </span>
           </Button>
         </div>
@@ -1629,7 +1748,7 @@ export default function InvoicesView() {
             </span>
           </div>
           {selectedIds.length > 0 && (
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <span className="text-[12px] font-medium text-accent">
                 {selectedIds.length} selected
               </span>
@@ -1637,12 +1756,23 @@ export default function InvoicesView() {
                 variant="secondary"
                 size="small"
                 type="button"
-                onClick={() => handleExportInvoicesCsv("selected")}
+                onClick={() => handleExportInvoicesCsv("selected", "csv")}
                 className="!text-xs !py-1 text-accent"
-                title="Export selected invoices to CSV"
+                title="Export selected invoices to CSV (.csv)"
               >
                 <Download className="w-3 h-3" />
-                <span>Export Selected to CSV</span>
+                <span>Export CSV</span>
+              </Button>
+              <Button
+                variant="secondary"
+                size="small"
+                type="button"
+                onClick={() => handleExportInvoicesCsv("selected", "excel")}
+                className="!text-xs !py-1 text-emerald-700 dark:text-emerald-300 !border-emerald-300 dark:!border-emerald-800"
+                title="Convert & export selected invoices to Excel (.xls)"
+              >
+                <FileSpreadsheet className="w-3 h-3" />
+                <span>Export Excel</span>
               </Button>
             </div>
           )}
