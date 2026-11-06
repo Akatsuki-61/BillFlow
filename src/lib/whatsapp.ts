@@ -199,3 +199,65 @@ export function createWhatsAppPayloadFromWorkOrder(
     freelancerName,
   };
 }
+
+export interface WhatsAppPaymentReminderPayload {
+  clientName: string;
+  clientPhone?: string | null;
+  invoiceCode: string;
+  amountDueFormatted: string;
+  dueDate?: string | null;
+  daysOverdue: number;
+  freelancerName?: string;
+  deliveryUrl?: string | null;
+  paymentInstructions?: string | null;
+}
+
+/**
+ * Builds a polite, professional payment reminder message for an overdue invoice.
+ */
+export function buildOverduePaymentReminderMessage(
+  data: WhatsAppPaymentReminderPayload,
+): string {
+  const parts: string[] = [];
+
+  parts.push(`Hi ${data.clientName.trim()}, hope you are having a productive week!`);
+  parts.push("");
+  parts.push(
+    `This is a friendly reminder regarding invoice *${data.invoiceCode}*, which reached its due date on *${data.dueDate || "recent"}* (${data.daysOverdue} ${data.daysOverdue === 1 ? "day" : "days"} past due).`,
+  );
+  parts.push("");
+  parts.push(`💰 *Outstanding Balance Due:* ${data.amountDueFormatted}`);
+
+  if (data.deliveryUrl) {
+    parts.push(`🔗 *Project Deliverable / Repository:* ${data.deliveryUrl}`);
+  }
+
+  if (data.paymentInstructions) {
+    parts.push(`🏦 *Payment Instructions:* ${data.paymentInstructions}`);
+  }
+
+  parts.push("");
+  parts.push(
+    "Please let me know once the remittance has been initiated, or feel free to reach out if you have any questions or require an updated statement.",
+  );
+
+  if (data.freelancerName) {
+    parts.push(`— ${data.freelancerName}`);
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Generates an official `https://wa.me/<phone>?text=<encoded>` reminder link for an overdue invoice.
+ */
+export function generateWhatsAppReminderLink(
+  data: WhatsAppPaymentReminderPayload,
+): string {
+  const phone = normalizeWhatsAppPhone(data.clientPhone);
+  const message = buildOverduePaymentReminderMessage(data);
+  const encoded = encodeURIComponent(message);
+  return phone
+    ? `https://wa.me/${phone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}

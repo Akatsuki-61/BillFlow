@@ -362,6 +362,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
         clientName: client?.name || "Unknown Client",
         clientEmail: client?.email,
+        clientPhone: client?.phone,
+        clientContactPerson: client?.contactPerson,
+        clientCategory: client?.category,
         items: input.items ? input.items.map((it, idx) => ({
           id: it.id || `item-${Date.now()}-${idx}`,
           invoiceId: id,
@@ -411,6 +414,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         paidCents: newStatus === "PAID" ? newAmount : 0,
         clientName: client ? client.name : target.clientName,
         clientEmail: client ? client.email : target.clientEmail,
+        clientPhone: client ? client.phone : target.clientPhone,
+        clientContactPerson: client ? client.contactPerson : target.clientContactPerson,
+        clientCategory: client ? client.category : target.clientCategory,
         updatedAt: new Date().toISOString(),
       };
       memoryInvoices[idx] = updated;

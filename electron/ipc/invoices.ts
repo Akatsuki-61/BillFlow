@@ -84,6 +84,9 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
       invoice: invoices,
       clientName: clients.name,
       clientEmail: clients.email,
+      clientPhone: clients.phone,
+      clientContactPerson: clients.contactPerson,
+      clientCategory: clients.category,
     })
     .from(invoices)
     .leftJoin(clients, eq(invoices.clientId, clients.id))
@@ -113,12 +116,30 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
         currency: p.currency as Currency,
       }));
 
+    let snapshot: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      contactPerson?: string;
+      category?: string;
+    } | null = null;
+    if (r.invoice.clientSnapshot) {
+      try {
+        snapshot = JSON.parse(r.invoice.clientSnapshot);
+      } catch {
+        snapshot = null;
+      }
+    }
+
     return {
       ...r.invoice,
       currency: r.invoice.currency as Currency,
       status: r.invoice.status as InvoiceStatus,
-      clientName: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).name : r.clientName || "Unknown Client",
-      clientEmail: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).email : r.clientEmail || undefined,
+      clientName: snapshot?.name || r.clientName || "Unknown Client",
+      clientEmail: snapshot?.email || r.clientEmail || undefined,
+      clientPhone: snapshot?.phone || r.clientPhone || null,
+      clientContactPerson: snapshot?.contactPerson || r.clientContactPerson || null,
+      clientCategory: snapshot?.category || r.clientCategory || null,
       items,
       payments,
     };

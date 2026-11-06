@@ -66,8 +66,10 @@ Delegate tasks directly from Kanban cards. BillFlow prefills a work order with t
 - **Offline Vector PDF Vouchers**: Export formal work order vouchers directly to your configured directory via `pdf-lib` and Electron IPC.
 - **Direct WhatsApp Task Dispatch**: Send clean, structured task delegation briefs to subcontractors directly via WhatsApp web/desktop intent links (`wa.me`) with automatic phone number normalization.
 
-### 9. Final Payment Settlement
+### 9. Final Payment Settlement & Accounts Receivable Aging
 Log the remaining milestone payment and attach final receipts. An invoice is marked fully paid only when total collections cover the complete balance.
+- **Overdue Summary & Aging Analysis**: Access actionable past-due breakdowns categorized into aging tiers (`1-15`, `16-30`, `31-60`, `60+` days) with delinquency statistics, affected client accounts, and 1-click WhatsApp or Email payment reminder dispatches.
+- **RFC 4180 CSV Data Export**: Export active register views, selected invoice sets, or dedicated accounts receivable delinquency reports to RFC 4180-compliant CSV format with automated balance totals.
 
 ### 10. Financial Truth & Net Profit
 Review accurate financial summaries with no artificial zero-clamping or synthetic data. Compare accrual billing against realized cashflow, isolate numbers by currency (`USD`, `LKR`, `EUR`), and subtract subcontractor costs and recorded business expenses to view true net margins.
@@ -84,7 +86,7 @@ Review accurate financial summaries with no artificial zero-clamping or syntheti
 | **Database & ORM** | SQLite 3 via `better-sqlite3`, Drizzle ORM | WAL mode, foreign key cascades, versioned schema migrations. |
 | **Analytics & Charts** | Apache ECharts 6 | Freelance turnaround velocity, retainer yields, capacity benchmarks. |
 | **Document Engine** | `pdf-lib` | Offline vector PDF invoice and work order voucher generation with embedded layouts. |
-| **Test Suite** | Vitest | 20 test suites, 126 unit and integration test assertions. |
+| **Test Suite** | Vitest | 25 test suites, 158 unit and integration test assertions. |
 
 ### Architecture Overview
 

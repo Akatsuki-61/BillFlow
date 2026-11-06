@@ -7,6 +7,8 @@ import {
   buildInvoiceWhatsAppMessage,
   generateInvoiceWhatsAppLink,
   generateInvoiceEmailLink,
+  buildOverduePaymentReminderMessage,
+  generateWhatsAppReminderLink,
 } from "../whatsapp";
 import type { WorkOrderItem } from "@/types/outsourcing";
 
@@ -124,5 +126,43 @@ describe("Contractor WhatsApp Integration", () => {
     const decoded = decodeURIComponent(mailto);
     expect(decoded).toContain("Invoice INV-500 from Studio X");
     expect(decoded).toContain("Total Amount: $800.00");
+  });
+
+  describe("Overdue Invoice WhatsApp Reminder Integration", () => {
+    it("builds polite, professional payment reminder message with all invoice parameters", () => {
+      const msg = buildOverduePaymentReminderMessage({
+        clientName: "Nimal Perera",
+        clientPhone: "+94 77 123 4567",
+        invoiceCode: "INV-2026-001",
+        amountDueFormatted: "Rs. 45,000.00",
+        dueDate: "2026-10-15",
+        daysOverdue: 21,
+        freelancerName: "Chethaka",
+        deliveryUrl: "https://staging.lankaretail.lk",
+        paymentInstructions: "Commercial Bank A/C 12345678",
+      });
+
+      expect(msg).toContain("Hi Nimal Perera");
+      expect(msg).toContain("*INV-2026-001*");
+      expect(msg).toContain("21 days past due");
+      expect(msg).toContain("*Outstanding Balance Due:* Rs. 45,000.00");
+      expect(msg).toContain("https://staging.lankaretail.lk");
+      expect(msg).toContain("Commercial Bank A/C 12345678");
+      expect(msg).toContain("— Chethaka");
+    });
+
+    it("generates wa.me link with normalized client phone number", () => {
+      const link = generateWhatsAppReminderLink({
+        clientName: "Alice",
+        clientPhone: "0771234567",
+        invoiceCode: "INV-500",
+        amountDueFormatted: "$1,200.00",
+        daysOverdue: 10,
+      });
+
+      expect(link.startsWith("https://wa.me/94771234567?text=")).toBe(true);
+      expect(decodeURIComponent(link)).toContain("INV-500");
+      expect(decodeURIComponent(link)).toContain("$1,200.00");
+    });
   });
 });
