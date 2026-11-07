@@ -2412,7 +2412,28 @@ button.record-status:focus-visible {
   letter-spacing: 0;
 }
 
-/* FontAwesome Solid Trash Icon (<i class="fa-solid fa-trash"></i>) offline-safe vector mask */
+/* FontAwesome Solid Trash Icon (<i class="fa-solid fa-trash"></i>) offline-safe vector mask + hover/click animation */
+@keyframes fa-trash-shake {
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  20% {
+    transform: translateY(-2px) scale(1.16) rotate(-14deg);
+  }
+  45% {
+    transform: translateY(-2px) scale(1.16) rotate(12deg);
+  }
+  70% {
+    transform: translateY(-1px) scale(1.12) rotate(-8deg);
+  }
+  85% {
+    transform: translateY(-1px) scale(1.08) rotate(5deg);
+  }
+  100% {
+    transform: translateY(0) scale(1.08) rotate(0deg);
+  }
+}
+
 i.fa-solid.fa-trash {
   display: inline-block;
   width: 0.875rem;
@@ -2429,4 +2450,29 @@ i.fa-solid.fa-trash {
   -webkit-mask-size: contain;
   mask-size: contain;
   flex-shrink: 0;
+  transform-origin: 50% 85%;
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
+  will-change: transform;
+}
+
+button:hover:not(:disabled) i.fa-solid.fa-trash,
+button:focus-visible:not(:disabled) i.fa-solid.fa-trash,
+i.fa-solid.fa-trash:hover {
+  animation: fa-trash-shake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+button:active:not(:disabled) i.fa-solid.fa-trash {
+  animation: none;
+  transform: scale(0.86) rotate(-8deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:hover:not(:disabled) i.fa-solid.fa-trash,
+  button:focus-visible:not(:disabled) i.fa-solid.fa-trash,
+  i.fa-solid.fa-trash:hover {
+    animation: none;
+    transform: none;
+  }
 }

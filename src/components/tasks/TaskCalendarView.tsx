@@ -1232,7 +1232,7 @@ export default function TaskCalendarView({
                               className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
                               title="Delete event"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <i className="fa-solid fa-trash" aria-hidden="true" />
                             </Button>
                           )}
                         </div>
@@ -1737,9 +1737,9 @@ export default function TaskCalendarView({
                               void onDeleteEvent(evt.id);
                             }}
                             title="Delete calendar event"
-                            className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors"
+                            className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <i className="fa-solid fa-trash" aria-hidden="true" />
                           </button>
                         )}
                       </div>
