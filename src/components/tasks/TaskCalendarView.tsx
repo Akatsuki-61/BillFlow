@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,10 +15,30 @@ import {
   Grid3X3,
   CalendarDays,
   ArrowRight,
+  Pencil,
+  Trash2,
+  Download,
+  Upload,
+  RefreshCw,
+  CheckSquare,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
-import type { TaskItem, TaskStatus, TaskPriority } from "@/types/tasks";
-import type { CalendarEventItem, EventCategory, EventColor } from "@/types/calendar";
+import type { TaskItem, TaskStatus, TaskPriority, TaskCategory } from "@/types/tasks";
+import type {
+  CalendarEventItem,
+  EventCategory,
+  EventColor,
+  NewCalendarEventInput,
+} from "@/types/calendar";
+import type { TaskPatchInput } from "@/types/workflow";
+import {
+  generateIcsFromEventsAndTasks,
+  parseIcsCalendar,
+  downloadIcsFile,
+  type ParsedLocalCalendarItem,
+} from "@/lib/local-calendar";
 
 interface TaskCalendarViewProps {
   tasks: TaskItem[];
@@ -28,6 +48,19 @@ interface TaskCalendarViewProps {
   onAddTaskForDate: (dateStr: string) => void;
   onAddEventForDate: (dateStr: string) => void;
   onRescheduleTask: (taskId: string, newDate: string) => Promise<boolean>;
+  onUpdateTask?: (taskId: string, patch: TaskPatchInput) => Promise<boolean>;
+  onDeleteTask?: (taskId: string) => Promise<void>;
+  onDeleteEvent?: (eventId: string) => Promise<void>;
+  onQuickCreateTask?: (input: {
+    title: string;
+    dueDate: string;
+    priority: TaskPriority;
+    category: TaskCategory;
+    status?: TaskStatus;
+    description?: string;
+  }) => Promise<void>;
+  onQuickCreateEvent?: (input: NewCalendarEventInput) => Promise<void>;
+  onNotify?: (message: string) => void;
 }
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -77,7 +110,7 @@ function formatDateString(year: number, month: number, day: number): string {
 }
 
 function formatDisplayDate(dateStr: string): string {
-  if (!dateStr) return "";
+  if (!dateStr) return "Unscheduled";
   const parts = dateStr.split("-");
   if (parts.length === 3) {
     const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
@@ -94,6 +127,12 @@ export default function TaskCalendarView({
   onAddTaskForDate,
   onAddEventForDate,
   onRescheduleTask,
+  onUpdateTask,
+  onDeleteTask,
+  onDeleteEvent,
+  onQuickCreateTask,
+  onQuickCreateEvent,
+  onNotify,
 }: TaskCalendarViewProps) {
   const today = new Date();
   const todayStr = formatDateString(today.getFullYear(), today.getMonth(), today.getDate());
@@ -106,6 +145,32 @@ export default function TaskCalendarView({
   const [scopeFilter, setScopeFilter] = useState<"all" | "tasks" | "events">("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  // Selected date in Calendar Tasks section ("all-month" | "unscheduled" | YYYY-MM-DD)
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>("all-month");
+
+  // Inline Quick-Add Form State inside Calendar Tasks Section
+  const [quickFormType, setQuickFormType] = useState<"task" | "event">("task");
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickDate, setQuickDate] = useState(todayStr);
+  const [quickTaskPriority, setQuickTaskPriority] = useState<TaskPriority>("medium");
+  const [quickTaskCategory, setQuickTaskCategory] = useState<TaskCategory>("Development");
+  const [quickEventCategory, setQuickEventCategory] = useState<EventCategory>("meeting");
+  const [quickEventTime, setQuickEventTime] = useState("10:00");
+  const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
+
+  // Inline Task Editing state inside Calendar Tasks Section
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskTitle, setEditingTaskTitle] = useState("");
+  const [editingTaskDueDate, setEditingTaskDueDate] = useState("");
+  const [editingTaskPriority, setEditingTaskPriority] = useState<TaskPriority>("medium");
+  const [editingTaskStatus, setEditingTaskStatus] = useState<TaskStatus>("todo");
+
+  // Local Calendar (.ics) Sync & Import Studio State
+  const [showLocalSyncPanel, setShowLocalSyncPanel] = useState(false);
+  const [importedItems, setImportedItems] = useState<ParsedLocalCalendarItem[]>([]);
+  const [isImportingIcs, setIsImportingIcs] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Drag & drop state for tasks
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -136,6 +201,8 @@ export default function TaskCalendarView({
   const handleToday = () => {
     setCurrentYear(today.getFullYear());
     setCurrentMonth(today.getMonth());
+    setSelectedCalendarDate(todayStr);
+    setQuickDate(todayStr);
   };
 
   // Calendar matrix calculation
@@ -210,6 +277,13 @@ export default function TaskCalendarView({
     return map;
   }, [tasks, statusFilter]);
 
+  // Unscheduled tasks (no dueDate)
+  const unscheduledTasks = useMemo(() => {
+    return tasks.filter(
+      (t) => !t.dueDate && (statusFilter === "all" || t.status === statusFilter)
+    );
+  }, [tasks, statusFilter]);
+
   // Map events by date
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEventItem[]>();
@@ -225,10 +299,10 @@ export default function TaskCalendarView({
   }, [events, categoryFilter]);
 
   // Monthly summary stats
+  const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
   const monthStats = useMemo(() => {
-    const currentMonthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
-    const monthTasks = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(currentMonthPrefix));
-    const monthEvents = events.filter((e) => e.startDate && e.startDate.startsWith(currentMonthPrefix));
+    const monthTasks = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(monthPrefix));
+    const monthEvents = events.filter((e) => e.startDate && e.startDate.startsWith(monthPrefix));
     const completedTasks = monthTasks.filter((t) => t.status === "done").length;
     const overdueTasks = tasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== "done").length;
 
@@ -238,7 +312,42 @@ export default function TaskCalendarView({
       completedTasks,
       overdueTasks,
     };
-  }, [tasks, events, currentYear, currentMonth, todayStr]);
+  }, [tasks, events, monthPrefix, todayStr]);
+
+  // Filtered Tasks & Events for the dedicated "Calendar Tasks & Local Calendar" Workbench
+  const workbenchTasks = useMemo(() => {
+    if (selectedCalendarDate === "unscheduled") {
+      return unscheduledTasks;
+    }
+    if (selectedCalendarDate === "all-month") {
+      return tasks
+        .filter(
+          (t) =>
+            t.dueDate &&
+            t.dueDate.startsWith(monthPrefix) &&
+            (statusFilter === "all" || t.status === statusFilter)
+        )
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    }
+    return tasksByDate.get(selectedCalendarDate) || [];
+  }, [selectedCalendarDate, unscheduledTasks, tasks, monthPrefix, statusFilter, tasksByDate]);
+
+  const workbenchEvents = useMemo(() => {
+    if (selectedCalendarDate === "unscheduled") {
+      return [];
+    }
+    if (selectedCalendarDate === "all-month") {
+      return events
+        .filter(
+          (e) =>
+            e.startDate &&
+            e.startDate.startsWith(monthPrefix) &&
+            (categoryFilter === "all" || e.category === categoryFilter)
+        )
+        .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    }
+    return eventsByDate.get(selectedCalendarDate) || [];
+  }, [selectedCalendarDate, events, monthPrefix, categoryFilter, eventsByDate]);
 
   // Drag and Drop handlers for rescheduling
   const handleTaskDragStart = (e: React.DragEvent, taskId: string) => {
@@ -263,6 +372,183 @@ export default function TaskCalendarView({
       void onRescheduleTask(taskId, targetDate);
     }
     setDraggedTaskId(null);
+  };
+
+  // Export to Local OS Calendar (.ics)
+  const handleExportLocalCalendar = (scope: "all" | "tasks" | "events") => {
+    const exportTasks = scope === "events" ? [] : tasks;
+    const exportEvents = scope === "tasks" ? [] : events;
+    const ics = generateIcsFromEventsAndTasks({
+      tasks: exportTasks,
+      events: exportEvents,
+      calendarName:
+        scope === "tasks"
+          ? "BillFlow Tasks"
+          : scope === "events"
+            ? "BillFlow Events"
+            : "BillFlow Tasks & Local Schedule",
+    });
+    downloadIcsFile(`billflow-${scope}-${todayStr}.ics`, ics);
+    onNotify?.(
+      `Exported ${scope === "all" ? "Tasks & Events" : scope} (.ics) for your Local Calendar app.`
+    );
+  };
+
+  // Export single Task or Event to Local Calendar (.ics)
+  const handleExportSingleTaskIcs = (task: TaskItem) => {
+    const ics = generateIcsFromEventsAndTasks({
+      tasks: [task],
+      events: [],
+      calendarName: task.title,
+    });
+    downloadIcsFile(`task-${task.id.slice(0, 8)}.ics`, ics);
+    onNotify?.(`Exported task "${task.title}" (.ics) to Local Calendar.`);
+  };
+
+  const handleExportSingleEventIcs = (evt: CalendarEventItem) => {
+    const ics = generateIcsFromEventsAndTasks({
+      tasks: [],
+      events: [evt],
+      calendarName: evt.title,
+    });
+    downloadIcsFile(`event-${evt.id.slice(0, 8)}.ics`, ics);
+    onNotify?.(`Exported event "${evt.title}" (.ics) to Local Calendar.`);
+  };
+
+  // Parse .ics file selected from user's Local Calendar
+  const handleIcsFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = parseIcsCalendar(text);
+      setImportedItems(parsed);
+      if (parsed.length === 0) {
+        onNotify?.("No VEVENT or VTODO items found in the selected .ics file.");
+      } else {
+        onNotify?.(
+          `Found ${parsed.length} items from "${file.name}". Review and click Import below.`
+        );
+      }
+    } catch {
+      onNotify?.("Could not read .ics calendar file.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Import parsed .ics items into BillFlow as Tasks & Events
+  const handleConfirmImportIcs = async () => {
+    if (importedItems.length === 0 || isImportingIcs) return;
+    setIsImportingIcs(true);
+    let tasksCreated = 0;
+    let eventsCreated = 0;
+    try {
+      for (const item of importedItems) {
+        if (item.kind === "task" && onQuickCreateTask) {
+          await onQuickCreateTask({
+            title: item.title,
+            dueDate: item.startDate,
+            priority: item.priority,
+            category: item.taskCategory,
+            status: item.status || "todo",
+            description: item.description || "Imported from Local Calendar (.ics)",
+          });
+          tasksCreated++;
+        } else if (onQuickCreateEvent) {
+          await onQuickCreateEvent({
+            title: item.title,
+            description: item.description || "Imported from Local Calendar (.ics)",
+            startDate: item.startDate,
+            endDate: item.endDate,
+            startTime: item.isAllDay ? null : item.startTime,
+            endTime: item.isAllDay ? null : item.endTime,
+            isAllDay: item.isAllDay,
+            category: item.category,
+            color: item.color,
+            location: item.location,
+          });
+          eventsCreated++;
+        }
+      }
+      setImportedItems([]);
+      setShowLocalSyncPanel(false);
+      onNotify?.(
+        `Synced from Local Calendar: ${tasksCreated} task(s) and ${eventsCreated} event(s) added.`
+      );
+    } finally {
+      setIsImportingIcs(false);
+    }
+  };
+
+  // Quick Inline Add Task or Event from Calendar Workbench
+  const handleQuickAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = quickTitle.trim();
+    if (!trimmed || isSubmittingQuick) return;
+
+    const targetDate =
+      quickDate ||
+      (selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+        ? selectedCalendarDate
+        : todayStr);
+
+    setIsSubmittingQuick(true);
+    try {
+      if (quickFormType === "task") {
+        if (onQuickCreateTask) {
+          await onQuickCreateTask({
+            title: trimmed,
+            dueDate: targetDate,
+            priority: quickTaskPriority,
+            category: quickTaskCategory,
+            status: "todo",
+          });
+          setQuickTitle("");
+        } else {
+          onAddTaskForDate(targetDate);
+        }
+      } else {
+        if (onQuickCreateEvent) {
+          await onQuickCreateEvent({
+            title: trimmed,
+            startDate: targetDate,
+            startTime: quickEventTime || "10:00",
+            endTime: "11:00",
+            isAllDay: false,
+            category: quickEventCategory,
+            color: "blue",
+          });
+          setQuickTitle("");
+        } else {
+          onAddEventForDate(targetDate);
+        }
+      }
+    } finally {
+      setIsSubmittingQuick(false);
+    }
+  };
+
+  const startInlineEditTask = (task: TaskItem) => {
+    setEditingTaskId(task.id);
+    setEditingTaskTitle(task.title);
+    setEditingTaskDueDate(task.dueDate ? task.dueDate.split("T")[0] : "");
+    setEditingTaskPriority(task.priority);
+    setEditingTaskStatus(task.status);
+  };
+
+  const saveInlineEditTask = async (taskId: string) => {
+    if (!onUpdateTask || !editingTaskTitle.trim()) return;
+    const ok = await onUpdateTask(taskId, {
+      title: editingTaskTitle.trim(),
+      dueDate: editingTaskDueDate,
+      priority: editingTaskPriority,
+      status: editingTaskStatus,
+    });
+    if (ok) {
+      setEditingTaskId(null);
+      onNotify?.(`Updated task "${editingTaskTitle.trim()}"`);
+    }
   };
 
   // Agenda view items (sorted chronologically)
@@ -333,7 +619,7 @@ export default function TaskCalendarView({
           </h2>
         </div>
 
-        {/* Filters and View Switcher */}
+        {/* Filters, Local Calendar Sync, and View Switcher */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Scope Filter Tabs */}
           <div className="inline-flex rounded-xl bg-surface-neutral-100 p-1 border border-line-neutral-200/70 text-xs font-semibold">
@@ -427,11 +713,48 @@ export default function TaskCalendarView({
             </button>
           </div>
 
-          {/* Create Event Trigger */}
+          {/* Local Calendar Sync (.ics Import / Export) Button */}
           <Button
             variant="secondary"
             size="small"
-            onClick={() => onAddEventForDate(todayStr)}
+            onClick={() => setShowLocalSyncPanel((prev) => !prev)}
+            className={`flex items-center gap-1.5 ${
+              showLocalSyncPanel ? "border-accent text-accent bg-accent-soft/30" : ""
+            }`}
+            title="Link with your computer's Local Calendar (.ics Import & Export)"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Local Calendar Sync</span>
+          </Button>
+
+          {/* Create Task Trigger */}
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={() =>
+              onAddTaskForDate(
+                selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+                  ? selectedCalendarDate
+                  : todayStr
+              )
+            }
+            className="flex items-center gap-1.5"
+          >
+            <CheckSquare className="w-3.5 h-3.5" />
+            <span>Add Task</span>
+          </Button>
+
+          {/* Create Event Trigger */}
+          <Button
+            variant="primary"
+            size="small"
+            onClick={() =>
+              onAddEventForDate(
+                selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+                  ? selectedCalendarDate
+                  : todayStr
+              )
+            }
             className="flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -439,6 +762,198 @@ export default function TaskCalendarView({
           </Button>
         </div>
       </div>
+
+      {/* LOCAL OS CALENDAR (.ICS) TWO-WAY SYNC & IMPORT STUDIO */}
+      {showLocalSyncPanel && (
+        <div className="ui-card p-5 border-2 border-accent/40 bg-surface space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-line-neutral-200/70">
+            <div>
+              <h3 className="text-sm font-semibold text-content-neutral-900 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-accent" />
+                <span>Local OS Calendar Bridge (Apple Calendar, Outlook &amp; Google Calendar)</span>
+              </h3>
+              <p className="text-xs text-content-neutral-500 mt-0.5">
+                Export BillFlow Tasks &amp; Events to your computer&apos;s local calendar app (`.ics`), or import `.ics` files from your local calendar to view, edit, and manage them inside BillFlow.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowLocalSyncPanel(false)}
+              aria-label="Close local calendar sync panel"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Export to Local Calendar App */}
+            <div className="p-4 rounded-xl border border-line-neutral-200/80 bg-surface-neutral-50/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700">
+                  1. Export to Local Calendar (.ics)
+                </span>
+                <span className="text-[11px] text-content-neutral-500">
+                  {tasks.filter((t) => Boolean(t.dueDate)).length} tasks · {events.length} events
+                </span>
+              </div>
+              <p className="text-xs text-content-neutral-500">
+                Download an RFC 5545 `.ics` file and open it directly in macOS Calendar, Microsoft Outlook, or Google Calendar.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={() => handleExportLocalCalendar("all")}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export Tasks &amp; Events (.ics)</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => handleExportLocalCalendar("tasks")}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Tasks Only (.ics)</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => handleExportLocalCalendar("events")}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Events Only (.ics)</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Import from Local Calendar App */}
+            <div className="p-4 rounded-xl border border-line-neutral-200/80 bg-surface-neutral-50/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700">
+                  2. Import from Local Calendar (.ics)
+                </span>
+                <span className="text-[11px] text-accent font-medium">
+                  Supports VEVENT &amp; VTODO
+                </span>
+              </div>
+              <p className="text-xs text-content-neutral-500">
+                Select any `.ics` file exported from your local calendar to add its events and tasks into BillFlow so you can edit, view, or delete them here.
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".ics,text/calendar"
+                  onChange={handleIcsFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Choose .ics Calendar File...</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview & Edit Imported Local Calendar Items before saving */}
+          {importedItems.length > 0 && (
+            <div className="p-4 rounded-xl border border-accent/40 bg-surface space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-content-neutral-800">
+                  Ready to Import ({importedItems.length} Local Calendar Items) — Switch Type or Edit Before Importing
+                </h4>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    onClick={() => setImportedItems([])}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="small"
+                    disabled={isImportingIcs}
+                    onClick={handleConfirmImportIcs}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>
+                      {isImportingIcs
+                        ? "Importing..."
+                        : `Import ${importedItems.length} Items into Application`}
+                    </span>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto divide-y divide-line-neutral-100 border border-line-neutral-200/70 rounded-xl">
+                {importedItems.map((item, idx) => (
+                  <div
+                    key={`${item.uid}-${idx}`}
+                    className="p-2.5 px-3 flex flex-wrap items-center justify-between gap-2 text-xs bg-surface hover:bg-surface-neutral-50"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                      <select
+                        value={item.kind}
+                        onChange={(e) => {
+                          const nextKind = e.target.value as "task" | "event";
+                          setImportedItems((prev) =>
+                            prev.map((it, i) => (i === idx ? { ...it, kind: nextKind } : it))
+                          );
+                        }}
+                        className="ui-field px-2 py-1 text-xs font-semibold rounded-lg border border-line-neutral-200"
+                      >
+                        <option value="task">Import as Task</option>
+                        <option value="event">Import as Event</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={item.title}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setImportedItems((prev) =>
+                            prev.map((it, i) => (i === idx ? { ...it, title: val } : it))
+                          );
+                        }}
+                        className="ui-field flex-1 px-2.5 py-1 text-xs border border-line-neutral-200 rounded-lg"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={item.startDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setImportedItems((prev) =>
+                            prev.map((it, i) => (i === idx ? { ...it, startDate: val } : it))
+                          );
+                        }}
+                        className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setImportedItems((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        className="p-1 text-content-neutral-400 hover:text-content-rose-600"
+                        title="Remove from import"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Month KPI Metrics Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -502,19 +1017,26 @@ export default function TaskCalendarView({
               const cellEvents = scopeFilter !== "tasks" ? eventsByDate.get(cell.dateStr) || [] : [];
               const totalItems = cellTasks.length + cellEvents.length;
               const isOver = dragOverDate === cell.dateStr;
+              const isSelectedDay = selectedCalendarDate === cell.dateStr;
 
               return (
                 <div
                   key={cell.dateStr}
+                  onClick={() => {
+                    setSelectedCalendarDate(cell.dateStr);
+                    setQuickDate(cell.dateStr);
+                  }}
                   onDragOver={(e) => handleCellDragOver(e, cell.dateStr)}
                   onDrop={(e) => handleCellDrop(e, cell.dateStr)}
-                  className={`min-h-[110px] p-1.5 flex flex-col justify-between transition-colors relative group ${
+                  className={`min-h-[112px] p-1.5 flex flex-col justify-between transition-colors relative group cursor-pointer ${
                     !cell.isCurrentMonth
                       ? "bg-surface-neutral-50/40 text-content-neutral-400"
                       : "bg-surface text-content-neutral-900"
                   } ${cell.isToday ? "ring-2 ring-accent ring-inset bg-accent-soft/20" : ""} ${
-                    isOver ? "bg-accent-soft/50 ring-2 ring-accent" : ""
-                  }`}
+                    isSelectedDay && !cell.isToday
+                      ? "ring-2 ring-accent/70 ring-inset bg-accent-soft/10"
+                      : ""
+                  } ${isOver ? "bg-accent-soft/50 ring-2 ring-accent" : ""}`}
                 >
                   {/* Top Bar of Cell: Day Number & Quick Add Button */}
                   <div className="flex items-center justify-between">
@@ -522,9 +1044,11 @@ export default function TaskCalendarView({
                       className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
                         cell.isToday
                           ? "bg-accent text-white"
-                          : cell.isCurrentMonth
-                          ? "text-content-neutral-800"
-                          : "text-content-neutral-400"
+                          : isSelectedDay
+                            ? "bg-accent-soft text-accent font-bold"
+                            : cell.isCurrentMonth
+                              ? "text-content-neutral-800"
+                              : "text-content-neutral-400"
                       }`}
                     >
                       {cell.dayNumber}
@@ -535,9 +1059,10 @@ export default function TaskCalendarView({
                       <button
                         type="button"
                         title="Add task or event for this date"
-                        onClick={() =>
-                          setQuickAddDate(quickAddDate === cell.dateStr ? null : cell.dateStr)
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuickAddDate(quickAddDate === cell.dateStr ? null : cell.dateStr);
+                        }}
                         className="p-1 rounded-md hover:bg-surface-neutral-200 text-content-neutral-600 hover:text-accent transition-colors"
                       >
                         <Plus className="w-3 h-3" />
@@ -550,6 +1075,7 @@ export default function TaskCalendarView({
                     <div
                       className="absolute z-30 top-7 left-2 right-2 p-2 bg-surface border border-line-neutral-300 rounded-xl shadow-xl space-y-1 text-xs"
                       onMouseLeave={() => setQuickAddDate(null)}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         type="button"
@@ -584,8 +1110,11 @@ export default function TaskCalendarView({
                       return (
                         <div
                           key={evt.id}
-                          onClick={() => onSelectEvent(evt)}
-                          title={`${evt.title} (${evt.category})${evt.startTime ? ` at ${evt.startTime}` : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectEvent(evt);
+                          }}
+                          title={`${evt.title} (${evt.category})${evt.startTime ? ` at ${evt.startTime}` : ""} — Click to view, edit, or delete`}
                           className={`px-1.5 py-0.5 rounded text-[11px] font-medium border-l-2 truncate cursor-pointer hover:brightness-95 transition-all flex items-center gap-1 ${pillStyle.border} ${pillStyle.bg} ${pillStyle.text}`}
                         >
                           <span className="shrink-0">{EVENT_CATEGORY_ICONS[evt.category]}</span>
@@ -606,8 +1135,11 @@ export default function TaskCalendarView({
                           key={t.id}
                           draggable
                           onDragStart={(e) => handleTaskDragStart(e, t.id)}
-                          onClick={() => onSelectTask(t)}
-                          title={`[${statusBadge.label}] ${t.title} (${t.priority} priority) - Drag to reschedule`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectTask(t);
+                          }}
+                          title={`[${statusBadge.label}] ${t.title} (${t.priority} priority) - Click to view/edit or drag to reschedule`}
                           className={`px-1.5 py-0.5 rounded text-[11px] border border-line-neutral-200/90 bg-surface hover:bg-surface-neutral-100/80 cursor-grab active:cursor-grabbing truncate transition-all shadow-2xs flex items-center gap-1 ${
                             t.status === "done" ? "opacity-60 line-through" : ""
                           }`}
@@ -621,8 +1153,9 @@ export default function TaskCalendarView({
                     {/* Overflow Badge */}
                     {totalItems > 3 && (
                       <div
-                        onClick={() => {
-                          setViewType("agenda");
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCalendarDate(cell.dateStr);
                         }}
                         className="text-[10px] font-semibold text-content-neutral-500 hover:text-accent cursor-pointer px-1 pt-0.5"
                       >
@@ -641,7 +1174,7 @@ export default function TaskCalendarView({
           <div className="flex items-center justify-between pb-3 border-b border-line-neutral-200/70">
             <h3 className="text-sm font-semibold text-content-neutral-900 flex items-center gap-2">
               <CalendarDays className="w-4 h-4 text-accent" />
-              Upcoming Schedule & Timeline ({agendaItems.length} items)
+              Upcoming Schedule &amp; Timeline ({agendaItems.length} items)
             </h3>
             <span className="text-xs text-content-neutral-500">
               Sorted chronologically with sprint tasks and local user events
@@ -703,15 +1236,39 @@ export default function TaskCalendarView({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                        {task.isOutsourced && (
-                          <span className="text-[11px] font-medium px-2 py-1 rounded bg-surface-purple-50 text-content-purple-700 border border-line-purple-200">
-                            Outsourced: {task.outsourcedVendor || "Vendor"}
-                          </span>
-                        )}
-                        <Button variant="ghost" size="small" className="text-xs">
-                          Details <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                      <div
+                        className="flex items-center gap-1.5 shrink-0 self-end sm:self-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          onClick={() => handleExportSingleTaskIcs(task)}
+                          title="Export task to Local Calendar (.ics)"
+                          className="text-xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          onClick={() => onSelectTask(task)}
+                          className="text-xs"
+                        >
+                          <Pencil className="w-3.5 h-3.5 mr-1" />
+                          Edit
+                        </Button>
+                        {onDeleteTask && (
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            onClick={() => void onDeleteTask(task.id)}
+                            className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
+                            title="Delete task"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
@@ -770,15 +1327,44 @@ export default function TaskCalendarView({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <div
+                        className="flex items-center gap-1.5 shrink-0 self-end sm:self-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {event.taskTitle && (
                           <span className="text-[11px] font-medium px-2 py-1 rounded bg-surface-blue-50 text-content-blue-700 border border-line-blue-200">
                             Task: {event.taskTitle}
                           </span>
                         )}
-                        <Button variant="ghost" size="small" className="text-xs">
-                          Edit Event <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          onClick={() => handleExportSingleEventIcs(event)}
+                          title="Export event to Local Calendar (.ics)"
+                          className="text-xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          onClick={() => onSelectEvent(event)}
+                          className="text-xs"
+                        >
+                          <Pencil className="w-3.5 h-3.5 mr-1" />
+                          Edit
+                        </Button>
+                        {onDeleteEvent && (
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            onClick={() => void onDeleteEvent(event.id)}
+                            className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
+                            title="Delete event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
@@ -788,6 +1374,485 @@ export default function TaskCalendarView({
           )}
         </div>
       )}
+
+      {/* =====================================================================
+          DEDICATED CALENDAR TASKS & LOCAL CALENDAR WORKBENCH SECTION
+          View, Add, Edit, Reschedule, Sync (.ics), and Delete Tasks & Events
+         ===================================================================== */}
+      <div className="ui-card p-5 space-y-5 border border-line-neutral-200/90">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3.5 border-b border-line-neutral-200/70">
+          <div>
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-4 h-4 text-accent" />
+              <h3 className="text-base font-semibold text-content-neutral-900">
+                Calendar Tasks &amp; Local Events Manager
+              </h3>
+              <span className="zentra-pill-badge !px-2.5 !py-0.5 !text-[11px]">
+                {workbenchTasks.length} tasks · {workbenchEvents.length} events
+              </span>
+            </div>
+            <p className="text-xs text-content-neutral-500 mt-0.5">
+              Add, view, edit, reschedule, or delete tasks and local calendar events directly from your schedule. Click any day on the calendar grid above to filter by date.
+            </p>
+          </div>
+
+          {/* Scope Selector: Active Month vs Today vs Selected Day vs Unscheduled Tasks */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setSelectedCalendarDate("all-month")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                selectedCalendarDate === "all-month"
+                  ? "bg-accent text-white shadow-xs"
+                  : "bg-surface-neutral-100 text-content-neutral-700 hover:bg-surface-neutral-200"
+              }`}
+            >
+              All in {formatMonthYear(currentYear, currentMonth)}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCalendarDate(todayStr);
+                setQuickDate(todayStr);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                selectedCalendarDate === todayStr
+                  ? "bg-accent text-white shadow-xs"
+                  : "bg-surface-neutral-100 text-content-neutral-700 hover:bg-surface-neutral-200"
+              }`}
+            >
+              Today ({formatDisplayDate(todayStr)})
+            </button>
+            {selectedCalendarDate !== "all-month" &&
+              selectedCalendarDate !== "unscheduled" &&
+              selectedCalendarDate !== todayStr && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCalendarDate(selectedCalendarDate)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-accent text-white shadow-xs"
+                >
+                  Selected: {formatDisplayDate(selectedCalendarDate)}
+                </button>
+              )}
+            <button
+              type="button"
+              onClick={() => setSelectedCalendarDate("unscheduled")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                selectedCalendarDate === "unscheduled"
+                  ? "bg-accent text-white shadow-xs"
+                  : "bg-surface-neutral-100 text-content-neutral-700 hover:bg-surface-neutral-200"
+              }`}
+            >
+              Unscheduled Tasks ({unscheduledTasks.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Inline Quick-Add Bar for Tasks & Local Calendar Events */}
+        <form
+          onSubmit={handleQuickAddSubmit}
+          className="p-3.5 rounded-xl bg-surface-neutral-50/80 dark:bg-surface-secondary border border-line-neutral-200/80 flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5"
+        >
+          <div className="inline-flex rounded-xl bg-surface p-0.5 border border-line-neutral-200/80 shrink-0">
+            <button
+              type="button"
+              onClick={() => setQuickFormType("task")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                quickFormType === "task"
+                  ? "bg-accent text-white"
+                  : "text-content-neutral-600 hover:text-content-neutral-900"
+              }`}
+            >
+              + Quick Task
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickFormType("event")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                quickFormType === "event"
+                  ? "bg-accent text-white"
+                  : "text-content-neutral-600 hover:text-content-neutral-900"
+              }`}
+            >
+              + Quick Event
+            </button>
+          </div>
+
+          <input
+            type="text"
+            value={quickTitle}
+            onChange={(e) => setQuickTitle(e.target.value)}
+            placeholder={
+              quickFormType === "task"
+                ? "Add a new task to calendar (e.g., Deploy staging build, AI prompt audit)..."
+                : "Add a new event to calendar (e.g., Client Sprint Review Call)..."
+            }
+            className="ui-field flex-1 px-3.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface"
+          />
+
+          <input
+            type="date"
+            aria-label="Quick item date"
+            value={quickDate}
+            onChange={(e) => setQuickDate(e.target.value)}
+            className="ui-field px-3 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+          />
+
+          {quickFormType === "task" ? (
+            <>
+              <select
+                aria-label="Quick task priority"
+                value={quickTaskPriority}
+                onChange={(e) => setQuickTaskPriority(e.target.value as TaskPriority)}
+                className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+              >
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+                <option value="urgent">Urgent</option>
+              </select>
+              <select
+                aria-label="Quick task category"
+                value={quickTaskCategory}
+                onChange={(e) => setQuickTaskCategory(e.target.value as TaskCategory)}
+                className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+              >
+                <option value="Development">Development</option>
+                <option value="Design">Design</option>
+                <option value="Infrastructure">Infrastructure</option>
+                <option value="Legal">Legal</option>
+                <option value="Documentation">Documentation</option>
+              </select>
+            </>
+          ) : (
+            <>
+              <input
+                type="time"
+                aria-label="Quick event time"
+                value={quickEventTime}
+                onChange={(e) => setQuickEventTime(e.target.value)}
+                className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+              />
+              <select
+                aria-label="Quick event category"
+                value={quickEventCategory}
+                onChange={(e) => setQuickEventCategory(e.target.value as EventCategory)}
+                className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+              >
+                <option value="meeting">👥 Meeting</option>
+                <option value="milestone">🚩 Milestone</option>
+                <option value="review">🔍 Review</option>
+                <option value="deadline">⏰ Deadline</option>
+                <option value="reminder">🔔 Reminder</option>
+                <option value="general">📅 General</option>
+              </select>
+            </>
+          )}
+
+          <Button
+            type="submit"
+            variant="primary"
+            size="small"
+            disabled={!quickTitle.trim() || isSubmittingQuick}
+            className="shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{quickFormType === "task" ? "Add Task" : "Add Event"}</span>
+          </Button>
+        </form>
+
+        {/* Two-Column Workbench: Calendar Tasks List + Calendar Events List */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* LEFT COLUMN: TASKS IN CALENDAR */}
+          <div className="rounded-xl border border-line-neutral-200/80 bg-surface p-4 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-line-neutral-100">
+              <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                <span>Tasks ({workbenchTasks.length})</span>
+              </span>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={() =>
+                  onAddTaskForDate(
+                    selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+                      ? selectedCalendarDate
+                      : todayStr
+                  )
+                }
+                className="text-xs"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Full Task Modal</span>
+              </Button>
+            </div>
+
+            {workbenchTasks.length === 0 ? (
+              <div className="py-8 text-center text-xs text-content-neutral-400 space-y-1.5">
+                <p>No tasks scheduled for this view.</p>
+                <p>Use the Quick Task bar above or click &ldquo;Full Task Modal&rdquo; to add one.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                {workbenchTasks.map((task) => {
+                  const isEditingThis = editingTaskId === task.id;
+                  const priorityStyle = PRIORITY_COLORS[task.priority];
+                  const statusBadge = STATUS_BADGES[task.status];
+
+                  if (isEditingThis) {
+                    return (
+                      <div
+                        key={task.id}
+                        className="p-3 rounded-xl border-2 border-accent/60 bg-surface-neutral-50/70 space-y-2.5 text-xs"
+                      >
+                        <input
+                          type="text"
+                          aria-label="Edit task title"
+                          value={editingTaskTitle}
+                          onChange={(e) => setEditingTaskTitle(e.target.value)}
+                          className="ui-field w-full px-2.5 py-1.5 text-xs font-semibold border border-line-neutral-200 rounded-lg bg-surface"
+                        />
+                        <div className="grid grid-cols-3 gap-2">
+                          <input
+                            type="date"
+                            aria-label="Edit task due date"
+                            value={editingTaskDueDate}
+                            onChange={(e) => setEditingTaskDueDate(e.target.value)}
+                            className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
+                          />
+                          <select
+                            aria-label="Edit task status"
+                            value={editingTaskStatus}
+                            onChange={(e) => setEditingTaskStatus(e.target.value as TaskStatus)}
+                            className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
+                          >
+                            <option value="todo">To Do</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="review">Review</option>
+                            <option value="done">Done</option>
+                          </select>
+                          <select
+                            aria-label="Edit task priority"
+                            value={editingTaskPriority}
+                            onChange={(e) =>
+                              setEditingTaskPriority(e.target.value as TaskPriority)
+                            }
+                            className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
+                          >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="small"
+                            onClick={() => setEditingTaskId(null)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="small"
+                            onClick={() => void saveInlineEditTask(task.id)}
+                          >
+                            Save Changes
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={task.id}
+                      className="p-3 rounded-xl border border-line-neutral-200/80 bg-surface hover:bg-surface-neutral-50/70 transition-all flex items-start justify-between gap-2.5"
+                    >
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => onSelectTask(task)}
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
+                            {formatDisplayDate(task.dueDate?.split("T")[0] || "")}
+                          </span>
+                          <span
+                            className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border ${statusBadge.badgeClass}`}
+                          >
+                            {statusBadge.label}
+                          </span>
+                          <span
+                            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 ${priorityStyle.bg} ${priorityStyle.text}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`} />
+                            {task.priority}
+                          </span>
+                        </div>
+                        <h4
+                          className={`text-xs font-semibold text-content-neutral-900 mt-1 truncate ${
+                            task.status === "done" ? "line-through opacity-65" : ""
+                          }`}
+                        >
+                          {task.title}
+                        </h4>
+                        {task.clientName && (
+                          <p className="text-[11px] text-content-neutral-500 truncate">
+                            Client: {task.clientName}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Direct Actions: Quick Edit, Open Detail, Export .ics, Delete */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {onUpdateTask && (
+                          <button
+                            type="button"
+                            onClick={() => startInlineEditTask(task)}
+                            title="Quick edit task title, status, priority, or due date"
+                            className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleExportSingleTaskIcs(task)}
+                          title="Export task to Local Calendar (.ics)"
+                          className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                        {onDeleteTask && (
+                          <button
+                            type="button"
+                            onClick={() => void onDeleteTask(task.id)}
+                            title="Delete task"
+                            className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: LOCAL CALENDAR EVENTS */}
+          <div className="rounded-xl border border-line-neutral-200/80 bg-surface p-4 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-line-neutral-100">
+              <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700 flex items-center gap-1.5">
+                <CalendarIcon className="w-3.5 h-3.5 text-accent" />
+                <span>Local Calendar Events ({workbenchEvents.length})</span>
+              </span>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={() =>
+                  onAddEventForDate(
+                    selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+                      ? selectedCalendarDate
+                      : todayStr
+                  )
+                }
+                className="text-xs"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Full Event Modal</span>
+              </Button>
+            </div>
+
+            {workbenchEvents.length === 0 ? (
+              <div className="py-8 text-center text-xs text-content-neutral-400 space-y-1.5">
+                <p>No calendar events scheduled for this view.</p>
+                <p>Use the Quick Event bar above or click &ldquo;Full Event Modal&rdquo; to schedule one.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                {workbenchEvents.map((evt) => {
+                  const pillStyle = COLOR_PILL_CLASSES[evt.color] || COLOR_PILL_CLASSES.blue;
+                  return (
+                    <div
+                      key={evt.id}
+                      className={`p-3 rounded-xl border border-line-neutral-200/80 bg-surface hover:bg-surface-neutral-50/70 transition-all flex items-start justify-between gap-2.5 border-l-4 ${pillStyle.border}`}
+                    >
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => onSelectEvent(evt)}
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
+                            {formatDisplayDate(evt.startDate)}
+                          </span>
+                          {evt.startTime && !evt.isAllDay ? (
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
+                              {evt.startTime}
+                              {evt.endTime ? ` - ${evt.endTime}` : ""}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-600">
+                              All-Day
+                            </span>
+                          )}
+                          <span
+                            className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded ${pillStyle.bg} ${pillStyle.text}`}
+                          >
+                            {EVENT_CATEGORY_ICONS[evt.category]} {evt.category}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-semibold text-content-neutral-900 mt-1 truncate">
+                          {evt.title}
+                        </h4>
+                        {evt.taskTitle && (
+                          <p className="text-[11px] text-accent truncate">
+                            Linked Task: {evt.taskTitle}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Direct Actions: Edit Event, Export .ics, Delete Event */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onSelectEvent(evt)}
+                          title="Edit calendar event"
+                          className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleExportSingleEventIcs(evt)}
+                          title="Export event to Local Calendar (.ics)"
+                          className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                        {onDeleteEvent && (
+                          <button
+                            type="button"
+                            onClick={() => void onDeleteEvent(evt.id)}
+                            title="Delete calendar event"
+                            className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

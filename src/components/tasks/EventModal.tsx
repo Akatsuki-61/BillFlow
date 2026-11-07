@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video } from "lucide-react";
+import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video, Download } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
 import { MotionSurface } from "@/components/ui/MotionSurface";
 import { useData } from "@/lib/data/DataProvider";
+import { generateIcsFromEventsAndTasks, downloadIcsFile } from "@/lib/local-calendar";
 import type {
   CalendarEventItem,
   NewCalendarEventInput,
@@ -60,6 +61,7 @@ function EventForm({
   const [clientId, setClientId] = useState(eventToEdit?.clientId || "");
   const [taskId, setTaskId] = useState(eventToEdit?.taskId || initialTaskId || "");
   const [location, setLocation] = useState(eventToEdit?.location || "");
+  const [exportToLocalIcs, setExportToLocalIcs] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,13 +100,24 @@ function EventForm({
         location: location.trim() || null,
       };
 
+      let savedEvent: CalendarEventItem;
       if (eventToEdit) {
-        await updateEvent(eventToEdit.id, input);
+        savedEvent = await updateEvent(eventToEdit.id, input);
         onSaved?.(`Updated event "${title}"`);
       } else {
-        await createEvent(input);
+        savedEvent = await createEvent(input);
         onSaved?.(`Created event "${title}"`);
       }
+
+      if (exportToLocalIcs && savedEvent) {
+        const ics = generateIcsFromEventsAndTasks({
+          events: [savedEvent],
+          tasks: [],
+          calendarName: savedEvent.title,
+        });
+        downloadIcsFile(`event-${savedEvent.startDate}.ics`, ics);
+      }
+
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save event");
@@ -371,7 +384,7 @@ function EventForm({
           {/* Description & Notes */}
           <div>
             <label htmlFor="event-desc" className="block text-xs font-semibold uppercase tracking-wider text-content-neutral-600 mb-1.5">
-              Description & Agenda Notes
+              Description &amp; Agenda Notes
             </label>
             <textarea
               id="event-desc"
@@ -382,6 +395,18 @@ function EventForm({
               className="ui-field w-full px-3.5 py-2 text-sm border border-line-neutral-200/90 rounded-xl text-content-neutral-900 placeholder:text-content-neutral-400 focus:outline-none focus:border-accent resize-none"
             />
           </div>
+
+          {/* Local Calendar Sync Option */}
+          <label className="flex items-center gap-2.5 p-3 rounded-xl border border-line-neutral-200/80 bg-surface-neutral-50/50 text-xs font-medium text-content-neutral-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={exportToLocalIcs}
+              onChange={(e) => setExportToLocalIcs(e.target.checked)}
+              className="rounded text-accent focus:ring-accent"
+            />
+            <Download className="w-3.5 h-3.5 text-accent shrink-0" />
+            <span>Also export (.ics) to my computer&apos;s Local Calendar app upon saving</span>
+          </label>
 
           {/* Footer Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-line-neutral-200/70">

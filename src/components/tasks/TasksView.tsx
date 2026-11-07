@@ -140,6 +140,8 @@ export default function TasksView({
   const {
     tasks,
     events,
+    createEvent,
+    deleteEvent,
     invoices,
     workflow,
     clients,
@@ -1303,6 +1305,50 @@ export default function TasksView({
             if (ok) showToast(`Rescheduled task to ${newDate}`);
             return ok;
           }}
+          onUpdateTask={async (taskId, patch) => {
+            return saveTask(taskId, patch);
+          }}
+          onDeleteTask={async (taskId) => {
+            await handleDeleteTask(taskId);
+          }}
+          onDeleteEvent={async (eventId) => {
+            try {
+              await deleteEvent(eventId);
+              showToast("Calendar event removed");
+            } catch (err) {
+              showToast(
+                err instanceof Error ? err.message : "Could not delete event."
+              );
+            }
+          }}
+          onQuickCreateTask={async (input) => {
+            const assignee = {
+              name: leadFreelancerName,
+              avatarLetter: (leadFreelancerName[0] || "L").toUpperCase(),
+              bgColor: "bg-surface-purple-100",
+              textColor: "text-content-purple-700",
+            };
+            await workflow.tasks.create({
+              id: crypto.randomUUID(),
+              title: input.title,
+              description:
+                input.description || "Scheduled from Calendar & Local Schedule.",
+              status: input.status || "todo",
+              priority: input.priority,
+              category: input.category,
+              assignee,
+              dueDate: input.dueDate,
+              clientId: null,
+              currency: settings?.defaultCurrency || activeCurrency || "LKR",
+              subtasks: [],
+            });
+            showToast(`Added task "${input.title}" for ${input.dueDate}`);
+          }}
+          onQuickCreateEvent={async (input) => {
+            await createEvent(input);
+            showToast(`Scheduled event "${input.title}" for ${input.startDate}`);
+          }}
+          onNotify={(msg) => showToast(msg)}
         />
       </section>
 
@@ -1800,13 +1846,14 @@ export default function TasksView({
                   </Button>
                 </div>
 
-                {/* Status and Details Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-line-neutral-100 text-xs">
+                {/* Status, Priority, Category & Due Date Editable Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-line-neutral-100 text-xs">
                   <div>
                     <span className="text-content-neutral-400 block mb-1">
                       Status
                     </span>
                     <select
+                      aria-label="Task status"
                       value={selectedTaskForDetail.status}
                       disabled={saving}
                       onChange={(e) => {
@@ -1833,20 +1880,69 @@ export default function TasksView({
 
                   <div>
                     <span className="text-content-neutral-400 block mb-1">
-                      Due Date
+                      Priority
                     </span>
-                    <span className="font-semibold text-content-neutral-800">
-                      {selectedTaskForDetail.dueDate || "No due date"}
-                    </span>
+                    <select
+                      aria-label="Task priority"
+                      value={selectedTaskForDetail.priority}
+                      disabled={saving}
+                      onChange={(e) => {
+                        void saveTask(selectedTaskForDetail.id, {
+                          priority: e.target.value as TaskPriority,
+                        });
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
                   </div>
 
                   <div>
                     <span className="text-content-neutral-400 block mb-1">
-                      Created
+                      Category
                     </span>
-                    <span className="font-semibold text-content-neutral-800">
-                      {selectedTaskForDetail.createdAt}
+                    <select
+                      aria-label="Task category"
+                      value={selectedTaskForDetail.category}
+                      disabled={saving}
+                      onChange={(e) => {
+                        void saveTask(selectedTaskForDetail.id, {
+                          category: e.target.value as TaskCategory,
+                        });
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    >
+                      <option value="Development">Development</option>
+                      <option value="Design">Design</option>
+                      <option value="Infrastructure">Infrastructure</option>
+                      <option value="Legal">Legal</option>
+                      <option value="Documentation">Documentation</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="text-content-neutral-400 block mb-1">
+                      Due Date
                     </span>
+                    <input
+                      type="date"
+                      aria-label="Task due date"
+                      value={
+                        selectedTaskForDetail.dueDate
+                          ? selectedTaskForDetail.dueDate.split("T")[0]
+                          : ""
+                      }
+                      disabled={saving}
+                      onChange={(e) => {
+                        void saveTask(selectedTaskForDetail.id, {
+                          dueDate: e.target.value,
+                        });
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    />
                   </div>
                 </div>
               </div>
