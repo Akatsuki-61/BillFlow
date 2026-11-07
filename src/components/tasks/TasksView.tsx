@@ -1156,6 +1156,19 @@ export default function TasksView({
                                     : "Outsource"}
                                 </span>
                               </Button>
+                              <button
+                                type="button"
+                                disabled={!isElectron || isLoading || saving}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleDeleteTask(task.id);
+                                }}
+                                title={`Delete task "${task.title}"`}
+                                aria-label={`Delete task ${task.title}`}
+                                className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-trash" aria-hidden="true" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1301,6 +1314,20 @@ export default function TasksView({
                             <span>
                               {task.isOutsourced ? "Outsourced" : "Outsource"}
                             </span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            disabled={!isElectron || isLoading || saving}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleDeleteTask(task.id);
+                            }}
+                            title={`Delete task "${task.title}"`}
+                            aria-label={`Delete task ${task.title}`}
+                            className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
+                          >
+                            <i className="fa-solid fa-trash" aria-hidden="true" />
                           </Button>
                         </div>
                       </td>
@@ -2016,7 +2043,7 @@ export default function TasksView({
                             });
                           }}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <i className="fa-solid fa-trash" aria-hidden="true" />
                         </Button>
                       </div>
                     ))}
@@ -2255,7 +2282,7 @@ export default function TasksView({
                 disabled={saving}
                 onClick={() => handleDeleteTask(selectedTaskForDetail.id)}
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <i className="fa-solid fa-trash" aria-hidden="true" />
                 <span>Delete Task</span>
               </Button>
 

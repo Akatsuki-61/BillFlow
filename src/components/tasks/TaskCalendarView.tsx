@@ -1005,7 +1005,22 @@ export default function TaskCalendarView({
                                 {t.startTime}
                               </span>
                             )}
-                            <span className="truncate font-medium text-content-neutral-900">{t.title}</span>
+                            <span className="truncate font-medium text-content-neutral-900 flex-1">{t.title}</span>
+                            {onDeleteTask && (
+                              <button
+                                type="button"
+                                title="Delete task"
+                                aria-label={`Delete task ${t.title}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  triggerBriefCalendarSync();
+                                  void onDeleteTask(t.id);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-content-neutral-400 hover:text-content-rose-600 transition-opacity shrink-0 cursor-pointer"
+                              >
+                                <i className="fa-solid fa-trash !w-2.5 !h-2.5" aria-hidden="true" />
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -1127,7 +1142,7 @@ export default function TaskCalendarView({
                               className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
                               title="Delete task"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <i className="fa-solid fa-trash" aria-hidden="true" />
                             </Button>
                           )}
                         </div>
@@ -1619,9 +1634,9 @@ export default function TaskCalendarView({
                               void onDeleteTask(task.id);
                             }}
                             title="Delete task"
-                            className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors"
+                            className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <i className="fa-solid fa-trash" aria-hidden="true" />
                           </button>
                         )}
                       </div>
