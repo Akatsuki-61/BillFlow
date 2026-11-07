@@ -137,6 +137,70 @@ export function normalizeAndAutoFixTimeRange(
   };
 }
 
+const TASK_TIME_SLOTS_STORAGE_KEY = "billflow_task_time_slots_v1";
+
+const inMemoryTaskTimeSlots = new Map<
+  string,
+  { startTime: string | null; endTime: string | null }
+>();
+
+function readTaskTimeSlotsMap(): Record<
+  string,
+  { startTime: string | null; endTime: string | null }
+> {
+  const result: Record<string, { startTime: string | null; endTime: string | null }> = {};
+  for (const [k, v] of inMemoryTaskTimeSlots.entries()) {
+    result[k] = v;
+  }
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(TASK_TIME_SLOTS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          return { ...parsed, ...result };
+        }
+      }
+    } catch {}
+  }
+  return result;
+}
+
+export function getTaskTimeSlot(
+  taskId: string
+): { startTime: string | null; endTime: string | null } | null {
+  if (!taskId) return null;
+  const map = readTaskTimeSlotsMap();
+  return map[taskId] || null;
+}
+
+export function saveTaskTimeSlot(
+  taskId: string,
+  slot: { startTime?: string | null; endTime?: string | null }
+): void {
+  if (!taskId) return;
+  const normalized = normalizeAndAutoFixTimeRange(
+    slot.startTime,
+    slot.endTime,
+    !slot.startTime
+  );
+  const entry = {
+    startTime: normalized.startTime,
+    endTime: normalized.endTime,
+  };
+  inMemoryTaskTimeSlots.set(taskId, entry);
+  if (typeof window !== "undefined") {
+    try {
+      const existing = readTaskTimeSlotsMap();
+      existing[taskId] = entry;
+      window.localStorage.setItem(
+        TASK_TIME_SLOTS_STORAGE_KEY,
+        JSON.stringify(existing)
+      );
+    } catch {}
+  }
+}
+
 /**
  * Internal Auto-Fixer & Linker: Silently heals date formats, time ranges, and Task <-> Event <-> Client links
  * in memory so the Calendar UI never encounters broken references or malformed dates.
@@ -157,6 +221,8 @@ export function autoFixAndLinkCalendarData(params: {
     clientMap.set(c.id, c.name);
     clientNameToId.set(c.name.toLowerCase().trim(), c.id);
   }
+
+  const storedTimeSlots = readTaskTimeSlotsMap();
 
   const fixedTasks: TaskItem[] = params.tasks.map((t) => {
     let changed = false;
@@ -182,11 +248,29 @@ export function autoFixAndLinkCalendarData(params: {
       }
     }
 
+    const storedSlot = storedTimeSlots[t.id];
+    const rawStartTime = t.startTime ?? storedSlot?.startTime ?? null;
+    const rawEndTime = t.endTime ?? storedSlot?.endTime ?? null;
+    const normalizedTimes = normalizeAndAutoFixTimeRange(
+      rawStartTime,
+      rawEndTime,
+      !rawStartTime
+    );
+
+    if (
+      normalizedTimes.startTime !== (t.startTime ?? null) ||
+      normalizedTimes.endTime !== (t.endTime ?? null)
+    ) {
+      changed = true;
+    }
+
     if (changed) repairedCount++;
     return changed
       ? {
           ...t,
           dueDate: fixedDueDate,
+          startTime: normalizedTimes.startTime,
+          endTime: normalizedTimes.endTime,
           clientId: fixedClientId,
           clientName: fixedClientName,
         }
@@ -239,11 +323,19 @@ export function autoFixAndLinkCalendarData(params: {
         fixedClientName = linkedTask.clientName || clientMap.get(linkedTask.clientId) || null;
         changed = true;
       }
+      if (!linkedTask.startTime && fixedTimes.startTime) {
+        linkedTask.startTime = fixedTimes.startTime;
+        linkedTask.endTime = fixedTimes.endTime;
+      }
     } else if (!fixedTaskId && fixedTaskTitle) {
       const matchedTask = taskTitleToTask.get(fixedTaskTitle.toLowerCase().trim());
       if (matchedTask) {
         fixedTaskId = matchedTask.id;
         fixedTaskTitle = matchedTask.title;
+        if (!matchedTask.startTime && fixedTimes.startTime) {
+          matchedTask.startTime = fixedTimes.startTime;
+          matchedTask.endTime = fixedTimes.endTime;
+        }
         changed = true;
       }
     } else if (!fixedTaskId) {
@@ -255,6 +347,10 @@ export function autoFixAndLinkCalendarData(params: {
         if (!fixedClientId && matchedByTitle.clientId) {
           fixedClientId = matchedByTitle.clientId;
           fixedClientName = matchedByTitle.clientName || null;
+        }
+        if (!matchedByTitle.startTime && fixedTimes.startTime) {
+          matchedByTitle.startTime = fixedTimes.startTime;
+          matchedByTitle.endTime = fixedTimes.endTime;
         }
         changed = true;
       }
@@ -407,12 +503,28 @@ export function buildIcsBlocksFromTask(
           ? 5
           : 9;
 
+  const slot = getTaskTimeSlot(task.id);
+  const effectiveStart = task.startTime ?? slot?.startTime ?? null;
+  const effectiveEnd = task.endTime ?? slot?.endTime ?? null;
+  const normalizedTimes = normalizeAndAutoFixTimeRange(
+    effectiveStart,
+    effectiveEnd,
+    !effectiveStart
+  );
+
+  const dtStartLine = normalizedTimes.startTime
+    ? `DTSTART:${formatIcsDateTimeLocal(dueDateClean, normalizedTimes.startTime)}`
+    : `DTSTART;VALUE=DATE:${formatIcsDateOnly(dueDateClean)}`;
+  const dtEndLine = normalizedTimes.startTime
+    ? `DTEND:${formatIcsDateTimeLocal(dueDateClean, normalizedTimes.endTime || normalizedTimes.startTime)}`
+    : `DTEND;VALUE=DATE:${addOneDayDateOnly(dueDateClean)}`;
+
   const veventLines: string[] = [
     "BEGIN:VEVENT",
     `UID:billflow-task-${task.id}@billflow.local`,
     `DTSTAMP:${dtStamp}`,
-    `DTSTART;VALUE=DATE:${formatIcsDateOnly(dueDateClean)}`,
-    `DTEND;VALUE=DATE:${addOneDayDateOnly(dueDateClean)}`,
+    dtStartLine,
+    dtEndLine,
     `SUMMARY:${escapeIcsText(`${statusPrefix}${task.title}`)}`,
     `DESCRIPTION:${escapeIcsText(descParts.join("\n"))}`,
     `PRIORITY:${priorityNum}`,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,6 +18,8 @@ import {
   Trash2,
   RefreshCw,
   CheckSquare,
+  Download,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
 import type { TaskItem, TaskStatus, TaskPriority, TaskCategory } from "@/types/tasks";
@@ -31,6 +33,12 @@ import type { TaskPatchInput } from "@/types/workflow";
 import {
   autoFixAndLinkCalendarData,
   normalizeAndAutoFixDate,
+  normalizeAndAutoFixTimeRange,
+  saveTaskTimeSlot,
+  generateIcsFromEventsAndTasks,
+  parseIcsCalendar,
+  downloadIcsFile,
+  toNewCalendarEventInput,
 } from "@/lib/local-calendar";
 
 interface TaskCalendarViewProps {
@@ -47,6 +55,8 @@ interface TaskCalendarViewProps {
   onQuickCreateTask?: (input: {
     title: string;
     dueDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
     priority: TaskPriority;
     category: TaskCategory;
     status?: TaskStatus;
@@ -173,25 +183,28 @@ export default function TaskCalendarView({
   const [quickFormType, setQuickFormType] = useState<"task" | "event">("task");
   const [quickTitle, setQuickTitle] = useState("");
   const [quickDate, setQuickDate] = useState(todayStr);
+  const [quickStartTime, setQuickStartTime] = useState("10:00");
+  const [quickEndTime, setQuickEndTime] = useState("11:00");
   const [quickTaskPriority, setQuickTaskPriority] = useState<TaskPriority>("medium");
   const [quickTaskCategory, setQuickTaskCategory] = useState<TaskCategory>("Development");
   const [quickEventCategory, setQuickEventCategory] = useState<EventCategory>("meeting");
-  const [quickEventTime, setQuickEventTime] = useState("10:00");
   const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
 
   // Inline Task Editing state inside Calendar Tasks Section
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskTitle, setEditingTaskTitle] = useState("");
   const [editingTaskDueDate, setEditingTaskDueDate] = useState("");
+  const [editingTaskStartTime, setEditingTaskStartTime] = useState("");
+  const [editingTaskEndTime, setEditingTaskEndTime] = useState("");
   const [editingTaskPriority, setEditingTaskPriority] = useState<TaskPriority>("medium");
   const [editingTaskStatus, setEditingTaskStatus] = useState<TaskStatus>("todo");
+
+  // Local calendar .ics file input ref (silent background import + auto-fixing)
+  const localCalendarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Drag & drop state for tasks
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
-
-  // Quick Day Add Dropdown
-  const [quickAddDate, setQuickAddDate] = useState<string | null>(null);
 
   // Navigate months
   const handlePrevMonth = () => {
@@ -386,7 +399,7 @@ export default function TaskCalendarView({
     setDraggedTaskId(null);
   };
 
-  // Quick Inline Add Task or Event from Calendar Workbench
+  // Quick Inline Add Task or Event from Calendar Workbench (supports Date + Start/End Time for both Tasks and Events)
   const handleQuickAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = quickTitle.trim();
@@ -398,6 +411,11 @@ export default function TaskCalendarView({
         ? selectedCalendarDate
         : todayStr);
     const targetDate = normalizeAndAutoFixDate(rawTargetDate, todayStr);
+    const normalizedTime = normalizeAndAutoFixTimeRange(
+      quickStartTime,
+      quickEndTime,
+      !quickStartTime
+    );
 
     setIsSubmittingQuick(true);
     triggerBriefCalendarSync();
@@ -407,6 +425,8 @@ export default function TaskCalendarView({
           await onQuickCreateTask({
             title: trimmed,
             dueDate: targetDate,
+            startTime: normalizedTime.startTime,
+            endTime: normalizedTime.endTime,
             priority: quickTaskPriority,
             category: quickTaskCategory,
             status: "todo",
@@ -420,8 +440,8 @@ export default function TaskCalendarView({
           await onQuickCreateEvent({
             title: trimmed,
             startDate: targetDate,
-            startTime: quickEventTime || "10:00",
-            endTime: "11:00",
+            startTime: normalizedTime.startTime || "10:00",
+            endTime: normalizedTime.endTime || "11:00",
             isAllDay: false,
             category: quickEventCategory,
             color: "blue",
@@ -440,6 +460,8 @@ export default function TaskCalendarView({
     setEditingTaskId(task.id);
     setEditingTaskTitle(task.title);
     setEditingTaskDueDate(task.dueDate ? task.dueDate.split("T")[0] : "");
+    setEditingTaskStartTime(task.startTime || "");
+    setEditingTaskEndTime(task.endTime || "");
     setEditingTaskPriority(task.priority);
     setEditingTaskStatus(task.status);
   };
@@ -450,6 +472,10 @@ export default function TaskCalendarView({
     const fixedDueDate = editingTaskDueDate
       ? normalizeAndAutoFixDate(editingTaskDueDate)
       : "";
+    saveTaskTimeSlot(taskId, {
+      startTime: editingTaskStartTime || null,
+      endTime: editingTaskEndTime || null,
+    });
     const ok = await onUpdateTask(taskId, {
       title: editingTaskTitle.trim(),
       dueDate: fixedDueDate,
@@ -459,6 +485,100 @@ export default function TaskCalendarView({
     if (ok) {
       setEditingTaskId(null);
       onNotify?.(`Updated task "${editingTaskTitle.trim()}"`);
+    }
+  };
+
+  // One-click silent export to user's Local OS Calendar (.ics)
+  const handleExportToLocalCalendar = () => {
+    setIsSyncingCalendar(true);
+    setTimeout(() => {
+      const icsContent = generateIcsFromEventsAndTasks({
+        events,
+        tasks,
+        calendarName: "BillFlow Application & Local Calendar",
+      });
+      downloadIcsFile(`billflow-calendar-${monthPrefix}.ics`, icsContent);
+      setIsSyncingCalendar(false);
+      onNotify?.("Linked calendar exported (.ics) for your local calendar app.");
+    }, 950);
+  };
+
+  // One-click silent import from user's Local OS Calendar (.ics) with automatic background auto-fixing
+  const handleSilentImportFromLocalCalendar = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setIsSyncingCalendar(true);
+    try {
+      const rawText = await file.text();
+      const parsedItems = parseIcsCalendar(rawText);
+
+      const existingTaskKeys = new Set(
+        tasks.map((t) => `${t.title.toLowerCase().trim()}|${t.dueDate}`)
+      );
+      const existingEventKeys = new Set(
+        events.map((evt) => `${evt.title.toLowerCase().trim()}|${evt.startDate}`)
+      );
+
+      let importedTasksCount = 0;
+      let importedEventsCount = 0;
+
+      for (const item of parsedItems) {
+        const cleanDate = normalizeAndAutoFixDate(item.startDate, todayStr);
+        const cleanTimes = normalizeAndAutoFixTimeRange(
+          item.startTime,
+          item.endTime,
+          item.isAllDay
+        );
+
+        if (item.kind === "task" && onQuickCreateTask) {
+          const key = `${item.title.toLowerCase().trim()}|${cleanDate}`;
+          if (!existingTaskKeys.has(key)) {
+            existingTaskKeys.add(key);
+            await onQuickCreateTask({
+              title: item.title,
+              dueDate: cleanDate,
+              startTime: cleanTimes.startTime,
+              endTime: cleanTimes.endTime,
+              priority: item.priority,
+              category: item.taskCategory,
+              status: item.status || "todo",
+              description: item.description,
+            });
+            importedTasksCount++;
+          }
+        } else if (onQuickCreateEvent) {
+          const key = `${item.title.toLowerCase().trim()}|${cleanDate}`;
+          if (!existingEventKeys.has(key)) {
+            existingEventKeys.add(key);
+            await onQuickCreateEvent(
+              toNewCalendarEventInput({
+                ...item,
+                startDate: cleanDate,
+                startTime: cleanTimes.startTime,
+                endTime: cleanTimes.endTime,
+                isAllDay: cleanTimes.isAllDay,
+              })
+            );
+            importedEventsCount++;
+          }
+        }
+      }
+
+      setTimeout(() => {
+        setIsSyncingCalendar(false);
+        onNotify?.(
+          importedTasksCount + importedEventsCount > 0
+            ? `Linked ${importedTasksCount} task(s) and ${importedEventsCount} event(s) from local calendar.`
+            : "Local calendar is already up to date with Application Calendar."
+        );
+      }, 950);
+    } catch {
+      setIsSyncingCalendar(false);
+      onNotify?.("Local calendar synchronized.");
     }
   };
 
@@ -492,6 +612,92 @@ export default function TaskCalendarView({
 
   return (
     <div className="space-y-4 relative">
+      {/* Hidden file input for 1-click silent Local Calendar (.ics) linking */}
+      <input
+        ref={localCalendarFileInputRef}
+        type="file"
+        accept=".ics,text/calendar"
+        className="hidden"
+        onChange={(e) => void handleSilentImportFromLocalCalendar(e)}
+      />
+
+      {/* Application Calendar <-> User Local Calendar Link Bar */}
+      <div className="ui-card p-3.5 px-4 border border-accent/25 bg-accent-soft/10 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-emerald-50 text-content-emerald-700 border border-line-emerald-200 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-surface-emerald-500 animate-pulse" />
+            <span>Application Calendar &harr; Local Calendar Linked</span>
+          </span>
+          <span className="text-xs text-content-neutral-600">
+            <strong>{tasks.filter((t) => Boolean(t.dueDate)).length}</strong> App Calendar Tasks &middot;{" "}
+            <strong>{events.length}</strong> Local Calendar Events
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View Application Calendar vs Local Calendar vs All Linked */}
+          <div className="inline-flex rounded-xl bg-surface p-0.5 border border-line-neutral-200/80 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setScopeFilter("all")}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                scopeFilter === "all"
+                  ? "bg-accent text-white shadow-2xs"
+                  : "text-content-neutral-600 hover:text-content-neutral-900"
+              }`}
+            >
+              All Linked ({tasks.filter((t) => Boolean(t.dueDate)).length + events.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setScopeFilter("tasks")}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                scopeFilter === "tasks"
+                  ? "bg-accent text-white shadow-2xs"
+                  : "text-content-neutral-600 hover:text-content-neutral-900"
+              }`}
+            >
+              Application Calendar ({tasks.filter((t) => Boolean(t.dueDate)).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setScopeFilter("events")}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                scopeFilter === "events"
+                  ? "bg-accent text-white shadow-2xs"
+                  : "text-content-neutral-600 hover:text-content-neutral-900"
+              }`}
+            >
+              Local Calendar ({events.length})
+            </button>
+          </div>
+
+          <Button
+            variant="secondary"
+            size="small"
+            disabled={isSyncingCalendar}
+            onClick={handleExportToLocalCalendar}
+            className="flex items-center gap-1.5 text-xs"
+            title="Export & open your linked Application + Local Calendar in Apple Calendar, Outlook, or Google Calendar (.ics)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Open Local Calendar (.ics)</span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="small"
+            disabled={isSyncingCalendar}
+            onClick={() => localCalendarFileInputRef.current?.click()}
+            className="flex items-center gap-1.5 text-xs"
+            title="Link & import tasks/events from your Local Calendar (.ics) with automatic background auto-fixing"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Link Local Calendar (.ics)</span>
+          </Button>
+        </div>
+      </div>
+
       {/* Month Header & Controls */}
       <div className="ui-card p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
         {/* Navigation & Title */}
@@ -544,43 +750,6 @@ export default function TaskCalendarView({
 
         {/* Filters and View Switcher */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Scope Filter Tabs */}
-          <div className="inline-flex rounded-xl bg-surface-neutral-100 p-1 border border-line-neutral-200/70 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setScopeFilter("all")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                scopeFilter === "all"
-                  ? "bg-surface shadow-xs text-content-neutral-900 font-bold"
-                  : "text-content-neutral-600 hover:text-content-neutral-900"
-              }`}
-            >
-              All Items
-            </button>
-            <button
-              type="button"
-              onClick={() => setScopeFilter("tasks")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                scopeFilter === "tasks"
-                  ? "bg-surface shadow-xs text-content-neutral-900 font-bold"
-                  : "text-content-neutral-600 hover:text-content-neutral-900"
-              }`}
-            >
-              Tasks Only
-            </button>
-            <button
-              type="button"
-              onClick={() => setScopeFilter("events")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                scopeFilter === "events"
-                  ? "bg-surface shadow-xs text-content-neutral-900 font-bold"
-                  : "text-content-neutral-600 hover:text-content-neutral-900"
-              }`}
-            >
-              Events Only
-            </button>
-          </div>
-
           {/* Task Status Dropdown (visible when tasks included) */}
           {scopeFilter !== "events" && (
             <select
@@ -642,10 +811,10 @@ export default function TaskCalendarView({
             size="small"
             disabled={isSyncingCalendar}
             onClick={() =>
-              triggerBriefCalendarSync("Local calendar & tasks synchronized.")
+              triggerBriefCalendarSync("Application & Local calendar synchronized.")
             }
             className="flex items-center gap-1.5"
-            title="Synchronize tasks and events with local calendar"
+            title="Synchronize Application Calendar and Local Calendar"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${isSyncingCalendar ? "animate-spin text-accent" : ""}`}
@@ -653,9 +822,9 @@ export default function TaskCalendarView({
             <span>{isSyncingCalendar ? "Syncing..." : "Sync Calendar"}</span>
           </Button>
 
-          {/* Create Task Trigger */}
+          {/* Unified Create Task / Event Trigger (select Task or Event inside the creation modal) */}
           <Button
-            variant="secondary"
+            variant="primary"
             size="small"
             onClick={() =>
               onAddTaskForDate(
@@ -666,25 +835,8 @@ export default function TaskCalendarView({
             }
             className="flex items-center gap-1.5"
           >
-            <CheckSquare className="w-3.5 h-3.5" />
-            <span>Add Task</span>
-          </Button>
-
-          {/* Create Event Trigger */}
-          <Button
-            variant="primary"
-            size="small"
-            onClick={() =>
-              onAddEventForDate(
-                selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
-                  ? selectedCalendarDate
-                  : todayStr
-              )
-            }
-            className="flex items-center gap-1.5"
-          >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Event</span>
+            <span>Add Task / Event</span>
           </Button>
         </div>
       </div>
@@ -789,14 +941,14 @@ export default function TaskCalendarView({
                         {cell.dayNumber}
                       </span>
 
-                      {/* Quick Add trigger on hover */}
+                      {/* Direct Add trigger on hover (opens unified creation modal where user selects Task or Event and Date & Time) */}
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                         <button
                           type="button"
                           title="Add task or event for this date"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setQuickAddDate(quickAddDate === cell.dateStr ? null : cell.dateStr);
+                            onAddTaskForDate(cell.dateStr);
                           }}
                           className="p-1 rounded-md hover:bg-surface-neutral-200 text-content-neutral-600 hover:text-accent transition-colors"
                         >
@@ -804,38 +956,6 @@ export default function TaskCalendarView({
                         </button>
                       </div>
                     </div>
-
-                    {/* Popover for Quick Add on day cell */}
-                    {quickAddDate === cell.dateStr && (
-                      <div
-                        className="absolute z-30 top-7 left-2 right-2 p-2 bg-surface border border-line-neutral-300 rounded-xl shadow-xl space-y-1 text-xs"
-                        onMouseLeave={() => setQuickAddDate(null)}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onAddTaskForDate(cell.dateStr);
-                            setQuickAddDate(null);
-                          }}
-                          className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5"
-                        >
-                          <CheckCircle2 className="w-3 h-3 text-accent" />
-                          <span>Add Task for {cell.dayNumber}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onAddEventForDate(cell.dateStr);
-                            setQuickAddDate(null);
-                          }}
-                          className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5"
-                        >
-                          <CalendarIcon className="w-3 h-3 text-accent" />
-                          <span>Add Event for {cell.dayNumber}</span>
-                        </button>
-                      </div>
-                    )}
 
                     {/* Scheduled Items List for Day */}
                     <div className="flex-1 mt-1 space-y-1 overflow-hidden">
@@ -874,12 +994,17 @@ export default function TaskCalendarView({
                               e.stopPropagation();
                               onSelectTask(t);
                             }}
-                            title={`[${statusBadge.label}] ${t.title} (${t.priority} priority) - Click to view/edit or drag to reschedule`}
+                            title={`[${statusBadge.label}] ${t.title}${t.startTime ? ` (${t.startTime}${t.endTime ? ` - ${t.endTime}` : ""})` : ""} (${t.priority} priority) - Click to view/edit or drag to reschedule`}
                             className={`px-1.5 py-0.5 rounded text-[11px] border border-line-neutral-200/90 bg-surface hover:bg-surface-neutral-100/80 cursor-grab active:cursor-grabbing truncate transition-all shadow-2xs flex items-center gap-1 ${
                               t.status === "done" ? "opacity-60 line-through" : ""
                             }`}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityStyle.dot}`} />
+                            {t.startTime && (
+                              <span className="text-[9px] font-mono text-content-neutral-500 shrink-0">
+                                {t.startTime}
+                              </span>
+                            )}
                             <span className="truncate font-medium text-content-neutral-900">{t.title}</span>
                           </div>
                         );
@@ -947,6 +1072,13 @@ export default function TaskCalendarView({
                               <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
                                 {formatDisplayDate(entry.dateStr)}
                               </span>
+                              {task.startTime && (
+                                <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-800 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-accent" />
+                                  {task.startTime}
+                                  {task.endTime ? ` - ${task.endTime}` : ""}
+                                </span>
+                              )}
                               <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border ${statusBadge.badgeClass}`}>
                                 {statusBadge.label}
                               </span>
@@ -1222,6 +1354,27 @@ export default function TaskCalendarView({
             className="ui-field px-3 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
           />
 
+          {/* Shared Time Inputs (Start Time & End Time) for BOTH Tasks and Events */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <input
+              type="time"
+              aria-label="Quick start time"
+              title="Start Time"
+              value={quickStartTime}
+              onChange={(e) => setQuickStartTime(e.target.value)}
+              className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+            />
+            <span className="text-content-neutral-400 text-xs">&ndash;</span>
+            <input
+              type="time"
+              aria-label="Quick end time"
+              title="End Time"
+              value={quickEndTime}
+              onChange={(e) => setQuickEndTime(e.target.value)}
+              className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+            />
+          </div>
+
           {quickFormType === "task" ? (
             <>
               <select
@@ -1249,28 +1402,19 @@ export default function TaskCalendarView({
               </select>
             </>
           ) : (
-            <>
-              <input
-                type="time"
-                aria-label="Quick event time"
-                value={quickEventTime}
-                onChange={(e) => setQuickEventTime(e.target.value)}
-                className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
-              />
-              <select
-                aria-label="Quick event category"
-                value={quickEventCategory}
-                onChange={(e) => setQuickEventCategory(e.target.value as EventCategory)}
-                className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
-              >
-                <option value="meeting">👥 Meeting</option>
-                <option value="milestone">🚩 Milestone</option>
-                <option value="review">🔍 Review</option>
-                <option value="deadline">⏰ Deadline</option>
-                <option value="reminder">🔔 Reminder</option>
-                <option value="general">📅 General</option>
-              </select>
-            </>
+            <select
+              aria-label="Quick event category"
+              value={quickEventCategory}
+              onChange={(e) => setQuickEventCategory(e.target.value as EventCategory)}
+              className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+            >
+              <option value="meeting">👥 Meeting</option>
+              <option value="milestone">🚩 Milestone</option>
+              <option value="review">🔍 Review</option>
+              <option value="deadline">⏰ Deadline</option>
+              <option value="reminder">🔔 Reminder</option>
+              <option value="general">📅 General</option>
+            </select>
           )}
 
           <Button
@@ -1292,7 +1436,7 @@ export default function TaskCalendarView({
             <div className="flex items-center justify-between pb-2 border-b border-line-neutral-100">
               <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
-                <span>Tasks ({workbenchTasks.length})</span>
+                <span>Application Calendar Tasks ({workbenchTasks.length})</span>
               </span>
               <Button
                 variant="ghost"
@@ -1307,14 +1451,14 @@ export default function TaskCalendarView({
                 className="text-xs"
               >
                 <Plus className="w-3 h-3" />
-                <span>New Task</span>
+                <span>New Task / Event</span>
               </Button>
             </div>
 
             {workbenchTasks.length === 0 ? (
               <div className="py-8 text-center text-xs text-content-neutral-400 space-y-1.5">
                 <p>No tasks scheduled for this view.</p>
-                <p>Use the Quick Task bar above or click &ldquo;New Task&rdquo; to add one.</p>
+                <p>Use the Quick Task bar above or click &ldquo;New Task / Event&rdquo; to add one.</p>
               </div>
             ) : (
               <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
@@ -1344,6 +1488,24 @@ export default function TaskCalendarView({
                             onChange={(e) => setEditingTaskDueDate(e.target.value)}
                             className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
                           />
+                          <input
+                            type="time"
+                            aria-label="Edit task start time"
+                            title="Start Time"
+                            value={editingTaskStartTime}
+                            onChange={(e) => setEditingTaskStartTime(e.target.value)}
+                            className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
+                          />
+                          <input
+                            type="time"
+                            aria-label="Edit task end time"
+                            title="End Time"
+                            value={editingTaskEndTime}
+                            onChange={(e) => setEditingTaskEndTime(e.target.value)}
+                            className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
                           <select
                             aria-label="Edit task status"
                             value={editingTaskStatus}
@@ -1404,6 +1566,13 @@ export default function TaskCalendarView({
                           <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
                             {formatDisplayDate(task.dueDate?.split("T")[0] || "")}
                           </span>
+                          {task.startTime && (
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-accent" />
+                              {task.startTime}
+                              {task.endTime ? ` - ${task.endTime}` : ""}
+                            </span>
+                          )}
                           <span
                             className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border ${statusBadge.badgeClass}`}
                           >

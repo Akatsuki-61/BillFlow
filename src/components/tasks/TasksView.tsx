@@ -37,7 +37,11 @@ import {
   TaskPriority,
   TaskCategory,
 } from "@/types/tasks";
-import type { CalendarEventItem } from "@/types/calendar";
+import type {
+  CalendarEventItem,
+  EventCategory,
+  EventColor,
+} from "@/types/calendar";
 import { useData } from "@/lib/data/DataProvider";
 import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/tasks/TaskTiming";
@@ -47,6 +51,12 @@ import SubmitWorkModal from "@/components/tasks/SubmitWorkModal";
 import Link from "next/link";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
+import {
+  saveTaskTimeSlot,
+  getTaskTimeSlot,
+  normalizeAndAutoFixDate,
+  normalizeAndAutoFixTimeRange,
+} from "@/lib/local-calendar";
 
 const PRIORITY_OPTIONS: SelectOption[] = [
   { value: "all", label: "Priority: All" },
@@ -195,18 +205,26 @@ export default function TasksView({
   const leadFreelancerName =
     settings?.businessName?.trim() || "Lead Freelancer";
 
-  // Form State for New Task
+  // Form State for Unified New Task / Event Creation Modal
+  const [newRecordType, setNewRecordType] = useState<"task" | "event">("task");
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newStatus, setNewStatus] = useState<TaskStatus>("todo");
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium");
   const [newCategory, setNewCategory] = useState<TaskCategory>("Development");
   const [newDueDate, setNewDueDate] = useState("");
+  const [newStartTime, setNewStartTime] = useState("10:00");
+  const [newEndTime, setNewEndTime] = useState("11:00");
+  const [newIsAllDay, setNewIsAllDay] = useState(false);
+  const [newEventCategory, setNewEventCategory] = useState<EventCategory>("meeting");
+  const [newEventColor, setNewEventColor] = useState<EventColor>("blue");
+  const [newEventLocation, setNewEventLocation] = useState("");
   const [newClientName, setNewClientName] = useState("");
   const [newIsOutsourced, setNewIsOutsourced] = useState(false);
   const [newOutsourcedVendor, setNewOutsourcedVendor] = useState("");
   const [newOutsourceBudget, setNewOutsourceBudget] = useState("");
   const [hasTaskDraft, setHasTaskDraft] = useState(false);
+  const [, setTimeSlotVersion] = useState(0);
 
   const isTaskFormDirty = () => {
     return Boolean(
@@ -447,11 +465,52 @@ export default function TasksView({
     router.push(`/outsourcing?${params}`);
   };
 
-  // Create Task Submission
+  // Create Task or Event Submission (Unified Creation Modal)
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || saving) return;
     setSaving(true);
+
+    const normalizedDate = newDueDate
+      ? normalizeAndAutoFixDate(newDueDate)
+      : "";
+    const normalizedTime = normalizeAndAutoFixTimeRange(
+      newStartTime,
+      newEndTime,
+      newIsAllDay
+    );
+
+    if (newRecordType === "event") {
+      try {
+        await createEvent({
+          title: newTitle.trim(),
+          description: newDescription.trim(),
+          startDate:
+            normalizedDate || new Date().toISOString().split("T")[0],
+          endDate: normalizedDate || new Date().toISOString().split("T")[0],
+          startTime: normalizedTime.isAllDay ? null : normalizedTime.startTime,
+          endTime: normalizedTime.isAllDay ? null : normalizedTime.endTime,
+          isAllDay: normalizedTime.isAllDay,
+          category: newEventCategory,
+          color: newEventColor,
+          clientId: newClientName || null,
+          location: newEventLocation.trim() || null,
+        });
+        clearTaskDraft();
+        closeAddTaskModal(false);
+        setNewTitle("");
+        setNewDescription("");
+        setNewEventLocation("");
+        showToast(`Event "${newTitle.trim()}" scheduled in calendar`);
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : "Could not create event."
+        );
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
 
     const assignee = {
       name: leadFreelancerName,
@@ -460,15 +519,17 @@ export default function TasksView({
       textColor: "text-content-purple-700",
     };
 
+    const taskId = draftId.current || (draftId.current = crypto.randomUUID());
+
     const newTask = {
-      id: draftId.current || (draftId.current = crypto.randomUUID()),
+      id: taskId,
       title: newTitle.trim(),
       description: newDescription.trim() || "No detailed description provided.",
       status: newStatus,
       priority: newPriority,
       category: newCategory,
       assignee,
-      dueDate: newDueDate,
+      dueDate: normalizedDate,
       clientId: newClientName || null,
       currency:
         clients.find((client) => client.id === newClientName)?.currency ||
@@ -484,7 +545,12 @@ export default function TasksView({
     };
 
     try {
+      saveTaskTimeSlot(taskId, {
+        startTime: normalizedTime.isAllDay ? null : normalizedTime.startTime,
+        endTime: normalizedTime.isAllDay ? null : normalizedTime.endTime,
+      });
       await workflow.tasks.create(newTask);
+      setTimeSlotVersion((v) => v + 1);
       draftId.current = null;
     } catch (error) {
       showToast(
@@ -1328,8 +1394,13 @@ export default function TasksView({
               bgColor: "bg-surface-purple-100",
               textColor: "text-content-purple-700",
             };
+            const taskId = crypto.randomUUID();
+            saveTaskTimeSlot(taskId, {
+              startTime: input.startTime || null,
+              endTime: input.endTime || null,
+            });
             await workflow.tasks.create({
-              id: crypto.randomUUID(),
+              id: taskId,
               title: input.title,
               description:
                 input.description || "Scheduled from Calendar & Local Schedule.",
@@ -1342,7 +1413,10 @@ export default function TasksView({
               currency: settings?.defaultCurrency || activeCurrency || "LKR",
               subtasks: [],
             });
-            showToast(`Added task "${input.title}" for ${input.dueDate}`);
+            setTimeSlotVersion((v) => v + 1);
+            showToast(
+              `Added task "${input.title}" for ${input.dueDate}${input.startTime ? ` at ${input.startTime}` : ""}`
+            );
           }}
           onQuickCreateEvent={async (input) => {
             await createEvent(input);
@@ -1352,22 +1426,25 @@ export default function TasksView({
         />
       </section>
 
-      {/* CREATE NEW TASK MODAL */}
+      {/* UNIFIED CREATE NEW TASK OR EVENT MODAL */}
       <MotionPresence>
         {isAddModalOpen && (
           <Dialog onClose={() => closeAddTaskModal()} width={700}>
             <div className="app-dialog-header">
               <div>
                 <h2 className="text-xl font-newspaper font-semibold text-content-neutral-900">
-                  Create New Deliverable
+                  {newRecordType === "task"
+                    ? "Create New Deliverable"
+                    : "Schedule Calendar Event"}
                 </h2>
                 <p className="text-xs text-content-neutral-500 mt-0.5">
-                  Add a task to the board with team assignments and optional
-                  subcontractor outsourcing.
+                  {newRecordType === "task"
+                    ? "Add a task with scheduled date, time, and optional subcontractor outsourcing."
+                    : "Schedule a local calendar event with date, start/end time, and client link."}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {hasTaskDraft && (
+                {hasTaskDraft && newRecordType === "task" && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -1384,10 +1461,43 @@ export default function TasksView({
             </div>
             <form onSubmit={handleCreateTask} className="app-dialog-form">
               <div className="app-dialog-body">
-                {/* Task Title */}
+                {/* Record Type Selector (Select Task or Event inside the creation modal) */}
                 <div>
                   <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                    Task Title{" "}
+                    Select Type (Task or Event)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5 p-1 rounded-xl bg-surface-neutral-100 border border-line-neutral-200/80">
+                    <button
+                      type="button"
+                      onClick={() => setNewRecordType("task")}
+                      className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        newRecordType === "task"
+                          ? "bg-accent text-white shadow-xs"
+                          : "text-content-neutral-700 hover:text-content-neutral-900"
+                      }`}
+                    >
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      <span>Task Deliverable</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewRecordType("event")}
+                      className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        newRecordType === "event"
+                          ? "bg-accent text-white shadow-xs"
+                          : "text-content-neutral-700 hover:text-content-neutral-900"
+                      }`}
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Calendar Event</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                    {newRecordType === "task" ? "Task Title" : "Event Title"}{" "}
                     <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
@@ -1395,7 +1505,11 @@ export default function TasksView({
                     required
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="e.g. Production Database Migration"
+                    placeholder={
+                      newRecordType === "task"
+                        ? "e.g. Production Database Migration"
+                        : "e.g. Client Sprint Review & AI Architecture Demo"
+                    }
                     className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
                   />
                 </div>
@@ -1414,161 +1528,289 @@ export default function TasksView({
                   />
                 </div>
 
-                {/* Status & Priority Row */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Initial Column / Status
+                {/* Date & Time Row (Available for BOTH Task and Event) */}
+                <div className="p-3.5 rounded-xl bg-surface-neutral-50/80 border border-line-neutral-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-content-neutral-700 uppercase tracking-wider">
+                      Scheduled Date &amp; Time
+                    </span>
+                    <label className="inline-flex items-center gap-2 text-xs font-medium text-content-neutral-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newIsAllDay}
+                        onChange={(e) => setNewIsAllDay(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-accent focus:ring-accent"
+                      />
+                      <span>All-day (no specific time)</span>
                     </label>
-                    <select
-                      value={newStatus}
-                      onChange={(e) =>
-                        setNewStatus(e.target.value as TaskStatus)
-                      }
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      <option value="todo">To Do</option>
-                      <option value="in-progress">In Progress</option>
-                      <option value="review">Under Review</option>
-                      <option value="done">Done</option>
-                    </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Priority
-                    </label>
-                    <select
-                      value={newPriority}
-                      onChange={(e) =>
-                        setNewPriority(e.target.value as TaskPriority)
-                      }
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Category & Client Row */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Category
-                    </label>
-                    <select
-                      value={newCategory}
-                      onChange={(e) =>
-                        setNewCategory(e.target.value as TaskCategory)
-                      }
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      <option value="Development">Development</option>
-                      <option value="Design">Design</option>
-                      <option value="Infrastructure">Infrastructure</option>
-                      <option value="Legal">Legal</option>
-                      <option value="Documentation">Documentation</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Client Association
-                    </label>
-                    <select
-                      value={newClientName}
-                      onChange={(e) => setNewClientName(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      <option value="">No client / Internal</option>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Due Date */}
-                <div>
-                  <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                    placeholder="e.g. Oct 12, 2026"
-                    className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
-                  />
-                </div>
-
-                {/* Subcontractor Outsourcing Section */}
-                <div className="pt-3 border-t border-line-neutral-100">
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newIsOutsourced}
-                      onChange={(e) => setNewIsOutsourced(e.target.checked)}
-                      className="w-4 h-4 rounded text-accent focus:ring-accent border-line-neutral-300"
-                    />
-                    <div className="flex items-center gap-1.5 text-sm font-semibold text-content-neutral-900">
-                      <GitFork className="w-3.5 h-3.5 text-accent" />
-                      <span>Outsource this task to an external vendor</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-content-neutral-600 mb-1">
+                        {newRecordType === "task" ? "Due Date" : "Event Date"}
+                      </label>
+                      <input
+                        type="date"
+                        value={newDueDate}
+                        onChange={(e) => setNewDueDate(e.target.value)}
+                        className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
+                      />
                     </div>
-                  </label>
 
-                  {newIsOutsourced && (
-                    <div className="motion-page mt-3.5 p-3.5 bg-surface-tinted rounded-xl border border-line-purple-200/60 grid grid-cols-2 gap-3.5">
+                    {!newIsAllDay && (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-content-neutral-600 mb-1">
+                            Start Time
+                          </label>
+                          <input
+                            type="time"
+                            aria-label="Start time"
+                            value={newStartTime}
+                            onChange={(e) => setNewStartTime(e.target.value)}
+                            className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-content-neutral-600 mb-1">
+                            End Time
+                          </label>
+                          <input
+                            type="time"
+                            aria-label="End time"
+                            value={newEndTime}
+                            onChange={(e) => setNewEndTime(e.target.value)}
+                            className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {newRecordType === "task" ? (
+                  <>
+                    {/* Status & Priority Row */}
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-content-neutral-700 mb-1">
-                          Subcontractor Vendor
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Initial Column / Status
                         </label>
                         <select
-                          value={newOutsourcedVendor}
+                          value={newStatus}
                           onChange={(e) =>
-                            setNewOutsourcedVendor(e.target.value)
+                            setNewStatus(e.target.value as TaskStatus)
                           }
-                          className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
                         >
-                          <option value="">Select a vendor</option>
-                          {vendors.map((vendor) => (
-                            <option key={vendor.id} value={vendor.name}>
-                              {vendor.name}
-                            </option>
-                          ))}
+                          <option value="todo">To Do</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="review">Under Review</option>
+                          <option value="done">Done</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-content-neutral-700 mb-1">
-                          Estimated Budget (
-                          {clients.find((client) => client.id === newClientName)
-                            ?.currency ||
-                            settings?.defaultCurrency ||
-                            activeCurrency ||
-                            "LKR"}
-                          )
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Priority
+                        </label>
+                        <select
+                          value={newPriority}
+                          onChange={(e) =>
+                            setNewPriority(e.target.value as TaskPriority)
+                          }
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                          <option value="urgent">Urgent</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Category & Client Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Category
+                        </label>
+                        <select
+                          value={newCategory}
+                          onChange={(e) =>
+                            setNewCategory(e.target.value as TaskCategory)
+                          }
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="Development">Development</option>
+                          <option value="Design">Design</option>
+                          <option value="Infrastructure">Infrastructure</option>
+                          <option value="Legal">Legal</option>
+                          <option value="Documentation">Documentation</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Client Association
+                        </label>
+                        <select
+                          value={newClientName}
+                          onChange={(e) => setNewClientName(e.target.value)}
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="">No client / Internal</option>
+                          {clients.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {client.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Subcontractor Outsourcing Section */}
+                    <div className="pt-3 border-t border-line-neutral-100">
+                      <label className="flex items-center gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newIsOutsourced}
+                          onChange={(e) => setNewIsOutsourced(e.target.checked)}
+                          className="w-4 h-4 rounded text-accent focus:ring-accent border-line-neutral-300"
+                        />
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-content-neutral-900">
+                          <GitFork className="w-3.5 h-3.5 text-accent" />
+                          <span>Outsource this task to an external vendor</span>
+                        </div>
+                      </label>
+
+                      {newIsOutsourced && (
+                        <div className="motion-page mt-3.5 p-3.5 bg-surface-tinted rounded-xl border border-line-purple-200/60 grid grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="block text-xs font-medium text-content-neutral-700 mb-1">
+                              Subcontractor Vendor
+                            </label>
+                            <select
+                              value={newOutsourcedVendor}
+                              onChange={(e) =>
+                                setNewOutsourcedVendor(e.target.value)
+                              }
+                              className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
+                            >
+                              <option value="">Select a vendor</option>
+                              {vendors.map((vendor) => (
+                                <option key={vendor.id} value={vendor.name}>
+                                  {vendor.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-content-neutral-700 mb-1">
+                              Estimated Budget (
+                              {clients.find((client) => client.id === newClientName)
+                                ?.currency ||
+                                settings?.defaultCurrency ||
+                                activeCurrency ||
+                                "LKR"}
+                              )
+                            </label>
+                            <input
+                              type="number"
+                              value={newOutsourceBudget}
+                              onChange={(e) =>
+                                setNewOutsourceBudget(e.target.value)
+                              }
+                              placeholder="0"
+                              className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* Event-specific fields inside the Unified Creation Modal */
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Event Type
+                        </label>
+                        <select
+                          value={newEventCategory}
+                          onChange={(e) =>
+                            setNewEventCategory(e.target.value as EventCategory)
+                          }
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="meeting">👥 Client Meeting</option>
+                          <option value="milestone">🚩 Project Milestone</option>
+                          <option value="review">🔍 Deliverable Review</option>
+                          <option value="deadline">⏰ Hard Deadline</option>
+                          <option value="reminder">🔔 Follow-up Reminder</option>
+                          <option value="general">📅 General Schedule</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Client Association
+                        </label>
+                        <select
+                          value={newClientName}
+                          onChange={(e) => setNewClientName(e.target.value)}
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="">No client / Internal</option>
+                          {clients.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {client.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Badge Color
+                        </label>
+                        <select
+                          value={newEventColor}
+                          onChange={(e) =>
+                            setNewEventColor(e.target.value as EventColor)
+                          }
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="blue">Ocean Blue</option>
+                          <option value="emerald">Emerald</option>
+                          <option value="amber">Amber Gold</option>
+                          <option value="purple">Royal Purple</option>
+                          <option value="rose">Crimson Rose</option>
+                          <option value="cyan">Sky Cyan</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Location / Meeting Link
                         </label>
                         <input
-                          type="number"
-                          value={newOutsourceBudget}
-                          onChange={(e) =>
-                            setNewOutsourceBudget(e.target.value)
-                          }
-                          placeholder="0"
-                          className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
+                          type="text"
+                          value={newEventLocation}
+                          onChange={(e) => setNewEventLocation(e.target.value)}
+                          placeholder="e.g. Google Meet, Zoom, or Office"
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent"
                         />
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* Action Buttons */}
+                  </>
+                )}
               </div>
               <div className="app-dialog-footer">
                 <Button
@@ -1579,7 +1821,9 @@ export default function TasksView({
                   Cancel
                 </Button>
                 <Button variant="primary" type="submit" disabled={saving}>
-                  Create Deliverable
+                  {newRecordType === "task"
+                    ? "Create Deliverable"
+                    : "Schedule Event"}
                 </Button>
               </div>
             </form>
@@ -1846,8 +2090,8 @@ export default function TasksView({
                   </Button>
                 </div>
 
-                {/* Status, Priority, Category & Due Date Editable Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-line-neutral-100 text-xs">
+                {/* Status, Priority, Category, Due Date & Time Editable Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-line-neutral-100 text-xs">
                   <div>
                     <span className="text-content-neutral-400 block mb-1">
                       Status
@@ -1940,6 +2184,62 @@ export default function TasksView({
                         void saveTask(selectedTaskForDetail.id, {
                           dueDate: e.target.value,
                         });
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    />
+                  </div>
+
+                  <div>
+                    <span className="text-content-neutral-400 block mb-1">
+                      Start Time
+                    </span>
+                    <input
+                      type="time"
+                      aria-label="Task start time"
+                      value={
+                        selectedTaskForDetail.startTime ??
+                        getTaskTimeSlot(selectedTaskForDetail.id)?.startTime ??
+                        ""
+                      }
+                      disabled={saving}
+                      onChange={(e) => {
+                        const currentSlot = getTaskTimeSlot(selectedTaskForDetail.id);
+                        saveTaskTimeSlot(selectedTaskForDetail.id, {
+                          startTime: e.target.value || null,
+                          endTime:
+                            selectedTaskForDetail.endTime ??
+                            currentSlot?.endTime ??
+                            null,
+                        });
+                        setTimeSlotVersion((v) => v + 1);
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    />
+                  </div>
+
+                  <div>
+                    <span className="text-content-neutral-400 block mb-1">
+                      End Time
+                    </span>
+                    <input
+                      type="time"
+                      aria-label="Task end time"
+                      value={
+                        selectedTaskForDetail.endTime ??
+                        getTaskTimeSlot(selectedTaskForDetail.id)?.endTime ??
+                        ""
+                      }
+                      disabled={saving}
+                      onChange={(e) => {
+                        const currentSlot = getTaskTimeSlot(selectedTaskForDetail.id);
+                        saveTaskTimeSlot(selectedTaskForDetail.id, {
+                          startTime:
+                            selectedTaskForDetail.startTime ??
+                            currentSlot?.startTime ??
+                            "09:00",
+                          endTime: e.target.value || null,
+                        });
+                        setTimeSlotVersion((v) => v + 1);
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     />

@@ -8,6 +8,8 @@ import {
   autoFixAndLinkCalendarData,
   normalizeAndAutoFixDate,
   normalizeAndAutoFixTimeRange,
+  saveTaskTimeSlot,
+  getTaskTimeSlot,
 } from "../local-calendar";
 
 describe("Calendar Date & Item Mapping", () => {
@@ -252,5 +254,11 @@ describe("Calendar Date & Item Mapping", () => {
     expect(healed.events[0].taskId).toBe("t-auto-1");
     expect(healed.events[0].clientId).toBe("c-1");
     expect(healed.events[0].clientName).toBe("Lanka Tech Corp");
+
+    // Task time slot persistence & auto-enrichment
+    saveTaskTimeSlot("t-auto-1", { startTime: "10:00", endTime: "09:30" }); // Inverted time auto-fixed to 11:00
+    const slot = getTaskTimeSlot("t-auto-1");
+    expect(slot?.startTime).toBe("10:00");
+    expect(slot?.endTime).toBe("11:00");
   });
 });

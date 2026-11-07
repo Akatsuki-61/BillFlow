@@ -32,6 +32,8 @@ export interface TaskItem {
   category: TaskCategory;
   assignee: TaskAssignee;
   dueDate: string;
+  startTime?: string | null;
+  endTime?: string | null;
   subtasks: Subtask[];
   isOutsourced?: boolean;
   outsourcedVendor?: string;
