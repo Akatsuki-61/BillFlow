@@ -2468,10 +2468,109 @@ button:active:not(:disabled) i.fa-solid.fa-trash {
   transform: scale(0.86) rotate(-8deg);
 }
 
+/* Bottom-Right Toast Popup Message Animation + Animated <i class="fa-solid fa-trash"></i> Badge */
+@keyframes bf-toast-pop-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(0, -4px, 0) scale(1.02);
+  }
+  82% {
+    transform: translate3d(0, 2px, 0) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes bf-toast-progress {
+  0% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+.bf-toast-popup {
+  animation: bf-toast-pop-in 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+
+.bf-toast-trash-badge i.fa-solid.fa-trash {
+  width: 0.9rem;
+  height: 0.9rem;
+  animation: fa-trash-shake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) 0.08s both;
+}
+
+.bf-toast-progress-bar {
+  transform-origin: left center;
+  animation: bf-toast-progress 3.5s linear forwards;
+}
+
+/* Modern Sleek Pill Scrollbar Design (Light & Dark Mode) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.32) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.38);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.62);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb,
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.28);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 139, 250, 0.65);
+}
+
+.bf-scroll-area {
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.bf-scroll-area::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   button:hover:not(:disabled) i.fa-solid.fa-trash,
   button:focus-visible:not(:disabled) i.fa-solid.fa-trash,
-  i.fa-solid.fa-trash:hover {
+  i.fa-solid.fa-trash:hover,
+  .bf-toast-popup,
+  .bf-toast-trash-badge i.fa-solid.fa-trash,
+  .bf-toast-progress-bar {
     animation: none;
     transform: none;
   }

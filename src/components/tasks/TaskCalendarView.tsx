@@ -35,6 +35,7 @@ import {
   normalizeAndAutoFixDate,
   normalizeAndAutoFixTimeRange,
   saveTaskTimeSlot,
+  getAllTaskTimeSlots,
   generateIcsFromEventsAndTasks,
   parseIcsCalendar,
   downloadIcsFile,
@@ -67,6 +68,21 @@ interface TaskCalendarViewProps {
 }
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 const PRIORITY_COLORS: Record<TaskPriority, { dot: string; text: string; bg: string }> = {
   urgent: { dot: "bg-surface-red-500", text: "text-content-red-700", bg: "bg-surface-red-50" },
@@ -138,37 +154,74 @@ export default function TaskCalendarView({
   onNotify,
 }: TaskCalendarViewProps) {
   const today = new Date();
-  const todayStr = formatDateString(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth();
+  const todayStr = formatDateString(todayYear, todayMonth, today.getDate());
 
-  const [currentYear, setCurrentYear] = useState<number>(today.getFullYear());
-  const [currentMonth, setCurrentMonth] = useState<number>(today.getMonth());
+  // Default to current month & year on open
+  const [currentYear, setCurrentYear] = useState<number>(todayYear);
+  const [currentMonth, setCurrentMonth] = useState<number>(todayMonth);
   const [viewType, setViewType] = useState<"grid" | "agenda">("grid");
+  const [timeSlotRevision, setTimeSlotRevision] = useState<number>(0);
+
+  const isViewingCurrentMonth =
+    currentYear === todayYear && currentMonth === todayMonth;
+
+  const yearOptions = useMemo(() => {
+    const years: number[] = [];
+    for (let y = todayYear - 3; y <= todayYear + 5; y++) {
+      years.push(y);
+    }
+    if (!years.includes(currentYear)) {
+      years.push(currentYear);
+      years.sort((a, b) => a - b);
+    }
+    return years;
+  }, [todayYear, currentYear]);
 
   // Silent Internal Auto-Fixing & Linking Engine
   const { tasks, events } = useMemo(
-    () => autoFixAndLinkCalendarData({ tasks: rawTasks, events: rawEvents }),
-    [rawTasks, rawEvents]
+    () => {
+      void timeSlotRevision;
+      return autoFixAndLinkCalendarData({ tasks: rawTasks, events: rawEvents });
+    },
+    [rawTasks, rawEvents, timeSlotRevision]
   );
 
   // Brief UI loading state while internal calendar sync/auto-linking runs
   const [isSyncingCalendar, setIsSyncingCalendar] = useState<boolean>(false);
+  const onNotifyRef = useRef(onNotify);
+  onNotifyRef.current = onNotify;
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasMountedSyncRef = useRef<boolean>(false);
 
-  const triggerBriefCalendarSync = useCallback(
-    (toastText?: string) => {
-      setIsSyncingCalendar(true);
-      const timer = setTimeout(() => {
-        setIsSyncingCalendar(false);
-        if (toastText) onNotify?.(toastText);
-      }, 950);
-      return () => clearTimeout(timer);
-    },
-    [onNotify]
-  );
+  const triggerBriefCalendarSync = useCallback((toastText?: string) => {
+    setIsSyncingCalendar(true);
+    if (typeof window !== "undefined" && window.billflow?.events?.syncNative) {
+      void window.billflow.events.syncNative(getAllTaskTimeSlots()).catch(() => {});
+    }
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current);
+    }
+    syncTimerRef.current = setTimeout(() => {
+      syncTimerRef.current = null;
+      setIsSyncingCalendar(false);
+      if (toastText) onNotifyRef.current?.(toastText);
+    }, 450);
+  }, []);
 
-  // Run brief internal sync when Calendar first mounts
+  // Run brief internal sync once when Calendar first mounts
   useEffect(() => {
-    const cleanup = triggerBriefCalendarSync();
-    return cleanup;
+    if (!hasMountedSyncRef.current) {
+      hasMountedSyncRef.current = true;
+      triggerBriefCalendarSync();
+    }
+    return () => {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+        syncTimerRef.current = null;
+      }
+    };
   }, [triggerBriefCalendarSync]);
 
   // Filters
@@ -226,10 +279,33 @@ export default function TaskCalendarView({
   };
 
   const handleToday = () => {
-    setCurrentYear(today.getFullYear());
-    setCurrentMonth(today.getMonth());
+    setCurrentYear(todayYear);
+    setCurrentMonth(todayMonth);
     setSelectedCalendarDate(todayStr);
     setQuickDate(todayStr);
+  };
+
+  const handleGoToCurrentMonth = () => {
+    setCurrentYear(todayYear);
+    setCurrentMonth(todayMonth);
+    setSelectedCalendarDate("all-month");
+    setQuickDate(todayStr);
+  };
+
+  const handleMonthSelect = (newMonthIndex: number) => {
+    setCurrentMonth(newMonthIndex);
+    setSelectedCalendarDate("all-month");
+    const targetDay =
+      newMonthIndex === todayMonth && currentYear === todayYear ? today.getDate() : 1;
+    setQuickDate(formatDateString(currentYear, newMonthIndex, targetDay));
+  };
+
+  const handleYearSelect = (newYear: number) => {
+    setCurrentYear(newYear);
+    setSelectedCalendarDate("all-month");
+    const targetDay =
+      currentMonth === todayMonth && newYear === todayYear ? today.getDate() : 1;
+    setQuickDate(formatDateString(newYear, currentMonth, targetDay));
   };
 
   // Calendar matrix calculation
@@ -418,10 +494,10 @@ export default function TaskCalendarView({
     );
 
     setIsSubmittingQuick(true);
-    triggerBriefCalendarSync();
     try {
       if (quickFormType === "task") {
         if (onQuickCreateTask) {
+          setQuickTitle("");
           await onQuickCreateTask({
             title: trimmed,
             dueDate: targetDate,
@@ -431,12 +507,14 @@ export default function TaskCalendarView({
             category: quickTaskCategory,
             status: "todo",
           });
-          setQuickTitle("");
+          setTimeSlotRevision((v) => v + 1);
+          triggerBriefCalendarSync();
         } else {
           onAddTaskForDate(targetDate);
         }
       } else {
         if (onQuickCreateEvent) {
+          setQuickTitle("");
           await onQuickCreateEvent({
             title: trimmed,
             startDate: targetDate,
@@ -446,7 +524,7 @@ export default function TaskCalendarView({
             category: quickEventCategory,
             color: "blue",
           });
-          setQuickTitle("");
+          triggerBriefCalendarSync();
         } else {
           onAddEventForDate(targetDate);
         }
@@ -468,7 +546,6 @@ export default function TaskCalendarView({
 
   const saveInlineEditTask = async (taskId: string) => {
     if (!onUpdateTask || !editingTaskTitle.trim()) return;
-    triggerBriefCalendarSync();
     const fixedDueDate = editingTaskDueDate
       ? normalizeAndAutoFixDate(editingTaskDueDate)
       : "";
@@ -476,6 +553,8 @@ export default function TaskCalendarView({
       startTime: editingTaskStartTime || null,
       endTime: editingTaskEndTime || null,
     });
+    setTimeSlotRevision((v) => v + 1);
+    triggerBriefCalendarSync();
     const ok = await onUpdateTask(taskId, {
       title: editingTaskTitle.trim(),
       dueDate: fixedDueDate,
@@ -484,23 +563,29 @@ export default function TaskCalendarView({
     });
     if (ok) {
       setEditingTaskId(null);
-      onNotify?.(`Updated task "${editingTaskTitle.trim()}"`);
+      onNotifyRef.current?.(`Updated task "${editingTaskTitle.trim()}"`);
     }
   };
 
-  // One-click silent export to user's Local OS Calendar (.ics)
-  const handleExportToLocalCalendar = () => {
-    setIsSyncingCalendar(true);
-    setTimeout(() => {
-      const icsContent = generateIcsFromEventsAndTasks({
-        events,
-        tasks,
-        calendarName: "BillFlow Application & Local Calendar",
-      });
-      downloadIcsFile(`billflow-calendar-${monthPrefix}.ics`, icsContent);
-      setIsSyncingCalendar(false);
-      onNotify?.("Linked calendar exported (.ics) for your local calendar app.");
-    }, 950);
+  // One-click silent sync & open in user's Local OS Calendar (macOS Calendar.app / .ics fallback)
+  const handleExportToLocalCalendar = async () => {
+    triggerBriefCalendarSync();
+    if (typeof window !== "undefined" && window.billflow?.events?.openNative) {
+      try {
+        await window.billflow.events.openNative(getAllTaskTimeSlots());
+        onNotifyRef.current?.("Synced with your macOS Calendar app ('BillFlow' calendar).");
+        return;
+      } catch {
+        // Fallback to .ics download below
+      }
+    }
+    const icsContent = generateIcsFromEventsAndTasks({
+      events,
+      tasks,
+      calendarName: "BillFlow",
+    });
+    downloadIcsFile(`billflow-calendar-${monthPrefix}.ics`, icsContent);
+    onNotifyRef.current?.("Linked calendar exported (.ics) for your local calendar app.");
   };
 
   // One-click silent import from user's Local OS Calendar (.ics) with automatic background auto-fixing
@@ -568,17 +653,15 @@ export default function TaskCalendarView({
         }
       }
 
-      setTimeout(() => {
-        setIsSyncingCalendar(false);
-        onNotify?.(
-          importedTasksCount + importedEventsCount > 0
-            ? `Linked ${importedTasksCount} task(s) and ${importedEventsCount} event(s) from local calendar.`
-            : "Local calendar is already up to date with Application Calendar."
-        );
-      }, 950);
+      setTimeSlotRevision((v) => v + 1);
+      triggerBriefCalendarSync(
+        importedTasksCount + importedEventsCount > 0
+          ? `Linked ${importedTasksCount} task(s) and ${importedEventsCount} event(s) from local calendar.`
+          : "Local calendar is already up to date with Application Calendar."
+      );
     } catch {
       setIsSyncingCalendar(false);
-      onNotify?.("Local calendar synchronized.");
+      onNotifyRef.current?.("Local calendar synchronized.");
     }
   };
 
@@ -700,8 +783,8 @@ export default function TaskCalendarView({
 
       {/* Month Header & Controls */}
       <div className="ui-card p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
-        {/* Navigation & Title */}
-        <div className="flex items-center gap-3">
+        {/* Navigation, Month/Year Selection & Title */}
+        <div className="flex items-center gap-2.5 flex-wrap">
           <div className="flex items-center gap-1 bg-surface-neutral-100 rounded-xl p-1 border border-line-neutral-200/80">
             <Button
               variant="ghost"
@@ -715,8 +798,21 @@ export default function TaskCalendarView({
             <Button
               variant="ghost"
               size="small"
+              onClick={handleGoToCurrentMonth}
+              title="Jump to current month"
+              className={`px-2.5 py-1 text-xs font-semibold ${
+                isViewingCurrentMonth
+                  ? "text-accent"
+                  : "text-content-neutral-800"
+              }`}
+            >
+              Current Month
+            </Button>
+            <Button
+              variant="ghost"
+              size="small"
               onClick={handleToday}
-              className="px-2.5 py-1 text-xs font-semibold text-content-neutral-800"
+              className="px-2 py-1 text-xs font-semibold text-content-neutral-700"
             >
               Today
             </Button>
@@ -731,9 +827,35 @@ export default function TaskCalendarView({
             </Button>
           </div>
 
-          <h2 className="text-lg font-newspaper text-content-neutral-900 tracking-tight">
-            {formatMonthYear(currentYear, currentMonth)}
-          </h2>
+          {/* Direct Calendar Month & Year Selection (Defaults to Current Month) */}
+          <div className="flex items-center gap-1.5">
+            <select
+              aria-label="Select calendar month"
+              value={currentMonth}
+              onChange={(e) => handleMonthSelect(Number(e.target.value))}
+              className="ui-field text-sm font-newspaper font-semibold px-3 py-1.5 border border-line-neutral-200/90 rounded-xl bg-surface text-content-neutral-900 focus:outline-none focus:border-accent cursor-pointer"
+            >
+              {MONTH_NAMES.map((mName, idx) => (
+                <option key={mName} value={idx}>
+                  {mName}
+                  {idx === todayMonth && currentYear === todayYear ? " (Current)" : ""}
+                </option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Select calendar year"
+              value={currentYear}
+              onChange={(e) => handleYearSelect(Number(e.target.value))}
+              className="ui-field text-sm font-newspaper font-semibold px-2.5 py-1.5 border border-line-neutral-200/90 rounded-xl bg-surface text-content-neutral-900 focus:outline-none focus:border-accent cursor-pointer"
+            >
+              {yearOptions.map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Brief Internal Sync Indicator */}
           {isSyncingCalendar && (
@@ -1009,6 +1131,7 @@ export default function TaskCalendarView({
                             {onDeleteTask && (
                               <button
                                 type="button"
+                                data-trash-popup="Delete Task"
                                 title="Delete task"
                                 aria-label={`Delete task ${t.title}`}
                                 onClick={(e) => {
@@ -1267,8 +1390,30 @@ export default function TaskCalendarView({
             </p>
           </div>
 
-          {/* Scope Selector: Active Month vs Today vs Selected Day vs Unscheduled Tasks */}
+          {/* Scope & Month Selector: Active Month vs Today vs Selected Day vs Unscheduled Tasks */}
           <div className="flex items-center gap-1.5 flex-wrap">
+            <select
+              aria-label="Select workbench month"
+              value={currentMonth}
+              onChange={(e) => handleMonthSelect(Number(e.target.value))}
+              className="ui-field px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-line-neutral-200/90 bg-surface text-content-neutral-800 focus:outline-none focus:border-accent cursor-pointer"
+            >
+              {MONTH_NAMES.map((mName, idx) => (
+                <option key={mName} value={idx}>
+                  {mName} {currentYear}
+                  {idx === todayMonth && currentYear === todayYear ? " (Current)" : ""}
+                </option>
+              ))}
+            </select>
+            {!isViewingCurrentMonth && (
+              <button
+                type="button"
+                onClick={handleGoToCurrentMonth}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-accent-soft/40 text-accent border border-accent/25 hover:bg-accent-soft/70 transition-all cursor-pointer"
+              >
+                Current Month ({MONTH_NAMES[todayMonth].slice(0, 3)})
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSelectedCalendarDate("all-month")}
@@ -1476,7 +1621,7 @@ export default function TaskCalendarView({
                 <p>Use the Quick Task bar above or click &ldquo;New Task / Event&rdquo; to add one.</p>
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+              <div className="bf-scroll-area space-y-2.5 max-h-[380px] overflow-y-auto overflow-x-hidden pr-1">
                 {workbenchTasks.map((task) => {
                   const isEditingThis = editingTaskId === task.id;
                   const priorityStyle = PRIORITY_COLORS[task.priority];
@@ -1677,7 +1822,7 @@ export default function TaskCalendarView({
                 <p>Use the Quick Event bar above or click &ldquo;New Event&rdquo; to schedule one.</p>
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+              <div className="bf-scroll-area space-y-2.5 max-h-[380px] overflow-y-auto overflow-x-hidden pr-1">
                 {workbenchEvents.map((evt) => {
                   const pillStyle = COLOR_PILL_CLASSES[evt.color] || COLOR_PILL_CLASSES.blue;
                   return (

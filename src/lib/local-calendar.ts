@@ -166,6 +166,13 @@ function readTaskTimeSlotsMap(): Record<
   return result;
 }
 
+export function getAllTaskTimeSlots(): Record<
+  string,
+  { startTime: string | null; endTime: string | null }
+> {
+  return readTaskTimeSlotsMap();
+}
+
 export function getTaskTimeSlot(
   taskId: string
 ): { startTime: string | null; endTime: string | null } | null {
@@ -197,6 +204,9 @@ export function saveTaskTimeSlot(
         TASK_TIME_SLOTS_STORAGE_KEY,
         JSON.stringify(existing)
       );
+      if (window.billflow?.events?.syncNative) {
+        void window.billflow.events.syncNative(existing).catch(() => {});
+      }
     } catch {}
   }
 }

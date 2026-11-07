@@ -75,6 +75,12 @@ export interface BillFlowAPI extends WorkflowAPI {
     create: (input: NewCalendarEventInput) => Promise<CalendarEventItem>;
     update: (id: string, patch: CalendarEventPatchInput) => Promise<CalendarEventItem>;
     remove: (id: string) => Promise<{ success: boolean }>;
+    syncNative?: (
+      taskTimeSlots?: Record<string, { startTime: string | null; endTime: string | null }>
+    ) => Promise<{ syncedFromMac: number; pushedToMac: number }>;
+    openNative?: (
+      taskTimeSlots?: Record<string, { startTime: string | null; endTime: string | null }>
+    ) => Promise<{ success: boolean; syncedFromMac: number; pushedToMac: number }>;
   };
   clients: {
     list: () => Promise<ClientWithStats[]>;

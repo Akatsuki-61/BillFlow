@@ -224,7 +224,8 @@ export default function TasksView({
   const [newOutsourcedVendor, setNewOutsourcedVendor] = useState("");
   const [newOutsourceBudget, setNewOutsourceBudget] = useState("");
   const [hasTaskDraft, setHasTaskDraft] = useState(false);
-  const [, setTimeSlotVersion] = useState(0);
+  const [timeSlotVersion, setTimeSlotVersion] = useState(0);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isTaskFormDirty = () => {
     return Boolean(
@@ -306,12 +307,16 @@ export default function TasksView({
     setIsAddModalOpen(true);
   };
 
-  const showToast = (message: string) => {
+  const showToast = React.useCallback((message: string) => {
     setToastMessage(message);
-    setTimeout(() => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
       setToastMessage(null);
     }, 3500);
-  };
+  }, []);
 
   const saveTask = async (id: string, patch: TaskPatchInput) => {
     if (saving) return false;
@@ -352,14 +357,17 @@ export default function TasksView({
 
   // Base filtered tasks matching priority & category filters
   const baseTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      const matchesPriority =
-        selectedPriority === "all" || t.priority === selectedPriority;
-      const matchesCategory =
-        selectedCategory === "all" || t.category === selectedCategory;
-      return matchesPriority && matchesCategory;
-    });
-  }, [tasks, selectedPriority, selectedCategory]);
+    void timeSlotVersion;
+    return tasks
+      .filter((t) => {
+        const matchesPriority =
+          selectedPriority === "all" || t.priority === selectedPriority;
+        const matchesCategory =
+          selectedCategory === "all" || t.category === selectedCategory;
+        return matchesPriority && matchesCategory;
+      })
+      .map((t) => ({ ...t }));
+  }, [tasks, selectedPriority, selectedCategory, timeSlotVersion]);
 
   const isTaskMatch = (title: string) => {
     return isSearching && title.toLowerCase().includes(trimmedSearchQuery);
@@ -582,11 +590,13 @@ export default function TasksView({
   };
   const handleDeleteTask = async (taskId: string) => {
     if (saving) return;
+    const target = tasks.find((t) => t.id === taskId);
+    const targetTitle = target?.title;
     setSaving(true);
     try {
       await workflow.tasks.remove(taskId);
       setSelectedTaskForDetail(null);
-      showToast("Task removed");
+      showToast(targetTitle ? `Task "${targetTitle}" deleted` : "Task deleted");
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : "Could not delete task.",
@@ -612,10 +622,17 @@ export default function TasksView({
       <MotionPresence>
         {toastMessage && (
           <MotionSurface
+            key={toastMessage}
             kind="toast"
-            className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 bg-surface-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-line-neutral-800 transition-all"
+            className="bf-toast-popup fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 bg-surface-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_14px_30px_-6px_rgba(0,0,0,0.38)] border border-line-neutral-800 transition-all"
           >
-            <div className="w-2 h-2 rounded-full bg-accent-solid animate-ping" />
+            {/\b(deleted|removed)\b/i.test(toastMessage) ? (
+              <span className="bf-toast-trash-badge w-6 h-6 rounded-lg bg-rose-500/20 border border-rose-500/35 text-rose-400 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-trash" aria-hidden="true" />
+              </span>
+            ) : (
+              <div className="w-2.5 h-2.5 rounded-full bg-accent-solid animate-ping shrink-0" />
+            )}
             <span>{toastMessage}</span>
             <Button
               aria-label="Close"
@@ -626,6 +643,14 @@ export default function TasksView({
             >
               <X className="w-4 h-4" />
             </Button>
+            <span
+              aria-hidden="true"
+              className={`bf-toast-progress-bar absolute bottom-0 left-0 right-0 h-[2.5px] ${
+                /\b(deleted|removed)\b/i.test(toastMessage)
+                  ? "bg-rose-500/80"
+                  : "bg-accent"
+              }`}
+            />
           </MotionSurface>
         )}
       </MotionPresence>
@@ -2033,6 +2058,7 @@ export default function TasksView({
                         <Button
                           size="icon"
                           disabled={saving}
+                          data-trash-popup="Delete Subtask"
                           aria-label={`Delete subtask ${st.title}`}
                           onClick={(e) => {
                             e.stopPropagation();

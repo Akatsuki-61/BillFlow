@@ -7,6 +7,7 @@ import { createTaskSchema, patchTaskSchema, deliveryLink, recordId, trackingChoi
 import type { TaskItem } from "../../src/types/tasks";
 import type { TaskCreateInput, TaskPatchInput, TrackingOffer } from "../../src/types/workflow";
 import { AppError } from "./errors";
+import { scheduleBackgroundNativeCalendarSync } from "./calendar";
 
 const defaultAssignee = { name: "Chethaka", avatarLetter: "C", bgColor: "bg-surface-purple-100", textColor: "text-content-purple-700" };
 
@@ -152,8 +153,27 @@ export function registerTaskHandlers(broadcast: () => void) {
   ipcMain.handle("tasks:list", () => listTasks());
   ipcMain.handle("tasks:history", (_e, id: string) => getTaskHistory(id));
   ipcMain.handle("tracking:pending", () => pendingTracking());
-  ipcMain.handle("tasks:create", (_e, input: TaskCreateInput) => { const result = createTask(input); broadcast(); return result; });
-  ipcMain.handle("tasks:update", (_e, id: string, patch: TaskPatchInput) => { const result = updateTask(id, patch); broadcast(); return result; });
-  ipcMain.handle("tasks:remove", (_e, id: string) => { deleteTask(id); broadcast(); });
-  ipcMain.handle("tracking:decide", (_e, id: string, choice: "yes" | "no") => { const result = decideTracking(id, choice); broadcast(); return result; });
+  ipcMain.handle("tasks:create", (_e, input: TaskCreateInput) => {
+    const result = createTask(input);
+    broadcast();
+    scheduleBackgroundNativeCalendarSync(broadcast);
+    return result;
+  });
+  ipcMain.handle("tasks:update", (_e, id: string, patch: TaskPatchInput) => {
+    const result = updateTask(id, patch);
+    broadcast();
+    scheduleBackgroundNativeCalendarSync(broadcast);
+    return result;
+  });
+  ipcMain.handle("tasks:remove", (_e, id: string) => {
+    deleteTask(id);
+    broadcast();
+    scheduleBackgroundNativeCalendarSync(broadcast);
+  });
+  ipcMain.handle("tracking:decide", (_e, id: string, choice: "yes" | "no") => {
+    const result = decideTracking(id, choice);
+    broadcast();
+    scheduleBackgroundNativeCalendarSync(broadcast);
+    return result;
+  });
 }
