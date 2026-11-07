@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import { randomUUID, createHash } from "crypto";
 import { and, eq, isNull, asc, desc } from "drizzle-orm";
 import { getDb } from "../db";
-import { tasks, subtasks, taskHistory, clients, invoices, invoiceItems, invoicePayments } from "../db/schema";
+import { tasks, subtasks, taskHistory, clients, invoices, invoiceItems, invoicePayments, calendarEvents } from "../db/schema";
 import { createTaskSchema, patchTaskSchema, deliveryLink, recordId, trackingChoiceSchema } from "../workflow-validation";
 import type { TaskItem } from "../../src/types/tasks";
 import type { TaskCreateInput, TaskPatchInput, TrackingOffer } from "../../src/types/workflow";
@@ -63,6 +63,9 @@ export function updateTask(idInput: string, input: TaskPatchInput): TaskItem {
       tx.insert(taskHistory).values({ id: randomUUID(), taskId: id, fromStatus: existing.status, toStatus: patch.status, occurredAt: now }).run();
     }
     tx.update(tasks).set({ ...fields, ...timing, updatedAt: now }).where(eq(tasks.id, id)).run();
+    if (patch.title !== undefined && patch.title !== existing.title) {
+      tx.update(calendarEvents).set({ taskTitle: patch.title, updatedAt: now }).where(eq(calendarEvents.taskId, id)).run();
+    }
     if (children) {
       tx.delete(subtasks).where(eq(subtasks.taskId, id)).run();
       for (const child of children) tx.insert(subtasks).values({ ...child, taskId: id }).run();
@@ -80,6 +83,7 @@ export function deleteTask(id: string) {
     const now = new Date().toISOString();
     // Close active time and retain the last real status plus source-item uniqueness.
     tx.update(tasks).set({ deletedAt: now, updatedAt: now, activeSince: null, activeMilliseconds: existing.activeMilliseconds + (existing.activeSince ? Math.max(0, Date.parse(now) - Date.parse(existing.activeSince)) : 0) }).where(eq(tasks.id, id)).run();
+    tx.update(calendarEvents).set({ taskId: null, updatedAt: now }).where(eq(calendarEvents.taskId, id)).run();
   });
 }
 

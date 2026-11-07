@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,15 +14,10 @@ import {
   List,
   Grid3X3,
   CalendarDays,
-  ArrowRight,
   Pencil,
   Trash2,
-  Download,
-  Upload,
   RefreshCw,
   CheckSquare,
-  Sparkles,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
 import type { TaskItem, TaskStatus, TaskPriority, TaskCategory } from "@/types/tasks";
@@ -34,10 +29,8 @@ import type {
 } from "@/types/calendar";
 import type { TaskPatchInput } from "@/types/workflow";
 import {
-  generateIcsFromEventsAndTasks,
-  parseIcsCalendar,
-  downloadIcsFile,
-  type ParsedLocalCalendarItem,
+  autoFixAndLinkCalendarData,
+  normalizeAndAutoFixDate,
 } from "@/lib/local-calendar";
 
 interface TaskCalendarViewProps {
@@ -120,8 +113,8 @@ function formatDisplayDate(dateStr: string): string {
 }
 
 export default function TaskCalendarView({
-  tasks,
-  events,
+  tasks: rawTasks,
+  events: rawEvents,
   onSelectTask,
   onSelectEvent,
   onAddTaskForDate,
@@ -140,6 +133,33 @@ export default function TaskCalendarView({
   const [currentYear, setCurrentYear] = useState<number>(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(today.getMonth());
   const [viewType, setViewType] = useState<"grid" | "agenda">("grid");
+
+  // Silent Internal Auto-Fixing & Linking Engine
+  const { tasks, events } = useMemo(
+    () => autoFixAndLinkCalendarData({ tasks: rawTasks, events: rawEvents }),
+    [rawTasks, rawEvents]
+  );
+
+  // Brief UI loading state while internal calendar sync/auto-linking runs
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState<boolean>(false);
+
+  const triggerBriefCalendarSync = useCallback(
+    (toastText?: string) => {
+      setIsSyncingCalendar(true);
+      const timer = setTimeout(() => {
+        setIsSyncingCalendar(false);
+        if (toastText) onNotify?.(toastText);
+      }, 950);
+      return () => clearTimeout(timer);
+    },
+    [onNotify]
+  );
+
+  // Run brief internal sync when Calendar first mounts
+  useEffect(() => {
+    const cleanup = triggerBriefCalendarSync();
+    return cleanup;
+  }, [triggerBriefCalendarSync]);
 
   // Filters
   const [scopeFilter, setScopeFilter] = useState<"all" | "tasks" | "events">("all");
@@ -165,12 +185,6 @@ export default function TaskCalendarView({
   const [editingTaskDueDate, setEditingTaskDueDate] = useState("");
   const [editingTaskPriority, setEditingTaskPriority] = useState<TaskPriority>("medium");
   const [editingTaskStatus, setEditingTaskStatus] = useState<TaskStatus>("todo");
-
-  // Local Calendar (.ics) Sync & Import Studio State
-  const [showLocalSyncPanel, setShowLocalSyncPanel] = useState(false);
-  const [importedItems, setImportedItems] = useState<ParsedLocalCalendarItem[]>([]);
-  const [isImportingIcs, setIsImportingIcs] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Drag & drop state for tasks
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -218,7 +232,6 @@ export default function TaskCalendarView({
       isToday: boolean;
     }[] = [];
 
-    // Previous month padding
     for (let i = firstDayIndex - 1; i >= 0; i--) {
       const day = daysInPrevMonth - i;
       const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
@@ -232,7 +245,6 @@ export default function TaskCalendarView({
       });
     }
 
-    // Current month days
     for (let day = 1; day <= daysInCurrentMonth; day++) {
       const dateStr = formatDateString(currentYear, currentMonth, day);
       cells.push({
@@ -243,7 +255,6 @@ export default function TaskCalendarView({
       });
     }
 
-    // Next month padding to complete 35 or 42 grid cells
     const remaining = (7 - (cells.length % 7)) % 7;
     const totalNeeded = cells.length + remaining < 35 ? 35 : cells.length + remaining;
     const additionalDays = totalNeeded - cells.length;
@@ -314,7 +325,7 @@ export default function TaskCalendarView({
     };
   }, [tasks, events, monthPrefix, todayStr]);
 
-  // Filtered Tasks & Events for the dedicated "Calendar Tasks & Local Calendar" Workbench
+  // Filtered Tasks & Events for the dedicated Calendar Tasks & Events Workbench
   const workbenchTasks = useMemo(() => {
     if (selectedCalendarDate === "unscheduled") {
       return unscheduledTasks;
@@ -369,116 +380,10 @@ export default function TaskCalendarView({
     setDragOverDate(null);
     const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
     if (taskId) {
-      void onRescheduleTask(taskId, targetDate);
+      triggerBriefCalendarSync();
+      void onRescheduleTask(taskId, normalizeAndAutoFixDate(targetDate));
     }
     setDraggedTaskId(null);
-  };
-
-  // Export to Local OS Calendar (.ics)
-  const handleExportLocalCalendar = (scope: "all" | "tasks" | "events") => {
-    const exportTasks = scope === "events" ? [] : tasks;
-    const exportEvents = scope === "tasks" ? [] : events;
-    const ics = generateIcsFromEventsAndTasks({
-      tasks: exportTasks,
-      events: exportEvents,
-      calendarName:
-        scope === "tasks"
-          ? "BillFlow Tasks"
-          : scope === "events"
-            ? "BillFlow Events"
-            : "BillFlow Tasks & Local Schedule",
-    });
-    downloadIcsFile(`billflow-${scope}-${todayStr}.ics`, ics);
-    onNotify?.(
-      `Exported ${scope === "all" ? "Tasks & Events" : scope} (.ics) for your Local Calendar app.`
-    );
-  };
-
-  // Export single Task or Event to Local Calendar (.ics)
-  const handleExportSingleTaskIcs = (task: TaskItem) => {
-    const ics = generateIcsFromEventsAndTasks({
-      tasks: [task],
-      events: [],
-      calendarName: task.title,
-    });
-    downloadIcsFile(`task-${task.id.slice(0, 8)}.ics`, ics);
-    onNotify?.(`Exported task "${task.title}" (.ics) to Local Calendar.`);
-  };
-
-  const handleExportSingleEventIcs = (evt: CalendarEventItem) => {
-    const ics = generateIcsFromEventsAndTasks({
-      tasks: [],
-      events: [evt],
-      calendarName: evt.title,
-    });
-    downloadIcsFile(`event-${evt.id.slice(0, 8)}.ics`, ics);
-    onNotify?.(`Exported event "${evt.title}" (.ics) to Local Calendar.`);
-  };
-
-  // Parse .ics file selected from user's Local Calendar
-  const handleIcsFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const parsed = parseIcsCalendar(text);
-      setImportedItems(parsed);
-      if (parsed.length === 0) {
-        onNotify?.("No VEVENT or VTODO items found in the selected .ics file.");
-      } else {
-        onNotify?.(
-          `Found ${parsed.length} items from "${file.name}". Review and click Import below.`
-        );
-      }
-    } catch {
-      onNotify?.("Could not read .ics calendar file.");
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  // Import parsed .ics items into BillFlow as Tasks & Events
-  const handleConfirmImportIcs = async () => {
-    if (importedItems.length === 0 || isImportingIcs) return;
-    setIsImportingIcs(true);
-    let tasksCreated = 0;
-    let eventsCreated = 0;
-    try {
-      for (const item of importedItems) {
-        if (item.kind === "task" && onQuickCreateTask) {
-          await onQuickCreateTask({
-            title: item.title,
-            dueDate: item.startDate,
-            priority: item.priority,
-            category: item.taskCategory,
-            status: item.status || "todo",
-            description: item.description || "Imported from Local Calendar (.ics)",
-          });
-          tasksCreated++;
-        } else if (onQuickCreateEvent) {
-          await onQuickCreateEvent({
-            title: item.title,
-            description: item.description || "Imported from Local Calendar (.ics)",
-            startDate: item.startDate,
-            endDate: item.endDate,
-            startTime: item.isAllDay ? null : item.startTime,
-            endTime: item.isAllDay ? null : item.endTime,
-            isAllDay: item.isAllDay,
-            category: item.category,
-            color: item.color,
-            location: item.location,
-          });
-          eventsCreated++;
-        }
-      }
-      setImportedItems([]);
-      setShowLocalSyncPanel(false);
-      onNotify?.(
-        `Synced from Local Calendar: ${tasksCreated} task(s) and ${eventsCreated} event(s) added.`
-      );
-    } finally {
-      setIsImportingIcs(false);
-    }
   };
 
   // Quick Inline Add Task or Event from Calendar Workbench
@@ -487,13 +392,15 @@ export default function TaskCalendarView({
     const trimmed = quickTitle.trim();
     if (!trimmed || isSubmittingQuick) return;
 
-    const targetDate =
+    const rawTargetDate =
       quickDate ||
       (selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
         ? selectedCalendarDate
         : todayStr);
+    const targetDate = normalizeAndAutoFixDate(rawTargetDate, todayStr);
 
     setIsSubmittingQuick(true);
+    triggerBriefCalendarSync();
     try {
       if (quickFormType === "task") {
         if (onQuickCreateTask) {
@@ -539,9 +446,13 @@ export default function TaskCalendarView({
 
   const saveInlineEditTask = async (taskId: string) => {
     if (!onUpdateTask || !editingTaskTitle.trim()) return;
+    triggerBriefCalendarSync();
+    const fixedDueDate = editingTaskDueDate
+      ? normalizeAndAutoFixDate(editingTaskDueDate)
+      : "";
     const ok = await onUpdateTask(taskId, {
       title: editingTaskTitle.trim(),
-      dueDate: editingTaskDueDate,
+      dueDate: fixedDueDate,
       priority: editingTaskPriority,
       status: editingTaskStatus,
     });
@@ -580,7 +491,7 @@ export default function TaskCalendarView({
   }, [tasks, events, scopeFilter, statusFilter, categoryFilter]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
       {/* Month Header & Controls */}
       <div className="ui-card p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
         {/* Navigation & Title */}
@@ -617,9 +528,21 @@ export default function TaskCalendarView({
           <h2 className="text-lg font-newspaper text-content-neutral-900 tracking-tight">
             {formatMonthYear(currentYear, currentMonth)}
           </h2>
+
+          {/* Brief Internal Sync Indicator */}
+          {isSyncingCalendar && (
+            <span
+              role="status"
+              aria-live="polite"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-soft/40 text-accent text-[11px] font-medium border border-accent/20 animate-pulse"
+            >
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              <span>Syncing calendar...</span>
+            </span>
+          )}
         </div>
 
-        {/* Filters, Local Calendar Sync, and View Switcher */}
+        {/* Filters and View Switcher */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Scope Filter Tabs */}
           <div className="inline-flex rounded-xl bg-surface-neutral-100 p-1 border border-line-neutral-200/70 text-xs font-semibold">
@@ -713,18 +636,21 @@ export default function TaskCalendarView({
             </button>
           </div>
 
-          {/* Local Calendar Sync (.ics Import / Export) Button */}
+          {/* One-Click Silent Calendar Sync Button */}
           <Button
             variant="secondary"
             size="small"
-            onClick={() => setShowLocalSyncPanel((prev) => !prev)}
-            className={`flex items-center gap-1.5 ${
-              showLocalSyncPanel ? "border-accent text-accent bg-accent-soft/30" : ""
-            }`}
-            title="Link with your computer's Local Calendar (.ics Import & Export)"
+            disabled={isSyncingCalendar}
+            onClick={() =>
+              triggerBriefCalendarSync("Local calendar & tasks synchronized.")
+            }
+            className="flex items-center gap-1.5"
+            title="Synchronize tasks and events with local calendar"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Local Calendar Sync</span>
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${isSyncingCalendar ? "animate-spin text-accent" : ""}`}
+            />
+            <span>{isSyncingCalendar ? "Syncing..." : "Sync Calendar"}</span>
           </Button>
 
           {/* Create Task Trigger */}
@@ -762,198 +688,6 @@ export default function TaskCalendarView({
           </Button>
         </div>
       </div>
-
-      {/* LOCAL OS CALENDAR (.ICS) TWO-WAY SYNC & IMPORT STUDIO */}
-      {showLocalSyncPanel && (
-        <div className="ui-card p-5 border-2 border-accent/40 bg-surface space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-line-neutral-200/70">
-            <div>
-              <h3 className="text-sm font-semibold text-content-neutral-900 flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-accent" />
-                <span>Local OS Calendar Bridge (Apple Calendar, Outlook &amp; Google Calendar)</span>
-              </h3>
-              <p className="text-xs text-content-neutral-500 mt-0.5">
-                Export BillFlow Tasks &amp; Events to your computer&apos;s local calendar app (`.ics`), or import `.ics` files from your local calendar to view, edit, and manage them inside BillFlow.
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowLocalSyncPanel(false)}
-              aria-label="Close local calendar sync panel"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Export to Local Calendar App */}
-            <div className="p-4 rounded-xl border border-line-neutral-200/80 bg-surface-neutral-50/50 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700">
-                  1. Export to Local Calendar (.ics)
-                </span>
-                <span className="text-[11px] text-content-neutral-500">
-                  {tasks.filter((t) => Boolean(t.dueDate)).length} tasks · {events.length} events
-                </span>
-              </div>
-              <p className="text-xs text-content-neutral-500">
-                Download an RFC 5545 `.ics` file and open it directly in macOS Calendar, Microsoft Outlook, or Google Calendar.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Button
-                  variant="primary"
-                  size="small"
-                  onClick={() => handleExportLocalCalendar("all")}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export Tasks &amp; Events (.ics)</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="small"
-                  onClick={() => handleExportLocalCalendar("tasks")}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Tasks Only (.ics)</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="small"
-                  onClick={() => handleExportLocalCalendar("events")}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Events Only (.ics)</span>
-                </Button>
-              </div>
-            </div>
-
-            {/* Import from Local Calendar App */}
-            <div className="p-4 rounded-xl border border-line-neutral-200/80 bg-surface-neutral-50/50 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700">
-                  2. Import from Local Calendar (.ics)
-                </span>
-                <span className="text-[11px] text-accent font-medium">
-                  Supports VEVENT &amp; VTODO
-                </span>
-              </div>
-              <p className="text-xs text-content-neutral-500">
-                Select any `.ics` file exported from your local calendar to add its events and tasks into BillFlow so you can edit, view, or delete them here.
-              </p>
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".ics,text/calendar"
-                  onChange={handleIcsFileUpload}
-                  className="hidden"
-                />
-                <Button
-                  variant="secondary"
-                  size="small"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Choose .ics Calendar File...</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Preview & Edit Imported Local Calendar Items before saving */}
-          {importedItems.length > 0 && (
-            <div className="p-4 rounded-xl border border-accent/40 bg-surface space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-content-neutral-800">
-                  Ready to Import ({importedItems.length} Local Calendar Items) — Switch Type or Edit Before Importing
-                </h4>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    onClick={() => setImportedItems([])}
-                  >
-                    Clear
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="small"
-                    disabled={isImportingIcs}
-                    onClick={handleConfirmImportIcs}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>
-                      {isImportingIcs
-                        ? "Importing..."
-                        : `Import ${importedItems.length} Items into Application`}
-                    </span>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="max-h-56 overflow-y-auto divide-y divide-line-neutral-100 border border-line-neutral-200/70 rounded-xl">
-                {importedItems.map((item, idx) => (
-                  <div
-                    key={`${item.uid}-${idx}`}
-                    className="p-2.5 px-3 flex flex-wrap items-center justify-between gap-2 text-xs bg-surface hover:bg-surface-neutral-50"
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                      <select
-                        value={item.kind}
-                        onChange={(e) => {
-                          const nextKind = e.target.value as "task" | "event";
-                          setImportedItems((prev) =>
-                            prev.map((it, i) => (i === idx ? { ...it, kind: nextKind } : it))
-                          );
-                        }}
-                        className="ui-field px-2 py-1 text-xs font-semibold rounded-lg border border-line-neutral-200"
-                      >
-                        <option value="task">Import as Task</option>
-                        <option value="event">Import as Event</option>
-                      </select>
-                      <input
-                        type="text"
-                        value={item.title}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setImportedItems((prev) =>
-                            prev.map((it, i) => (i === idx ? { ...it, title: val } : it))
-                          );
-                        }}
-                        className="ui-field flex-1 px-2.5 py-1 text-xs border border-line-neutral-200 rounded-lg"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={item.startDate}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setImportedItems((prev) =>
-                            prev.map((it, i) => (i === idx ? { ...it, startDate: val } : it))
-                          );
-                        }}
-                        className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setImportedItems((prev) => prev.filter((_, i) => i !== idx))
-                        }
-                        className="p-1 text-content-neutral-400 hover:text-content-rose-600"
-                        title="Remove from import"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Month KPI Metrics Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -999,385 +733,375 @@ export default function TaskCalendarView({
       </div>
 
       {/* Main Calendar View: Month Grid vs Agenda List */}
-      {viewType === "grid" ? (
-        <div className="ui-card overflow-hidden border border-line-neutral-200/80">
-          {/* Day of Week Header */}
-          <div className="grid grid-cols-7 border-b border-line-neutral-200/80 bg-surface-neutral-50/90 text-center text-xs font-semibold text-content-neutral-600 py-2.5">
-            {DAYS_OF_WEEK.map((day, idx) => (
-              <div key={day} className={idx === 0 || idx === 6 ? "text-content-neutral-400" : ""}>
-                {day}
-              </div>
-            ))}
-          </div>
+      <div className={`transition-opacity duration-300 ${isSyncingCalendar ? "opacity-80" : "opacity-100"}`}>
+        {viewType === "grid" ? (
+          <div className="ui-card overflow-hidden border border-line-neutral-200/80">
+            {/* Day of Week Header */}
+            <div className="grid grid-cols-7 border-b border-line-neutral-200/80 bg-surface-neutral-50/90 text-center text-xs font-semibold text-content-neutral-600 py-2.5">
+              {DAYS_OF_WEEK.map((day, idx) => (
+                <div key={day} className={idx === 0 || idx === 6 ? "text-content-neutral-400" : ""}>
+                  {day}
+                </div>
+              ))}
+            </div>
 
-          {/* Grid Cells */}
-          <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-line-neutral-200/60 bg-surface-neutral-100/30">
-            {calendarCells.map((cell) => {
-              const cellTasks = scopeFilter !== "events" ? tasksByDate.get(cell.dateStr) || [] : [];
-              const cellEvents = scopeFilter !== "tasks" ? eventsByDate.get(cell.dateStr) || [] : [];
-              const totalItems = cellTasks.length + cellEvents.length;
-              const isOver = dragOverDate === cell.dateStr;
-              const isSelectedDay = selectedCalendarDate === cell.dateStr;
+            {/* Grid Cells */}
+            <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-line-neutral-200/60 bg-surface-neutral-100/30">
+              {calendarCells.map((cell) => {
+                const cellTasks = scopeFilter !== "events" ? tasksByDate.get(cell.dateStr) || [] : [];
+                const cellEvents = scopeFilter !== "tasks" ? eventsByDate.get(cell.dateStr) || [] : [];
+                const totalItems = cellTasks.length + cellEvents.length;
+                const isOver = dragOverDate === cell.dateStr;
+                const isSelectedDay = selectedCalendarDate === cell.dateStr;
 
-              return (
-                <div
-                  key={cell.dateStr}
-                  onClick={() => {
-                    setSelectedCalendarDate(cell.dateStr);
-                    setQuickDate(cell.dateStr);
-                  }}
-                  onDragOver={(e) => handleCellDragOver(e, cell.dateStr)}
-                  onDrop={(e) => handleCellDrop(e, cell.dateStr)}
-                  className={`min-h-[112px] p-1.5 flex flex-col justify-between transition-colors relative group cursor-pointer ${
-                    !cell.isCurrentMonth
-                      ? "bg-surface-neutral-50/40 text-content-neutral-400"
-                      : "bg-surface text-content-neutral-900"
-                  } ${cell.isToday ? "ring-2 ring-accent ring-inset bg-accent-soft/20" : ""} ${
-                    isSelectedDay && !cell.isToday
-                      ? "ring-2 ring-accent/70 ring-inset bg-accent-soft/10"
-                      : ""
-                  } ${isOver ? "bg-accent-soft/50 ring-2 ring-accent" : ""}`}
-                >
-                  {/* Top Bar of Cell: Day Number & Quick Add Button */}
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
-                        cell.isToday
-                          ? "bg-accent text-white"
-                          : isSelectedDay
-                            ? "bg-accent-soft text-accent font-bold"
-                            : cell.isCurrentMonth
-                              ? "text-content-neutral-800"
-                              : "text-content-neutral-400"
-                      }`}
-                    >
-                      {cell.dayNumber}
-                    </span>
-
-                    {/* Quick Add trigger on hover */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-                      <button
-                        type="button"
-                        title="Add task or event for this date"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setQuickAddDate(quickAddDate === cell.dateStr ? null : cell.dateStr);
-                        }}
-                        className="p-1 rounded-md hover:bg-surface-neutral-200 text-content-neutral-600 hover:text-accent transition-colors"
+                return (
+                  <div
+                    key={cell.dateStr}
+                    onClick={() => {
+                      setSelectedCalendarDate(cell.dateStr);
+                      setQuickDate(cell.dateStr);
+                    }}
+                    onDragOver={(e) => handleCellDragOver(e, cell.dateStr)}
+                    onDrop={(e) => handleCellDrop(e, cell.dateStr)}
+                    className={`min-h-[112px] p-1.5 flex flex-col justify-between transition-colors relative group cursor-pointer ${
+                      !cell.isCurrentMonth
+                        ? "bg-surface-neutral-50/40 text-content-neutral-400"
+                        : "bg-surface text-content-neutral-900"
+                    } ${cell.isToday ? "ring-2 ring-accent ring-inset bg-accent-soft/20" : ""} ${
+                      isSelectedDay && !cell.isToday
+                        ? "ring-2 ring-accent/70 ring-inset bg-accent-soft/10"
+                        : ""
+                    } ${isOver ? "bg-accent-soft/50 ring-2 ring-accent" : ""}`}
+                  >
+                    {/* Top Bar of Cell: Day Number & Quick Add Button */}
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                          cell.isToday
+                            ? "bg-accent text-white"
+                            : isSelectedDay
+                              ? "bg-accent-soft text-accent font-bold"
+                              : cell.isCurrentMonth
+                                ? "text-content-neutral-800"
+                                : "text-content-neutral-400"
+                        }`}
                       >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
+                        {cell.dayNumber}
+                      </span>
 
-                  {/* Popover for Quick Add on day cell */}
-                  {quickAddDate === cell.dateStr && (
-                    <div
-                      className="absolute z-30 top-7 left-2 right-2 p-2 bg-surface border border-line-neutral-300 rounded-xl shadow-xl space-y-1 text-xs"
-                      onMouseLeave={() => setQuickAddDate(null)}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onAddTaskForDate(cell.dateStr);
-                          setQuickAddDate(null);
-                        }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5"
-                      >
-                        <CheckCircle2 className="w-3 h-3 text-accent" />
-                        <span>Add Task for {cell.dayNumber}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onAddEventForDate(cell.dateStr);
-                          setQuickAddDate(null);
-                        }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5"
-                      >
-                        <CalendarIcon className="w-3 h-3 text-accent" />
-                        <span>Add Event for {cell.dayNumber}</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Scheduled Items List for Day */}
-                  <div className="flex-1 mt-1 space-y-1 overflow-hidden">
-                    {/* Render Local Events first */}
-                    {cellEvents.slice(0, 2).map((evt) => {
-                      const pillStyle = COLOR_PILL_CLASSES[evt.color] || COLOR_PILL_CLASSES.blue;
-                      return (
-                        <div
-                          key={evt.id}
+                      {/* Quick Add trigger on hover */}
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          title="Add task or event for this date"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onSelectEvent(evt);
+                            setQuickAddDate(quickAddDate === cell.dateStr ? null : cell.dateStr);
                           }}
-                          title={`${evt.title} (${evt.category})${evt.startTime ? ` at ${evt.startTime}` : ""} — Click to view, edit, or delete`}
-                          className={`px-1.5 py-0.5 rounded text-[11px] font-medium border-l-2 truncate cursor-pointer hover:brightness-95 transition-all flex items-center gap-1 ${pillStyle.border} ${pillStyle.bg} ${pillStyle.text}`}
+                          className="p-1 rounded-md hover:bg-surface-neutral-200 text-content-neutral-600 hover:text-accent transition-colors"
                         >
-                          <span className="shrink-0">{EVENT_CATEGORY_ICONS[evt.category]}</span>
-                          {evt.startTime && !evt.isAllDay && (
-                            <span className="text-[9px] font-mono opacity-80 shrink-0">{evt.startTime}</span>
-                          )}
-                          <span className="truncate">{evt.title}</span>
-                        </div>
-                      );
-                    })}
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
 
-                    {/* Render Tasks next */}
-                    {cellTasks.slice(0, 3 - Math.min(2, cellEvents.length)).map((t) => {
-                      const priorityStyle = PRIORITY_COLORS[t.priority];
-                      const statusBadge = STATUS_BADGES[t.status];
-                      return (
-                        <div
-                          key={t.id}
-                          draggable
-                          onDragStart={(e) => handleTaskDragStart(e, t.id)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectTask(t);
-                          }}
-                          title={`[${statusBadge.label}] ${t.title} (${t.priority} priority) - Click to view/edit or drag to reschedule`}
-                          className={`px-1.5 py-0.5 rounded text-[11px] border border-line-neutral-200/90 bg-surface hover:bg-surface-neutral-100/80 cursor-grab active:cursor-grabbing truncate transition-all shadow-2xs flex items-center gap-1 ${
-                            t.status === "done" ? "opacity-60 line-through" : ""
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityStyle.dot}`} />
-                          <span className="truncate font-medium text-content-neutral-900">{t.title}</span>
-                        </div>
-                      );
-                    })}
-
-                    {/* Overflow Badge */}
-                    {totalItems > 3 && (
+                    {/* Popover for Quick Add on day cell */}
+                    {quickAddDate === cell.dateStr && (
                       <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedCalendarDate(cell.dateStr);
-                        }}
-                        className="text-[10px] font-semibold text-content-neutral-500 hover:text-accent cursor-pointer px-1 pt-0.5"
+                        className="absolute z-30 top-7 left-2 right-2 p-2 bg-surface border border-line-neutral-300 rounded-xl shadow-xl space-y-1 text-xs"
+                        onMouseLeave={() => setQuickAddDate(null)}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        +{totalItems - 3} more...
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onAddTaskForDate(cell.dateStr);
+                            setQuickAddDate(null);
+                          }}
+                          className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5"
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-accent" />
+                          <span>Add Task for {cell.dayNumber}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onAddEventForDate(cell.dateStr);
+                            setQuickAddDate(null);
+                          }}
+                          className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5"
+                        >
+                          <CalendarIcon className="w-3 h-3 text-accent" />
+                          <span>Add Event for {cell.dayNumber}</span>
+                        </button>
                       </div>
                     )}
+
+                    {/* Scheduled Items List for Day */}
+                    <div className="flex-1 mt-1 space-y-1 overflow-hidden">
+                      {/* Render Local Events first */}
+                      {cellEvents.slice(0, 2).map((evt) => {
+                        const pillStyle = COLOR_PILL_CLASSES[evt.color] || COLOR_PILL_CLASSES.blue;
+                        return (
+                          <div
+                            key={evt.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectEvent(evt);
+                            }}
+                            title={`${evt.title} (${evt.category})${evt.startTime ? ` at ${evt.startTime}` : ""} — Click to view, edit, or delete`}
+                            className={`px-1.5 py-0.5 rounded text-[11px] font-medium border-l-2 truncate cursor-pointer hover:brightness-95 transition-all flex items-center gap-1 ${pillStyle.border} ${pillStyle.bg} ${pillStyle.text}`}
+                          >
+                            <span className="shrink-0">{EVENT_CATEGORY_ICONS[evt.category]}</span>
+                            {evt.startTime && !evt.isAllDay && (
+                              <span className="text-[9px] font-mono opacity-80 shrink-0">{evt.startTime}</span>
+                            )}
+                            <span className="truncate">{evt.title}</span>
+                          </div>
+                        );
+                      })}
+
+                      {/* Render Tasks next */}
+                      {cellTasks.slice(0, 3 - Math.min(2, cellEvents.length)).map((t) => {
+                        const priorityStyle = PRIORITY_COLORS[t.priority];
+                        const statusBadge = STATUS_BADGES[t.status];
+                        return (
+                          <div
+                            key={t.id}
+                            draggable
+                            onDragStart={(e) => handleTaskDragStart(e, t.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectTask(t);
+                            }}
+                            title={`[${statusBadge.label}] ${t.title} (${t.priority} priority) - Click to view/edit or drag to reschedule`}
+                            className={`px-1.5 py-0.5 rounded text-[11px] border border-line-neutral-200/90 bg-surface hover:bg-surface-neutral-100/80 cursor-grab active:cursor-grabbing truncate transition-all shadow-2xs flex items-center gap-1 ${
+                              t.status === "done" ? "opacity-60 line-through" : ""
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityStyle.dot}`} />
+                            <span className="truncate font-medium text-content-neutral-900">{t.title}</span>
+                          </div>
+                        );
+                      })}
+
+                      {/* Overflow Badge */}
+                      {totalItems > 3 && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCalendarDate(cell.dateStr);
+                          }}
+                          className="text-[10px] font-semibold text-content-neutral-500 hover:text-accent cursor-pointer px-1 pt-0.5"
+                        >
+                          +{totalItems - 3} more...
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        /* Agenda / Timeline View */
-        <div className="ui-card p-5 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-line-neutral-200/70">
-            <h3 className="text-sm font-semibold text-content-neutral-900 flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-accent" />
-              Upcoming Schedule &amp; Timeline ({agendaItems.length} items)
-            </h3>
-            <span className="text-xs text-content-neutral-500">
-              Sorted chronologically with sprint tasks and local user events
-            </span>
-          </div>
-
-          {agendaItems.length === 0 ? (
-            <div className="py-12 text-center text-content-neutral-500 space-y-2">
-              <CalendarIcon className="w-8 h-8 mx-auto text-content-neutral-400" />
-              <p className="text-sm font-medium">No tasks or events found for the active filters.</p>
-              <p className="text-xs text-content-neutral-400">
-                Schedule a new sprint task or add a local event using the buttons above.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {agendaItems.map((entry) => {
-                if (entry.type === "task") {
-                  const task = entry.item as TaskItem;
-                  const priorityStyle = PRIORITY_COLORS[task.priority];
-                  const statusBadge = STATUS_BADGES[task.status];
-
-                  return (
-                    <div
-                      key={`agenda-task-${task.id}`}
-                      onClick={() => onSelectTask(task)}
-                      className="p-3.5 rounded-xl border border-line-neutral-200/80 bg-surface hover:bg-surface-neutral-50/70 cursor-pointer transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-xl bg-surface-neutral-100 text-content-neutral-700 shrink-0 mt-0.5">
-                          <CheckCircle2 className="w-4 h-4 text-accent" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
-                              {formatDisplayDate(entry.dateStr)}
-                            </span>
-                            <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border ${statusBadge.badgeClass}`}>
-                              {statusBadge.label}
-                            </span>
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 ${priorityStyle.bg} ${priorityStyle.text}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`} />
-                              {task.priority}
-                            </span>
-                            {task.clientName && (
-                              <span className="text-[11px] text-content-neutral-500 font-medium">
-                                Client: {task.clientName}
-                              </span>
-                            )}
-                          </div>
-                          <h4 className={`text-sm font-semibold mt-1 text-content-neutral-900 ${task.status === "done" ? "line-through opacity-70" : ""}`}>
-                            {task.title}
-                          </h4>
-                          {task.description && (
-                            <p className="text-xs text-content-neutral-500 line-clamp-1 mt-0.5">
-                              {task.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div
-                        className="flex items-center gap-1.5 shrink-0 self-end sm:self-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="small"
-                          onClick={() => handleExportSingleTaskIcs(task)}
-                          title="Export task to Local Calendar (.ics)"
-                          className="text-xs"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="small"
-                          onClick={() => onSelectTask(task)}
-                          className="text-xs"
-                        >
-                          <Pencil className="w-3.5 h-3.5 mr-1" />
-                          Edit
-                        </Button>
-                        {onDeleteTask && (
-                          <Button
-                            variant="ghost"
-                            size="small"
-                            onClick={() => void onDeleteTask(task.id)}
-                            className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
-                            title="Delete task"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                } else {
-                  const event = entry.item as CalendarEventItem;
-                  const pillStyle = COLOR_PILL_CLASSES[event.color] || COLOR_PILL_CLASSES.blue;
-
-                  return (
-                    <div
-                      key={`agenda-event-${event.id}`}
-                      onClick={() => onSelectEvent(event)}
-                      className={`p-3.5 rounded-xl border border-line-neutral-200/80 bg-surface hover:bg-surface-neutral-50/70 cursor-pointer transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs border-l-4 ${pillStyle.border}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="text-xl p-1.5 shrink-0">
-                          {EVENT_CATEGORY_ICONS[event.category]}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
-                              {formatDisplayDate(entry.dateStr)}
-                            </span>
-                            {event.startTime && !event.isAllDay ? (
-                              <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-800 flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-accent" />
-                                {event.startTime}
-                                {event.endTime ? ` - ${event.endTime}` : ""}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
-                                All-Day
-                              </span>
-                            )}
-                            <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded ${pillStyle.bg} ${pillStyle.text}`}>
-                              {event.category}
-                            </span>
-                            {event.clientName && (
-                              <span className="text-[11px] text-content-neutral-500 font-medium flex items-center gap-1">
-                                <Link2 className="w-3 h-3" /> {event.clientName}
-                              </span>
-                            )}
-                          </div>
-                          <h4 className="text-sm font-semibold mt-1 text-content-neutral-900">
-                            {event.title}
-                          </h4>
-                          {event.description && (
-                            <p className="text-xs text-content-neutral-500 line-clamp-1 mt-0.5">
-                              {event.description}
-                            </p>
-                          )}
-                          {event.location && (
-                            <p className="text-xs text-accent font-medium flex items-center gap-1 mt-1">
-                              <MapPin className="w-3 h-3" /> {event.location}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div
-                        className="flex items-center gap-1.5 shrink-0 self-end sm:self-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {event.taskTitle && (
-                          <span className="text-[11px] font-medium px-2 py-1 rounded bg-surface-blue-50 text-content-blue-700 border border-line-blue-200">
-                            Task: {event.taskTitle}
-                          </span>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="small"
-                          onClick={() => handleExportSingleEventIcs(event)}
-                          title="Export event to Local Calendar (.ics)"
-                          className="text-xs"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="small"
-                          onClick={() => onSelectEvent(event)}
-                          className="text-xs"
-                        >
-                          <Pencil className="w-3.5 h-3.5 mr-1" />
-                          Edit
-                        </Button>
-                        {onDeleteEvent && (
-                          <Button
-                            variant="ghost"
-                            size="small"
-                            onClick={() => void onDeleteEvent(event.id)}
-                            className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
-                            title="Delete event"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
+                );
               })}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          /* Agenda / Timeline View */
+          <div className="ui-card p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-line-neutral-200/70">
+              <h3 className="text-sm font-semibold text-content-neutral-900 flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-accent" />
+                Upcoming Schedule &amp; Timeline ({agendaItems.length} items)
+              </h3>
+              <span className="text-xs text-content-neutral-500">
+                Sorted chronologically with sprint tasks and local user events
+              </span>
+            </div>
+
+            {agendaItems.length === 0 ? (
+              <div className="py-12 text-center text-content-neutral-500 space-y-2">
+                <CalendarIcon className="w-8 h-8 mx-auto text-content-neutral-400" />
+                <p className="text-sm font-medium">No tasks or events found for the active filters.</p>
+                <p className="text-xs text-content-neutral-400">
+                  Schedule a new sprint task or add a local event using the buttons above.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {agendaItems.map((entry) => {
+                  if (entry.type === "task") {
+                    const task = entry.item as TaskItem;
+                    const priorityStyle = PRIORITY_COLORS[task.priority];
+                    const statusBadge = STATUS_BADGES[task.status];
+
+                    return (
+                      <div
+                        key={`agenda-task-${task.id}`}
+                        onClick={() => onSelectTask(task)}
+                        className="p-3.5 rounded-xl border border-line-neutral-200/80 bg-surface hover:bg-surface-neutral-50/70 cursor-pointer transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-xl bg-surface-neutral-100 text-content-neutral-700 shrink-0 mt-0.5">
+                            <CheckCircle2 className="w-4 h-4 text-accent" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
+                                {formatDisplayDate(entry.dateStr)}
+                              </span>
+                              <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border ${statusBadge.badgeClass}`}>
+                                {statusBadge.label}
+                              </span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 ${priorityStyle.bg} ${priorityStyle.text}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`} />
+                                {task.priority}
+                              </span>
+                              {task.clientName && (
+                                <span className="text-[11px] text-content-neutral-500 font-medium">
+                                  Client: {task.clientName}
+                                </span>
+                              )}
+                            </div>
+                            <h4 className={`text-sm font-semibold mt-1 text-content-neutral-900 ${task.status === "done" ? "line-through opacity-70" : ""}`}>
+                              {task.title}
+                            </h4>
+                            {task.description && (
+                              <p className="text-xs text-content-neutral-500 line-clamp-1 mt-0.5">
+                                {task.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          className="flex items-center gap-1.5 shrink-0 self-end sm:self-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            onClick={() => onSelectTask(task)}
+                            className="text-xs"
+                          >
+                            <Pencil className="w-3.5 h-3.5 mr-1" />
+                            Edit
+                          </Button>
+                          {onDeleteTask && (
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              onClick={() => {
+                                triggerBriefCalendarSync();
+                                void onDeleteTask(task.id);
+                              }}
+                              className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
+                              title="Delete task"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    const event = entry.item as CalendarEventItem;
+                    const pillStyle = COLOR_PILL_CLASSES[event.color] || COLOR_PILL_CLASSES.blue;
+
+                    return (
+                      <div
+                        key={`agenda-event-${event.id}`}
+                        onClick={() => onSelectEvent(event)}
+                        className={`p-3.5 rounded-xl border border-line-neutral-200/80 bg-surface hover:bg-surface-neutral-50/70 cursor-pointer transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs border-l-4 ${pillStyle.border}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="text-xl p-1.5 shrink-0">
+                            {EVENT_CATEGORY_ICONS[event.category]}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
+                                {formatDisplayDate(entry.dateStr)}
+                              </span>
+                              {event.startTime && !event.isAllDay ? (
+                                <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-800 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-accent" />
+                                  {event.startTime}
+                                  {event.endTime ? ` - ${event.endTime}` : ""}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
+                                  All-Day
+                                </span>
+                              )}
+                              <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded ${pillStyle.bg} ${pillStyle.text}`}>
+                                {event.category}
+                              </span>
+                              {event.clientName && (
+                                <span className="text-[11px] text-content-neutral-500 font-medium flex items-center gap-1">
+                                  <Link2 className="w-3 h-3" /> {event.clientName}
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="text-sm font-semibold mt-1 text-content-neutral-900">
+                              {event.title}
+                            </h4>
+                            {event.description && (
+                              <p className="text-xs text-content-neutral-500 line-clamp-1 mt-0.5">
+                                {event.description}
+                              </p>
+                            )}
+                            {event.location && (
+                              <p className="text-xs text-accent font-medium flex items-center gap-1 mt-1">
+                                <MapPin className="w-3 h-3" /> {event.location}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          className="flex items-center gap-1.5 shrink-0 self-end sm:self-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {event.taskTitle && (
+                            <span className="text-[11px] font-medium px-2 py-1 rounded bg-surface-blue-50 text-content-blue-700 border border-line-blue-200">
+                              Task: {event.taskTitle}
+                            </span>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            onClick={() => onSelectEvent(event)}
+                            className="text-xs"
+                          >
+                            <Pencil className="w-3.5 h-3.5 mr-1" />
+                            Edit
+                          </Button>
+                          {onDeleteEvent && (
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              onClick={() => {
+                                triggerBriefCalendarSync();
+                                void onDeleteEvent(event.id);
+                              }}
+                              className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
+                              title="Delete event"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* =====================================================================
-          DEDICATED CALENDAR TASKS & LOCAL CALENDAR WORKBENCH SECTION
-          View, Add, Edit, Reschedule, Sync (.ics), and Delete Tasks & Events
+          DEDICATED CALENDAR TASKS & LOCAL EVENTS SECTION
+          View, Add, Edit, Reschedule, and Delete Tasks & Events Directly
          ===================================================================== */}
       <div className="ui-card p-5 space-y-5 border border-line-neutral-200/90">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3.5 border-b border-line-neutral-200/70">
@@ -1385,14 +1109,14 @@ export default function TaskCalendarView({
             <div className="flex items-center gap-2">
               <CheckSquare className="w-4 h-4 text-accent" />
               <h3 className="text-base font-semibold text-content-neutral-900">
-                Calendar Tasks &amp; Local Events Manager
+                Calendar Tasks &amp; Events
               </h3>
               <span className="zentra-pill-badge !px-2.5 !py-0.5 !text-[11px]">
                 {workbenchTasks.length} tasks · {workbenchEvents.length} events
               </span>
             </div>
             <p className="text-xs text-content-neutral-500 mt-0.5">
-              Add, view, edit, reschedule, or delete tasks and local calendar events directly from your schedule. Click any day on the calendar grid above to filter by date.
+              Add, view, edit, or delete tasks and events directly in your calendar. Click any date cell above to filter by that day.
             </p>
           </div>
 
@@ -1583,14 +1307,14 @@ export default function TaskCalendarView({
                 className="text-xs"
               >
                 <Plus className="w-3 h-3" />
-                <span>Full Task Modal</span>
+                <span>New Task</span>
               </Button>
             </div>
 
             {workbenchTasks.length === 0 ? (
               <div className="py-8 text-center text-xs text-content-neutral-400 space-y-1.5">
                 <p>No tasks scheduled for this view.</p>
-                <p>Use the Quick Task bar above or click &ldquo;Full Task Modal&rdquo; to add one.</p>
+                <p>Use the Quick Task bar above or click &ldquo;New Task&rdquo; to add one.</p>
               </div>
             ) : (
               <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
@@ -1660,7 +1384,7 @@ export default function TaskCalendarView({
                             size="small"
                             onClick={() => void saveInlineEditTask(task.id)}
                           >
-                            Save Changes
+                            Save
                           </Button>
                         </div>
                       </div>
@@ -1706,30 +1430,25 @@ export default function TaskCalendarView({
                         )}
                       </div>
 
-                      {/* Direct Actions: Quick Edit, Open Detail, Export .ics, Delete */}
+                      {/* Direct Actions: Quick Edit, Delete */}
                       <div className="flex items-center gap-1 shrink-0">
                         {onUpdateTask && (
                           <button
                             type="button"
                             onClick={() => startInlineEditTask(task)}
-                            title="Quick edit task title, status, priority, or due date"
+                            title="Edit task"
                             className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => handleExportSingleTaskIcs(task)}
-                          title="Export task to Local Calendar (.ics)"
-                          className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
                         {onDeleteTask && (
                           <button
                             type="button"
-                            onClick={() => void onDeleteTask(task.id)}
+                            onClick={() => {
+                              triggerBriefCalendarSync();
+                              void onDeleteTask(task.id);
+                            }}
                             title="Delete task"
                             className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors"
                           >
@@ -1749,7 +1468,7 @@ export default function TaskCalendarView({
             <div className="flex items-center justify-between pb-2 border-b border-line-neutral-100">
               <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700 flex items-center gap-1.5">
                 <CalendarIcon className="w-3.5 h-3.5 text-accent" />
-                <span>Local Calendar Events ({workbenchEvents.length})</span>
+                <span>Events ({workbenchEvents.length})</span>
               </span>
               <Button
                 variant="ghost"
@@ -1764,14 +1483,14 @@ export default function TaskCalendarView({
                 className="text-xs"
               >
                 <Plus className="w-3 h-3" />
-                <span>Full Event Modal</span>
+                <span>New Event</span>
               </Button>
             </div>
 
             {workbenchEvents.length === 0 ? (
               <div className="py-8 text-center text-xs text-content-neutral-400 space-y-1.5">
                 <p>No calendar events scheduled for this view.</p>
-                <p>Use the Quick Event bar above or click &ldquo;Full Event Modal&rdquo; to schedule one.</p>
+                <p>Use the Quick Event bar above or click &ldquo;New Event&rdquo; to schedule one.</p>
               </div>
             ) : (
               <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
@@ -1816,7 +1535,7 @@ export default function TaskCalendarView({
                         )}
                       </div>
 
-                      {/* Direct Actions: Edit Event, Export .ics, Delete Event */}
+                      {/* Direct Actions: Edit Event, Delete Event */}
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
@@ -1826,18 +1545,13 @@ export default function TaskCalendarView({
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleExportSingleEventIcs(evt)}
-                          title="Export event to Local Calendar (.ics)"
-                          className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
                         {onDeleteEvent && (
                           <button
                             type="button"
-                            onClick={() => void onDeleteEvent(evt.id)}
+                            onClick={() => {
+                              triggerBriefCalendarSync();
+                              void onDeleteEvent(evt.id);
+                            }}
                             title="Delete calendar event"
                             className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors"
                           >

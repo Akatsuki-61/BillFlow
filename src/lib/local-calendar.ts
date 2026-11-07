@@ -1,5 +1,10 @@
-import type { CalendarEventItem, EventCategory, EventColor, NewCalendarEventInput } from "@/types/calendar";
-import type { TaskItem, TaskPriority, TaskCategory } from "@/types/tasks";
+import type {
+  CalendarEventItem,
+  EventCategory,
+  EventColor,
+  NewCalendarEventInput,
+} from "@/types/calendar";
+import type { TaskItem, TaskPriority, TaskCategory, TaskStatus } from "@/types/tasks";
 
 export interface ParsedLocalCalendarItem {
   uid: string;
@@ -16,7 +21,272 @@ export interface ParsedLocalCalendarItem {
   priority: TaskPriority;
   taskCategory: TaskCategory;
   location: string | null;
-  status?: "todo" | "in-progress" | "review" | "done";
+  status?: TaskStatus;
+}
+
+/**
+ * Internal Auto-Fixer: Normalizes any raw date input into a strict YYYY-MM-DD string.
+ * Never throws; falls back to fallbackDate or today's local date if malformed.
+ */
+export function normalizeAndAutoFixDate(
+  rawDate?: string | null,
+  fallbackDate?: string
+): string {
+  const defaultDate =
+    fallbackDate && /^\d{4}-\d{2}-\d{2}$/.test(fallbackDate)
+      ? fallbackDate
+      : new Date().toISOString().slice(0, 10);
+
+  if (!rawDate || !String(rawDate).trim()) {
+    return defaultDate;
+  }
+
+  const trimmed = String(rawDate).trim();
+
+  // Standard ISO YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const y = Number(isoMatch[1]);
+    const m = Math.min(12, Math.max(1, Number(isoMatch[2])));
+    const maxDay = new Date(y, m, 0).getDate();
+    const d = Math.min(maxDay, Math.max(1, Number(isoMatch[3])));
+    return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  // Slash or dot separated YYYY/MM/DD
+  const slashMatch = trimmed.match(/^(\d{4})[/.](\d{1,2})[/.](\d{1,2})/);
+  if (slashMatch) {
+    const y = Number(slashMatch[1]);
+    const m = Math.min(12, Math.max(1, Number(slashMatch[2])));
+    const maxDay = new Date(y, m, 0).getDate();
+    const d = Math.min(maxDay, Math.max(1, Number(slashMatch[3])));
+    return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  // Compact YYYYMMDD
+  const compactMatch = trimmed.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (compactMatch) {
+    const y = Number(compactMatch[1]);
+    const m = Math.min(12, Math.max(1, Number(compactMatch[2])));
+    const maxDay = new Date(y, m, 0).getDate();
+    const d = Math.min(maxDay, Math.max(1, Number(compactMatch[3])));
+    return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  // Native Date parse fallback (e.g., "Oct 15, 2026")
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, "0");
+    const d = String(parsed.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  return defaultDate;
+}
+
+/**
+ * Internal Auto-Fixer: Normalizes startTime and endTime to HH:mm and ensures endTime > startTime.
+ */
+export function normalizeAndAutoFixTimeRange(
+  startTime?: string | null,
+  endTime?: string | null,
+  isAllDay?: boolean
+): { startTime: string | null; endTime: string | null; isAllDay: boolean } {
+  if (isAllDay) {
+    return { startTime: null, endTime: null, isAllDay: true };
+  }
+
+  const parseTime = (raw?: string | null): { h: number; m: number } | null => {
+    if (!raw || !String(raw).trim()) return null;
+    const match = String(raw)
+      .trim()
+      .match(/^(\d{1,2}):(\d{1,2})/);
+    if (!match) return null;
+    const h = Math.min(23, Math.max(0, Number(match[1])));
+    const m = Math.min(59, Math.max(0, Number(match[2])));
+    return { h, m };
+  };
+
+  const fmt = (t: { h: number; m: number }) =>
+    `${String(t.h).padStart(2, "0")}:${String(t.m).padStart(2, "0")}`;
+
+  const start = parseTime(startTime);
+  if (!start) {
+    return { startTime: null, endTime: null, isAllDay: Boolean(isAllDay) };
+  }
+
+  const end = parseTime(endTime);
+  const startMinutes = start.h * 60 + start.m;
+  if (!end || end.h * 60 + end.m <= startMinutes) {
+    // Auto-fix: set end time to +60 minutes (clamped to 23:59)
+    const targetMinutes = Math.min(23 * 60 + 59, startMinutes + 60);
+    const endH = Math.floor(targetMinutes / 60);
+    const endM = targetMinutes % 60;
+    return {
+      startTime: fmt(start),
+      endTime: fmt({ h: endH, m: endM }),
+      isAllDay: false,
+    };
+  }
+
+  return {
+    startTime: fmt(start),
+    endTime: fmt(end),
+    isAllDay: false,
+  };
+}
+
+/**
+ * Internal Auto-Fixer & Linker: Silently heals date formats, time ranges, and Task <-> Event <-> Client links
+ * in memory so the Calendar UI never encounters broken references or malformed dates.
+ */
+export function autoFixAndLinkCalendarData(params: {
+  tasks: TaskItem[];
+  events: CalendarEventItem[];
+  clients?: { id: string; name: string }[];
+}): {
+  tasks: TaskItem[];
+  events: CalendarEventItem[];
+  repairedCount: number;
+} {
+  let repairedCount = 0;
+  const clientMap = new Map<string, string>();
+  const clientNameToId = new Map<string, string>();
+  for (const c of params.clients || []) {
+    clientMap.set(c.id, c.name);
+    clientNameToId.set(c.name.toLowerCase().trim(), c.id);
+  }
+
+  const fixedTasks: TaskItem[] = params.tasks.map((t) => {
+    let changed = false;
+    let fixedDueDate = t.dueDate || "";
+    if (fixedDueDate) {
+      const normalized = normalizeAndAutoFixDate(fixedDueDate);
+      if (normalized !== fixedDueDate) {
+        fixedDueDate = normalized;
+        changed = true;
+      }
+    }
+
+    let fixedClientName = t.clientName;
+    let fixedClientId = t.clientId;
+    if (fixedClientId && !fixedClientName && clientMap.has(fixedClientId)) {
+      fixedClientName = clientMap.get(fixedClientId);
+      changed = true;
+    } else if (!fixedClientId && fixedClientName) {
+      const matchedId = clientNameToId.get(fixedClientName.toLowerCase().trim());
+      if (matchedId) {
+        fixedClientId = matchedId;
+        changed = true;
+      }
+    }
+
+    if (changed) repairedCount++;
+    return changed
+      ? {
+          ...t,
+          dueDate: fixedDueDate,
+          clientId: fixedClientId,
+          clientName: fixedClientName,
+        }
+      : t;
+  });
+
+  const taskMap = new Map<string, TaskItem>();
+  const taskTitleToTask = new Map<string, TaskItem>();
+  for (const t of fixedTasks) {
+    taskMap.set(t.id, t);
+    taskTitleToTask.set(t.title.toLowerCase().trim(), t);
+  }
+
+  const fixedEvents: CalendarEventItem[] = params.events.map((evt) => {
+    let changed = false;
+    const fixedStart = normalizeAndAutoFixDate(evt.startDate);
+    if (fixedStart !== evt.startDate) changed = true;
+
+    let fixedEnd = evt.endDate ? normalizeAndAutoFixDate(evt.endDate, fixedStart) : null;
+    if (fixedEnd && fixedEnd < fixedStart) {
+      fixedEnd = fixedStart;
+      changed = true;
+    }
+
+    const fixedTimes = normalizeAndAutoFixTimeRange(
+      evt.startTime,
+      evt.endTime,
+      evt.isAllDay
+    );
+    if (
+      fixedTimes.startTime !== (evt.startTime || null) ||
+      fixedTimes.endTime !== (evt.endTime || null)
+    ) {
+      changed = true;
+    }
+
+    let fixedTaskId = evt.taskId || null;
+    let fixedTaskTitle = evt.taskTitle || null;
+    let fixedClientId = evt.clientId || null;
+    let fixedClientName = evt.clientName || null;
+
+    if (fixedTaskId && taskMap.has(fixedTaskId)) {
+      const linkedTask = taskMap.get(fixedTaskId)!;
+      if (fixedTaskTitle !== linkedTask.title) {
+        fixedTaskTitle = linkedTask.title;
+        changed = true;
+      }
+      if (!fixedClientId && linkedTask.clientId) {
+        fixedClientId = linkedTask.clientId;
+        fixedClientName = linkedTask.clientName || clientMap.get(linkedTask.clientId) || null;
+        changed = true;
+      }
+    } else if (!fixedTaskId && fixedTaskTitle) {
+      const matchedTask = taskTitleToTask.get(fixedTaskTitle.toLowerCase().trim());
+      if (matchedTask) {
+        fixedTaskId = matchedTask.id;
+        fixedTaskTitle = matchedTask.title;
+        changed = true;
+      }
+    } else if (!fixedTaskId) {
+      // Auto-link if event title matches a task title
+      const matchedByTitle = taskTitleToTask.get(evt.title.toLowerCase().trim());
+      if (matchedByTitle) {
+        fixedTaskId = matchedByTitle.id;
+        fixedTaskTitle = matchedByTitle.title;
+        if (!fixedClientId && matchedByTitle.clientId) {
+          fixedClientId = matchedByTitle.clientId;
+          fixedClientName = matchedByTitle.clientName || null;
+        }
+        changed = true;
+      }
+    }
+
+    if (fixedClientId && !fixedClientName && clientMap.has(fixedClientId)) {
+      fixedClientName = clientMap.get(fixedClientId)!;
+      changed = true;
+    }
+
+    if (changed) repairedCount++;
+    return changed
+      ? {
+          ...evt,
+          startDate: fixedStart,
+          endDate: fixedEnd,
+          startTime: fixedTimes.startTime,
+          endTime: fixedTimes.endTime,
+          isAllDay: fixedTimes.isAllDay,
+          taskId: fixedTaskId,
+          taskTitle: fixedTaskTitle,
+          clientId: fixedClientId,
+          clientName: fixedClientName,
+        }
+      : evt;
+  });
+
+  return {
+    tasks: fixedTasks,
+    events: fixedEvents,
+    repairedCount,
+  };
 }
 
 function escapeIcsText(value: string | null | undefined): string {
@@ -38,12 +308,15 @@ function unescapeIcsText(value: string | null | undefined): string {
 }
 
 function formatIcsDateOnly(dateStr: string): string {
-  const clean = dateStr.split("T")[0].replace(/-/g, "");
-  return clean.length === 8 ? clean : new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const clean = normalizeAndAutoFixDate(dateStr).replace(/-/g, "");
+  return clean.length === 8
+    ? clean
+    : new Date().toISOString().slice(0, 10).replace(/-/g, "");
 }
 
 function addOneDayDateOnly(dateStr: string): string {
-  const parts = dateStr.split("T")[0].split("-").map(Number);
+  const normalized = normalizeAndAutoFixDate(dateStr);
+  const parts = normalized.split("-").map(Number);
   if (parts.length !== 3 || parts.some(isNaN)) {
     return formatIcsDateOnly(dateStr);
   }
@@ -67,9 +340,6 @@ function formatUtcStamp(isoStr?: string): string {
   return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
-/**
- * Generates an RFC 5545 VEVENT block for a BillFlow CalendarEventItem
- */
 export function buildVEventFromCalendarEvent(event: CalendarEventItem): string {
   const lines: string[] = [
     "BEGIN:VEVENT",
@@ -111,16 +381,12 @@ export function buildVEventFromCalendarEvent(event: CalendarEventItem): string {
   return lines.join("\r\n");
 }
 
-/**
- * Generates both a VEVENT (for local calendar day grid visibility) and a VTODO (for local calendar reminders/tasks)
- * from a BillFlow TaskItem.
- */
 export function buildIcsBlocksFromTask(
   task: TaskItem,
   options?: { includeTodo?: boolean }
 ): string {
   if (!task.dueDate) return "";
-  const dueDateClean = task.dueDate.split("T")[0];
+  const dueDateClean = normalizeAndAutoFixDate(task.dueDate);
   const dtStamp = formatUtcStamp(task.updatedAt || task.createdAt);
   const statusPrefix = task.status === "done" ? "[DONE] " : "[TASK] ";
 
@@ -182,10 +448,6 @@ export function buildIcsBlocksFromTask(
   return `${veventLines.join("\r\n")}\r\n${vtodoLines.join("\r\n")}`;
 }
 
-/**
- * Generates a complete RFC 5545 iCalendar (.ics) file string containing BillFlow events and tasks
- * so the user can open/import/subscribe to it in Apple Calendar, Outlook, or Google Calendar.
- */
 export function generateIcsFromEventsAndTasks(options: {
   events?: CalendarEventItem[];
   tasks?: TaskItem[];
@@ -222,15 +484,10 @@ function parseIcsDateTimeValue(rawVal: string): {
   isAllDay: boolean;
 } {
   const clean = rawVal.trim();
-  // Match YYYYMMDD or YYYYMMDDTHHMMSS(Z)
   const match = clean.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/);
   if (!match) {
-    const fallback = clean.split("T")[0];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(fallback)) {
-      return { dateStr: fallback, timeStr: null, isAllDay: true };
-    }
     return {
-      dateStr: new Date().toISOString().slice(0, 10),
+      dateStr: normalizeAndAutoFixDate(clean),
       timeStr: null,
       isAllDay: true,
     };
@@ -316,14 +573,9 @@ function inferTaskCategory(rawCategories: string, title: string): TaskCategory {
   return "Development";
 }
 
-/**
- * Parses an RFC 5545 .ics calendar file from the user's local calendar (Apple Calendar, Outlook, Google Calendar)
- * into structured items that can be imported as Tasks or Calendar Events in BillFlow.
- */
 export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] {
   if (!icsContent || !icsContent.trim()) return [];
 
-  // Unfold RFC 5545 folded lines (CRLF + space/tab)
   const unfolded = icsContent.replace(/\r?\n[ \t]/g, "");
   const lines = unfolded.split(/\r?\n/);
 
@@ -355,7 +607,6 @@ export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] 
         const uid =
           props["UID"] || `local-ics-${items.length + 1}-${Date.now()}`;
 
-        // Avoid importing duplicate VEVENT if a matching VTODO from BillFlow is also in the same file
         const isTaskTaggedEvent =
           currentBlock === "VEVENT" &&
           (uid.startsWith("billflow-task-") ||
@@ -383,7 +634,7 @@ export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] 
         const taskCategory = inferTaskCategory(categories, cleanTitle);
 
         const rawStatus = (props["STATUS"] || "").toUpperCase();
-        const status: "todo" | "in-progress" | "review" | "done" =
+        const status: TaskStatus =
           rawStatus === "COMPLETED" || rawSummary.startsWith("[DONE]")
             ? "done"
             : rawStatus === "IN-PROCESS"
@@ -424,7 +675,6 @@ export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] 
     }
   }
 
-  // Deduplicate if both billflow-task-<id> and billflow-todo-<id> were in the same exported .ics file
   const seenTaskIds = new Set<string>();
   return items.filter((item) => {
     const match = item.uid.match(/^billflow-(?:task|todo)-(.+)@billflow\.local$/);
@@ -437,9 +687,6 @@ export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] 
   });
 }
 
-/**
- * Triggers download/open of an .ics calendar file so the OS opens it in the user's Local Calendar app.
- */
 export function downloadIcsFile(filename: string, icsContent: string): void {
   if (typeof window === "undefined") return;
   const normalized = filename.toLowerCase().endsWith(".ics")
@@ -459,9 +706,6 @@ export function downloadIcsFile(filename: string, icsContent: string): void {
   URL.revokeObjectURL(url);
 }
 
-/**
- * Converts a ParsedLocalCalendarItem into a NewCalendarEventInput payload
- */
 export function toNewCalendarEventInput(
   item: ParsedLocalCalendarItem
 ): NewCalendarEventInput {

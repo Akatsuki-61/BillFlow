@@ -1,11 +1,15 @@
 import { ipcMain } from "electron";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { getDb } from "../db";
 import { calendarEvents, clients, tasks } from "../db/schema";
 import { newCalendarEventSchema, calendarEventPatchSchema } from "../validation";
 import { recordId } from "../workflow-validation";
 import { AppError } from "./errors";
+import {
+  normalizeAndAutoFixDate,
+  normalizeAndAutoFixTimeRange,
+} from "../../src/lib/local-calendar";
 import type {
   CalendarEventItem,
   NewCalendarEventInput,
@@ -13,6 +17,78 @@ import type {
   EventCategory,
   EventColor,
 } from "../../src/types/calendar";
+
+/**
+ * Internal silent auto-healer for calendar event inputs & links.
+ * Repairs date/time formats and resolves Task <-> Client foreign keys before DB write.
+ */
+function autoHealCalendarInput(raw: NewCalendarEventInput): NewCalendarEventInput {
+  const db = getDb();
+  const fixedStart = normalizeAndAutoFixDate(raw.startDate);
+  let fixedEnd = raw.endDate
+    ? normalizeAndAutoFixDate(raw.endDate, fixedStart)
+    : null;
+  if (fixedEnd && fixedEnd < fixedStart) {
+    fixedEnd = fixedStart;
+  }
+
+  const fixedTimes = normalizeAndAutoFixTimeRange(
+    raw.startTime,
+    raw.endTime,
+    raw.isAllDay
+  );
+
+  let validTaskId: string | null = raw.taskId || null;
+  let resolvedTaskTitle: string | null = raw.taskTitle || null;
+  let validClientId: string | null = raw.clientId || null;
+  let resolvedClientName: string | null = raw.clientName || null;
+
+  if (validTaskId) {
+    const taskRow = db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.id, validTaskId), isNull(tasks.deletedAt)))
+      .get();
+    if (taskRow) {
+      resolvedTaskTitle = taskRow.title;
+      if (!validClientId && taskRow.clientId) {
+        validClientId = taskRow.clientId;
+        resolvedClientName = taskRow.clientName || resolvedClientName;
+      }
+    } else {
+      // Auto-fix stale/missing taskId without failing
+      validTaskId = null;
+    }
+  }
+
+  if (validClientId) {
+    const clientRow = db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, validClientId))
+      .get();
+    if (clientRow) {
+      resolvedClientName = clientRow.name;
+    } else {
+      // Auto-fix stale/missing clientId without failing FK constraint
+      validClientId = null;
+    }
+  }
+
+  return {
+    ...raw,
+    title: (raw.title || "Scheduled Event").trim(),
+    startDate: fixedStart,
+    endDate: fixedEnd,
+    startTime: fixedTimes.startTime,
+    endTime: fixedTimes.endTime,
+    isAllDay: fixedTimes.isAllDay,
+    taskId: validTaskId,
+    taskTitle: resolvedTaskTitle,
+    clientId: validClientId,
+    clientName: resolvedClientName,
+  };
+}
 
 export function listCalendarEvents(filter?: {
   startDate?: string;
@@ -47,8 +123,8 @@ export function listCalendarEvents(filter?: {
       id: evt.id,
       title: evt.title,
       description: evt.description,
-      startDate: evt.startDate,
-      endDate: evt.endDate || null,
+      startDate: normalizeAndAutoFixDate(evt.startDate),
+      endDate: evt.endDate ? normalizeAndAutoFixDate(evt.endDate, evt.startDate) : null,
       startTime: evt.startTime || null,
       endTime: evt.endTime || null,
       isAllDay: Boolean(evt.isAllDay),
@@ -76,8 +152,8 @@ export function getCalendarEvent(idInput: string): CalendarEventItem {
     id: evt.id,
     title: evt.title,
     description: evt.description,
-    startDate: evt.startDate,
-    endDate: evt.endDate || null,
+    startDate: normalizeAndAutoFixDate(evt.startDate),
+    endDate: evt.endDate ? normalizeAndAutoFixDate(evt.endDate, evt.startDate) : null,
     startTime: evt.startTime || null,
     endTime: evt.endTime || null,
     isAllDay: Boolean(evt.isAllDay),
@@ -97,22 +173,11 @@ export function createCalendarEvent(
   input: NewCalendarEventInput,
   broadcast?: () => void
 ): CalendarEventItem {
-  const parsed = newCalendarEventSchema.parse(input);
+  const healed = autoHealCalendarInput(input);
+  const parsed = newCalendarEventSchema.parse(healed);
   const db = getDb();
   const id = parsed.id || `evt-${randomUUID()}`;
   const now = new Date().toISOString();
-
-  let resolvedClientName = parsed.clientName || null;
-  if (parsed.clientId && !resolvedClientName) {
-    const client = db.select().from(clients).where(eq(clients.id, parsed.clientId)).get();
-    if (client) resolvedClientName = client.name;
-  }
-
-  let resolvedTaskTitle = parsed.taskTitle || null;
-  if (parsed.taskId && !resolvedTaskTitle) {
-    const task = db.select().from(tasks).where(eq(tasks.id, parsed.taskId)).get();
-    if (task) resolvedTaskTitle = task.title;
-  }
 
   db.insert(calendarEvents)
     .values({
@@ -127,9 +192,9 @@ export function createCalendarEvent(
       category: parsed.category || "general",
       color: parsed.color || "blue",
       clientId: parsed.clientId || null,
-      clientName: resolvedClientName,
+      clientName: parsed.clientName || null,
       taskId: parsed.taskId || null,
-      taskTitle: resolvedTaskTitle,
+      taskTitle: parsed.taskTitle || null,
       location: parsed.location || null,
       createdAt: now,
       updatedAt: now,
@@ -146,39 +211,82 @@ export function updateCalendarEvent(
   broadcast?: () => void
 ): CalendarEventItem {
   const id = recordId.parse(idInput);
-  const parsed = calendarEventPatchSchema.parse(input);
   const db = getDb();
   const existing = db.select().from(calendarEvents).where(eq(calendarEvents.id, id)).get();
   if (!existing) {
     throw new AppError("NOT_FOUND", "Calendar event not found.");
   }
 
+  const parsed = calendarEventPatchSchema.parse(input);
   const now = new Date().toISOString();
-  let resolvedClientName = parsed.clientName !== undefined ? parsed.clientName : existing.clientName;
-  if (parsed.clientId && parsed.clientId !== existing.clientId && !parsed.clientName) {
-    const client = db.select().from(clients).where(eq(clients.id, parsed.clientId)).get();
-    resolvedClientName = client ? client.name : null;
+
+  const mergedStartDate =
+    parsed.startDate !== undefined
+      ? normalizeAndAutoFixDate(parsed.startDate, existing.startDate)
+      : existing.startDate;
+  let mergedEndDate =
+    parsed.endDate !== undefined
+      ? parsed.endDate
+        ? normalizeAndAutoFixDate(parsed.endDate, mergedStartDate)
+        : null
+      : existing.endDate;
+  if (mergedEndDate && mergedEndDate < mergedStartDate) {
+    mergedEndDate = mergedStartDate;
   }
 
-  let resolvedTaskTitle = parsed.taskTitle !== undefined ? parsed.taskTitle : existing.taskTitle;
-  if (parsed.taskId && parsed.taskId !== existing.taskId && !parsed.taskTitle) {
-    const task = db.select().from(tasks).where(eq(tasks.id, parsed.taskId)).get();
-    resolvedTaskTitle = task ? task.title : null;
+  const mergedIsAllDay =
+    parsed.isAllDay !== undefined ? Boolean(parsed.isAllDay) : Boolean(existing.isAllDay);
+  const fixedTimes = normalizeAndAutoFixTimeRange(
+    parsed.startTime !== undefined ? parsed.startTime : existing.startTime,
+    parsed.endTime !== undefined ? parsed.endTime : existing.endTime,
+    mergedIsAllDay
+  );
+
+  let validClientId =
+    parsed.clientId !== undefined ? parsed.clientId : existing.clientId;
+  let resolvedClientName =
+    parsed.clientName !== undefined ? parsed.clientName : existing.clientName;
+  if (validClientId) {
+    const client = db.select().from(clients).where(eq(clients.id, validClientId)).get();
+    if (client) {
+      resolvedClientName = client.name;
+    } else {
+      validClientId = null;
+    }
+  }
+
+  let validTaskId =
+    parsed.taskId !== undefined ? parsed.taskId : existing.taskId;
+  let resolvedTaskTitle =
+    parsed.taskTitle !== undefined ? parsed.taskTitle : existing.taskTitle;
+  if (validTaskId) {
+    const task = db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.id, validTaskId), isNull(tasks.deletedAt)))
+      .get();
+    if (task) {
+      resolvedTaskTitle = task.title;
+    } else {
+      validTaskId = null;
+    }
   }
 
   db.update(calendarEvents)
     .set({
       ...(parsed.title !== undefined ? { title: parsed.title } : {}),
       ...(parsed.description !== undefined ? { description: parsed.description } : {}),
-      ...(parsed.startDate !== undefined ? { startDate: parsed.startDate } : {}),
-      ...(parsed.endDate !== undefined ? { endDate: parsed.endDate } : {}),
-      ...(parsed.startTime !== undefined ? { startTime: parsed.startTime } : {}),
-      ...(parsed.endTime !== undefined ? { endTime: parsed.endTime } : {}),
-      ...(parsed.isAllDay !== undefined ? { isAllDay: Boolean(parsed.isAllDay) } : {}),
+      startDate: mergedStartDate,
+      endDate: mergedEndDate,
+      startTime: fixedTimes.startTime,
+      endTime: fixedTimes.endTime,
+      isAllDay: fixedTimes.isAllDay,
       ...(parsed.category !== undefined ? { category: parsed.category } : {}),
       ...(parsed.color !== undefined ? { color: parsed.color } : {}),
-      ...(parsed.clientId !== undefined ? { clientId: parsed.clientId, clientName: resolvedClientName } : {}),
-      ...(parsed.taskId !== undefined ? { taskId: parsed.taskId, taskTitle: resolvedTaskTitle } : {}),
+      clientId: validClientId || null,
+      clientName: resolvedClientName || null,
+      taskId: validTaskId || null,
+      taskTitle: resolvedTaskTitle || null,
       ...(parsed.location !== undefined ? { location: parsed.location } : {}),
       updatedAt: now,
     })

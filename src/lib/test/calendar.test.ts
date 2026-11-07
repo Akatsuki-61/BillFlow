@@ -5,6 +5,9 @@ import {
   generateIcsFromEventsAndTasks,
   parseIcsCalendar,
   toNewCalendarEventInput,
+  autoFixAndLinkCalendarData,
+  normalizeAndAutoFixDate,
+  normalizeAndAutoFixTimeRange,
 } from "../local-calendar";
 
 describe("Calendar Date & Item Mapping", () => {
@@ -184,5 +187,70 @@ describe("Calendar Date & Item Mapping", () => {
     expect(parsedTask.title).toBe("Business Website Development");
     expect(parsedTask.startDate).toBe("2026-11-15");
     expect(parsedTask.priority).toBe("urgent");
+  });
+
+  it("silently auto-fixes malformed dates, inverted time ranges, and broken task/client links", () => {
+    expect(normalizeAndAutoFixDate("2026/11/5")).toBe("2026-11-05");
+    expect(normalizeAndAutoFixDate("20261109")).toBe("2026-11-09");
+
+    const fixedTimes = normalizeAndAutoFixTimeRange("14:30", "13:00", false);
+    expect(fixedTimes.startTime).toBe("14:30");
+    expect(fixedTimes.endTime).toBe("15:30"); // Auto-healed +60m
+
+    const rawTasks: TaskItem[] = [
+      {
+        id: "t-auto-1",
+        title: "AI Automation Deliverable",
+        description: "",
+        status: "todo",
+        priority: "high",
+        category: "Development",
+        assignee: {
+          name: "Chethaka",
+          avatarLetter: "C",
+          bgColor: "bg-surface-purple-100",
+          textColor: "text-content-purple-700",
+        },
+        dueDate: "2026/11/20",
+        clientId: "c-1",
+        subtasks: [],
+        createdAt: "2026-11-01",
+      },
+    ];
+
+    const rawEvents: CalendarEventItem[] = [
+      {
+        id: "e-auto-1",
+        title: "AI Automation Deliverable",
+        description: "",
+        startDate: "2026/11/20",
+        endDate: "2026-11-10", // Inverted end date (< startDate)
+        startTime: "9:5",
+        endTime: "8:00", // Inverted end time
+        isAllDay: false,
+        category: "review",
+        color: "purple",
+        createdAt: "2026-11-01",
+        updatedAt: "2026-11-01",
+      },
+    ];
+
+    const healed = autoFixAndLinkCalendarData({
+      tasks: rawTasks,
+      events: rawEvents,
+      clients: [{ id: "c-1", name: "Lanka Tech Corp" }],
+    });
+
+    expect(healed.repairedCount).toBeGreaterThan(0);
+    expect(healed.tasks[0].dueDate).toBe("2026-11-20");
+    expect(healed.tasks[0].clientName).toBe("Lanka Tech Corp");
+
+    expect(healed.events[0].startDate).toBe("2026-11-20");
+    expect(healed.events[0].endDate).toBe("2026-11-20");
+    expect(healed.events[0].startTime).toBe("09:05");
+    expect(healed.events[0].endTime).toBe("10:05");
+    expect(healed.events[0].taskId).toBe("t-auto-1");
+    expect(healed.events[0].clientId).toBe("c-1");
+    expect(healed.events[0].clientName).toBe("Lanka Tech Corp");
   });
 });

@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video, Download } from "lucide-react";
+import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
 import { MotionSurface } from "@/components/ui/MotionSurface";
 import { useData } from "@/lib/data/DataProvider";
-import { generateIcsFromEventsAndTasks, downloadIcsFile } from "@/lib/local-calendar";
+import {
+  normalizeAndAutoFixDate,
+  normalizeAndAutoFixTimeRange,
+} from "@/lib/local-calendar";
 import type {
   CalendarEventItem,
   NewCalendarEventInput,
@@ -51,7 +54,9 @@ function EventForm({
 
   const [title, setTitle] = useState(eventToEdit?.title || "");
   const [description, setDescription] = useState(eventToEdit?.description || "");
-  const [startDate, setStartDate] = useState(() => eventToEdit?.startDate || initialDate || new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(() =>
+    normalizeAndAutoFixDate(eventToEdit?.startDate || initialDate)
+  );
   const [endDate, setEndDate] = useState(eventToEdit?.endDate || "");
   const [startTime, setStartTime] = useState(eventToEdit ? eventToEdit.startTime || "" : "10:00");
   const [endTime, setEndTime] = useState(eventToEdit ? eventToEdit.endTime || "" : "11:00");
@@ -61,7 +66,6 @@ function EventForm({
   const [clientId, setClientId] = useState(eventToEdit?.clientId || "");
   const [taskId, setTaskId] = useState(eventToEdit?.taskId || initialTaskId || "");
   const [location, setLocation] = useState(eventToEdit?.location || "");
-  const [exportToLocalIcs, setExportToLocalIcs] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,53 +75,47 @@ function EventForm({
       setError("Please provide an event title");
       return;
     }
-    if (!startDate) {
-      setError("Please select a date");
-      return;
-    }
 
     setSaving(true);
     setError(null);
 
     try {
-      const selectedClient = clients.find((c) => c.id === clientId);
+      // Internal silent auto-fixing of dates, time ranges, and Task <-> Client links
+      const fixedStart = normalizeAndAutoFixDate(startDate);
+      let fixedEnd = endDate ? normalizeAndAutoFixDate(endDate, fixedStart) : null;
+      if (fixedEnd && fixedEnd < fixedStart) {
+        fixedEnd = fixedStart;
+      }
+      const fixedTimes = normalizeAndAutoFixTimeRange(startTime, endTime, isAllDay);
+
       const selectedTask = tasks.find((t) => t.id === taskId);
+      const resolvedClientId = clientId || selectedTask?.clientId || "";
+      const selectedClient = clients.find((c) => c.id === resolvedClientId);
 
       const input: NewCalendarEventInput = {
         title: title.trim(),
         description: description.trim(),
-        startDate,
-        endDate: endDate || null,
-        startTime: isAllDay ? null : startTime || null,
-        endTime: isAllDay ? null : endTime || null,
-        isAllDay,
+        startDate: fixedStart,
+        endDate: fixedEnd,
+        startTime: fixedTimes.startTime,
+        endTime: fixedTimes.endTime,
+        isAllDay: fixedTimes.isAllDay,
         category,
         color,
-        clientId: clientId || null,
-        clientName: selectedClient?.name || null,
+        clientId: resolvedClientId || null,
+        clientName: selectedClient?.name || selectedTask?.clientName || null,
         taskId: taskId || null,
         taskTitle: selectedTask?.title || null,
         location: location.trim() || null,
       };
 
-      let savedEvent: CalendarEventItem;
       if (eventToEdit) {
-        savedEvent = await updateEvent(eventToEdit.id, input);
-        onSaved?.(`Updated event "${title}"`);
+        await updateEvent(eventToEdit.id, input);
+        onSaved?.(`Updated event "${title.trim()}"`);
       } else {
-        savedEvent = await createEvent(input);
-        onSaved?.(`Created event "${title}"`);
+        await createEvent(input);
+        onSaved?.(`Created event "${title.trim()}"`);
       }
-
-      if (exportToLocalIcs && savedEvent) {
-        const ics = generateIcsFromEventsAndTasks({
-          events: [savedEvent],
-          tasks: [],
-          calendarName: savedEvent.title,
-        });
-        downloadIcsFile(`event-${savedEvent.startDate}.ics`, ics);
-      }
-
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save event");
@@ -241,7 +239,7 @@ function EventForm({
           <div className="p-3.5 rounded-xl border border-line-neutral-200/80 bg-surface-neutral-50/40 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-content-neutral-800 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-accent" /> Date & Schedule
+                <Clock className="w-3.5 h-3.5 text-accent" /> Date &amp; Schedule
               </span>
               <label className="flex items-center gap-2 text-xs text-content-neutral-700 cursor-pointer select-none">
                 <input
@@ -396,18 +394,6 @@ function EventForm({
             />
           </div>
 
-          {/* Local Calendar Sync Option */}
-          <label className="flex items-center gap-2.5 p-3 rounded-xl border border-line-neutral-200/80 bg-surface-neutral-50/50 text-xs font-medium text-content-neutral-700 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={exportToLocalIcs}
-              onChange={(e) => setExportToLocalIcs(e.target.checked)}
-              className="rounded text-accent focus:ring-accent"
-            />
-            <Download className="w-3.5 h-3.5 text-accent shrink-0" />
-            <span>Also export (.ics) to my computer&apos;s Local Calendar app upon saving</span>
-          </label>
-
           {/* Footer Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-line-neutral-200/70">
             {eventToEdit ? (
@@ -429,7 +415,16 @@ function EventForm({
                 Cancel
               </Button>
               <Button type="submit" variant="primary" disabled={saving}>
-                {saving ? "Saving..." : eventToEdit ? "Update Event" : "Create Event"}
+                {saving ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Syncing...</span>
+                  </>
+                ) : eventToEdit ? (
+                  "Update Event"
+                ) : (
+                  "Create Event"
+                )}
               </Button>
             </div>
           </div>
