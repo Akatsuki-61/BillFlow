@@ -2613,6 +2613,104 @@ button:active:not(:disabled) i.fa-solid.fa-trash {
   transform: scale(0.86) rotate(-8deg);
 }
 
+/* FontAwesome Solid Plus & Circle Plus Icon (<i class="fa-solid fa-plus"></i> & <i class="fa-solid fa-circle-plus"></i>) vector mask + animations */
+@keyframes fa-plus-pop {
+  0% {
+    transform: scale(0.55) rotate(-60deg);
+    opacity: 0.2;
+  }
+  60% {
+    transform: scale(1.24) rotate(14deg);
+    opacity: 1;
+  }
+  82% {
+    transform: scale(0.94) rotate(-5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes fa-plus-spin {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.22) rotate(90deg);
+  }
+  80% {
+    transform: scale(1.08) rotate(90deg);
+  }
+  100% {
+    transform: scale(1.04) rotate(90deg);
+  }
+}
+
+i.fa-solid.fa-plus {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  vertical-align: -0.125em;
+  font-style: normal;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex-shrink: 0;
+  transform-origin: center center;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
+  will-change: transform;
+}
+
+i.fa-solid.fa-circle-plus {
+  display: inline-block;
+  width: 0.95rem;
+  height: 0.95rem;
+  vertical-align: -0.125em;
+  font-style: normal;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 344V280H168c-13.3 0-24-10.7-24-24s10.7-24 24-24h64V168c0-13.3 10.7-24 24-24s24 10.7 24 24v64h64c13.3 0 24 10.7 24 24s-10.7 24-24 24H280v64c0 13.3-10.7 24-24 24s-24-10.7-24-24z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 344V280H168c-13.3 0-24-10.7-24-24s10.7-24 24-24h64V168c0-13.3 10.7-24 24-24s24 10.7 24 24v64h64c13.3 0 24 10.7 24 24s-10.7 24-24 24H280v64c0 13.3-10.7 24-24 24s-24-10.7-24-24z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex-shrink: 0;
+  transform-origin: center center;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
+  will-change: transform;
+}
+
+button:hover:not(:disabled) i.fa-solid.fa-plus,
+button:focus-visible:not(:disabled) i.fa-solid.fa-plus,
+i.fa-solid.fa-plus:hover {
+  animation: fa-plus-spin 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+button:hover:not(:disabled) i.fa-solid.fa-circle-plus,
+button:focus-visible:not(:disabled) i.fa-solid.fa-circle-plus,
+i.fa-solid.fa-circle-plus:hover {
+  animation: fa-plus-pop 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+button:active:not(:disabled) i.fa-solid.fa-plus,
+button:active:not(:disabled) i.fa-solid.fa-circle-plus {
+  animation: none;
+  transform: scale(0.85);
+}
+
 /* Bottom-Right Toast Popup Message Animation + Animated <i class="fa-solid fa-trash"></i> Badge */
 @keyframes bf-toast-pop-in {
   0% {
@@ -2650,6 +2748,13 @@ button:active:not(:disabled) i.fa-solid.fa-trash {
   width: 0.9rem;
   height: 0.9rem;
   animation: fa-trash-shake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) 0.08s both;
+}
+
+.bf-toast-add-badge i.fa-solid.fa-plus,
+.bf-toast-add-badge i.fa-solid.fa-circle-plus {
+  width: 0.95rem;
+  height: 0.95rem;
+  animation: fa-plus-pop 0.58s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
 }
 
 .bf-toast-progress-bar {
@@ -2713,8 +2818,16 @@ button:active:not(:disabled) i.fa-solid.fa-trash {
   button:hover:not(:disabled) i.fa-solid.fa-trash,
   button:focus-visible:not(:disabled) i.fa-solid.fa-trash,
   i.fa-solid.fa-trash:hover,
+  button:hover:not(:disabled) i.fa-solid.fa-plus,
+  button:focus-visible:not(:disabled) i.fa-solid.fa-plus,
+  i.fa-solid.fa-plus:hover,
+  button:hover:not(:disabled) i.fa-solid.fa-circle-plus,
+  button:focus-visible:not(:disabled) i.fa-solid.fa-circle-plus,
+  i.fa-solid.fa-circle-plus:hover,
   .bf-toast-popup,
   .bf-toast-trash-badge i.fa-solid.fa-trash,
+  .bf-toast-add-badge i.fa-solid.fa-plus,
+  .bf-toast-add-badge i.fa-solid.fa-circle-plus,
   .bf-toast-progress-bar {
     animation: none;
     transform: none;

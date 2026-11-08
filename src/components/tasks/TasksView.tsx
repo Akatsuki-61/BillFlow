@@ -572,10 +572,11 @@ export default function TasksView({
     closeAddTaskModal(false);
 
     // Reset Form
+    const createdTitle = newTitle.trim();
     setNewTitle("");
     setNewDescription("");
     setNewIsOutsourced(false);
-    showToast(`Task created in ${newStatus.replace("-", " ")}`);
+    showToast(`Task "${createdTitle}" created in ${newStatus.replace("-", " ")}`);
   };
 
   // Toggle Subtask Completion in Detail Modal
@@ -630,6 +631,10 @@ export default function TasksView({
               <span className="bf-toast-trash-badge w-6 h-6 rounded-lg bg-rose-500/20 border border-rose-500/35 text-rose-400 flex items-center justify-center shrink-0">
                 <i className="fa-solid fa-trash" aria-hidden="true" />
               </span>
+            ) : /\b(created|added|scheduled)\b/i.test(toastMessage) ? (
+              <span className="bf-toast-add-badge w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/35 text-emerald-400 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-circle-plus" aria-hidden="true" />
+              </span>
             ) : (
               <div className="w-2.5 h-2.5 rounded-full bg-accent-solid animate-ping shrink-0" />
             )}
@@ -648,7 +653,9 @@ export default function TasksView({
               className={`bf-toast-progress-bar absolute bottom-0 left-0 right-0 h-[2.5px] ${
                 /\b(deleted|removed)\b/i.test(toastMessage)
                   ? "bg-rose-500/80"
-                  : "bg-accent"
+                  : /\b(created|added|scheduled)\b/i.test(toastMessage)
+                    ? "bg-emerald-500/85"
+                    : "bg-accent"
               }`}
             />
           </MotionSurface>
@@ -721,8 +728,8 @@ export default function TasksView({
           </Button>
 
           {/* Create Task Button */}
-          <Button variant="primary" onClick={() => openAddTaskModal("todo")}>
-            <Plus className="w-4 h-4 transition-transform duration-200 group-hover:scale-105 group-hover:rotate-6" />
+          <Button variant="primary" onClick={() => openAddTaskModal("todo")} className="flex items-center gap-1.5">
+            <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
             <span>New Task</span>
           </Button>
         </div>
@@ -957,9 +964,9 @@ export default function TasksView({
                       disabled={!isElectron || isLoading || saving}
                       title={`Add task to ${col.title}`}
                       aria-label={`Add task to ${col.title}`}
-                      className="zentra-circle-btn zentra-circle-btn--sm"
+                      className="zentra-circle-btn zentra-circle-btn--sm flex items-center justify-center text-content-neutral-600 hover:text-accent"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
                     </button>
                   </div>
 
@@ -987,9 +994,10 @@ export default function TasksView({
                         size="small"
                         disabled={!isElectron || isLoading || saving}
                         onClick={() => openAddTaskModal(col.id)}
+                        className="flex items-center gap-1.5"
                       >
-                        <Plus />
-                        Add a task
+                        <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                        <span>Add a task</span>
                       </Button>
                     </EmptyState>
                   ) : (
@@ -1872,10 +1880,13 @@ export default function TasksView({
                 >
                   Cancel
                 </Button>
-                <Button variant="primary" type="submit" disabled={saving}>
-                  {newRecordType === "task"
-                    ? "Create Deliverable"
-                    : "Schedule Event"}
+                <Button variant="primary" type="submit" disabled={saving} className="flex items-center gap-1.5">
+                  <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                  <span>
+                    {newRecordType === "task"
+                      ? "Create Deliverable"
+                      : "Schedule Event"}
+                  </span>
                 </Button>
               </div>
             </form>

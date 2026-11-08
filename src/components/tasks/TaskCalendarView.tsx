@@ -209,7 +209,7 @@ export default function TaskCalendarView({
       syncTimerRef.current = null;
       setIsSyncingCalendar(false);
       if (toastText) onNotifyRef.current?.(toastText);
-    }, 450);
+    }, 200);
   }, []);
 
   // Run brief internal sync once when Calendar first mounts
@@ -556,7 +556,6 @@ export default function TaskCalendarView({
       endTime: editingTaskEndTime || null,
     });
     setTimeSlotRevision((v) => v + 1);
-    triggerBriefCalendarSync();
     const ok = await onUpdateTask(taskId, {
       title: editingTaskTitle.trim(),
       dueDate: fixedDueDate,
@@ -1002,7 +1001,7 @@ export default function TaskCalendarView({
             }
             className="flex items-center gap-1.5"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
             <span>Add Task / Event</span>
           </Button>
         </div>
@@ -1181,7 +1180,6 @@ export default function TaskCalendarView({
                                 aria-label={`Delete task ${t.title}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  triggerBriefCalendarSync();
                                   void onDeleteTask(t.id);
                                 }}
                                 className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-content-neutral-400 hover:text-content-rose-600 transition-opacity shrink-0 cursor-pointer"
@@ -1304,7 +1302,6 @@ export default function TaskCalendarView({
                               variant="ghost"
                               size="small"
                               onClick={() => {
-                                triggerBriefCalendarSync();
                                 void onDeleteTask(task.id);
                               }}
                               className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
@@ -1518,13 +1515,14 @@ export default function TaskCalendarView({
             <button
               type="button"
               onClick={() => setQuickFormType("task")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 quickFormType === "task"
                   ? "bg-accent text-white"
                   : "text-content-neutral-600 hover:text-content-neutral-900"
               }`}
             >
-              + Quick Task
+              <i className="fa-solid fa-plus text-[10px]" aria-hidden="true" />
+              <span>Quick Task</span>
             </button>
             <button
               type="button"
@@ -1627,9 +1625,9 @@ export default function TaskCalendarView({
             variant="primary"
             size="small"
             disabled={!quickTitle.trim() || isSubmittingQuick}
-            className="shrink-0"
+            className="shrink-0 flex items-center gap-1.5"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
             <span>{quickFormType === "task" ? "Add Task" : "Add Event"}</span>
           </Button>
         </form>
@@ -1653,9 +1651,9 @@ export default function TaskCalendarView({
                       : todayStr
                   )
                 }
-                className="text-xs"
+                className="text-xs flex items-center gap-1.5"
               >
-                <Plus className="w-3 h-3" />
+                <i className="fa-solid fa-plus text-[11px]" aria-hidden="true" />
                 <span>New Task / Event</span>
               </Button>
             </div>
@@ -1820,7 +1818,6 @@ export default function TaskCalendarView({
                           <button
                             type="button"
                             onClick={() => {
-                              triggerBriefCalendarSync();
                               void onDeleteTask(task.id);
                             }}
                             title="Delete task"
