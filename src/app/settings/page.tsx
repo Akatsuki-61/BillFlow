@@ -12,6 +12,8 @@ import React, {
   Suspense,
 } from "react";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { motion } from "framer-motion";
+import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   User,
   Receipt,
@@ -473,32 +475,42 @@ function SettingsContent() {
                   icon: Database,
                 },
               ] as const
-            ).map(({ id, title, detail, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                aria-current={activeTab === id ? "page" : undefined}
-                onClick={() => {
-                  setActiveTab(id);
-                  document.querySelector("main.workspace-scroll")?.scrollTo({
-                    top: 0,
-                    behavior: window.matchMedia(
-                      "(prefers-reduced-motion: reduce)",
-                    ).matches
-                      ? "instant"
-                      : "smooth",
-                  });
-                }}
-              >
-                <span className="settings-nav-icon">
-                  <Icon size={19} />
-                </span>
-                <span>
-                  <strong>{title}</strong>
-                  <small>{detail}</small>
-                </span>
-              </button>
-            ))}
+            ).map(({ id, title, detail, icon: Icon }) => {
+              const isActive = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => {
+                    setActiveTab(id);
+                    document.querySelector("main.workspace-scroll")?.scrollTo({
+                      top: 0,
+                      behavior: window.matchMedia(
+                        "(prefers-reduced-motion: reduce)",
+                      ).matches
+                        ? "instant"
+                        : "smooth",
+                    });
+                  }}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="settings-nav-active-pill"
+                      transition={SPRING_NAV_GLIDE}
+                      className="settings-nav-active-pill"
+                    />
+                  )}
+                  <span className="settings-nav-icon relative z-10">
+                    <Icon size={19} />
+                  </span>
+                  <span className="relative z-10">
+                    <strong>{title}</strong>
+                    <small>{detail}</small>
+                  </span>
+                </button>
+              );
+            })}
           </nav>
           <div className="settings-local-note">
             <Database size={16} />

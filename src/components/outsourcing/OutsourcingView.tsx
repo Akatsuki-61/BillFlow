@@ -30,6 +30,8 @@ import {
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { motion } from "framer-motion";
+import { SPRING_NAV_GLIDE, SPRING_MENU_POPOVER } from "@/lib/motion";
 import {
   useClients,
   useInvoices,
@@ -986,30 +988,42 @@ export default function OutsourcingView() {
           <div className="space-y-1">
             {/* View Switcher Tabs */}
             <div className="inline-flex items-center gap-1 p-1 bg-surface-neutral-100 rounded-xl border border-line-neutral-200">
-              <button
-                type="button"
-                onClick={() => setActiveTab("work-orders")}
-                aria-pressed={activeTab === "work-orders"}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === "work-orders"
-                    ? "bg-surface text-content-neutral-900 shadow-xs"
-                    : "text-content-neutral-600 hover:text-content-neutral-900"
-                }`}
-              >
-                Payable Work Orders ({workOrders.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("vendors")}
-                aria-pressed={activeTab === "vendors"}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === "vendors"
-                    ? "bg-surface text-content-neutral-900 shadow-xs"
-                    : "text-content-neutral-600 hover:text-content-neutral-900"
-                }`}
-              >
-                Vendor Directory ({vendors.length})
-              </button>
+              {(
+                [
+                  {
+                    id: "work-orders",
+                    label: `Payable Work Orders (${workOrders.length})`,
+                  },
+                  {
+                    id: "vendors",
+                    label: `Vendor Directory (${vendors.length})`,
+                  },
+                ] as const
+              ).map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    aria-pressed={isActive}
+                    className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:scale-[0.96] ${
+                      isActive
+                        ? "text-content-neutral-900"
+                        : "text-content-neutral-600 hover:text-content-neutral-900"
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="outsourcing-main-tab-pill"
+                        transition={SPRING_NAV_GLIDE}
+                        className="absolute inset-0 rounded-lg bg-surface shadow-xs"
+                      />
+                    )}
+                    <span className="relative z-10">{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
             <p className="vendor-directory-subtitle">
               {activeTab === "work-orders"
@@ -1036,30 +1050,33 @@ export default function OutsourcingView() {
             </div>
 
             <div className="vendor-status-filter">
-              <button
-                type="button"
-                onClick={() => setStatusFilter("ALL")}
-                aria-pressed={statusFilter === "ALL"}
-                className={`vendor-filter-btn ${statusFilter === "ALL" ? "active" : ""}`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("PENDING")}
-                aria-pressed={statusFilter === "PENDING"}
-                className={`vendor-filter-btn ${statusFilter === "PENDING" ? "active" : ""}`}
-              >
-                Pending
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter("PAID")}
-                aria-pressed={statusFilter === "PAID"}
-                className={`vendor-filter-btn ${statusFilter === "PAID" ? "active" : ""}`}
-              >
-                Paid
-              </button>
+              {(
+                [
+                  { id: "ALL", label: "All" },
+                  { id: "PENDING", label: "Pending" },
+                  { id: "PAID", label: "Paid" },
+                ] as const
+              ).map((item) => {
+                const isActive = statusFilter === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setStatusFilter(item.id)}
+                    aria-pressed={isActive}
+                    className={`vendor-filter-btn relative active:scale-[0.955] ${isActive ? "active !bg-transparent !shadow-none" : ""}`}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="outsourcing-status-pill"
+                        transition={SPRING_NAV_GLIDE}
+                        className="absolute inset-0 rounded-lg bg-surface dark:bg-[#252530] shadow-xs border border-line-neutral-200/80 dark:border-[#353545]"
+                      />
+                    )}
+                    <span className="relative z-10">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1853,24 +1870,38 @@ export default function OutsourcingView() {
                       { id: "in-progress", label: "In Progress" },
                       { id: "review", label: "Under Review" },
                       { id: "done", label: "Completed" },
-                    ].map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() =>
-                          setReviewStatus(
-                            s.id as "todo" | "in-progress" | "review" | "done",
-                          )
-                        }
-                        className={`px-2 py-1.5 rounded-lg text-xs font-semibold border transition-all text-center ${
-                          reviewStatus === s.id
-                            ? "bg-accent text-white border-accent shadow-xs"
-                            : "bg-surface-neutral-50 border-line-neutral-200 text-content-neutral-700 hover:bg-surface-neutral-100"
-                        }`}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
+                    ].map((s) => {
+                      const isActive = reviewStatus === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() =>
+                            setReviewStatus(
+                              s.id as
+                                | "todo"
+                                | "in-progress"
+                                | "review"
+                                | "done",
+                            )
+                          }
+                          className={`relative px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors text-center active:scale-[0.955] ${
+                            isActive
+                              ? "text-white border-accent"
+                              : "bg-surface-neutral-50 border-line-neutral-200 text-content-neutral-700 hover:bg-surface-neutral-100"
+                          }`}
+                        >
+                          {isActive && (
+                            <motion.span
+                              layoutId="review-status-pill"
+                              transition={SPRING_NAV_GLIDE}
+                              className="absolute inset-0 rounded-lg bg-accent shadow-xs"
+                            />
+                          )}
+                          <span className="relative z-10">{s.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -2059,7 +2090,16 @@ export default function OutsourcingView() {
                       </option>
                     </select>
                   ) : (
-                    <div className="p-3.5 rounded-xl bg-surface-neutral-50 border border-line-neutral-200 space-y-3">
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        transition: SPRING_MENU_POPOVER,
+                      }}
+                      className="p-3.5 rounded-xl bg-surface-neutral-50 border border-line-neutral-200 space-y-3"
+                    >
                       <div>
                         <label className="block text-[11px] font-semibold text-content-neutral-700 mb-1">
                           Contractor / Agency Name{" "}
@@ -2152,7 +2192,7 @@ export default function OutsourcingView() {
                           />
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   )}
                   {woFormErrors.vendor && (
                     <p className="text-content-rose-600 text-[11px] mt-1 font-medium">

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { motion } from "framer-motion";
+import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   ChevronLeft,
   ChevronRight,
@@ -872,6 +874,39 @@ export default function TaskCalendarView({
 
         {/* Filters and View Switcher */}
         <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Scope Filter Tabs */}
+          <div className="inline-flex rounded-xl bg-surface-neutral-100 p-1 border border-line-neutral-200/70 text-xs font-semibold">
+            {(
+              [
+                { id: "all", label: "All Items" },
+                { id: "tasks", label: "Tasks Only" },
+                { id: "events", label: "Events Only" },
+              ] as const
+            ).map((tab) => {
+              const isActive = scopeFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setScopeFilter(tab.id)}
+                  className={`relative px-3 py-1.5 rounded-lg transition-colors active:scale-[0.96] ${
+                    isActive
+                      ? "text-content-neutral-900 font-bold"
+                      : "text-content-neutral-600 hover:text-content-neutral-900"
+                  }`}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="calendar-scope-pill"
+                      transition={SPRING_NAV_GLIDE}
+                      className="absolute inset-0 rounded-lg bg-surface shadow-xs"
+                    />
+                  )}
+                  <span className="relative z-10">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
           {/* Task Status Dropdown (visible when tasks included) */}
           {scopeFilter !== "events" && (
             <select
@@ -905,26 +940,36 @@ export default function TaskCalendarView({
 
           {/* View Mode Toggle: Grid vs Agenda */}
           <div className="flex items-center gap-1 bg-surface-neutral-100 rounded-xl p-1 border border-line-neutral-200/70">
-            <button
-              type="button"
-              title="Month Grid"
-              onClick={() => setViewType("grid")}
-              className={`p-1.5 rounded-lg transition-colors ${
-                viewType === "grid" ? "bg-surface text-accent shadow-xs" : "text-content-neutral-500 hover:text-content-neutral-800"
-              }`}
-            >
-              <Grid3X3 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              title="Schedule / Agenda"
-              onClick={() => setViewType("agenda")}
-              className={`p-1.5 rounded-lg transition-colors ${
-                viewType === "agenda" ? "bg-surface text-accent shadow-xs" : "text-content-neutral-500 hover:text-content-neutral-800"
-              }`}
-            >
-              <List className="w-4 h-4" />
-            </button>
+            {(
+              [
+                { id: "grid", title: "Month Grid", Icon: Grid3X3 },
+                { id: "agenda", title: "Schedule / Agenda", Icon: List },
+              ] as const
+            ).map(({ id, title, Icon }) => {
+              const isActive = viewType === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  title={title}
+                  onClick={() => setViewType(id)}
+                  className={`relative p-1.5 rounded-lg transition-colors active:scale-[0.94] ${
+                    isActive
+                      ? "text-accent"
+                      : "text-content-neutral-500 hover:text-content-neutral-800"
+                  }`}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="calendar-view-mode-pill"
+                      transition={SPRING_NAV_GLIDE}
+                      className="absolute inset-0 rounded-lg bg-surface shadow-xs"
+                    />
+                  )}
+                  <Icon className="relative z-10 w-4 h-4" />
+                </button>
+              );
+            })}
           </div>
 
           {/* One-Click Silent Calendar Sync Button */}

@@ -1,6 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  SPRING_MODAL_SHEET,
+  EXIT_MODAL_SHEET,
+  SPRING_NAV_GLIDE,
+  SPRING_LIQUID_BUTTON,
+  KEYFRAME_ERROR_SHAKE,
+} from "@/lib/motion";
 import {
   Plus,
   Lock,
@@ -105,6 +113,7 @@ export function ProfileGateModal() {
   );
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [shakeCount, setShakeCount] = useState(0);
 
   // Unlock view state
   const [unlockTarget, setUnlockTarget] = useState<UserProfile | null>(null);
@@ -282,8 +291,6 @@ export function ProfileGateModal() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isGateOpen, isLocked, busy, view, closeProfileGate]);
 
-  if (!isGateOpen) return null;
-
   const openUnlockForProfile = (profile: UserProfile) => {
     setUnlockTarget(profile);
     setUnlockMode(profile.lockType === "password" ? "alphanumeric" : "pin");
@@ -334,6 +341,7 @@ export function ProfileGateModal() {
       setErrorMsg(
         err instanceof Error ? err.message : "Incorrect passcode. Try again.",
       );
+      setShakeCount((c) => c + 1);
       if (unlockMode === "pin") {
         setUnlockPinDigits(["", "", "", ""]);
         setTimeout(() => unlockPinRefs.current[0]?.focus(), 40);
@@ -608,28 +616,34 @@ export function ProfileGateModal() {
     PROFILE_ACCENT_STYLES[ambientAccent] ?? PROFILE_ACCENT_STYLES.blue;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="BillFlow Profiles"
-      className="fixed inset-0 z-[120] flex flex-col overflow-y-auto select-none text-white"
-      style={{
-        backgroundColor: "rgba(8, 9, 13, 0.985)",
-        backdropFilter: "blur(64px) saturate(140%)",
-        WebkitBackdropFilter: "blur(64px) saturate(140%)",
-      }}
-    >
-      {/* Subtle Ambient Radial Glow that responds to active/hovered profile */}
-      <div
-        className="pointer-events-none fixed inset-0 transition-all duration-500"
-        style={{
-          background: `radial-gradient(650px circle at 50% 28%, ${ambientStyle.glow}, transparent 72%)`,
-          opacity: 0.45,
-        }}
-      />
+    <AnimatePresence initial={false}>
+      {isGateOpen && (
+        <motion.div
+          key="profile-gate-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="BillFlow Profiles"
+          initial={{ opacity: 0, scale: 1.015 }}
+          animate={{ opacity: 1, scale: 1, transition: SPRING_MODAL_SHEET }}
+          exit={{ opacity: 0, scale: 0.985, transition: EXIT_MODAL_SHEET }}
+          className="fixed inset-0 z-[120] flex flex-col overflow-y-auto select-none text-white app-no-drag"
+          style={{
+            backgroundColor: "rgba(8, 9, 13, 0.985)",
+            backdropFilter: "blur(64px) saturate(140%)",
+            WebkitBackdropFilter: "blur(64px) saturate(140%)",
+          }}
+        >
+          {/* Subtle Ambient Radial Glow that responds to active/hovered profile */}
+          <div
+            className="pointer-events-none fixed inset-0 transition-all duration-500"
+            style={{
+              background: `radial-gradient(650px circle at 50% 28%, ${ambientStyle.glow}, transparent 72%)`,
+              opacity: 0.45,
+            }}
+          />
 
-      {/* Minimal Top Bar */}
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-6 sm:px-10 pt-8 pb-4 flex items-center justify-between shrink-0">
+          {/* Minimal Top Bar (pt-12 clears both macOS traffic lights and Windows 40px titleBarOverlay) */}
+          <div className="relative z-10 w-full max-w-6xl mx-auto px-6 sm:px-10 pt-12 pb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           {view !== "select" && (
             <button
@@ -679,8 +693,15 @@ export function ProfileGateModal() {
       {/* =====================================================================
           VIEW 1: AUTHENTIC NETFLIX PROFILE SWITCHER
          ===================================================================== */}
+      <AnimatePresence mode="wait" initial={false}>
       {view === "select" && (
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8 text-center">
+        <motion.div
+          key="view-select"
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
+          exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.13 } }}
+          className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8 text-center"
+        >
           <h1 className="text-3xl sm:text-5xl font-medium tracking-tight text-white mb-3">
             {isManageMode ? "Manage Profiles:" : "Who’s working?"}
           </h1>
@@ -787,14 +808,20 @@ export function ProfileGateModal() {
               {isManageMode ? "Done" : "Manage Profiles"}
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* =====================================================================
           VIEW 2: NETFLIX PROFILE LOCK / PASSCODE UNLOCK STAGE
          ===================================================================== */}
       {view === "unlock" && unlockTarget && (
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8 text-center max-w-lg mx-auto w-full">
+        <motion.div
+          key="view-unlock"
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
+          exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.13 } }}
+          className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8 text-center max-w-lg mx-auto w-full"
+        >
           <ProfileAvatarTile
             avatar={unlockTarget.avatar}
             accent={unlockTarget.accent}
@@ -816,59 +843,82 @@ export function ProfileGateModal() {
           </p>
 
           <form onSubmit={handleUnlockFormSubmit} className="w-full space-y-6">
-            {unlockMode === "pin" ? (
-              <div className="flex items-center justify-center gap-3.5">
-                {[0, 1, 2, 3].map((idx) => (
+            <motion.div
+              key={shakeCount}
+              animate={shakeCount > 0 ? KEYFRAME_ERROR_SHAKE : undefined}
+            >
+              {unlockMode === "pin" ? (
+                <div className="flex items-center justify-center gap-3.5">
+                  {[0, 1, 2, 3].map((idx) => {
+                    const hasDigit = Boolean(unlockPinDigits[idx]);
+                    return (
+                      <motion.div
+                        key={idx}
+                        animate={
+                          hasDigit ? { scale: [1, 1.07, 1] } : { scale: 1 }
+                        }
+                        transition={{ duration: 0.18 }}
+                      >
+                        <input
+                          ref={(el) => {
+                            unlockPinRefs.current[idx] = el;
+                          }}
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={unlockPinDigits[idx]}
+                          onChange={(e) =>
+                            handleUnlockPinDigitChange(idx, e.target.value)
+                          }
+                          onKeyDown={(e) => handleUnlockPinKeyDown(idx, e)}
+                          aria-label={`PIN digit ${idx + 1}`}
+                          className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-white/[0.05] border-2 border-white/20 focus:border-white focus:bg-white/[0.09] focus:shadow-[0_0_0_4px_rgba(255,255,255,0.14)] text-center text-2xl font-mono text-white outline-none transition-all"
+                        />
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="relative max-w-xs mx-auto">
                   <input
-                    key={idx}
-                    ref={(el) => {
-                      unlockPinRefs.current[idx] = el;
+                    ref={unlockInputRef}
+                    type={showUnlockPassword ? "text" : "password"}
+                    value={unlockPassword}
+                    onChange={(e) => {
+                      setUnlockPassword(e.target.value);
+                      if (errorMsg) setErrorMsg(null);
                     }}
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={unlockPinDigits[idx]}
-                    onChange={(e) =>
-                      handleUnlockPinDigitChange(idx, e.target.value)
-                    }
-                    onKeyDown={(e) => handleUnlockPinKeyDown(idx, e)}
-                    aria-label={`PIN digit ${idx + 1}`}
-                    className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-white/[0.05] border-2 border-white/20 focus:border-white focus:bg-white/[0.09] text-center text-2xl font-mono text-white outline-none transition-all"
+                    placeholder="Enter letters or numbers"
+                    className="w-full h-12 pl-4 pr-11 rounded-xl bg-white/[0.06] border border-white/20 focus:border-white focus:shadow-[0_0_0_3.5px_rgba(255,255,255,0.14)] text-sm text-white placeholder:text-zinc-500 outline-none transition-all"
                   />
-                ))}
-              </div>
-            ) : (
-              <div className="relative max-w-xs mx-auto">
-                <input
-                  ref={unlockInputRef}
-                  type={showUnlockPassword ? "text" : "password"}
-                  value={unlockPassword}
-                  onChange={(e) => {
-                    setUnlockPassword(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                  placeholder="Enter letters or numbers"
-                  className="w-full h-12 pl-4 pr-11 rounded-xl bg-white/[0.06] border border-white/20 focus:border-white text-sm text-white placeholder:text-zinc-500 outline-none transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowUnlockPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
-                >
-                  {showUnlockPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            )}
+                  <button
+                    type="button"
+                    onClick={() => setShowUnlockPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
+                  >
+                    {showUnlockPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </motion.div>
 
-            {errorMsg && (
-              <div className="px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium max-w-xs mx-auto">
-                {errorMsg}
-              </div>
-            )}
+            <AnimatePresence initial={false}>
+              {errorMsg && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                  transition={SPRING_LIQUID_BUTTON}
+                  className="px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium max-w-xs mx-auto"
+                >
+                  {errorMsg}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="flex flex-col items-center gap-3 pt-2">
               {unlockMode === "alphanumeric" && (
@@ -897,14 +947,20 @@ export function ProfileGateModal() {
               </button>
             </div>
           </form>
-        </div>
+        </motion.div>
       )}
 
       {/* =====================================================================
           VIEW 3: PREMIUM EDITORIAL PROFILE CREATOR / EDITOR
          ===================================================================== */}
       {view === "form" && (
-        <div className="relative z-10 flex-1 flex items-center justify-center px-6 py-6">
+        <motion.div
+          key="view-form"
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
+          exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.13 } }}
+          className="relative z-10 flex-1 flex items-center justify-center px-6 py-6"
+        >
           <div className="w-full max-w-3xl">
             <div className="border-b border-white/10 pb-5 mb-7">
               <h1 className="text-2xl sm:text-4xl font-medium tracking-tight text-white">
@@ -1141,30 +1197,46 @@ export function ProfileGateModal() {
                     {formEnablePassword && (
                       <div className="space-y-3 pt-1">
                         {/* Mode Toggle: 4-Digit PIN vs Letters & Numbers */}
-                        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-black/40 border border-white/10">
+                        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-black/40 border border-white/10 relative">
                           <button
                             type="button"
                             onClick={() => setFormLockMode("pin")}
-                            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                            className={`relative isolate flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                               formLockMode === "pin"
-                                ? "bg-white text-zinc-950"
+                                ? "text-zinc-950"
                                 : "text-zinc-400 hover:text-white"
                             }`}
                           >
-                            <Hash className="w-3.5 h-3.5" />
-                            4-Digit PIN
+                            {formLockMode === "pin" && (
+                              <motion.span
+                                layoutId="profile-lock-mode-pill"
+                                transition={SPRING_NAV_GLIDE}
+                                className="absolute inset-0 -z-10 rounded-lg bg-white"
+                              />
+                            )}
+                            <Hash className="w-3.5 h-3.5 relative z-10" />
+                            <span className="relative z-10">4-Digit PIN</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => setFormLockMode("alphanumeric")}
-                            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                            className={`relative isolate flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                               formLockMode === "alphanumeric"
-                                ? "bg-white text-zinc-950"
+                                ? "text-zinc-950"
                                 : "text-zinc-400 hover:text-white"
                             }`}
                           >
-                            <Type className="w-3.5 h-3.5" />
-                            Letters & Numbers
+                            {formLockMode === "alphanumeric" && (
+                              <motion.span
+                                layoutId="profile-lock-mode-pill"
+                                transition={SPRING_NAV_GLIDE}
+                                className="absolute inset-0 -z-10 rounded-lg bg-white"
+                              />
+                            )}
+                            <Type className="w-3.5 h-3.5 relative z-10" />
+                            <span className="relative z-10">
+                              Letters & Numbers
+                            </span>
                           </button>
                         </div>
 
@@ -1297,14 +1369,20 @@ export function ProfileGateModal() {
               </div>
             </form>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* =====================================================================
           VIEW 4: FULL-SCREEN ROLE ONBOARDING SETUP
          ===================================================================== */}
       {view === "onboarding" && (
-        <div className="relative z-10 flex-1 flex items-center justify-center px-6 py-6">
+        <motion.div
+          key="view-onboarding"
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
+          exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.13 } }}
+          className="relative z-10 flex-1 flex items-center justify-center px-6 py-6"
+        >
           <div className="w-full max-w-2xl">
             <div className="border-b border-white/10 pb-5 mb-6">
               <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-white">
@@ -1472,8 +1550,11 @@ export function ProfileGateModal() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
-    </div>
+      </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

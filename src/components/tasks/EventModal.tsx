@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
-import { MotionSurface } from "@/components/ui/MotionSurface";
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { useData } from "@/lib/data/DataProvider";
 import {
   normalizeAndAutoFixDate,
@@ -141,7 +141,8 @@ function EventForm({
   };
 
   return (
-    <div
+    <MotionSurface
+      kind="dialog"
       role="dialog"
       aria-modal="true"
       aria-labelledby="event-modal-title"
@@ -430,11 +431,19 @@ function EventForm({
           </div>
         </form>
       </MotionSurface>
-    </div>
+    </MotionSurface>
   );
 }
 
 export default function EventModal(props: EventModalProps) {
-  if (!props.isOpen) return null;
-  return <EventForm key={props.eventToEdit?.id || `${props.initialDate}-${props.initialTaskId}`} {...props} />;
+  return (
+    <MotionPresence>
+      {props.isOpen && (
+        <EventForm
+          key={props.eventToEdit?.id || `${props.initialDate}-${props.initialTaskId}`}
+          {...props}
+        />
+      )}
+    </MotionPresence>
+  );
 }

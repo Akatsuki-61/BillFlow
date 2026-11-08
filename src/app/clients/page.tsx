@@ -7,6 +7,8 @@ import { DataBreakdown } from "@/components/ui/DataGraphic";
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { AnimatePresence, motion } from "framer-motion";
+import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
 import React, { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -707,69 +709,88 @@ function ClientsContent() {
                       </button>
 
                       {/* Dropdown Menu */}
-                      {activeMenuId === client.id && (
-                        <div className="absolute right-0 top-10 mt-1 z-30 bg-surface/95 dark:bg-[#19191f]/95 backdrop-blur-md rounded-[16px] shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] border border-line-neutral-200/80 dark:border-[#2c2c37] p-1.5 w-48 text-xs font-medium text-content-neutral-700 animate-in fade-in-0 zoom-in-95 duration-150">
-                          <Button
-                            variant="menu"
-                            onClick={() => {
-                              handleOpenEditModal(client);
-                              setActiveMenuId(null);
+                      <AnimatePresence>
+                        {activeMenuId === client.id && (
+                          <motion.div
+                            key={`client-menu-${client.id}`}
+                            initial={{ opacity: 0, scale: 0.92, y: -6 }}
+                            animate={{
+                              opacity: 1,
+                              scale: 1,
+                              y: 0,
+                              transition: SPRING_MENU_POPOVER,
                             }}
-                            className="w-full"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-content-neutral-400" />
-                            <span>Edit Profile</span>
-                          </Button>
-                          <Button
-                            variant="menu"
-                            onClick={() => {
-                              setSelectedClientForHistory(client);
-                              setActiveMenuId(null);
+                            exit={{
+                              opacity: 0,
+                              scale: 0.95,
+                              y: -4,
+                              transition: EXIT_MENU_POPOVER,
                             }}
-                            className="w-full"
+                            style={{ transformOrigin: "top right" }}
+                            className="absolute right-0 top-10 mt-1 z-30 bg-surface/95 dark:bg-[#19191f]/95 backdrop-blur-md rounded-[16px] shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] border border-line-neutral-200/80 dark:border-[#2c2c37] p-1.5 w-48 text-xs font-medium text-content-neutral-700"
                           >
-                            <Receipt className="w-3.5 h-3.5 text-content-neutral-400" />
-                            <span>View Ledger</span>
-                          </Button>
-                          <Button
-                            variant="menu"
-                            onClick={() => {
-                              router.push(
-                                `/invoices?new=1&client=${client.id}`,
-                              );
-                              setActiveMenuId(null);
-                            }}
-                            className="w-full"
-                          >
-                            <Plus className="w-3.5 h-3.5 text-content-neutral-400" />
-                            <span>New Invoice</span>
-                          </Button>
-                          {client.driveUrl && (
                             <Button
                               variant="menu"
-                              onClick={(e) => {
-                                openExternalLink(client.driveUrl, e);
+                              onClick={() => {
+                                handleOpenEditModal(client);
                                 setActiveMenuId(null);
                               }}
-                              className="w-full text-left"
+                              className="w-full"
                             >
-                              <ExternalLink className="w-3.5 h-3.5 text-content-neutral-400" />
-                              <span>Open Delivery Link</span>
+                              <Edit3 className="w-3.5 h-3.5 text-content-neutral-400" />
+                              <span>Edit Profile</span>
                             </Button>
-                          )}
-                          <div className="my-1 border-t border-line-neutral-100" />
-                          <Button
-                            variant="danger"
-                            onClick={() =>
-                              handleDeleteClient(client.id, client.name)
-                            }
-                            className="w-full"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-content-red-400" />
-                            <span>Delete Client</span>
-                          </Button>
-                        </div>
-                      )}
+                            <Button
+                              variant="menu"
+                              onClick={() => {
+                                setSelectedClientForHistory(client);
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full"
+                            >
+                              <Receipt className="w-3.5 h-3.5 text-content-neutral-400" />
+                              <span>View Ledger</span>
+                            </Button>
+                            <Button
+                              variant="menu"
+                              onClick={() => {
+                                router.push(
+                                  `/invoices?new=1&client=${client.id}`,
+                                );
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full"
+                            >
+                              <Plus className="w-3.5 h-3.5 text-content-neutral-400" />
+                              <span>New Invoice</span>
+                            </Button>
+                            {client.driveUrl && (
+                              <Button
+                                variant="menu"
+                                onClick={(e) => {
+                                  openExternalLink(client.driveUrl, e);
+                                  setActiveMenuId(null);
+                                }}
+                                className="w-full text-left"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 text-content-neutral-400" />
+                                <span>Open Delivery Link</span>
+                              </Button>
+                            )}
+                            <div className="my-1 border-t border-line-neutral-100" />
+                            <Button
+                              variant="danger"
+                              onClick={() =>
+                                handleDeleteClient(client.id, client.name)
+                              }
+                              className="w-full"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-content-red-400" />
+                              <span>Delete Client</span>
+                            </Button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
 
