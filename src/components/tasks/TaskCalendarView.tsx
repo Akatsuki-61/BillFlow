@@ -1292,10 +1292,10 @@ export default function TaskCalendarView({
                             variant="ghost"
                             size="small"
                             onClick={() => onSelectTask(task)}
-                            className="text-xs"
+                            className="text-xs flex items-center gap-1.5"
                           >
-                            <Pencil className="w-3.5 h-3.5 mr-1" />
-                            Edit
+                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                            <span>Edit</span>
                           </Button>
                           {onDeleteTask && (
                             <Button
@@ -1381,17 +1381,16 @@ export default function TaskCalendarView({
                             variant="ghost"
                             size="small"
                             onClick={() => onSelectEvent(event)}
-                            className="text-xs"
+                            className="text-xs flex items-center gap-1.5"
                           >
-                            <Pencil className="w-3.5 h-3.5 mr-1" />
-                            Edit
+                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                            <span>Edit</span>
                           </Button>
                           {onDeleteEvent && (
                             <Button
                               variant="ghost"
                               size="small"
                               onClick={() => {
-                                triggerBriefCalendarSync();
                                 void onDeleteEvent(event.id);
                               }}
                               className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
@@ -1748,8 +1747,10 @@ export default function TaskCalendarView({
                             variant="primary"
                             size="small"
                             onClick={() => void saveInlineEditTask(task.id)}
+                            className="flex items-center gap-1.5"
                           >
-                            Save
+                            <i className="fa-solid fa-arrows-rotate text-xs" aria-hidden="true" />
+                            <span>Save Task</span>
                           </Button>
                         </div>
                       </div>
@@ -1809,9 +1810,9 @@ export default function TaskCalendarView({
                             type="button"
                             onClick={() => startInlineEditTask(task)}
                             title="Edit task"
-                            className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
+                            className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors cursor-pointer"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
                           </button>
                         )}
                         {onDeleteTask && (

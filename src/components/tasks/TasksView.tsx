@@ -449,6 +449,7 @@ export default function TasksView({
     }
 
     void saveTask(taskId, { status: targetStatus });
+    showToast(`Updated task status to ${targetStatus.replace("-", " ")}`);
     setDraggedTaskId(null);
   };
 
@@ -582,12 +583,14 @@ export default function TasksView({
   // Toggle Subtask Completion in Detail Modal
   const handleToggleSubtask = (taskId: string, subtaskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
-    if (task)
+    if (task) {
       void saveTask(taskId, {
         subtasks: task.subtasks.map((st) =>
           st.id === subtaskId ? { ...st, completed: !st.completed } : st,
         ),
       });
+      showToast("Updated task subtasks");
+    }
   };
   const handleDeleteTask = async (taskId: string) => {
     if (saving) return;
@@ -635,6 +638,10 @@ export default function TasksView({
               <span className="bf-toast-add-badge w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/35 text-emerald-400 flex items-center justify-center shrink-0">
                 <i className="fa-solid fa-circle-plus" aria-hidden="true" />
               </span>
+            ) : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(toastMessage) ? (
+              <span className="bf-toast-update-badge w-6 h-6 rounded-lg bg-blue-500/20 border border-blue-500/35 text-blue-400 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-pen-to-square" aria-hidden="true" />
+              </span>
             ) : (
               <div className="w-2.5 h-2.5 rounded-full bg-accent-solid animate-ping shrink-0" />
             )}
@@ -655,7 +662,9 @@ export default function TasksView({
                   ? "bg-rose-500/80"
                   : /\b(created|added|scheduled)\b/i.test(toastMessage)
                     ? "bg-emerald-500/85"
-                    : "bg-accent"
+                    : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(toastMessage)
+                      ? "bg-blue-500/85"
+                      : "bg-accent"
               }`}
             />
           </MotionSurface>
@@ -2175,6 +2184,7 @@ export default function TasksView({
                           void saveTask(selectedTaskForDetail.id, {
                             status: newStatus,
                           });
+                          showToast(`Updated task status to ${newStatus.replace("-", " ")}`);
                         }
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
@@ -2198,6 +2208,7 @@ export default function TasksView({
                         void saveTask(selectedTaskForDetail.id, {
                           priority: e.target.value as TaskPriority,
                         });
+                        showToast(`Updated priority to ${e.target.value}`);
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     >
@@ -2220,6 +2231,7 @@ export default function TasksView({
                         void saveTask(selectedTaskForDetail.id, {
                           category: e.target.value as TaskCategory,
                         });
+                        showToast(`Updated category to ${e.target.value}`);
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     >
@@ -2248,6 +2260,7 @@ export default function TasksView({
                         void saveTask(selectedTaskForDetail.id, {
                           dueDate: e.target.value,
                         });
+                        showToast(`Updated due date to ${e.target.value}`);
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     />
