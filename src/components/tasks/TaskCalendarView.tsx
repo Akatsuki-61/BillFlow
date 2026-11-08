@@ -22,6 +22,7 @@ import {
   CheckSquare,
   Download,
   Upload,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
 import type { TaskItem, TaskStatus, TaskPriority, TaskCategory } from "@/types/tasks";
@@ -569,12 +570,17 @@ export default function TaskCalendarView({
   };
 
   // One-click silent sync & open in user's Local OS Calendar (macOS Calendar.app / .ics fallback)
-  const handleExportToLocalCalendar = async () => {
-    triggerBriefCalendarSync();
+  // One-click silent background sync (does NOT open Calendar.app window)
+  const handleSilentSyncLocalCalendar = () => {
+    triggerBriefCalendarSync("Synchronized with local calendar in background.");
+  };
+
+  // Explicit action to open macOS Calendar.app window
+  const handleOpenLocalCalendarApp = async () => {
     if (typeof window !== "undefined" && window.billflow?.events?.openNative) {
       try {
         await window.billflow.events.openNative(getAllTaskTimeSlots());
-        onNotifyRef.current?.("Synced with your macOS Calendar app ('BillFlow' calendar).");
+        onNotifyRef.current?.("Opened your macOS Calendar app ('BillFlow' calendar).");
         return;
       } catch {
         // Fallback to .ics download below
@@ -586,7 +592,7 @@ export default function TaskCalendarView({
       calendarName: "BillFlow",
     });
     downloadIcsFile(`billflow-calendar-${monthPrefix}.ics`, icsContent);
-    onNotifyRef.current?.("Linked calendar exported (.ics) for your local calendar app.");
+    onNotifyRef.current?.("Exported (.ics) file for your local calendar.");
   };
 
   // One-click silent import from user's Local OS Calendar (.ics) with automatic background auto-fixing
@@ -772,12 +778,24 @@ export default function TaskCalendarView({
             variant="secondary"
             size="small"
             disabled={isSyncingCalendar}
-            onClick={handleExportToLocalCalendar}
-            className="flex items-center gap-1.5 text-xs"
-            title="Export & open your linked Application + Local Calendar in Apple Calendar, Outlook, or Google Calendar (.ics)"
+            onClick={handleSilentSyncLocalCalendar}
+            className="flex items-center gap-1.5 text-xs font-medium"
+            title="Silently synchronize tasks and events with macOS Calendar in the background without opening the Calendar app"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Open Local Calendar (.ics)</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCalendar ? "animate-spin" : ""}`} />
+            <span>Sync Local Calendar</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="small"
+            disabled={isSyncingCalendar}
+            onClick={handleOpenLocalCalendarApp}
+            className="flex items-center gap-1.5 text-xs text-content-neutral-600 hover:text-content-neutral-900"
+            title="Open the macOS Calendar.app window on your screen"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Open Calendar App</span>
           </Button>
 
           <Button
@@ -785,11 +803,11 @@ export default function TaskCalendarView({
             size="small"
             disabled={isSyncingCalendar}
             onClick={() => localCalendarFileInputRef.current?.click()}
-            className="flex items-center gap-1.5 text-xs"
+            className="flex items-center gap-1.5 text-xs font-medium"
             title="Link & import tasks/events from your Local Calendar (.ics) with automatic background auto-fixing"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Link Local Calendar (.ics)</span>
+            <span>Import (.ics)</span>
           </Button>
         </div>
       </div>
