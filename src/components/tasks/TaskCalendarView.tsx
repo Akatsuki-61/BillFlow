@@ -23,6 +23,7 @@ import {
   Download,
   Upload,
   ExternalLink,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
 import type { TaskItem, TaskStatus, TaskPriority, TaskCategory } from "@/types/tasks";
@@ -213,19 +214,15 @@ export default function TaskCalendarView({
     }, 200);
   }, []);
 
-  // Run brief internal sync once when Calendar first mounts
+  // Cleanup sync timer on unmount
   useEffect(() => {
-    if (!hasMountedSyncRef.current) {
-      hasMountedSyncRef.current = true;
-      triggerBriefCalendarSync();
-    }
     return () => {
       if (syncTimerRef.current) {
         clearTimeout(syncTimerRef.current);
         syncTimerRef.current = null;
       }
     };
-  }, [triggerBriefCalendarSync]);
+  }, []);
 
   // Filters
   const [scopeFilter, setScopeFilter] = useState<"all" | "tasks" | "events">("all");
@@ -712,28 +709,39 @@ export default function TaskCalendarView({
       />
 
       {/* Application Calendar <-> User Local Calendar Link Bar */}
-      <div className="ui-card p-3.5 px-4 border border-accent/25 bg-accent-soft/10 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="ui-card p-3.5 px-4 border border-line-neutral-200/80 dark:border-line-neutral-800 bg-surface-neutral-50/60 dark:bg-surface-neutral-900/50 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-2xs">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface dark:bg-surface-neutral-900/90 border border-line-neutral-200/90 dark:border-line-neutral-800 text-xs shadow-2xs">
+          {/* Linked Status Pill Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 text-xs shadow-2xs backdrop-blur-xs">
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <span className="font-semibold text-content-neutral-800 dark:text-content-neutral-200">
+            <span className="font-medium text-content-neutral-800 dark:text-content-neutral-200">
               Application Calendar
             </span>
-            <span className="text-content-neutral-400 dark:text-content-neutral-500 font-mono text-[11px]">
-              &harr;
-            </span>
+            <ArrowLeftRight className="w-3 h-3 text-emerald-500/80 shrink-0" />
             <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
               <Link2 className="w-3 h-3 text-emerald-500" />
               <span>Local Calendar Linked</span>
             </span>
-          </span>
-          <span className="text-xs text-content-neutral-500 dark:text-content-neutral-400">
-            <strong className="text-content-neutral-800 dark:text-content-neutral-200">{tasks.filter((t) => Boolean(t.dueDate)).length}</strong> App Tasks &middot;{" "}
-            <strong className="text-content-neutral-800 dark:text-content-neutral-200">{events.length}</strong> Local Events
-          </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs text-content-neutral-500 dark:text-content-neutral-400">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface dark:bg-surface-neutral-800 border border-line-neutral-200/70 dark:border-line-neutral-700/60 font-medium text-content-neutral-700 dark:text-content-neutral-300">
+              <strong className="text-content-neutral-900 dark:text-content-neutral-100 font-semibold mr-1">
+                {tasks.filter((t) => Boolean(t.dueDate)).length}
+              </strong>{" "}
+              App Tasks
+            </span>
+            <span>&middot;</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface dark:bg-surface-neutral-800 border border-line-neutral-200/70 dark:border-line-neutral-700/60 font-medium text-content-neutral-700 dark:text-content-neutral-300">
+              <strong className="text-content-neutral-900 dark:text-content-neutral-100 font-semibold mr-1">
+                {events.length}
+              </strong>{" "}
+              Local Events
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

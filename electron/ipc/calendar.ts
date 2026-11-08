@@ -1,7 +1,7 @@
 import { app, ipcMain, shell } from "electron";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
-import { execFile } from "child_process";
+import { execFile, execSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -668,6 +668,16 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
   return { accessible, changedCount: importedCount };
 }
 
+function isMacCalendarAppRunning(): boolean {
+  if (process.platform !== "darwin") return false;
+  try {
+    const stdout = execSync("pgrep -x Calendar", { encoding: "utf-8", timeout: 300 });
+    return Boolean(stdout.trim());
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Two-way JXA bridge with macOS Calendar.app:
  * 1) Creates/updates the "BillFlow" calendar inside macOS Calendar.app with all BillFlow Tasks & Events
@@ -724,6 +734,10 @@ function syncWithMacOsCalendarAppViaJxa(
       var itemsToPush = JSON.parse(argv[0] || "[]");
       var pullMode = argv[1] === "1";
       var Cal = Application("Calendar");
+      var wasRunning = false;
+      try {
+        wasRunning = Cal.running();
+      } catch (e) {}
 
       // Fast direct lookup of BillFlow calendar without iterating every calendar
       var cals = Cal.calendars.whose({ name: "BillFlow" })();
@@ -862,6 +876,12 @@ function syncWithMacOsCalendarAppViaJxa(
             }
           } catch (calErr) {}
         }
+      }
+
+      if (!wasRunning) {
+        try {
+          Cal.quit();
+        } catch (qErr) {}
       }
 
       return JSON.stringify({ pushedCount: pushedCount, deletedCount: deletedCount, pulledEvents: pulledEvents });
@@ -1034,6 +1054,62 @@ export async function syncNativeLocalCalendar(
         location: e.location || null,
       })),
     ];
+
+    // If this is a background push-only sync (from task/event edit, create, or delete)
+    // and Calendar.app is NOT currently running, do NOT launch Calendar.app!
+    // Simply keep the local BillFlow.ics export up-to-date.
+    const isCalendarRunning = isMacCalendarAppRunning();
+    if (pushOnly && !isCalendarRunning) {
+      try {
+        const icsContent = generateIcsFromEventsAndTasks({
+          events: appEvents.map((e) => ({
+            id: e.id,
+            title: e.title,
+            description: e.description,
+            startDate: normalizeAndAutoFixDate(e.startDate),
+            endDate: e.endDate ? normalizeAndAutoFixDate(e.endDate, e.startDate) : null,
+            startTime: e.startTime || null,
+            endTime: e.endTime || null,
+            isAllDay: Boolean(e.isAllDay),
+            category: e.category as any,
+            color: e.color as any,
+            clientId: e.clientId || null,
+            clientName: e.clientName || null,
+            taskId: e.taskId || null,
+            taskTitle: e.taskTitle || null,
+            location: e.location || null,
+            createdAt: e.createdAt,
+            updatedAt: e.updatedAt,
+          })),
+          tasks: activeTasks.map((t) => {
+            const slot = timeSlots[t.id];
+            return {
+              id: t.id,
+              title: t.title,
+              description: t.description,
+              status: t.status as any,
+              priority: t.priority as any,
+              category: t.category as any,
+              assignee: t.assignee,
+              dueDate: t.dueDate,
+              startTime: slot?.startTime || null,
+              endTime: slot?.endTime || null,
+              subtasks: [],
+              createdAt: t.createdAt,
+            };
+          }),
+          calendarName: "BillFlow",
+        });
+        const icsPath = path.join(app.getPath("userData"), "BillFlow.ics");
+        fs.writeFileSync(icsPath, icsContent, "utf-8");
+      } catch {}
+
+      return {
+        syncedFromMac: 0,
+        pushedToMac: payloadToPush.length,
+        deletedFromMac: 0,
+      };
+    }
 
     const jxaResult = await syncWithMacOsCalendarAppViaJxa(
       payloadToPush,
