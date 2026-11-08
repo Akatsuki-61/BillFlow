@@ -1389,8 +1389,10 @@ export default function TasksView({
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-accent" />
+            <div className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-lg bg-accent-soft/50 text-accent border border-accent/30 flex items-center justify-center shrink-0 shadow-2xs">
+                <Calendar className="w-4 h-4 text-accent" />
+              </span>
               <h2 className="text-xl font-newspaper font-semibold text-content-neutral-900 dark:text-content-neutral-100">
                 Calendar &amp; Schedule
               </h2>
