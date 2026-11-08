@@ -708,13 +708,25 @@ export default function TaskCalendarView({
       {/* Application Calendar <-> User Local Calendar Link Bar */}
       <div className="ui-card p-3.5 px-4 border border-accent/25 bg-accent-soft/10 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-emerald-50 text-content-emerald-700 border border-line-emerald-200 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-surface-emerald-500 animate-pulse" />
-            <span>Application Calendar &harr; Local Calendar Linked</span>
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface dark:bg-surface-neutral-900/90 border border-line-neutral-200/90 dark:border-line-neutral-800 text-xs shadow-2xs">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="font-semibold text-content-neutral-800 dark:text-content-neutral-200">
+              Application Calendar
+            </span>
+            <span className="text-content-neutral-400 dark:text-content-neutral-500 font-mono text-[11px]">
+              &harr;
+            </span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              <Link2 className="w-3 h-3 text-emerald-500" />
+              <span>Local Calendar Linked</span>
+            </span>
           </span>
-          <span className="text-xs text-content-neutral-600">
-            <strong>{tasks.filter((t) => Boolean(t.dueDate)).length}</strong> App Calendar Tasks &middot;{" "}
-            <strong>{events.length}</strong> Local Calendar Events
+          <span className="text-xs text-content-neutral-500 dark:text-content-neutral-400">
+            <strong className="text-content-neutral-800 dark:text-content-neutral-200">{tasks.filter((t) => Boolean(t.dueDate)).length}</strong> App Tasks &middot;{" "}
+            <strong className="text-content-neutral-800 dark:text-content-neutral-200">{events.length}</strong> Local Events
           </span>
         </div>
 
