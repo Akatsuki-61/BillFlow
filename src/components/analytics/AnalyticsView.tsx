@@ -2,7 +2,7 @@
 
 import { Dialog } from "@/components/ui/Dialog";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   CheckCircle2,
   SlidersHorizontal,
@@ -18,6 +18,8 @@ import {
   Switch,
 } from "@/components/ui/Workspace";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { motion } from "framer-motion";
+import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { useWidgetContext } from "@/context/WidgetContext";
@@ -29,16 +31,53 @@ export default function AnalyticsView() {
   const {
     analyticsWidgets,
     dashboardWidgets,
+    draggedWidgetId,
     pinToDashboard,
     removeFromDashboard,
     isPinnedToDashboard,
     toggleAnalytics,
+    moveAnalyticsWidget,
     showAllAnalytics,
     resetToDefaults,
     toastMessage,
     toastAction,
     showToast,
   } = useWidgetContext();
+
+  const lastSwapRef = useRef<{ pair: string; time: number }>({
+    pair: "",
+    time: 0,
+  });
+
+  const handleTileDragOver = (
+    e: React.DragEvent<HTMLDivElement>,
+    targetId: string,
+  ) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (!draggedWidgetId || draggedWidgetId === targetId) return;
+    const now = performance.now();
+    const pairKey = [draggedWidgetId, targetId].sort().join("::");
+    if (
+      lastSwapRef.current.pair === pairKey &&
+      now - lastSwapRef.current.time < 160
+    ) {
+      return;
+    }
+    lastSwapRef.current = { pair: pairKey, time: now };
+    moveAnalyticsWidget(draggedWidgetId, targetId);
+  };
+
+  const handleTileDrop = (
+    e: React.DragEvent<HTMLDivElement>,
+    targetId: string,
+  ) => {
+    e.preventDefault();
+    const fromId = draggedWidgetId || e.dataTransfer.getData("text/plain");
+    if (fromId && fromId !== targetId) {
+      moveAnalyticsWidget(fromId, targetId);
+    }
+  };
 
   // Selected timeframe filter state: Month, Quarter, or Year
   const [timeframe, setTimeframe] = useState<Timeframe>("Quarter");
@@ -109,10 +148,10 @@ export default function AnalyticsView() {
       ]
     : [];
 
-  // Categorize visible widgets
-  const visibleWidgets = WIDGET_CATALOG.filter((w) =>
-    analyticsWidgets.includes(w.id),
-  );
+  // Categorize visible widgets while preserving user-arranged order in analyticsWidgets
+  const visibleWidgets = analyticsWidgets
+    .map((id) => WIDGET_CATALOG.find((w) => w.id === id))
+    .filter((w): w is NonNullable<typeof w> => Boolean(w));
   const metricWidgets = visibleWidgets.filter((w) => w.size === "metric");
   const chartWidgets = visibleWidgets.filter(
     (w) => w.category === "charts" && w.size !== "medium",
@@ -219,20 +258,27 @@ export default function AnalyticsView() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {metricWidgets.map((w) => (
-                  <WidgetRenderer
+                  <motion.div
                     key={w.id}
-                    widgetId={w.id}
-                    source="analytics"
-                    period={
-                      timeframe === "Month"
-                        ? "month"
-                        : timeframe === "Year"
-                          ? "year"
-                          : "quarter"
-                    }
-                    isDraggable={true}
-                    onContextMenu={handleContextMenu}
-                  />
+                    layout="position"
+                    transition={SPRING_NAV_GLIDE}
+                    onDragOver={(e) => handleTileDragOver(e, w.id)}
+                    onDrop={(e) => handleTileDrop(e, w.id)}
+                  >
+                    <WidgetRenderer
+                      widgetId={w.id}
+                      source="analytics"
+                      period={
+                        timeframe === "Month"
+                          ? "month"
+                          : timeframe === "Year"
+                            ? "year"
+                            : "quarter"
+                      }
+                      isDraggable={true}
+                      onContextMenu={handleContextMenu}
+                    />
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -257,8 +303,12 @@ export default function AnalyticsView() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {chartWidgets.map((w) => (
-                  <div
+                  <motion.div
                     key={w.id}
+                    layout="position"
+                    transition={SPRING_NAV_GLIDE}
+                    onDragOver={(e) => handleTileDragOver(e, w.id)}
+                    onDrop={(e) => handleTileDrop(e, w.id)}
                     className={
                       w.id === "profit-trajectory-chart" ? "lg:col-span-2" : ""
                     }
@@ -276,7 +326,7 @@ export default function AnalyticsView() {
                       isDraggable={true}
                       onContextMenu={handleContextMenu}
                     />
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -297,20 +347,27 @@ export default function AnalyticsView() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {otherWidgets.map((w) => (
-                  <WidgetRenderer
+                  <motion.div
                     key={w.id}
-                    widgetId={w.id}
-                    source="analytics"
-                    period={
-                      timeframe === "Month"
-                        ? "month"
-                        : timeframe === "Year"
-                          ? "year"
-                          : "quarter"
-                    }
-                    isDraggable={true}
-                    onContextMenu={handleContextMenu}
-                  />
+                    layout="position"
+                    transition={SPRING_NAV_GLIDE}
+                    onDragOver={(e) => handleTileDragOver(e, w.id)}
+                    onDrop={(e) => handleTileDrop(e, w.id)}
+                  >
+                    <WidgetRenderer
+                      widgetId={w.id}
+                      source="analytics"
+                      period={
+                        timeframe === "Month"
+                          ? "month"
+                          : timeframe === "Year"
+                            ? "year"
+                            : "quarter"
+                      }
+                      isDraggable={true}
+                      onContextMenu={handleContextMenu}
+                    />
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -335,22 +392,22 @@ export default function AnalyticsView() {
             </div>
             <div className="app-dialog-body">
               {/* Central Widget Storage Banner shown inside Customize modal */}
-              <div className="mx-6 mt-4 flex items-center justify-between px-4 py-3 rounded-2xl bg-accent-faint/80 dark:bg-accent-soft/40 border border-border-accent/70 dark:border-border-accent/50 text-xs text-content-neutral-900">
-                <div className="flex items-center gap-2">
+              <div className="mb-4 flex items-center justify-between gap-4 px-4 py-3 rounded-2xl bg-accent-faint/80 dark:bg-accent-soft/40 border border-border-accent/70 dark:border-border-accent/50 text-xs text-content-neutral-900">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <SlidersHorizontal className="w-4 h-4 text-accent shrink-0" />
-                  <span>
+                  <span className="leading-snug">
                     <strong>Central Widget Catalog:</strong> Drag any card to{" "}
                     <strong>Home</strong> in the top navigation bar, or
                     right-click to pin instantly.
                   </span>
                 </div>
-                <span className="text-[11px] text-accent font-semibold whitespace-nowrap ml-2">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-accent/15 text-accent text-[11px] font-semibold leading-none whitespace-nowrap shrink-0">
                   {visibleWidgets.length} active
                 </span>
               </div>
 
               {/* Widget List */}
-              <div className="app-dialog-section p-6 space-y-3 max-h-[60vh] overflow-y-auto divide-y divide-line-neutral-100">
+              <div className="divide-y divide-line-neutral-100 dark:divide-line-neutral-800/80">
                 {WIDGET_CATALOG.map((widget) => {
                   const isVisible = analyticsWidgets.includes(widget.id);
                   const isPinned = dashboardWidgets.includes(widget.id);
@@ -358,7 +415,7 @@ export default function AnalyticsView() {
                   return (
                     <div
                       key={widget.id}
-                      className="pt-3 first:pt-0 flex items-center justify-between gap-4 group"
+                      className="py-3.5 first:pt-1 last:pb-1 flex items-center justify-between gap-4 group"
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">

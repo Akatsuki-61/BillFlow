@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
@@ -18,6 +18,8 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
+import { motion } from "motion/react";
+import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
@@ -41,6 +43,7 @@ export default function DashboardPage() {
   const {
     dashboardWidgets,
     widgetSizes,
+    draggedWidgetId,
     isDashboardEditing,
     setIsDashboardEditing,
     toggleDashboard,
@@ -48,6 +51,7 @@ export default function DashboardPage() {
     removeFromDashboard,
     toggleWidgetSize,
     moveDashboardWidget,
+    moveDashboardWidgetById,
     resetToDefaults,
     toastMessage,
     toastAction,
@@ -56,8 +60,11 @@ export default function DashboardPage() {
   } = useWidgetContext();
 
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const lastSwapRef = useRef<{ pair: string; time: number }>({
+    pair: "",
+    time: 0,
+  });
 
   // Global keyboard shortcut: Cmd+Z / Ctrl+Z for Dashboard Undo
   useEffect(() => {
@@ -437,42 +444,46 @@ export default function DashboardPage() {
             const isOver = dragOverIndex === index;
 
             return (
-              <div
+              <motion.div
                 key={w.id}
+                layout="position"
+                transition={SPRING_NAV_GLIDE}
                 data-widget={w.id}
-                draggable={isDashboardEditing}
-                onDragStart={() => {
-                  if (isDashboardEditing) {
-                    setDraggedIndex(index);
-                  }
-                }}
                 onDragEnd={() => {
-                  setDraggedIndex(null);
                   setDragOverIndex(null);
                 }}
-                className={`${colSpan} transition-all duration-200 ${
-                  isOver
+                className={`${colSpan} transition-shadow duration-200 ${
+                  isOver && draggedWidgetId !== w.id
                     ? "ring-2 ring-accent ring-offset-2 rounded-[24px] scale-[1.01]"
                     : ""
                 }`}
                 onDragOver={(e) => {
-                  if (isDashboardEditing) {
-                    e.preventDefault();
-                    setDragOverIndex(index);
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDragOverIndex(index);
+                  if (!draggedWidgetId || draggedWidgetId === w.id) return;
+                  const now = performance.now();
+                  const pairKey = [draggedWidgetId, w.id].sort().join("::");
+                  if (
+                    lastSwapRef.current.pair === pairKey &&
+                    now - lastSwapRef.current.time < 180
+                  ) {
+                    return;
                   }
+                  lastSwapRef.current = { pair: pairKey, time: now };
+                  moveDashboardWidgetById(draggedWidgetId, w.id);
                 }}
                 onDragLeave={() => {
-                  if (isDashboardEditing) {
-                    setDragOverIndex((curr) => (curr === index ? null : curr));
-                  }
+                  setDragOverIndex((curr) => (curr === index ? null : curr));
                 }}
                 onDrop={(e) => {
-                  if (isDashboardEditing && draggedIndex !== null) {
-                    e.preventDefault();
-                    moveDashboardWidget(draggedIndex, index);
-                    setDraggedIndex(null);
-                    setDragOverIndex(null);
+                  e.preventDefault();
+                  const fromId =
+                    draggedWidgetId || e.dataTransfer.getData("text/plain");
+                  if (fromId && fromId !== w.id) {
+                    moveDashboardWidgetById(fromId, w.id);
                   }
+                  setDragOverIndex(null);
                 }}
               >
                 <WidgetRenderer
@@ -480,7 +491,7 @@ export default function DashboardPage() {
                   source="dashboard"
                   period={period}
                   displaySize={isCompact ? "compact" : "normal"}
-                  isDraggable={isDashboardEditing}
+                  isDraggable={true}
                   isEditing={isDashboardEditing}
                   onToggleSize={() => toggleWidgetSize(w.id)}
                   onMoveLeft={
@@ -496,7 +507,7 @@ export default function DashboardPage() {
                   onRemove={() => removeFromDashboard(w.id)}
                   onContextMenu={handleContextMenu}
                 />
-              </div>
+              </motion.div>
             );
           })}
         </div>

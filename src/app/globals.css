@@ -10,8 +10,11 @@
 
 :root {
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-liquid-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-press-in: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-fast: 150ms;
   --motion-normal: 240ms;
+  --motion-bounce: 310ms;
 }
 
 body {
@@ -35,7 +38,20 @@ body {
   -webkit-app-region: drag;
 }
 
-.app-no-drag {
+.app-no-drag,
+:where(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  [role="dialog"],
+  [data-motion-surface],
+  .app-dialog-backdrop,
+  .app-dialog,
+  .app-dialog-close
+) {
   -webkit-app-region: no-drag;
 }
 
@@ -56,21 +72,26 @@ body {
   letter-spacing: -0.03em;
 }
 
-/* Shared interaction rhythm: small movements, soft landings, no layout shifts. */
+/* Shared interaction rhythm: tactile Liquid Glass press + spring rebound on release, Windows ClearType safe (scale: 1 at rest & hover). */
 :where(button, a, input, select, textarea, [role="button"]) {
-  transition-property:
-    color, background-color, border-color, box-shadow, opacity, transform,
-    translate, scale;
-  transition-duration: var(--motion-fast);
-  transition-timing-function: var(--motion-ease);
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease),
+    transform var(--motion-bounce) var(--ease-liquid-bounce),
+    translate var(--motion-bounce) var(--ease-liquid-bounce),
+    scale var(--motion-bounce) var(--ease-liquid-bounce);
 }
 
 :where(button, [role="button"]):not(:disabled):not(
     [aria-disabled="true"]
   ):active {
-  scale: 0.99;
-  translate: 0 0;
-  transition-duration: 100ms;
+  scale: 0.96;
+  translate: 0 0.5px;
+  transition-duration: 75ms;
+  transition-timing-function: var(--ease-press-in);
 }
 
 :where(button, a, input, select, textarea, [role="button"]):focus-visible {
@@ -493,6 +514,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 }
 
 .ui-button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -508,13 +530,27 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   text-transform: none;
   white-space: nowrap;
   cursor: pointer;
-  translate: none;
+  translate: 0 0;
+  scale: 1;
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease),
+    transform var(--motion-bounce) var(--ease-liquid-bounce),
+    translate var(--motion-bounce) var(--ease-liquid-bounce),
+    scale var(--motion-bounce) var(--ease-liquid-bounce);
+}
+.ui-button:hover:not(:disabled) {
+  translate: 0 -1px;
   scale: 1;
 }
-.ui-button:active,
-.ui-button:hover {
-  translate: none;
-  scale: 1;
+.ui-button:active:not(:disabled) {
+  translate: 0 0.5px;
+  scale: 0.955;
+  transition-duration: 70ms;
+  transition-timing-function: var(--ease-press-in);
 }
 .ui-button > svg,
 .ui-button > div > svg {
@@ -522,28 +558,44 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   height: 16px;
   flex-shrink: 0;
   scale: 1;
+  transition:
+    transform var(--motion-bounce) var(--ease-liquid-bounce),
+    scale var(--motion-bounce) var(--ease-liquid-bounce);
+}
+.ui-button:active:not(:disabled) > svg {
+  scale: 0.92;
 }
 .ui-button--primary {
   background: #1c1c1f;
   color: #ffffff;
   border-color: #1c1c1f;
   box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
     0px 4px 10px -2px rgba(0, 0, 0, 0.18),
     0px 1px 2px 0px rgba(0, 0, 0, 0.1);
 }
-.ui-button--primary:hover {
+.ui-button--primary:hover:not(:disabled) {
   background: #0d0d10;
   border-color: #0d0d10;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0px 6px 14px -2px rgba(0, 0, 0, 0.24),
+    0px 2px 4px 0px rgba(0, 0, 0, 0.12);
 }
 :root[data-theme="dark"] .ui-button--primary {
   background: #f4f4f6;
   color: #111115;
   border-color: #f4f4f6;
-  box-shadow: 0px 4px 12px -2px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0px 4px 12px -2px rgba(0, 0, 0, 0.4);
 }
-:root[data-theme="dark"] .ui-button--primary:hover {
+:root[data-theme="dark"] .ui-button--primary:hover:not(:disabled) {
   background: #ffffff;
   border-color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0px 6px 16px -2px rgba(0, 0, 0, 0.5);
 }
 .ui-button--primary svg {
   color: currentColor !important;
@@ -552,18 +604,26 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   background: #e6e6eb;
   border-color: transparent;
   color: #18181b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
-.ui-button--secondary:hover {
+.ui-button--secondary:hover:not(:disabled) {
   background: #dcdce2;
   border-color: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 2px 5px -1px rgba(0, 0, 0, 0.06);
 }
 :root[data-theme="dark"] .ui-button--secondary {
   background: #25252e;
   border-color: rgba(255, 255, 255, 0.06);
   color: #f4f4f6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
-:root[data-theme="dark"] .ui-button--secondary:hover {
+:root[data-theme="dark"] .ui-button--secondary:hover:not(:disabled) {
   background: #2f2f3a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 3px 8px -2px rgba(0, 0, 0, 0.35);
 }
 .ui-button--ghost {
   background: transparent;
@@ -622,6 +682,13 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   background-color: var(--ui-surface);
   border: 1px solid var(--ui-border);
   color: var(--ui-text);
+  caret-color: var(--ui-accent);
+  box-shadow: 0 0 0 0px transparent;
+  transition:
+    border-color 180ms var(--motion-ease),
+    box-shadow 220ms var(--motion-ease),
+    background-color 180ms var(--motion-ease),
+    translate 200ms var(--motion-ease);
 }
 
 .ui-field {
@@ -631,9 +698,18 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   font-size: 13px;
   line-height: 22px;
   background-color: var(--ui-surface);
+  caret-color: var(--ui-accent);
+  box-shadow: 0 0 0 0px transparent;
 }
 .ui-field::placeholder {
   color: var(--ui-placeholder);
+  transition:
+    opacity 180ms var(--motion-ease),
+    transform 200ms var(--motion-ease);
+}
+.ui-field:focus::placeholder {
+  opacity: 0.58;
+  transform: translateX(2px);
 }
 
 /* Ensure all select elements and options respect the application color theme */
@@ -682,7 +758,13 @@ input.ui-field-search {
 .ui-field:focus-visible {
   outline: none;
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 3px var(--theme-accent-soft, rgba(37, 99, 235, 0.16));
+  box-shadow: 0 0 0 3.5px var(--theme-accent-soft, rgba(37, 99, 235, 0.18));
+}
+
+/* Search wrapper icon focus tint & micro-scale when input inside is focused */
+:where(.relative, div):focus-within > svg.lucide-search {
+  color: var(--ui-accent);
+  transform: scale(1.08);
 }
 
 /* Custom Inset Select Chevrons (Prevents arrow touching corner border) */
@@ -723,6 +805,7 @@ input[type="checkbox"] {
 }
 
 .ui-segmented {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -734,6 +817,8 @@ input[type="checkbox"] {
   max-width: 100%;
 }
 .ui-segmented button {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -748,20 +833,45 @@ input[type="checkbox"] {
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-}
-.ui-segmented button:hover,
-.ui-segmented button:active {
-  translate: none;
   scale: 1;
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    scale var(--motion-bounce) var(--ease-liquid-bounce);
 }
 .ui-segmented button:hover {
+  translate: none;
+  scale: 1;
   color: var(--ui-text);
 }
+.ui-segmented button:active:not(:disabled) {
+  scale: 0.96;
+  transition-duration: 70ms;
+  transition-timing-function: var(--ease-press-in);
+}
 .ui-segmented button[aria-pressed="true"] {
+  color: var(--ui-text);
+}
+.ui-segmented button[aria-pressed="true"]:not([data-has-pill="true"]) {
   background: var(--ui-surface);
   border-color: var(--ui-border);
-  color: var(--ui-text);
   box-shadow: var(--ui-shadow);
+}
+.ui-segmented-pill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 9px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow:
+    var(--ui-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+:root[data-theme="dark"] .ui-segmented-pill {
+  box-shadow:
+    var(--ui-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .ui-segmented svg {
   width: 15px;
@@ -1273,6 +1383,7 @@ input[type="checkbox"] {
   gap: 8px;
 }
 .settings-sidebar nav button {
+  position: relative;
   display: flex;
   gap: 12px;
   align-items: center;
@@ -1283,16 +1394,34 @@ input[type="checkbox"] {
   border-radius: 16px;
   color: var(--ui-muted);
   cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    scale 260ms var(--ease-liquid-bounce);
+}
+.settings-sidebar nav button:active {
+  scale: 0.975;
+  transition-duration: 75ms;
+  transition-timing-function: var(--ease-press-in);
 }
 .settings-sidebar nav button:hover {
   background: var(--ui-subtle);
   color: var(--ui-text);
 }
 .settings-sidebar nav button[aria-current="page"] {
-  background: var(--ui-surface);
+  background: transparent;
   color: var(--ui-text);
-  border-color: var(--ui-border);
-  box-shadow: 0 3px 8px -6px rgb(0 0 0 / 25%);
+}
+.settings-nav-active-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow:
+    0 3px 8px -6px rgb(0 0 0 / 25%),
+    inset 0 1px 0 rgb(255 255 255 / 45%);
+  pointer-events: none;
 }
 .settings-nav-icon {
   flex-shrink: 0;
@@ -2224,12 +2353,15 @@ button.record-status:focus-visible {
   position: absolute;
   top: 24px;
   right: 24px;
-  z-index: 2;
+  z-index: 30;
   width: 36px;
   height: 36px;
   background: var(--ui-inset);
   color: var(--ui-secondary);
   border: 1px solid var(--ui-border);
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 .app-dialog .app-dialog-close:hover {
   background: var(--ui-hover);
@@ -2290,7 +2422,7 @@ button.record-status:focus-visible {
 }
 .app-dialog .app-dialog-section {
   padding: 0;
-  margin: 0;
+  margin-inline: 0;
   max-height: none;
   overflow: visible;
 }
@@ -2331,18 +2463,31 @@ button.record-status:focus-visible {
   border-color: var(--ui-border);
   background-color: var(--ui-subtle);
   color: var(--foreground);
+  caret-color: var(--theme-accent);
   font-size: 13px;
   font-weight: 400;
   line-height: 1.5;
-  box-shadow: none;
+  box-shadow: 0 0 0 0px transparent;
+  transition:
+    border-color 180ms var(--motion-ease),
+    box-shadow 220ms var(--motion-ease),
+    background-color 180ms var(--motion-ease);
 }
 .app-dialog :is(input, textarea)::placeholder {
   color: var(--theme-text-placeholder);
+  transition:
+    opacity 180ms var(--motion-ease),
+    transform 200ms var(--motion-ease);
+}
+.app-dialog :is(input, textarea):focus::placeholder {
+  opacity: 0.58;
+  transform: translateX(2px);
 }
 .app-dialog :is(input, select, textarea):focus {
   outline: none;
   border-color: var(--theme-accent);
-  box-shadow: 0 0 0 3px var(--theme-accent-faint);
+  background-color: var(--ui-surface);
+  box-shadow: 0 0 0 3.5px var(--theme-accent-faint);
 }
 .app-dialog input:is([type="checkbox"], [type="radio"]) {
   accent-color: var(--theme-accent);

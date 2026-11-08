@@ -1,6 +1,12 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  SPRING_NAV_GLIDE,
+  SPRING_MENU_POPOVER,
+  EXIT_MENU_POPOVER,
+} from "@/lib/motion";
 import {
   ChevronLeft,
   ChevronRight,
@@ -337,39 +343,36 @@ export default function TaskCalendarView({
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Scope Filter Tabs */}
           <div className="inline-flex rounded-xl bg-surface-neutral-100 p-1 border border-line-neutral-200/70 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setScopeFilter("all")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                scopeFilter === "all"
-                  ? "bg-surface shadow-xs text-content-neutral-900 font-bold"
-                  : "text-content-neutral-600 hover:text-content-neutral-900"
-              }`}
-            >
-              All Items
-            </button>
-            <button
-              type="button"
-              onClick={() => setScopeFilter("tasks")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                scopeFilter === "tasks"
-                  ? "bg-surface shadow-xs text-content-neutral-900 font-bold"
-                  : "text-content-neutral-600 hover:text-content-neutral-900"
-              }`}
-            >
-              Tasks Only
-            </button>
-            <button
-              type="button"
-              onClick={() => setScopeFilter("events")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                scopeFilter === "events"
-                  ? "bg-surface shadow-xs text-content-neutral-900 font-bold"
-                  : "text-content-neutral-600 hover:text-content-neutral-900"
-              }`}
-            >
-              Events Only
-            </button>
+            {(
+              [
+                { id: "all", label: "All Items" },
+                { id: "tasks", label: "Tasks Only" },
+                { id: "events", label: "Events Only" },
+              ] as const
+            ).map((tab) => {
+              const isActive = scopeFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setScopeFilter(tab.id)}
+                  className={`relative px-3 py-1.5 rounded-lg transition-colors active:scale-[0.96] ${
+                    isActive
+                      ? "text-content-neutral-900 font-bold"
+                      : "text-content-neutral-600 hover:text-content-neutral-900"
+                  }`}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="calendar-scope-pill"
+                      transition={SPRING_NAV_GLIDE}
+                      className="absolute inset-0 rounded-lg bg-surface shadow-xs"
+                    />
+                  )}
+                  <span className="relative z-10">{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Task Status Dropdown (visible when tasks included) */}
@@ -405,26 +408,36 @@ export default function TaskCalendarView({
 
           {/* View Mode Toggle: Grid vs Agenda */}
           <div className="flex items-center gap-1 bg-surface-neutral-100 rounded-xl p-1 border border-line-neutral-200/70">
-            <button
-              type="button"
-              title="Month Grid"
-              onClick={() => setViewType("grid")}
-              className={`p-1.5 rounded-lg transition-colors ${
-                viewType === "grid" ? "bg-surface text-accent shadow-xs" : "text-content-neutral-500 hover:text-content-neutral-800"
-              }`}
-            >
-              <Grid3X3 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              title="Schedule / Agenda"
-              onClick={() => setViewType("agenda")}
-              className={`p-1.5 rounded-lg transition-colors ${
-                viewType === "agenda" ? "bg-surface text-accent shadow-xs" : "text-content-neutral-500 hover:text-content-neutral-800"
-              }`}
-            >
-              <List className="w-4 h-4" />
-            </button>
+            {(
+              [
+                { id: "grid", title: "Month Grid", Icon: Grid3X3 },
+                { id: "agenda", title: "Schedule / Agenda", Icon: List },
+              ] as const
+            ).map(({ id, title, Icon }) => {
+              const isActive = viewType === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  title={title}
+                  onClick={() => setViewType(id)}
+                  className={`relative p-1.5 rounded-lg transition-colors active:scale-[0.94] ${
+                    isActive
+                      ? "text-accent"
+                      : "text-content-neutral-500 hover:text-content-neutral-800"
+                  }`}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="calendar-view-mode-pill"
+                      transition={SPRING_NAV_GLIDE}
+                      className="absolute inset-0 rounded-lg bg-surface shadow-xs"
+                    />
+                  )}
+                  <Icon className="relative z-10 w-4 h-4" />
+                </button>
+              );
+            })}
           </div>
 
           {/* Create Event Trigger */}
@@ -546,35 +559,52 @@ export default function TaskCalendarView({
                   </div>
 
                   {/* Popover for Quick Add on day cell */}
-                  {quickAddDate === cell.dateStr && (
-                    <div
-                      className="absolute z-30 top-7 left-2 right-2 p-2 bg-surface border border-line-neutral-300 rounded-xl shadow-xl space-y-1 text-xs"
-                      onMouseLeave={() => setQuickAddDate(null)}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onAddTaskForDate(cell.dateStr);
-                          setQuickAddDate(null);
+                  <AnimatePresence>
+                    {quickAddDate === cell.dateStr && (
+                      <motion.div
+                        key={`quick-add-${cell.dateStr}`}
+                        initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                        animate={{
+                          opacity: 1,
+                          scale: 1,
+                          y: 0,
+                          transition: SPRING_MENU_POPOVER,
                         }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5"
-                      >
-                        <CheckCircle2 className="w-3 h-3 text-accent" />
-                        <span>Add Task for {cell.dayNumber}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onAddEventForDate(cell.dateStr);
-                          setQuickAddDate(null);
+                        exit={{
+                          opacity: 0,
+                          scale: 0.95,
+                          y: -3,
+                          transition: EXIT_MENU_POPOVER,
                         }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5"
+                        style={{ transformOrigin: "top right" }}
+                        className="absolute z-30 top-7 left-2 right-2 p-2 bg-surface border border-line-neutral-300 rounded-xl shadow-xl space-y-1 text-xs"
+                        onMouseLeave={() => setQuickAddDate(null)}
                       >
-                        <CalendarIcon className="w-3 h-3 text-accent" />
-                        <span>Add Event for {cell.dayNumber}</span>
-                      </button>
-                    </div>
-                  )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onAddTaskForDate(cell.dateStr);
+                            setQuickAddDate(null);
+                          }}
+                          className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5 active:scale-[0.97] transition-transform"
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-accent" />
+                          <span>Add Task for {cell.dayNumber}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onAddEventForDate(cell.dateStr);
+                            setQuickAddDate(null);
+                          }}
+                          className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent-soft hover:text-accent font-medium text-content-neutral-800 flex items-center gap-1.5 active:scale-[0.97] transition-transform"
+                        >
+                          <CalendarIcon className="w-3 h-3 text-accent" />
+                          <span>Add Event for {cell.dayNumber}</span>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Scheduled Items List for Day */}
                   <div className="flex-1 mt-1 space-y-1 overflow-hidden">

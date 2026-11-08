@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect, useId } from "react";
 import { ChevronDown, Check } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER, SPRING_LIQUID_BUTTON } from "@/lib/motion";
 
 export interface SelectOption<T extends string = string> {
   value: T;
@@ -42,6 +44,7 @@ export function SelectDropdown<T extends string = string>({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
+  const reducedMotion = useReducedMotion();
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -152,63 +155,102 @@ export function SelectDropdown<T extends string = string>({
         />
       </button>
 
-      {isOpen && (
-        <div
-          ref={menuRef}
-          id={listboxId}
-          role="listbox"
-          tabIndex={-1}
-          aria-label={ariaLabel || "Options"}
-          className={`absolute z-50 mt-2 min-w-[170px] bg-surface/95 dark:bg-[#19191f]/95 backdrop-blur-md rounded-[16px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] border border-line-neutral-200/80 dark:border-[#2c2c37] animate-in fade-in-0 zoom-in-95 duration-150 select-none ${
-            align === "right" ? "right-0" : "left-0"
-          } ${menuClassName}`}
-        >
-          <div className="flex flex-col gap-0.5 max-h-[300px] overflow-y-auto no-scrollbar">
-            {options.map((option, index) => {
-              const isSelected = option.value === value;
-              const isHighlighted = index === highlightedIndex;
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            ref={menuRef}
+            id={listboxId}
+            role="listbox"
+            tabIndex={-1}
+            aria-label={ariaLabel || "Options"}
+            initial={
+              reducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, scaleX: 0.95, scaleY: 0.86, y: -6 }
+            }
+            animate={
+              reducedMotion
+                ? { opacity: 1, transition: { duration: 0 } }
+                : {
+                    opacity: 1,
+                    scaleX: 1,
+                    scaleY: 1,
+                    y: 0,
+                    transition: SPRING_MENU_POPOVER,
+                  }
+            }
+            exit={
+              reducedMotion
+                ? { opacity: 0, transition: { duration: 0 } }
+                : {
+                    opacity: 0,
+                    scaleX: 0.96,
+                    scaleY: 0.9,
+                    y: -4,
+                    transition: EXIT_MENU_POPOVER,
+                  }
+            }
+            style={{
+              transformOrigin: align === "right" ? "top right" : "top left",
+            }}
+            className={`absolute z-50 mt-2 min-w-[170px] bg-surface/95 dark:bg-[#19191f]/95 backdrop-blur-md rounded-[16px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] border border-line-neutral-200/80 dark:border-[#2c2c37] select-none ${
+              align === "right" ? "right-0" : "left-0"
+            } ${menuClassName}`}
+          >
+            <div className="flex flex-col gap-0.5 max-h-[300px] overflow-y-auto no-scrollbar">
+              {options.map((option, index) => {
+                const isSelected = option.value === value;
+                const isHighlighted = index === highlightedIndex;
 
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                    buttonRef.current?.focus();
-                  }}
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-[10px] text-[12.5px] font-medium text-left transition-colors cursor-pointer outline-none ${
-                    isSelected
-                      ? "bg-accent/12 text-accent font-semibold"
-                      : isHighlighted
-                        ? "bg-surface-neutral-100 text-content-neutral-950"
-                        : "text-content-neutral-700 hover:bg-surface-neutral-100 hover:text-content-neutral-950"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    {option.icon && (
-                      <span className="shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-                        {option.icon}
-                      </span>
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      onChange(option.value);
+                      setIsOpen(false);
+                      buttonRef.current?.focus();
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-[10px] text-[12.5px] font-medium text-left transition-colors cursor-pointer outline-none ${
+                      isSelected
+                        ? "bg-accent/12 text-accent font-semibold"
+                        : isHighlighted
+                          ? "bg-surface-neutral-100 text-content-neutral-950"
+                          : "text-content-neutral-700 hover:bg-surface-neutral-100 hover:text-content-neutral-950"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      {option.icon && (
+                        <span className="shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+                          {option.icon}
+                        </span>
+                      )}
+                      <span className="truncate">{option.label}</span>
+                    </div>
+                    {isSelected && (
+                      <motion.span
+                        initial={reducedMotion ? false : { scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={SPRING_LIQUID_BUTTON}
+                        className="shrink-0 ml-2 inline-flex"
+                      >
+                        <Check
+                          className="w-3.5 h-3.5 text-accent"
+                          strokeWidth={2.4}
+                          aria-hidden="true"
+                        />
+                      </motion.span>
                     )}
-                    <span className="truncate">{option.label}</span>
-                  </div>
-                  {isSelected && (
-                    <Check
-                      className="w-3.5 h-3.5 text-accent shrink-0 ml-2"
-                      strokeWidth={2.4}
-                      aria-hidden="true"
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

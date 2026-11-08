@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
+import { motion } from "motion/react";
+import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import type { InvoiceWithClient } from "@/types/billing";
 import { formatCents } from "@/lib/format";
 import {
@@ -356,31 +358,45 @@ export function OverdueSummaryDialog({
           <div className="flex flex-wrap items-center gap-2">
             {/* Format Choice Pill: CSV vs Excel */}
             <div
-              className="inline-flex p-0.5 rounded-xl bg-surface-neutral-100 border border-line-neutral-200"
+              className="relative inline-flex p-0.5 rounded-xl bg-surface-neutral-100 border border-line-neutral-200"
               role="group"
               aria-label="Choose export file format"
             >
               <button
                 type="button"
                 onClick={() => setExportFormat("csv")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`relative isolate px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   exportFormat === "csv"
-                    ? "bg-surface text-content-neutral-950 shadow-2xs border border-line-neutral-200/80"
+                    ? "text-content-neutral-950"
                     : "text-content-neutral-500 hover:text-content-neutral-800"
                 }`}
               >
-                CSV (.csv)
+                {exportFormat === "csv" && (
+                  <motion.span
+                    layoutId="overdue-export-fmt-pill"
+                    transition={SPRING_NAV_GLIDE}
+                    className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-2xs border border-line-neutral-200/80"
+                  />
+                )}
+                <span className="relative z-10">CSV (.csv)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setExportFormat("excel")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`relative isolate px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   exportFormat === "excel"
-                    ? "bg-emerald-600 text-white shadow-2xs"
+                    ? "text-white"
                     : "text-content-neutral-500 hover:text-content-neutral-800"
                 }`}
               >
-                Excel (.xls)
+                {exportFormat === "excel" && (
+                  <motion.span
+                    layoutId="overdue-export-fmt-pill"
+                    transition={SPRING_NAV_GLIDE}
+                    className="absolute inset-0 -z-10 rounded-lg bg-emerald-600 shadow-2xs"
+                  />
+                )}
+                <span className="relative z-10">Excel (.xls)</span>
               </button>
             </div>
 
@@ -538,31 +554,47 @@ export function OverdueSummaryDialog({
 
         {/* Professional Template View Switcher */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="inline-flex p-1 rounded-xl bg-surface-neutral-100 border border-line-neutral-200/80 gap-1">
+          <div className="relative inline-flex p-1 rounded-xl bg-surface-neutral-100 border border-line-neutral-200/80 gap-1">
             <button
               type="button"
               onClick={() => setActiveViewTab("ledger")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`relative isolate inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                 activeViewTab === "ledger"
-                  ? "bg-surface text-content-neutral-950 shadow-xs border border-line-neutral-200/70"
+                  ? "text-content-neutral-950"
                   : "text-content-neutral-500 hover:text-content-neutral-800"
               }`}
             >
-              <Table2 className="w-3.5 h-3.5 text-accent" />
-              <span>Executive Aging Ledger ({displayedInvoices.length})</span>
+              {activeViewTab === "ledger" && (
+                <motion.span
+                  layoutId="overdue-ledger-tab-pill"
+                  transition={SPRING_NAV_GLIDE}
+                  className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-xs border border-line-neutral-200/70"
+                />
+              )}
+              <Table2 className="w-3.5 h-3.5 text-accent relative z-10" />
+              <span className="relative z-10">
+                Executive Aging Ledger ({displayedInvoices.length})
+              </span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveViewTab("clients")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`relative isolate inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                 activeViewTab === "clients"
-                  ? "bg-surface text-content-neutral-950 shadow-xs border border-line-neutral-200/70"
+                  ? "text-content-neutral-950"
                   : "text-content-neutral-500 hover:text-content-neutral-800"
               }`}
             >
-              <Users className="w-3.5 h-3.5 text-accent" />
-              <span>
+              {activeViewTab === "clients" && (
+                <motion.span
+                  layoutId="overdue-ledger-tab-pill"
+                  transition={SPRING_NAV_GLIDE}
+                  className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-xs border border-line-neutral-200/70"
+                />
+              )}
+              <Users className="w-3.5 h-3.5 text-accent relative z-10" />
+              <span className="relative z-10">
                 Client Consolidation ({clientConsolidatedRows.length})
               </span>
             </button>
@@ -570,14 +602,23 @@ export function OverdueSummaryDialog({
             <button
               type="button"
               onClick={() => setActiveViewTab("template")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`relative isolate inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                 activeViewTab === "template"
-                  ? "bg-surface text-content-neutral-950 shadow-xs border border-line-neutral-200/70"
+                  ? "text-content-neutral-950"
                   : "text-content-neutral-500 hover:text-content-neutral-800"
               }`}
             >
-              <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-600" />
-              <span>CSV &harr; Excel Convert Engine</span>
+              {activeViewTab === "template" && (
+                <motion.span
+                  layoutId="overdue-ledger-tab-pill"
+                  transition={SPRING_NAV_GLIDE}
+                  className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-xs border border-line-neutral-200/70"
+                />
+              )}
+              <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-600 relative z-10" />
+              <span className="relative z-10">
+                CSV &harr; Excel Convert Engine
+              </span>
             </button>
           </div>
 

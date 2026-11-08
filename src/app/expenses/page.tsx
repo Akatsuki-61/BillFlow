@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { motion } from "framer-motion";
+import { SPRING_NAV_GLIDE } from "@/lib/motion";
 
 import React, { useState, useMemo } from "react";
 import {
@@ -712,19 +714,29 @@ export default function ExpensesPage() {
                 length: Math.max(1, Math.ceil(expenses.length / itemsPerPage)),
               },
               (_, i) => i + 1,
-            ).map((pageNumber) => (
-              <button
-                key={pageNumber}
-                onClick={() => setCurrentPage(pageNumber)}
-                className={`w-7 h-7 rounded flex items-center justify-center text-xs font-semibold transition-all cursor-pointer ${
-                  currentPage === pageNumber
-                    ? "bg-accent-deep-solid text-white shadow-xs"
-                    : "text-content-neutral-600 hover:bg-surface-neutral-100"
-                }`}
-              >
-                {pageNumber}
-              </button>
-            ))}
+            ).map((pageNumber) => {
+              const isActive = currentPage === pageNumber;
+              return (
+                <button
+                  key={pageNumber}
+                  onClick={() => setCurrentPage(pageNumber)}
+                  className={`relative w-7 h-7 rounded flex items-center justify-center text-xs font-semibold transition-colors cursor-pointer active:scale-[0.94] ${
+                    isActive
+                      ? "text-white"
+                      : "text-content-neutral-600 hover:bg-surface-neutral-100"
+                  }`}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="expenses-page-pill"
+                      transition={SPRING_NAV_GLIDE}
+                      className="absolute inset-0 rounded bg-accent-deep-solid shadow-xs"
+                    />
+                  )}
+                  <span className="relative z-10">{pageNumber}</span>
+                </button>
+              );
+            })}
 
             <Button
               aria-label="Next page"

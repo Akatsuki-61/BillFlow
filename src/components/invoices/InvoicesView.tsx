@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { AnimatePresence, motion } from "motion/react";
+import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -3585,275 +3587,327 @@ export default function InvoicesView() {
       )}
 
       {/* Floating Status Menu */}
-      {statusMenu && (
-        <div
-          style={{
-            position: "fixed",
-            top:
-              statusMenu.top !== undefined ? `${statusMenu.top}px` : undefined,
-            bottom:
-              statusMenu.bottom !== undefined
-                ? `${statusMenu.bottom}px`
-                : undefined,
-            left: `${statusMenu.left}px`,
-          }}
-          className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-60 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)] animate-in fade-in-0 zoom-in-95 duration-100"
-          role="menu"
-        >
-          <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider border-b border-line-neutral-100 mb-1">
-            Change Status · {statusMenu.invoice.code}
-          </div>
-          {[
-            {
-              value: "UNPAID",
-              label: "Unpaid",
-              desc: "No payments recorded yet",
-              dot: "bg-accent-faint0",
-            },
-            {
-              value: "ADVANCE_PAID",
-              label: "Advance Paid",
-              desc: "Deposit received, ready to track",
-              dot: "bg-amber-500",
-            },
-            {
-              value: "PAID",
-              label: "Paid",
-              desc: "Fully settled invoice",
-              dot: "bg-emerald-500",
-            },
-            {
-              value: "OVERDUE",
-              label: "Overdue",
-              desc: "Past agreed payment date",
-              dot: "bg-rose-500",
-            },
-            {
-              value: "DRAFT",
-              label: "Draft",
-              desc: "Estimate or unfinalized invoice",
-              dot: "bg-neutral-400",
-            },
-          ].map((opt) => {
-            const isCurrent = statusMenu.invoice.status === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="menuitem"
-                onClick={() =>
-                  void handleChangeStatus(
-                    statusMenu.invoice.id,
-                    opt.value as InvoiceStatus,
-                  )
-                }
-                className={`w-full px-3 py-2 hover:bg-surface-neutral-50 flex items-center justify-between text-left cursor-pointer transition-colors ${
-                  isCurrent
-                    ? "bg-surface-neutral-50/80 font-semibold text-accent"
-                    : ""
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full shrink-0 ${opt.dot}`}
-                  />
-                  <div>
-                    <div className="text-xs leading-none">{opt.label}</div>
-                    <div className="text-[10px] text-content-neutral-400 mt-0.5 leading-tight">
-                      {opt.desc}
+      <AnimatePresence initial={false}>
+        {statusMenu && (
+          <motion.div
+            key={`status-menu-${statusMenu.invoice.id}`}
+            initial={{
+              opacity: 0,
+              scaleX: 0.95,
+              scaleY: 0.86,
+              y: statusMenu.bottom !== undefined ? 6 : -6,
+            }}
+            animate={{
+              opacity: 1,
+              scaleX: 1,
+              scaleY: 1,
+              y: 0,
+              transition: SPRING_MENU_POPOVER,
+            }}
+            exit={{
+              opacity: 0,
+              scaleX: 0.96,
+              scaleY: 0.9,
+              y: statusMenu.bottom !== undefined ? 4 : -4,
+              transition: EXIT_MENU_POPOVER,
+            }}
+            style={{
+              position: "fixed",
+              top:
+                statusMenu.top !== undefined ? `${statusMenu.top}px` : undefined,
+              bottom:
+                statusMenu.bottom !== undefined
+                  ? `${statusMenu.bottom}px`
+                  : undefined,
+              left: `${statusMenu.left}px`,
+              transformOrigin:
+                statusMenu.bottom !== undefined ? "bottom left" : "top left",
+            }}
+            className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-60 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)]"
+            role="menu"
+          >
+            <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider border-b border-line-neutral-100 mb-1">
+              Change Status · {statusMenu.invoice.code}
+            </div>
+            {[
+              {
+                value: "UNPAID",
+                label: "Unpaid",
+                desc: "No payments recorded yet",
+                dot: "bg-accent-faint0",
+              },
+              {
+                value: "ADVANCE_PAID",
+                label: "Advance Paid",
+                desc: "Deposit received, ready to track",
+                dot: "bg-amber-500",
+              },
+              {
+                value: "PAID",
+                label: "Paid",
+                desc: "Fully settled invoice",
+                dot: "bg-emerald-500",
+              },
+              {
+                value: "OVERDUE",
+                label: "Overdue",
+                desc: "Past agreed payment date",
+                dot: "bg-rose-500",
+              },
+              {
+                value: "DRAFT",
+                label: "Draft",
+                desc: "Estimate or unfinalized invoice",
+                dot: "bg-neutral-400",
+              },
+            ].map((opt) => {
+              const isCurrent = statusMenu.invoice.status === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="menuitem"
+                  onClick={() =>
+                    void handleChangeStatus(
+                      statusMenu.invoice.id,
+                      opt.value as InvoiceStatus,
+                    )
+                  }
+                  className={`w-full px-3 py-2 hover:bg-surface-neutral-50 flex items-center justify-between text-left cursor-pointer transition-colors ${
+                    isCurrent
+                      ? "bg-surface-neutral-50/80 font-semibold text-accent"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full shrink-0 ${opt.dot}`}
+                    />
+                    <div>
+                      <div className="text-xs leading-none">{opt.label}</div>
+                      <div className="text-[10px] text-content-neutral-400 mt-0.5 leading-tight">
+                        {opt.desc}
+                      </div>
                     </div>
                   </div>
-                </div>
-                {isCurrent && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 ml-2" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+                  {isCurrent && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 ml-2" />
+                  )}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating Actions Menu */}
-      {actionMenu && (
-        <div
-          style={{
-            position: "fixed",
-            top:
-              actionMenu.top !== undefined ? `${actionMenu.top}px` : undefined,
-            bottom:
-              actionMenu.bottom !== undefined
-                ? `${actionMenu.bottom}px`
-                : undefined,
-            right: `${actionMenu.right}px`,
-          }}
-          className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-52 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)] animate-in fade-in-0 zoom-in-95 duration-100 max-h-[85vh] overflow-y-auto"
-          role="menu"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              setPreviewInvoice(inv);
+      <AnimatePresence initial={false}>
+        {actionMenu && (
+          <motion.div
+            key={`action-menu-${actionMenu.invoice.id}`}
+            initial={{
+              opacity: 0,
+              scaleX: 0.95,
+              scaleY: 0.86,
+              y: actionMenu.bottom !== undefined ? 6 : -6,
             }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors text-content-neutral-900 font-semibold"
-          >
-            <Eye className="w-3.5 h-3.5 text-[#00A887]" />
-            <span>View Invoice Design</span>
-          </button>
-
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              void handleOpenPdf(inv);
+            animate={{
+              opacity: 1,
+              scaleX: 1,
+              scaleY: 1,
+              y: 0,
+              transition: SPRING_MENU_POPOVER,
             }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5 text-content-neutral-500" />
-            <span>Open PDF</span>
-          </button>
-
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              void handleRevealPdf(inv);
+            exit={{
+              opacity: 0,
+              scaleX: 0.96,
+              scaleY: 0.9,
+              y: actionMenu.bottom !== undefined ? 4 : -4,
+              transition: EXIT_MENU_POPOVER,
             }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            style={{
+              position: "fixed",
+              top:
+                actionMenu.top !== undefined ? `${actionMenu.top}px` : undefined,
+              bottom:
+                actionMenu.bottom !== undefined
+                  ? `${actionMenu.bottom}px`
+                  : undefined,
+              right: `${actionMenu.right}px`,
+              transformOrigin:
+                actionMenu.bottom !== undefined ? "bottom right" : "top right",
+            }}
+            className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-52 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)] max-h-[85vh] overflow-y-auto"
+            role="menu"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-content-neutral-500" />
-            <span>Reveal PDF in folder</span>
-          </button>
-
-          {actionMenu.invoice.payments &&
-            actionMenu.invoice.payments.length > 0 && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  const inv = actionMenu.invoice;
-                  setActionMenu(null);
-                  handleOpenInspector(inv);
-                }}
-                className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
-              >
-                <Paperclip className="w-3.5 h-3.5 text-content-neutral-500" />
-                <span>
-                  Payments & Receipts ({actionMenu.invoice.payments.length})
-                </span>
-              </button>
-            )}
-
-          <div className="my-1 border-t border-line-neutral-100" />
-
-          {!actionMenu.invoice.clientId && (
             <button
               type="button"
               role="menuitem"
               onClick={() => {
                 const inv = actionMenu.invoice;
                 setActionMenu(null);
-                void handlePromoteClient(inv);
+                setPreviewInvoice(inv);
               }}
-              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer text-accent font-semibold transition-colors"
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors text-content-neutral-900 font-semibold"
             >
-              <UserPlus className="w-3.5 h-3.5 text-accent" />
-              <span>Save as Permanent Client</span>
+              <Eye className="w-3.5 h-3.5 text-[#00A887]" />
+              <span>View Invoice Design</span>
             </button>
-          )}
 
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              handleOpenEdit(inv);
-            }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
-          >
-            <Pencil className="w-3.5 h-3.5 text-content-neutral-400" />
-            <span>Edit Details</span>
-          </button>
-
-          <div className="my-1 border-t border-line-neutral-100" />
-          <div className="px-3 py-1 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider">
-            Change Status
-          </div>
-          {(
-            [
-              { value: "UNPAID", label: "UNPAID" },
-              { value: "ADVANCE_PAID", label: "ADVANCE PAID" },
-              { value: "PAID", label: "PAID" },
-              { value: "OVERDUE", label: "OVERDUE" },
-              { value: "DRAFT", label: "DRAFT" },
-            ] as { value: InvoiceStatus; label: string }[]
-          ).map((s) => (
             <button
-              key={s.value}
               type="button"
               role="menuitem"
-              onClick={() =>
-                void handleChangeStatus(actionMenu.invoice.id, s.value)
-              }
-              className={`w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center justify-between cursor-pointer transition-colors ${
-                actionMenu.invoice.status === s.value
-                  ? "font-bold text-accent"
-                  : ""
-              }`}
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                void handleOpenPdf(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <span>{s.label}</span>
-              {actionMenu.invoice.status === s.value && (
-                <CheckCircle2 className="w-3 h-3 text-accent" />
-              )}
+              <FileText className="w-3.5 h-3.5 text-content-neutral-500" />
+              <span>Open PDF</span>
             </button>
-          ))}
 
-          <div className="my-1 border-t border-line-neutral-100" />
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              setDeletingInvoice(inv);
-            }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-rose-50 text-content-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
-            <span>Delete Invoice</span>
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                void handleRevealPdf(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-content-neutral-500" />
+              <span>Reveal PDF in folder</span>
+            </button>
+
+            {actionMenu.invoice.payments &&
+              actionMenu.invoice.payments.length > 0 && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    const inv = actionMenu.invoice;
+                    setActionMenu(null);
+                    handleOpenInspector(inv);
+                  }}
+                  className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Paperclip className="w-3.5 h-3.5 text-content-neutral-500" />
+                  <span>
+                    Payments & Receipts ({actionMenu.invoice.payments.length})
+                  </span>
+                </button>
+              )}
+
+            <div className="my-1 border-t border-line-neutral-100" />
+
+            {!actionMenu.invoice.clientId && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const inv = actionMenu.invoice;
+                  setActionMenu(null);
+                  void handlePromoteClient(inv);
+                }}
+                className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer text-accent font-semibold transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-accent" />
+                <span>Save as Permanent Client</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                handleOpenEdit(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5 text-content-neutral-400" />
+              <span>Edit Details</span>
+            </button>
+
+            <div className="my-1 border-t border-line-neutral-100" />
+            <div className="px-3 py-1 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider">
+              Change Status
+            </div>
+            {(
+              [
+                { value: "UNPAID", label: "UNPAID" },
+                { value: "ADVANCE_PAID", label: "ADVANCE PAID" },
+                { value: "PAID", label: "PAID" },
+                { value: "OVERDUE", label: "OVERDUE" },
+                { value: "DRAFT", label: "DRAFT" },
+              ] as { value: InvoiceStatus; label: string }[]
+            ).map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                role="menuitem"
+                onClick={() =>
+                  void handleChangeStatus(actionMenu.invoice.id, s.value)
+                }
+                className={`w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center justify-between cursor-pointer transition-colors ${
+                  actionMenu.invoice.status === s.value
+                    ? "font-bold text-accent"
+                    : ""
+                }`}
+              >
+                <span>{s.label}</span>
+                {actionMenu.invoice.status === s.value && (
+                  <CheckCircle2 className="w-3 h-3 text-accent" />
+                )}
+              </button>
+            ))}
+
+            <div className="my-1 border-t border-line-neutral-100" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                setDeletingInvoice(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-rose-50 text-content-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
+              <span>Delete Invoice</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Visual Invoice Document Sheet Modal (from EPS template) */}
-      {previewInvoice && (
-        <InvoiceDocumentSheet
-          invoice={previewInvoice}
-          onClose={() => setPreviewInvoice(null)}
-          onOpenPdf={() => {
-            const inv = previewInvoice;
-            if (inv.id === "sample-preview" || inv.id === "draft-preview") {
-              window.print();
-            } else {
-              void handleOpenPdf(inv);
-            }
-          }}
-          onRecordPayment={() => {
-            const inv = previewInvoice;
-            setPreviewInvoice(null);
-            if (inv.id !== "sample-preview" && inv.id !== "draft-preview") {
-              handleOpenPayment(inv);
-            }
-          }}
-        />
-      )}
+      <MotionPresence>
+        {previewInvoice && (
+          <InvoiceDocumentSheet
+            invoice={previewInvoice}
+            onClose={() => setPreviewInvoice(null)}
+            onOpenPdf={() => {
+              const inv = previewInvoice;
+              if (inv.id === "sample-preview" || inv.id === "draft-preview") {
+                window.print();
+              } else {
+                void handleOpenPdf(inv);
+              }
+            }}
+            onRecordPayment={() => {
+              const inv = previewInvoice;
+              setPreviewInvoice(null);
+              if (inv.id !== "sample-preview" && inv.id !== "draft-preview") {
+                handleOpenPayment(inv);
+              }
+            }}
+          />
+        )}
+      </MotionPresence>
     </div>
   );
 }
