@@ -243,10 +243,10 @@ Run the verification suite before committing:
 ```bash
 npx tsc --noEmit    # Type checking
 npm run lint        # Code style & linting
-npm test            # 96 unit and integration tests (14 suites)
+npm test            # 168 unit and integration tests (26 suites)
 ```
 
-For the complete contribution guide, local environment configuration, and PR workflow, read **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+For the complete module ownership breakdown, detailed sprint timeline, and development history, see **[CONTRIBUTIONS.md](CONTRIBUTIONS.md)**.
 
 ---
 
@@ -256,14 +256,12 @@ BillFlow is designed and built by the **Akatsuki** engineering team:
 
 | Contributor | GitHub | Primary Modules |
 | :--- | :--- | :--- |
-| **Nipun Yatawara** | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron runtime, SQLite/Drizzle layer, itemized invoices, vector PDF generator, Kanban workflow, domain analytics, dark/light theme engine, bug resolution. |
-| **GVSL-Lahiru** | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Lead Quality Assurance & bug hunting audit, application layout & navigation, Clients profiles & delivery defaults, Expenses SQLite ledger, receipt attachments, delivery link resolution. |
-| **Binuka Reshan** | [@Binukareshane](https://github.com/Binukareshane) | Outsourcing work orders, subcontractor payout management, financial integrity, multi-currency synchronization. |
-| **Sandika** | [@Sandika-2003](https://github.com/Sandika-2003) | Service Catalog management, CSV/Excel bulk import, migration naming reconciliation, invoice styling. |
+| **Nipun Yatawara** | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron runtime, SQLite/Drizzle layer, Multi-profile workspaces & password locks, Task-to-Invoice workflow, synchronized card highlighting, spring motion. |
+| **GVSL-Lahiru** | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Lead QA & bug hunting, Deliverable handoff workflow (Submit Work modal), Overdue invoices summary engine (AR aging), CSV data export. |
+| **Binuka Reshan** | [@Binukareshane](https://github.com/Binukareshane) | Task outsourcing engine & payable vouchers (`VND-INV-xxxx`), WhatsApp contractor dispatch, automated ledger expense posting, Excel workbook export. |
+| **Sandika** | [@Sandika-2003](https://github.com/Sandika-2003) | Service Catalog management, bulk CSV/Excel import, UI Rework integration, invoice preview sheet (`InvoiceDocumentSheet.tsx`), macOS Calendar two-way `.ics` sync. |
 
 For the complete module ownership breakdown, detailed sprint timeline, and git history, see **[CONTRIBUTIONS.md](CONTRIBUTIONS.md)**.
-
-For development conventions, branching policies, and pull request guidelines, see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ---
 
