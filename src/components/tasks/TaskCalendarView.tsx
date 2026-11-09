@@ -22,6 +22,8 @@ import {
   CheckSquare,
   Download,
   Upload,
+  ExternalLink,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
 import type { TaskItem, TaskStatus, TaskPriority, TaskCategory } from "@/types/tasks";
@@ -209,22 +211,18 @@ export default function TaskCalendarView({
       syncTimerRef.current = null;
       setIsSyncingCalendar(false);
       if (toastText) onNotifyRef.current?.(toastText);
-    }, 450);
+    }, 200);
   }, []);
 
-  // Run brief internal sync once when Calendar first mounts
+  // Cleanup sync timer on unmount
   useEffect(() => {
-    if (!hasMountedSyncRef.current) {
-      hasMountedSyncRef.current = true;
-      triggerBriefCalendarSync();
-    }
     return () => {
       if (syncTimerRef.current) {
         clearTimeout(syncTimerRef.current);
         syncTimerRef.current = null;
       }
     };
-  }, [triggerBriefCalendarSync]);
+  }, []);
 
   // Filters
   const [scopeFilter, setScopeFilter] = useState<"all" | "tasks" | "events">("all");
@@ -556,7 +554,6 @@ export default function TaskCalendarView({
       endTime: editingTaskEndTime || null,
     });
     setTimeSlotRevision((v) => v + 1);
-    triggerBriefCalendarSync();
     const ok = await onUpdateTask(taskId, {
       title: editingTaskTitle.trim(),
       dueDate: fixedDueDate,
@@ -570,12 +567,17 @@ export default function TaskCalendarView({
   };
 
   // One-click silent sync & open in user's Local OS Calendar (macOS Calendar.app / .ics fallback)
-  const handleExportToLocalCalendar = async () => {
-    triggerBriefCalendarSync();
+  // One-click silent background sync (does NOT open Calendar.app window)
+  const handleSilentSyncLocalCalendar = () => {
+    triggerBriefCalendarSync("Synchronized with local calendar in background.");
+  };
+
+  // Explicit action to open macOS Calendar.app window
+  const handleOpenLocalCalendarApp = async () => {
     if (typeof window !== "undefined" && window.billflow?.events?.openNative) {
       try {
         await window.billflow.events.openNative(getAllTaskTimeSlots());
-        onNotifyRef.current?.("Synced with your macOS Calendar app ('BillFlow' calendar).");
+        onNotifyRef.current?.("Opened your macOS Calendar app ('BillFlow' calendar).");
         return;
       } catch {
         // Fallback to .ics download below
@@ -587,7 +589,7 @@ export default function TaskCalendarView({
       calendarName: "BillFlow",
     });
     downloadIcsFile(`billflow-calendar-${monthPrefix}.ics`, icsContent);
-    onNotifyRef.current?.("Linked calendar exported (.ics) for your local calendar app.");
+    onNotifyRef.current?.("Exported (.ics) file for your local calendar.");
   };
 
   // One-click silent import from user's Local OS Calendar (.ics) with automatic background auto-fixing
@@ -707,16 +709,39 @@ export default function TaskCalendarView({
       />
 
       {/* Application Calendar <-> User Local Calendar Link Bar */}
-      <div className="ui-card p-3.5 px-4 border border-accent/25 bg-accent-soft/10 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="ui-card p-3.5 px-4 border border-line-neutral-200/80 dark:border-line-neutral-800 bg-surface-neutral-50/60 dark:bg-surface-neutral-900/50 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-2xs">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-emerald-50 text-content-emerald-700 border border-line-emerald-200 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-surface-emerald-500 animate-pulse" />
-            <span>Application Calendar &harr; Local Calendar Linked</span>
-          </span>
-          <span className="text-xs text-content-neutral-600">
-            <strong>{tasks.filter((t) => Boolean(t.dueDate)).length}</strong> App Calendar Tasks &middot;{" "}
-            <strong>{events.length}</strong> Local Calendar Events
-          </span>
+          {/* Linked Status Pill Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 text-xs shadow-2xs backdrop-blur-xs">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="font-medium text-content-neutral-800 dark:text-content-neutral-200">
+              Application Calendar
+            </span>
+            <ArrowLeftRight className="w-3 h-3 text-emerald-500/80 shrink-0" />
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              <Link2 className="w-3 h-3 text-emerald-500" />
+              <span>Local Calendar Linked</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs text-content-neutral-500 dark:text-content-neutral-400">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface dark:bg-surface-neutral-800 border border-line-neutral-200/70 dark:border-line-neutral-700/60 font-medium text-content-neutral-700 dark:text-content-neutral-300">
+              <strong className="text-content-neutral-900 dark:text-content-neutral-100 font-semibold mr-1">
+                {tasks.filter((t) => Boolean(t.dueDate)).length}
+              </strong>{" "}
+              App Tasks
+            </span>
+            <span>&middot;</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface dark:bg-surface-neutral-800 border border-line-neutral-200/70 dark:border-line-neutral-700/60 font-medium text-content-neutral-700 dark:text-content-neutral-300">
+              <strong className="text-content-neutral-900 dark:text-content-neutral-100 font-semibold mr-1">
+                {events.length}
+              </strong>{" "}
+              Local Events
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -761,12 +786,24 @@ export default function TaskCalendarView({
             variant="secondary"
             size="small"
             disabled={isSyncingCalendar}
-            onClick={handleExportToLocalCalendar}
-            className="flex items-center gap-1.5 text-xs"
-            title="Export & open your linked Application + Local Calendar in Apple Calendar, Outlook, or Google Calendar (.ics)"
+            onClick={handleSilentSyncLocalCalendar}
+            className="flex items-center gap-1.5 text-xs font-medium"
+            title="Silently synchronize tasks and events with macOS Calendar in the background without opening the Calendar app"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Open Local Calendar (.ics)</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCalendar ? "animate-spin" : ""}`} />
+            <span>Sync Local Calendar</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="small"
+            disabled={isSyncingCalendar}
+            onClick={handleOpenLocalCalendarApp}
+            className="flex items-center gap-1.5 text-xs text-content-neutral-600 hover:text-content-neutral-900"
+            title="Open the macOS Calendar.app window on your screen"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Open Calendar App</span>
           </Button>
 
           <Button
@@ -774,11 +811,11 @@ export default function TaskCalendarView({
             size="small"
             disabled={isSyncingCalendar}
             onClick={() => localCalendarFileInputRef.current?.click()}
-            className="flex items-center gap-1.5 text-xs"
+            className="flex items-center gap-1.5 text-xs font-medium"
             title="Link & import tasks/events from your Local Calendar (.ics) with automatic background auto-fixing"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Link Local Calendar (.ics)</span>
+            <span>Import (.ics)</span>
           </Button>
         </div>
       </div>
@@ -1002,7 +1039,7 @@ export default function TaskCalendarView({
             }
             className="flex items-center gap-1.5"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
             <span>Add Task / Event</span>
           </Button>
         </div>
@@ -1181,7 +1218,6 @@ export default function TaskCalendarView({
                                 aria-label={`Delete task ${t.title}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  triggerBriefCalendarSync();
                                   void onDeleteTask(t.id);
                                 }}
                                 className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-content-neutral-400 hover:text-content-rose-600 transition-opacity shrink-0 cursor-pointer"
@@ -1294,17 +1330,16 @@ export default function TaskCalendarView({
                             variant="ghost"
                             size="small"
                             onClick={() => onSelectTask(task)}
-                            className="text-xs"
+                            className="text-xs flex items-center gap-1.5"
                           >
-                            <Pencil className="w-3.5 h-3.5 mr-1" />
-                            Edit
+                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                            <span>Edit</span>
                           </Button>
                           {onDeleteTask && (
                             <Button
                               variant="ghost"
                               size="small"
                               onClick={() => {
-                                triggerBriefCalendarSync();
                                 void onDeleteTask(task.id);
                               }}
                               className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
@@ -1384,17 +1419,16 @@ export default function TaskCalendarView({
                             variant="ghost"
                             size="small"
                             onClick={() => onSelectEvent(event)}
-                            className="text-xs"
+                            className="text-xs flex items-center gap-1.5"
                           >
-                            <Pencil className="w-3.5 h-3.5 mr-1" />
-                            Edit
+                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                            <span>Edit</span>
                           </Button>
                           {onDeleteEvent && (
                             <Button
                               variant="ghost"
                               size="small"
                               onClick={() => {
-                                triggerBriefCalendarSync();
                                 void onDeleteEvent(event.id);
                               }}
                               className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
@@ -1518,13 +1552,14 @@ export default function TaskCalendarView({
             <button
               type="button"
               onClick={() => setQuickFormType("task")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 quickFormType === "task"
                   ? "bg-accent text-white"
                   : "text-content-neutral-600 hover:text-content-neutral-900"
               }`}
             >
-              + Quick Task
+              <i className="fa-solid fa-plus text-[10px]" aria-hidden="true" />
+              <span>Quick Task</span>
             </button>
             <button
               type="button"
@@ -1627,9 +1662,9 @@ export default function TaskCalendarView({
             variant="primary"
             size="small"
             disabled={!quickTitle.trim() || isSubmittingQuick}
-            className="shrink-0"
+            className="shrink-0 flex items-center gap-1.5"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
             <span>{quickFormType === "task" ? "Add Task" : "Add Event"}</span>
           </Button>
         </form>
@@ -1653,9 +1688,9 @@ export default function TaskCalendarView({
                       : todayStr
                   )
                 }
-                className="text-xs"
+                className="text-xs flex items-center gap-1.5"
               >
-                <Plus className="w-3 h-3" />
+                <i className="fa-solid fa-plus text-[11px]" aria-hidden="true" />
                 <span>New Task / Event</span>
               </Button>
             </div>
@@ -1750,8 +1785,10 @@ export default function TaskCalendarView({
                             variant="primary"
                             size="small"
                             onClick={() => void saveInlineEditTask(task.id)}
+                            className="flex items-center gap-1.5"
                           >
-                            Save
+                            <i className="fa-solid fa-arrows-rotate text-xs" aria-hidden="true" />
+                            <span>Save Task</span>
                           </Button>
                         </div>
                       </div>
@@ -1811,16 +1848,15 @@ export default function TaskCalendarView({
                             type="button"
                             onClick={() => startInlineEditTask(task)}
                             title="Edit task"
-                            className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors"
+                            className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors cursor-pointer"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
                           </button>
                         )}
                         {onDeleteTask && (
                           <button
                             type="button"
                             onClick={() => {
-                              triggerBriefCalendarSync();
                               void onDeleteTask(task.id);
                             }}
                             title="Delete task"

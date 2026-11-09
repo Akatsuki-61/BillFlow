@@ -155,8 +155,12 @@ function EventForm({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-line-neutral-200/70 bg-surface-neutral-50/60">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-accent-soft text-accent">
-              <Calendar className="w-5 h-5" />
+            <div className="p-2 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+              {eventToEdit ? (
+                <i className="fa-solid fa-pen-to-square text-base" aria-hidden="true" />
+              ) : (
+                <Calendar className="w-5 h-5" />
+              )}
             </div>
             <div>
               <h2 id="event-modal-title" className="text-base font-semibold text-content-neutral-900">
@@ -422,9 +426,15 @@ function EventForm({
                     <span>Syncing...</span>
                   </>
                 ) : eventToEdit ? (
-                  "Update Event"
+                  <span className="flex items-center gap-1.5">
+                    <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                    <span>Update Event</span>
+                  </span>
                 ) : (
-                  "Create Event"
+                  <span className="flex items-center gap-1.5">
+                    <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                    <span>Create Event</span>
+                  </span>
                 )}
               </Button>
             </div>

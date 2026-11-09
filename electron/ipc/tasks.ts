@@ -156,24 +156,24 @@ export function registerTaskHandlers(broadcast: () => void) {
   ipcMain.handle("tasks:create", (_e, input: TaskCreateInput) => {
     const result = createTask(input);
     broadcast();
-    scheduleBackgroundNativeCalendarSync(broadcast);
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return result;
   });
   ipcMain.handle("tasks:update", (_e, id: string, patch: TaskPatchInput) => {
     const result = updateTask(id, patch);
     broadcast();
-    scheduleBackgroundNativeCalendarSync(broadcast);
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return result;
   });
   ipcMain.handle("tasks:remove", (_e, id: string) => {
     deleteTask(id);
     broadcast();
-    scheduleBackgroundNativeCalendarSync(broadcast);
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
   });
   ipcMain.handle("tracking:decide", (_e, id: string, choice: "yes" | "no") => {
     const result = decideTracking(id, choice);
     broadcast();
-    scheduleBackgroundNativeCalendarSync(broadcast);
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return result;
   });
 }

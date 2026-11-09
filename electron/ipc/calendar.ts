@@ -1,7 +1,7 @@
 import { app, ipcMain, shell } from "electron";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
-import { execFile } from "child_process";
+import { execFile, execSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -668,6 +668,16 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
   return { accessible, changedCount: importedCount };
 }
 
+function isMacCalendarAppRunning(): boolean {
+  if (process.platform !== "darwin") return false;
+  try {
+    const stdout = execSync("pgrep -x Calendar", { encoding: "utf-8", timeout: 300 });
+    return Boolean(stdout.trim());
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Two-way JXA bridge with macOS Calendar.app:
  * 1) Creates/updates the "BillFlow" calendar inside macOS Calendar.app with all BillFlow Tasks & Events
@@ -700,9 +710,10 @@ function syncWithMacOsCalendarAppViaJxa(
     location: string | null;
   }>;
   pushedCount: number;
+  deletedCount: number;
 }> {
   if (process.platform !== "darwin") {
-    return Promise.resolve({ pulledEvents: [], pushedCount: 0 });
+    return Promise.resolve({ pulledEvents: [], pushedCount: 0, deletedCount: 0 });
   }
 
   const jxaScript = `
@@ -723,14 +734,14 @@ function syncWithMacOsCalendarAppViaJxa(
       var itemsToPush = JSON.parse(argv[0] || "[]");
       var pullMode = argv[1] === "1";
       var Cal = Application("Calendar");
-      var bfCal = null;
-      var cals = Cal.calendars();
-      for (var i = 0; i < cals.length; i++) {
-        if (cals[i].name() === "BillFlow") {
-          bfCal = cals[i];
-          break;
-        }
-      }
+      var wasRunning = false;
+      try {
+        wasRunning = Cal.running();
+      } catch (e) {}
+
+      // Fast direct lookup of BillFlow calendar without iterating every calendar
+      var cals = Cal.calendars.whose({ name: "BillFlow" })();
+      var bfCal = cals.length > 0 ? cals[0] : null;
       if (!bfCal) {
         bfCal = Cal.Calendar({ name: "BillFlow", description: "BillFlow Tasks & Client Schedule" });
         Cal.calendars.push(bfCal);
@@ -744,20 +755,42 @@ function syncWithMacOsCalendarAppViaJxa(
         var existingSummaries = bfCal.events.summary();
         for (var j = 0; j < existingEvents.length; j++) {
           var desc = (existingDescs && existingDescs[j]) ? String(existingDescs[j]) : "";
-          var match = desc.match(/\\[BF-SYNC:([^\\]]+)\\]/);
-          if (match) {
-            existingByKey[match[1]] = {
-              ref: existingEvents[j],
-              summary: (existingSummaries && existingSummaries[j]) ? String(existingSummaries[j]) : "",
-              desc: desc
-            };
+          var bfIdx = desc.indexOf("[BF-SYNC:");
+          if (bfIdx !== -1) {
+            var endIdx = desc.indexOf("]", bfIdx + 9);
+            if (endIdx !== -1) {
+              var syncKey = desc.substring(bfIdx + 9, endIdx);
+              existingByKey[syncKey] = {
+                ref: existingEvents[j],
+                summary: (existingSummaries && existingSummaries[j]) ? String(existingSummaries[j]) : "",
+                desc: desc
+              };
+            }
           }
         }
       } catch (e) {}
 
-      var pushedCount = 0;
+      // 1. Map of active items
+      var activeKeyMap = {};
       for (var k = 0; k < itemsToPush.length; k++) {
-        var item = itemsToPush[k];
+        activeKeyMap[itemsToPush[k].bfKey] = true;
+      }
+
+      // 2. AUTO-DELETE: Remove any events in BillFlow calendar that were deleted or unscheduled in BillFlow
+      var deletedCount = 0;
+      for (var exKey in existingByKey) {
+        if (!activeKeyMap[exKey]) {
+          try {
+            Cal.delete(existingByKey[exKey].ref);
+            deletedCount++;
+          } catch(delErr) {}
+        }
+      }
+
+      // 3. AUTO-EDIT & ADD: Create or update active tasks/events
+      var pushedCount = 0;
+      for (var m = 0; m < itemsToPush.length; m++) {
+        var item = itemsToPush[m];
         var startD = parseLocal(item.startDate, item.isAllDay ? null : (item.startTime || "09:00"), 0);
         var endD = item.isAllDay
           ? parseLocal(item.endDate || item.startDate, null, 24)
@@ -771,14 +804,21 @@ function syncWithMacOsCalendarAppViaJxa(
         var existingEntry = existingByKey[item.bfKey];
         if (existingEntry) {
           try {
-            // Only send AppleEvents to mutate if title or date/time signature actually changed
-            if (existingEntry.summary !== item.title || existingEntry.desc !== fullDesc) {
-              var existingEv = existingEntry.ref;
+            var existingEv = existingEntry.ref;
+            var curSummary = existingEntry.summary || "";
+            var curDesc = existingEntry.desc || "";
+            var needsUpdate = (curSummary !== item.title) ||
+                              (curDesc.indexOf("[BF-SIG:" + syncSig + "]") === -1) ||
+                              (curDesc !== fullDesc);
+            if (needsUpdate) {
               existingEv.summary = item.title;
               existingEv.startDate = startD;
               existingEv.endDate = endD;
               existingEv.alldayEvent = Boolean(item.isAllDay);
               existingEv.description = fullDesc;
+              if (item.location !== undefined) {
+                existingEv.location = item.location || "";
+              }
             }
             pushedCount++;
           } catch (e) {}
@@ -789,7 +829,8 @@ function syncWithMacOsCalendarAppViaJxa(
               description: fullDesc,
               startDate: startD,
               endDate: endD,
-              alldayEvent: Boolean(item.isAllDay)
+              alldayEvent: Boolean(item.isAllDay),
+              location: item.location || ""
             });
             bfCal.events.push(newEv);
             pushedCount++;
@@ -797,15 +838,17 @@ function syncWithMacOsCalendarAppViaJxa(
         }
       }
 
+      // 4. PULL MODE: Only runs when explicitly requested for external calendars
       var pulledEvents = [];
       if (pullMode) {
+        var allCals = Cal.calendars();
         var minDate = new Date(Date.now() - 35 * 86400 * 1000);
         var maxDate = new Date(Date.now() + 90 * 86400 * 1000);
-        for (var ci = 0; ci < cals.length; ci++) {
+        for (var ci = 0; ci < allCals.length; ci++) {
           try {
-            var cName = cals[ci].name();
+            var cName = allCals[ci].name();
             if (cName === "BillFlow") continue;
-            var evs = cals[ci].events.whose({
+            var evs = allCals[ci].events.whose({
               _and: [
                 { startDate: { _greaterThan: minDate } },
                 { startDate: { _lessThan: maxDate } }
@@ -835,7 +878,13 @@ function syncWithMacOsCalendarAppViaJxa(
         }
       }
 
-      return JSON.stringify({ pushedCount: pushedCount, pulledEvents: pulledEvents });
+      if (!wasRunning) {
+        try {
+          Cal.quit();
+        } catch (qErr) {}
+      }
+
+      return JSON.stringify({ pushedCount: pushedCount, deletedCount: deletedCount, pulledEvents: pulledEvents });
     }
   `;
 
@@ -850,10 +899,10 @@ function syncWithMacOsCalendarAppViaJxa(
         JSON.stringify(payloadToPush),
         shouldPullEvents ? "1" : "0",
       ],
-      { timeout: 6000 },
+      { timeout: 7000 },
       (err, stdout) => {
         if (err || !stdout) {
-          resolve({ pulledEvents: [], pushedCount: 0 });
+          resolve({ pulledEvents: [], pushedCount: 0, deletedCount: 0 });
           return;
         }
         try {
@@ -861,24 +910,36 @@ function syncWithMacOsCalendarAppViaJxa(
           resolve({
             pulledEvents: Array.isArray(parsed.pulledEvents) ? parsed.pulledEvents : [],
             pushedCount: Number(parsed.pushedCount) || 0,
+            deletedCount: Number(parsed.deletedCount) || 0,
           });
         } catch {
-          resolve({ pulledEvents: [], pushedCount: 0 });
+          resolve({ pulledEvents: [], pushedCount: 0, deletedCount: 0 });
         }
       }
     );
   });
 }
 
+let lastJxaPullAt = 0;
 let isSyncInFlight = false;
+let queuedSyncPayload: {
+  broadcast?: () => void;
+  incomingTaskTimeSlots?: TaskTimeSlotMap;
+  forcePull?: boolean;
+  pushOnly?: boolean;
+} | null = null;
 let pendingBackgroundSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Non-blocking, debounced background calendar sync.
- * Ensures task/event creation IPC handlers return in <2ms without waiting on macOS Calendar.
+ * Ensures task/event creation, edit, and deletion IPC handlers return in <2ms without waiting on macOS Calendar.
  */
 export function scheduleBackgroundNativeCalendarSync(
-  broadcast?: () => void
+  broadcast?: () => void,
+  options?: {
+    pushOnly?: boolean;
+    incomingTaskTimeSlots?: TaskTimeSlotMap;
+  }
 ): void {
   if (
     process.platform !== "darwin" ||
@@ -892,38 +953,63 @@ export function scheduleBackgroundNativeCalendarSync(
   }
   pendingBackgroundSyncTimer = setTimeout(() => {
     pendingBackgroundSyncTimer = null;
-    void syncNativeLocalCalendar(broadcast);
-  }, 250);
+    void syncNativeLocalCalendar(
+      broadcast,
+      options?.incomingTaskTimeSlots,
+      false,
+      options?.pushOnly ?? true
+    );
+  }, 100);
 }
 
 export async function syncNativeLocalCalendar(
   broadcast?: () => void,
   incomingTaskTimeSlots?: TaskTimeSlotMap,
-  forcePull = false
-): Promise<{ syncedFromMac: number; pushedToMac: number }> {
+  forcePull = false,
+  pushOnly = false
+): Promise<{ syncedFromMac: number; pushedToMac: number; deletedFromMac: number }> {
   if (
     process.platform !== "darwin" ||
     process.env.VITEST ||
     process.env.NODE_ENV === "test"
   ) {
-    return { syncedFromMac: 0, pushedToMac: 0 };
+    return { syncedFromMac: 0, pushedToMac: 0, deletedFromMac: 0 };
   }
   const timeSlots = savePersistedTaskTimeSlots(incomingTaskTimeSlots);
 
   if (isSyncInFlight) {
-    return { syncedFromMac: 0, pushedToMac: 0 };
+    // Queue the latest request so we never drop any task edit or deletion
+    queuedSyncPayload = {
+      broadcast,
+      incomingTaskTimeSlots,
+      forcePull: Boolean(queuedSyncPayload?.forcePull || forcePull),
+      pushOnly: Boolean((queuedSyncPayload ? queuedSyncPayload.pushOnly : true) && pushOnly),
+    };
+    return { syncedFromMac: 0, pushedToMac: 0, deletedFromMac: 0 };
   }
   isSyncInFlight = true;
 
   try {
-    // 1. Pull user's local/iCloud/Google events from macOS Calendar.sqlitedb into BillFlow SQLite
-    const sqliteResult = pullFromMacOsCalendarSqliteDb(forcePull);
-    let totalSyncedFromMac = sqliteResult.changedCount;
-    if (totalSyncedFromMac > 0) {
-      broadcast?.();
+    let totalSyncedFromMac = 0;
+
+    // Only pull external macOS Calendar events if not in push-only mode
+    let shouldPullViaJxa = false;
+    if (!pushOnly) {
+      const sqliteResult = pullFromMacOsCalendarSqliteDb(forcePull);
+      totalSyncedFromMac = sqliteResult.changedCount;
+      if (totalSyncedFromMac > 0) {
+        broadcast?.();
+      }
+
+      // If SQLite was not accessible (FDA required), fallback to JXA pull at most once every 5 minutes unless forced
+      const nowMs = Date.now();
+      if (!sqliteResult.accessible && (forcePull || nowMs - lastJxaPullAt > 5 * 60 * 1000)) {
+        shouldPullViaJxa = true;
+        lastJxaPullAt = nowMs;
+      }
     }
 
-    // 2. Push BillFlow Tasks & Events (including task start/end times) into "BillFlow" in macOS Calendar.app
+    // Push BillFlow Tasks & Events to "BillFlow" in macOS Calendar.app (and delete obsolete events)
     const db = getDb();
     const activeTasks = db
       .select()
@@ -969,10 +1055,65 @@ export async function syncNativeLocalCalendar(
       })),
     ];
 
-    // Only use JXA pull fallback if Calendar.sqlitedb was not accessible at all
+    // If this is a background push-only sync (from task/event edit, create, or delete)
+    // and Calendar.app is NOT currently running, do NOT launch Calendar.app!
+    // Simply keep the local BillFlow.ics export up-to-date.
+    const isCalendarRunning = isMacCalendarAppRunning();
+    if (pushOnly && !isCalendarRunning) {
+      try {
+        const icsContent = generateIcsFromEventsAndTasks({
+          events: appEvents.map((e) => ({
+            id: e.id,
+            title: e.title,
+            description: e.description,
+            startDate: normalizeAndAutoFixDate(e.startDate),
+            endDate: e.endDate ? normalizeAndAutoFixDate(e.endDate, e.startDate) : null,
+            startTime: e.startTime || null,
+            endTime: e.endTime || null,
+            isAllDay: Boolean(e.isAllDay),
+            category: e.category as any,
+            color: e.color as any,
+            clientId: e.clientId || null,
+            clientName: e.clientName || null,
+            taskId: e.taskId || null,
+            taskTitle: e.taskTitle || null,
+            location: e.location || null,
+            createdAt: e.createdAt,
+            updatedAt: e.updatedAt,
+          })),
+          tasks: activeTasks.map((t) => {
+            const slot = timeSlots[t.id];
+            return {
+              id: t.id,
+              title: t.title,
+              description: t.description,
+              status: t.status as any,
+              priority: t.priority as any,
+              category: t.category as any,
+              assignee: t.assignee,
+              dueDate: t.dueDate,
+              startTime: slot?.startTime || null,
+              endTime: slot?.endTime || null,
+              subtasks: [],
+              createdAt: t.createdAt,
+            };
+          }),
+          calendarName: "BillFlow",
+        });
+        const icsPath = path.join(app.getPath("userData"), "BillFlow.ics");
+        fs.writeFileSync(icsPath, icsContent, "utf-8");
+      } catch {}
+
+      return {
+        syncedFromMac: 0,
+        pushedToMac: payloadToPush.length,
+        deletedFromMac: 0,
+      };
+    }
+
     const jxaResult = await syncWithMacOsCalendarAppViaJxa(
       payloadToPush,
-      !sqliteResult.accessible
+      shouldPullViaJxa
     );
 
     if (jxaResult.pulledEvents.length > 0) {
@@ -993,9 +1134,20 @@ export async function syncNativeLocalCalendar(
     return {
       syncedFromMac: totalSyncedFromMac,
       pushedToMac: jxaResult.pushedCount,
+      deletedFromMac: jxaResult.deletedCount,
     };
   } finally {
     isSyncInFlight = false;
+    if (queuedSyncPayload) {
+      const next = queuedSyncPayload;
+      queuedSyncPayload = null;
+      void syncNativeLocalCalendar(
+        next.broadcast,
+        next.incomingTaskTimeSlots,
+        next.forcePull,
+        next.pushOnly
+      );
+    }
   }
 }
 
@@ -1070,22 +1222,22 @@ export function registerCalendarHandlers(broadcast: () => void): void {
   ipcMain.handle("events:get", async (_, id) => getCalendarEvent(id));
   ipcMain.handle("events:create", async (_, input) => {
     const created = createCalendarEvent(input, broadcast);
-    scheduleBackgroundNativeCalendarSync(broadcast);
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return created;
   });
   ipcMain.handle("events:update", async (_, id, patch) => {
     const updated = updateCalendarEvent(id, patch, broadcast);
-    scheduleBackgroundNativeCalendarSync(broadcast);
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return updated;
   });
   ipcMain.handle("events:remove", async (_, id) => {
     const removed = deleteCalendarEvent(id, broadcast);
-    scheduleBackgroundNativeCalendarSync(broadcast);
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return removed;
   });
   ipcMain.handle("events:syncNative", async (_, taskTimeSlots?: TaskTimeSlotMap) => {
     savePersistedTaskTimeSlots(taskTimeSlots);
-    scheduleBackgroundNativeCalendarSync(broadcast);
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true, incomingTaskTimeSlots: taskTimeSlots });
     return { syncedFromMac: 0, pushedToMac: 0 };
   });
   ipcMain.handle("events:openNative", async (_, taskTimeSlots?: TaskTimeSlotMap) =>

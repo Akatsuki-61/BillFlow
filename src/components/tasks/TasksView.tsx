@@ -524,6 +524,7 @@ export default function TasksView({
     }
 
     void saveTask(taskId, { status: targetStatus });
+    showToast(`Updated task status to ${targetStatus.replace("-", " ")}`);
     setDraggedTaskId(null);
   };
 
@@ -711,21 +712,24 @@ export default function TasksView({
     closeAddTaskModal(false);
 
     // Reset Form
+    const createdTitle = newTitle.trim();
     setNewTitle("");
     setNewDescription("");
     setNewIsOutsourced(false);
-    showToast(`Task created in ${newStatus.replace("-", " ")}`);
+    showToast(`Task "${createdTitle}" created in ${newStatus.replace("-", " ")}`);
   };
 
   // Toggle Subtask Completion in Detail Modal
   const handleToggleSubtask = (taskId: string, subtaskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
-    if (task)
+    if (task) {
       void saveTask(taskId, {
         subtasks: task.subtasks.map((st) =>
           st.id === subtaskId ? { ...st, completed: !st.completed } : st,
         ),
       });
+      showToast("Updated task subtasks");
+    }
   };
   const handleDeleteTask = async (taskId: string) => {
     if (saving) return;
@@ -769,6 +773,14 @@ export default function TasksView({
               <span className="bf-toast-trash-badge w-6 h-6 rounded-lg bg-rose-500/20 border border-rose-500/35 text-rose-400 flex items-center justify-center shrink-0">
                 <i className="fa-solid fa-trash" aria-hidden="true" />
               </span>
+            ) : /\b(created|added|scheduled)\b/i.test(toastMessage) ? (
+              <span className="bf-toast-add-badge w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/35 text-emerald-400 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-circle-plus" aria-hidden="true" />
+              </span>
+            ) : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(toastMessage) ? (
+              <span className="bf-toast-update-badge w-6 h-6 rounded-lg bg-blue-500/20 border border-blue-500/35 text-blue-400 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-pen-to-square" aria-hidden="true" />
+              </span>
             ) : (
               <div className="w-2.5 h-2.5 rounded-full bg-accent-solid animate-ping shrink-0" />
             )}
@@ -787,7 +799,11 @@ export default function TasksView({
               className={`bf-toast-progress-bar absolute bottom-0 left-0 right-0 h-[2.5px] ${
                 /\b(deleted|removed)\b/i.test(toastMessage)
                   ? "bg-rose-500/80"
-                  : "bg-accent"
+                  : /\b(created|added|scheduled)\b/i.test(toastMessage)
+                    ? "bg-emerald-500/85"
+                    : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(toastMessage)
+                      ? "bg-blue-500/85"
+                      : "bg-accent"
               }`}
             />
           </MotionSurface>
@@ -860,8 +876,8 @@ export default function TasksView({
           </Button>
 
           {/* Create Task Button */}
-          <Button variant="primary" onClick={() => openAddTaskModal("todo")}>
-            <Plus className="w-4 h-4 transition-transform duration-200 group-hover:scale-105 group-hover:rotate-6" />
+          <Button variant="primary" onClick={() => openAddTaskModal("todo")} className="flex items-center gap-1.5">
+            <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
             <span>New Task</span>
           </Button>
         </div>
@@ -1123,9 +1139,9 @@ export default function TasksView({
                         disabled={!isElectron || isLoading || saving}
                         title={`Add task to ${col.title}`}
                         aria-label={`Add task to ${col.title}`}
-                        className="zentra-circle-btn zentra-circle-btn--sm"
+                        className="zentra-circle-btn zentra-circle-btn--sm flex items-center justify-center text-content-neutral-600 hover:text-accent"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
                       </button>
                     </div>
                   </div>
@@ -1196,9 +1212,10 @@ export default function TasksView({
                         size="small"
                         disabled={!isElectron || isLoading || saving}
                         onClick={() => openAddTaskModal(col.id)}
+                        className="flex items-center gap-1.5"
                       >
-                        <Plus />
-                        Add a task
+                        <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                        <span>Add a task</span>
                       </Button>
                     </EmptyState>
                   ) : (
@@ -1761,13 +1778,21 @@ export default function TasksView({
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-accent" />
-              <h2 className="text-xl font-newspaper font-semibold text-content-neutral-900 dark:text-content-neutral-100">
-                Calendar &amp; Schedule
-              </h2>
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-accent-soft/60 dark:bg-accent-soft/20 text-accent border border-accent/30 flex items-center justify-center shrink-0 shadow-2xs">
+                <Calendar className="w-4 h-4 text-accent" />
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-newspaper font-semibold text-content-neutral-900 dark:text-content-neutral-100">
+                  Calendar &amp; Schedule
+                </h2>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-accent/10 text-accent border border-accent/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  Live Sync
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-content-neutral-500 mt-1">
+            <p className="text-xs text-content-neutral-500 dark:text-content-neutral-400 mt-1 pl-10.5">
               Deliverable deadlines, client milestones, and scheduled work events linked with your tasks.
             </p>
           </div>
@@ -2261,10 +2286,13 @@ export default function TasksView({
                 >
                   Cancel
                 </Button>
-                <Button variant="primary" type="submit" disabled={saving}>
-                  {newRecordType === "task"
-                    ? "Create Deliverable"
-                    : "Schedule Event"}
+                <Button variant="primary" type="submit" disabled={saving} className="flex items-center gap-1.5">
+                  <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                  <span>
+                    {newRecordType === "task"
+                      ? "Create Deliverable"
+                      : "Schedule Event"}
+                  </span>
                 </Button>
               </div>
             </form>
@@ -2553,6 +2581,7 @@ export default function TasksView({
                           void saveTask(selectedTaskForDetail.id, {
                             status: newStatus,
                           });
+                          showToast(`Updated task status to ${newStatus.replace("-", " ")}`);
                         }
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
@@ -2576,6 +2605,7 @@ export default function TasksView({
                         void saveTask(selectedTaskForDetail.id, {
                           priority: e.target.value as TaskPriority,
                         });
+                        showToast(`Updated priority to ${e.target.value}`);
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     >
@@ -2598,6 +2628,7 @@ export default function TasksView({
                         void saveTask(selectedTaskForDetail.id, {
                           category: e.target.value as TaskCategory,
                         });
+                        showToast(`Updated category to ${e.target.value}`);
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     >
@@ -2626,6 +2657,7 @@ export default function TasksView({
                         void saveTask(selectedTaskForDetail.id, {
                           dueDate: e.target.value,
                         });
+                        showToast(`Updated due date to ${e.target.value}`);
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
                     />
