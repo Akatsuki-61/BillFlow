@@ -30,6 +30,8 @@ import {
   Trash2,
   RotateCcw,
   CheckCircle2,
+  Receipt,
+  ListChecks,
 } from "lucide-react";
 import {
   TaskItem,
@@ -42,7 +44,9 @@ import type {
   EventCategory,
   EventColor,
 } from "@/types/calendar";
-import { useData } from "@/lib/data/DataProvider";
+import { useData, isTaskEligibleForInvoicing } from "@/lib/data/DataProvider";
+import type { InvoiceWithClient } from "@/types/billing";
+import InvoiceDocumentSheet from "@/components/invoices/InvoiceDocumentSheet";
 import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/tasks/TaskTiming";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
@@ -74,6 +78,68 @@ const CATEGORY_OPTIONS: SelectOption[] = [
   { value: "Legal", label: "Legal" },
   { value: "Documentation", label: "Documentation" },
 ];
+
+export interface InvoiceLinkPalette {
+  name: "emerald" | "indigo" | "amber" | "teal" | "violet";
+  barColor: string;
+  ringClass: string;
+  glowShadow: string;
+  activeChipClass: string;
+}
+
+const INVOICE_LINK_PALETTES: InvoiceLinkPalette[] = [
+  {
+    name: "emerald",
+    barColor: "#10b981",
+    ringClass: "ring-2 ring-emerald-500/70 !border-emerald-500/60",
+    glowShadow: "0 0 12px rgba(16, 185, 129, 0.25)",
+    activeChipClass:
+      "text-emerald-700 dark:text-emerald-300 bg-emerald-500/12 border-emerald-500/35",
+  },
+  {
+    name: "indigo",
+    barColor: "#6366f1",
+    ringClass: "ring-2 ring-indigo-500/70 !border-indigo-500/60",
+    glowShadow: "0 0 12px rgba(99, 102, 241, 0.25)",
+    activeChipClass:
+      "text-indigo-700 dark:text-indigo-300 bg-indigo-500/12 border-indigo-500/35",
+  },
+  {
+    name: "amber",
+    barColor: "#f59e0b",
+    ringClass: "ring-2 ring-amber-500/70 !border-amber-500/60",
+    glowShadow: "0 0 12px rgba(245, 158, 11, 0.25)",
+    activeChipClass:
+      "text-amber-700 dark:text-amber-300 bg-amber-500/12 border-amber-500/35",
+  },
+  {
+    name: "teal",
+    barColor: "#14b8a6",
+    ringClass: "ring-2 ring-teal-500/70 !border-teal-500/60",
+    glowShadow: "0 0 12px rgba(20, 184, 166, 0.25)",
+    activeChipClass:
+      "text-teal-700 dark:text-teal-300 bg-teal-500/12 border-teal-500/35",
+  },
+  {
+    name: "violet",
+    barColor: "#8b5cf6",
+    ringClass: "ring-2 ring-violet-500/70 !border-violet-500/60",
+    glowShadow: "0 0 12px rgba(139, 92, 246, 0.25)",
+    activeChipClass:
+      "text-violet-700 dark:text-violet-300 bg-violet-500/12 border-violet-500/35",
+  },
+];
+
+export function getInvoiceLinkPalette(
+  invoiceKey?: string | null,
+): InvoiceLinkPalette {
+  const key = (invoiceKey || "default").trim();
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return INVOICE_LINK_PALETTES[hash % INVOICE_LINK_PALETTES.length];
+}
 
 function HighlightText({ text, query }: { text: string; query: string }) {
   const trimmed = query.trim();
@@ -185,6 +251,15 @@ export default function TasksView({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
+
+  // Synchronized Invoice Hover & Batch Invoicing state
+  const [hoveredInvoiceId, setHoveredInvoiceId] = useState<string | null>(null);
+  const [isBatchInvoicingMode, setIsBatchInvoicingMode] = useState(false);
+  const [selectedBatchTaskIds, setSelectedBatchTaskIds] = useState<string[]>(
+    [],
+  );
+  const [previewInvoice, setPreviewInvoice] =
+    useState<InvoiceWithClient | null>(null);
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -471,6 +546,70 @@ export default function TasksView({
       budget: String(task.outsourceBudget || ""),
     });
     router.push(`/outsourcing?${params}`);
+  };
+
+  // Task-to-Invoice handlers
+  const handleBillSingleTask = (task: TaskItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const params = new URLSearchParams({
+      action: "new",
+      importTaskIds: task.id,
+    });
+    if (task.clientId) {
+      params.set("client", task.clientId);
+    }
+    router.push(`/invoices?${params.toString()}`);
+  };
+
+  const handleToggleBatchInvoiceMode = (unbilledTasks: TaskItem[]) => {
+    if (isBatchInvoicingMode) {
+      setIsBatchInvoicingMode(false);
+      setSelectedBatchTaskIds([]);
+    } else {
+      setIsBatchInvoicingMode(true);
+      setSelectedBatchTaskIds(unbilledTasks.map((t) => t.id));
+    }
+  };
+
+  const handleToggleBatchTaskSelection = (
+    taskId: string,
+    e?: React.MouseEvent,
+  ) => {
+    e?.stopPropagation();
+    setSelectedBatchTaskIds((prev) =>
+      prev.includes(taskId)
+        ? prev.filter((id) => id !== taskId)
+        : [...prev, taskId],
+    );
+  };
+
+  const handleSubmitBatchInvoice = () => {
+    if (selectedBatchTaskIds.length === 0) {
+      showToast("Select at least one completed task to invoice");
+      return;
+    }
+    const params = new URLSearchParams({
+      action: "new",
+      importTaskIds: selectedBatchTaskIds.join(","),
+    });
+    setIsBatchInvoicingMode(false);
+    router.push(`/invoices?${params.toString()}`);
+  };
+
+  const handleOpenLinkedInvoicePreview = (
+    task: TaskItem,
+    e?: React.MouseEvent,
+  ) => {
+    e?.stopPropagation();
+    if (!task.invoiceId) return;
+    const linkedInv = invoices.find((inv) => inv.id === task.invoiceId);
+    if (linkedInv) {
+      setPreviewInvoice(linkedInv);
+    } else {
+      router.push(
+        `/invoices?invoice=${encodeURIComponent(task.invoiceId)}&preview=1`,
+      );
+    }
   };
 
   // Create Task or Event Submission (Unified Creation Modal)
@@ -950,18 +1089,88 @@ export default function TasksView({
                       </span>
                     </div>
 
-                    {/* Column Quick Add */}
-                    <button
-                      type="button"
-                      onClick={() => openAddTaskModal(col.id)}
-                      disabled={!isElectron || isLoading || saving}
-                      title={`Add task to ${col.title}`}
-                      aria-label={`Add task to ${col.title}`}
-                      className="zentra-circle-btn zentra-circle-btn--sm"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {col.id === "done" &&
+                        columnTasks.some(isTaskEligibleForInvoicing) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleToggleBatchInvoiceMode(
+                                columnTasks.filter(isTaskEligibleForInvoicing),
+                              )
+                            }
+                            title="Batch Invoice Completed Tasks"
+                            aria-label="Batch Invoice Completed"
+                            className={`px-2 py-1 rounded-full text-[10.5px] font-semibold border transition-all duration-150 flex items-center gap-1 cursor-pointer ${
+                              isBatchInvoicingMode
+                                ? "bg-accent text-white border-accent shadow-2xs"
+                                : "bg-surface border-line-neutral-200 text-content-neutral-700 hover:border-accent/50 hover:text-accent"
+                            }`}
+                          >
+                            <ListChecks className="w-3 h-3" />
+                            <span>
+                              {isBatchInvoicingMode
+                                ? "Cancel Batch"
+                                : "Batch Invoice"}
+                            </span>
+                          </button>
+                        )}
+
+                      {/* Column Quick Add */}
+                      <button
+                        type="button"
+                        onClick={() => openAddTaskModal(col.id)}
+                        disabled={!isElectron || isLoading || saving}
+                        title={`Add task to ${col.title}`}
+                        aria-label={`Add task to ${col.title}`}
+                        className="zentra-circle-btn zentra-circle-btn--sm"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Batch Invoice Selection Toolbar in Done Column */}
+                  {col.id === "done" && isBatchInvoicingMode && (
+                    <div className="mb-2.5 p-2 rounded-xl bg-accent/8 border border-accent/25 flex items-center justify-between gap-2 text-[11px]">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedBatchTaskIds(
+                              columnTasks
+                                .filter(isTaskEligibleForInvoicing)
+                                .map((t) => t.id),
+                            )
+                          }
+                          className="font-semibold text-accent hover:underline cursor-pointer"
+                        >
+                          All
+                        </button>
+                        <span className="text-content-neutral-300">·</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBatchTaskIds([])}
+                          className="text-content-neutral-500 hover:text-content-neutral-800 cursor-pointer"
+                        >
+                          None
+                        </button>
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="small"
+                        type="button"
+                        disabled={selectedBatchTaskIds.length === 0}
+                        onClick={handleSubmitBatchInvoice}
+                        className="!h-6 !px-2.5 !text-[10.5px] gap-1"
+                      >
+                        <Receipt className="w-3 h-3" />
+                        <span>
+                          Create Invoice ({selectedBatchTaskIds.length})
+                        </span>
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Mini Diagonal-Striped Column Strip */}
                   <div className="w-full h-[8px] rounded-full bg-surface-neutral-100 p-[1.5px] flex items-center">
@@ -1001,26 +1210,114 @@ export default function TasksView({
                       const matched = isTaskMatch(task.title);
                       const dimmed = isSearching && !matched;
                       const taskProgressPct = taskProgress(task);
+                      const hasLinkedInvoice = Boolean(
+                        task.invoiceId && task.invoiceId.trim() !== "",
+                      );
+                      const isUnbilledDone = isTaskEligibleForInvoicing(task);
+                      const isBatchSelected = selectedBatchTaskIds.includes(
+                        task.id,
+                      );
+                      const invoicePalette = hasLinkedInvoice
+                        ? getInvoiceLinkPalette(
+                            task.invoiceCode || task.invoiceId,
+                          )
+                        : null;
+                      const isInvoiceHoverLinked = Boolean(
+                        hasLinkedInvoice &&
+                          hoveredInvoiceId &&
+                          hoveredInvoiceId === task.invoiceId,
+                      );
+                      const resolvedInvoiceCode =
+                        task.invoiceCode ||
+                        invoices.find((inv) => inv.id === task.invoiceId)
+                          ?.code ||
+                        "INV";
 
                       return (
                         <div
                           key={task.id}
-                          draggable={!saving}
+                          draggable={!saving && !isBatchInvoicingMode}
                           onDragStart={(e) => handleDragStart(e, task.id)}
-                          onClick={() => setSelectedTaskForDetail(task)}
-                          className={`motion-card group relative bg-surface-neutral-50/75 dark:bg-surface-secondary rounded-[18px] p-4 border transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                          onMouseEnter={() => {
+                            if (hasLinkedInvoice && task.invoiceId) {
+                              setHoveredInvoiceId(task.invoiceId);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            if (hasLinkedInvoice && task.invoiceId) {
+                              setHoveredInvoiceId((prev) =>
+                                prev === task.invoiceId ? null : prev,
+                              );
+                            }
+                          }}
+                          onClick={(e) => {
+                            if (
+                              col.id === "done" &&
+                              isBatchInvoicingMode &&
+                              isUnbilledDone
+                            ) {
+                              handleToggleBatchTaskSelection(task.id, e);
+                              return;
+                            }
+                            setSelectedTaskForDetail(task);
+                          }}
+                          style={
+                            isInvoiceHoverLinked && invoicePalette
+                              ? { boxShadow: invoicePalette.glowShadow }
+                              : undefined
+                          }
+                          data-invoice-id={task.invoiceId || undefined}
+                          data-invoice-highlighted={
+                            isInvoiceHoverLinked ? "true" : undefined
+                          }
+                          className={`motion-card group relative bg-surface-neutral-50/75 dark:bg-surface-secondary rounded-[18px] p-4 border transition-all duration-150 ease-out cursor-grab active:cursor-grabbing ${
                             isDragging
                               ? "opacity-40 scale-98"
-                              : matched
-                                ? "ring-2 ring-accent border-accent opacity-100 z-10"
-                                : dimmed
-                                  ? "opacity-35 dark:opacity-25 grayscale-[70%] border-line-neutral-200/50 shadow-none hover:opacity-75"
-                                  : "border-line-neutral-200/80 hover:border-line-neutral-300 hover:bg-surface shadow-2xs"
+                              : isInvoiceHoverLinked && invoicePalette
+                                ? `${invoicePalette.ringClass} -translate-y-[1.5px] bg-surface z-10`
+                                : col.id === "done" &&
+                                    isBatchInvoicingMode &&
+                                    isBatchSelected
+                                  ? "ring-2 ring-accent border-accent bg-accent/5"
+                                  : matched
+                                    ? "ring-2 ring-accent border-accent opacity-100 z-10"
+                                    : dimmed
+                                      ? "opacity-35 dark:opacity-25 grayscale-[70%] border-line-neutral-200/50 shadow-none hover:opacity-75"
+                                      : "border-line-neutral-200/80 hover:border-line-neutral-300 hover:bg-surface shadow-2xs"
                           }`}
                         >
+                          {/* Subtle 2px Left Accent Bar for Invoice-Linked Cards */}
+                          {hasLinkedInvoice && invoicePalette && (
+                            <span
+                              aria-hidden="true"
+                              style={{
+                                backgroundColor: invoicePalette.barColor,
+                              }}
+                              className={`absolute left-0 top-3.5 bottom-3.5 w-[2.5px] rounded-r-full transition-opacity duration-150 ${
+                                isInvoiceHoverLinked
+                                  ? "opacity-100"
+                                  : "opacity-65 group-hover:opacity-95"
+                              }`}
+                            />
+                          )}
+
                           {/* Top Tag Strip */}
                           <div className="flex items-center justify-between gap-1.5 mb-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              {col.id === "done" &&
+                                isBatchInvoicingMode &&
+                                isUnbilledDone && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isBatchSelected}
+                                    onChange={() => {}}
+                                    onClick={(e) =>
+                                      handleToggleBatchTaskSelection(task.id, e)
+                                    }
+                                    aria-label={`Select ${task.title} for batch invoice`}
+                                    className="w-3.5 h-3.5 rounded text-accent focus:ring-accent cursor-pointer"
+                                  />
+                                )}
                               <span className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-surface border border-line-neutral-200 text-content-neutral-600">
                                 {task.category}
                               </span>
@@ -1093,18 +1390,50 @@ export default function TasksView({
                             </div>
                           </div>
 
-                          {/* Bottom Row: Due Date and Direct Outsource / Delivery Actions */}
-                          <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between gap-2">
-                            <span className="text-[11px] text-content-neutral-500 flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-content-neutral-400" />
-                              <span>
-                                {task.dueDate
-                                  ? task.dueDate.replace(", 2026", "")
-                                  : "No due date"}
+                          {/* Bottom Row: Due Date, Subtle Invoice Indicator, and Direct Outsource / Delivery Actions */}
+                          <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[11px] text-content-neutral-500 flex items-center gap-1 truncate">
+                                <Calendar className="w-3 h-3 text-content-neutral-400 shrink-0" />
+                                <span className="truncate">
+                                  {task.dueDate
+                                    ? task.dueDate.replace(", 2026", "")
+                                    : "No due date"}
+                                </span>
                               </span>
-                            </span>
 
-                            <div className="flex items-center gap-1.5">
+                              {hasLinkedInvoice && invoicePalette && (
+                                <button
+                                  type="button"
+                                  onClick={(e) =>
+                                    handleOpenLinkedInvoicePreview(task, e)
+                                  }
+                                  title={`Linked to Invoice ${resolvedInvoiceCode}`}
+                                  aria-label={`Linked to Invoice ${resolvedInvoiceCode}`}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono tracking-tight border transition-all duration-150 cursor-pointer shrink-0 ${
+                                    isInvoiceHoverLinked
+                                      ? invoicePalette.activeChipClass
+                                      : "text-content-neutral-500 bg-transparent border-transparent hover:border-line-neutral-200 hover:bg-surface-neutral-100 hover:text-content-neutral-800 dark:hover:text-content-neutral-200"
+                                  }`}
+                                >
+                                  #{resolvedInvoiceCode}
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isUnbilledDone && (
+                                <Button
+                                  variant="ghost"
+                                  size="small"
+                                  onClick={(e) => handleBillSingleTask(task, e)}
+                                  title="Bill Task — Create an invoice from this completed deliverable"
+                                  className="text-[11px] text-accent hover:bg-accent/10 flex items-center gap-1 font-semibold"
+                                >
+                                  <Receipt className="w-3 h-3" />
+                                  <span>Bill Task</span>
+                                </Button>
+                              )}
                               {task.status !== "done" ? (
                                 <Button
                                   variant="ghost"
@@ -1242,25 +1571,73 @@ export default function TasksView({
                 {displayListTasks.map((task) => {
                   const matched = isTaskMatch(task.title);
                   const dimmed = isSearching && !matched;
+                  const hasLinkedInvoice = Boolean(
+                    task.invoiceId && task.invoiceId.trim() !== "",
+                  );
+                  const isUnbilledDone = isTaskEligibleForInvoicing(task);
+                  const invoicePalette = hasLinkedInvoice
+                    ? getInvoiceLinkPalette(task.invoiceCode || task.invoiceId)
+                    : null;
+                  const isInvoiceHoverLinked = Boolean(
+                    hasLinkedInvoice &&
+                      hoveredInvoiceId &&
+                      hoveredInvoiceId === task.invoiceId,
+                  );
+                  const resolvedInvoiceCode =
+                    task.invoiceCode ||
+                    invoices.find((inv) => inv.id === task.invoiceId)?.code ||
+                    "INV";
 
                   return (
                     <tr
                       key={task.id}
+                      onMouseEnter={() => {
+                        if (hasLinkedInvoice && task.invoiceId) {
+                          setHoveredInvoiceId(task.invoiceId);
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        if (hasLinkedInvoice && task.invoiceId) {
+                          setHoveredInvoiceId((prev) =>
+                            prev === task.invoiceId ? null : prev,
+                          );
+                        }
+                      }}
                       onClick={() => setSelectedTaskForDetail(task)}
-                      className={`transition-colors cursor-pointer group ${
-                        matched
-                          ? "bg-accent/10 border-l-4 border-l-accent opacity-100"
-                          : dimmed
-                            ? "opacity-35 dark:opacity-25 grayscale-[70%] hover:opacity-75"
-                            : "hover:bg-surface-neutral-50/80"
+                      className={`transition-all duration-150 ease-out cursor-pointer group ${
+                        isInvoiceHoverLinked && invoicePalette
+                          ? `${invoicePalette.ringClass} bg-surface`
+                          : matched
+                            ? "bg-accent/10 border-l-4 border-l-accent opacity-100"
+                            : dimmed
+                              ? "opacity-35 dark:opacity-25 grayscale-[70%] hover:opacity-75"
+                              : "hover:bg-surface-neutral-50/80"
                       }`}
                     >
                       <td className="py-3.5 px-4 font-medium text-content-neutral-900 max-w-xs">
-                        <div className="font-semibold text-content-neutral-900 group-hover:text-accent transition-colors truncate">
-                          <HighlightText
-                            text={task.title}
-                            query={searchQuery}
-                          />
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold text-content-neutral-900 group-hover:text-accent transition-colors truncate">
+                            <HighlightText
+                              text={task.title}
+                              query={searchQuery}
+                            />
+                          </div>
+                          {hasLinkedInvoice && invoicePalette && (
+                            <button
+                              type="button"
+                              onClick={(e) =>
+                                handleOpenLinkedInvoicePreview(task, e)
+                              }
+                              title={`Linked to Invoice ${resolvedInvoiceCode}`}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono tracking-tight border transition-colors cursor-pointer shrink-0 ${
+                                isInvoiceHoverLinked
+                                  ? invoicePalette.activeChipClass
+                                  : "text-content-neutral-500 border-transparent hover:border-line-neutral-200 hover:bg-surface-neutral-100"
+                              }`}
+                            >
+                              #{resolvedInvoiceCode}
+                            </button>
+                          )}
                         </div>
                         <div className="text-xs text-content-neutral-400 truncate">
                           {task.clientName
@@ -1308,6 +1685,18 @@ export default function TasksView({
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {isUnbilledDone && (
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              onClick={(e) => handleBillSingleTask(task, e)}
+                              className="text-xs text-accent hover:bg-accent/10 flex items-center gap-1 font-semibold"
+                              title="Bill Task — Create an invoice from this completed deliverable"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                              <span>Bill Task</span>
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="small"
@@ -2360,6 +2749,29 @@ export default function TasksView({
             onClose={handleCloseSubmitWork}
             onSubmit={handleSubmitWork}
             saving={saving}
+          />
+        )}
+      </MotionPresence>
+
+      {/* LINKED INVOICE PREVIEW SHEET */}
+      <MotionPresence>
+        {previewInvoice && (
+          <InvoiceDocumentSheet
+            invoice={previewInvoice}
+            onClose={() => setPreviewInvoice(null)}
+            onOpenPdf={() => {
+              const inv = previewInvoice;
+              if (workflow?.files?.openInvoicePdf) {
+                void workflow.files.openInvoicePdf(inv.id);
+              } else {
+                window.print();
+              }
+            }}
+            onRecordPayment={() => {
+              const inv = previewInvoice;
+              setPreviewInvoice(null);
+              router.push(`/invoices?invoice=${encodeURIComponent(inv.id)}`);
+            }}
           />
         )}
       </MotionPresence>

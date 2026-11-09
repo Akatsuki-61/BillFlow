@@ -2,7 +2,11 @@ import type { Currency } from "./billing";
 import type { TaskItem, TaskStatus } from "./tasks";
 
 export type TaskCreateInput = Pick<TaskItem, "id" | "title" | "description" | "status" | "priority" | "category" | "assignee" | "dueDate" | "subtasks"> & Partial<Pick<TaskItem, "clientId" | "clientName" | "deliveryUrl" | "currency" | "isOutsourced" | "outsourcedVendor" | "outsourceBudgetCents">>;
-export type TaskPatchInput = Partial<Omit<TaskCreateInput, "id" | "clientId" | "clientName">>;
+export type TaskPatchInput = Partial<Omit<TaskCreateInput, "id">> & {
+  invoiceId?: string | null;
+  invoiceItemId?: string | null;
+  invoiceCode?: string | null;
+};
 export interface TaskHistoryEntry { id: string; taskId: string; fromStatus: string | null; toStatus: string; occurredAt: string }
 export interface TrackingOffer { invoiceId: string; code: string; clientName: string; eligibleAt: string; advanceCents: number; receivedCents: number; currency: Currency }
 export type AttachmentOwner = { type: "payment" | "expense" | "payout"; id: string };

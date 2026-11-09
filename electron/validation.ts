@@ -60,6 +60,7 @@ export const newInvoiceItemSchema = z.object({
   quantity: z.number().int().positive("Quantity must be positive").default(1),
   unitPriceCents: z.number().int().nonnegative("Unit price must be non-negative"),
   catalogId: z.string().nullable().optional(),
+  sourceTaskId: z.string().nullable().optional(),
 });
 
 export const newInvoiceSchema = z.object({
@@ -71,6 +72,7 @@ export const newInvoiceSchema = z.object({
   catalogItemId: z.string().trim().nullable().optional(),
   title: z.string().trim().max(160).optional(),
   items: z.array(newInvoiceItemSchema).optional(),
+  linkedTaskIds: z.array(z.string().trim().min(1)).optional(),
   discountCents: z.number().int().nonnegative().optional().default(0),
   taxCents: z.number().int().nonnegative().optional().default(0),
   advanceCents: z.number().int().nonnegative().optional().default(0),

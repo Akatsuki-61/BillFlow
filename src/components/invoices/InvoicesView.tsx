@@ -40,6 +40,8 @@ import {
   AlertTriangle,
   Download,
   FileSpreadsheet,
+  CheckSquare,
+  ListChecks,
 } from "lucide-react";
 import { OverdueSummaryDialog } from "./OverdueSummaryDialog";
 import {
@@ -70,6 +72,7 @@ import type {
   Currency,
 } from "@/types/billing";
 import type { AttachmentItem } from "@/types/workflow";
+import type { TaskItem } from "@/types/tasks";
 
 import "./invoices.css";
 import InvoiceDocumentSheet from "./InvoiceDocumentSheet";
@@ -84,6 +87,7 @@ type FilterTab =
 interface LineItemDraft {
   id: string;
   catalogId?: string;
+  sourceTaskId?: string;
   description: string;
   quantity: number;
   unitPrice: string;
@@ -122,7 +126,13 @@ export default function InvoicesView() {
   const { clients } = useClients();
   const { catalogItems } = useCatalog();
   const { settings } = useSettings();
-  const { workflow, activeCurrency } = useData();
+  const {
+    tasks,
+    workflow,
+    activeCurrency,
+    getUnbilledCompletedTasks,
+    linkTasksToInvoice,
+  } = useData();
 
   const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
   const [clientName, setClientName] = useState("");
@@ -219,6 +229,21 @@ export default function InvoicesView() {
   const [newNotes, setNewNotes] = useState("");
   const [isSubmittingNew, setIsSubmittingNew] = useState(false);
   const [hasInvoiceDraft, setHasInvoiceDraft] = useState(false);
+  const [linkedTaskIds, setLinkedTaskIds] = useState<string[]>([]);
+
+  // Import Completed Tasks Dialog state
+  const [showImportTasksModal, setShowImportTasksModal] = useState(false);
+  const [importTasksShowAllClients, setImportTasksShowAllClients] =
+    useState(false);
+  const [selectedImportTaskIds, setSelectedImportTaskIds] = useState<string[]>(
+    [],
+  );
+  const [importTaskFees, setImportTaskFees] = useState<Record<string, string>>(
+    {},
+  );
+  const [importTaskQuantities, setImportTaskQuantities] = useState<
+    Record<string, number>
+  >({});
 
   // Edit Invoice Modal state
   const [editingInvoice, setEditingInvoice] =
@@ -282,6 +307,9 @@ export default function InvoicesView() {
   // URL search parameters
   const clientFilterParam = searchParams.get("client");
   const isNewParam = searchParams.get("new");
+  const actionParam = searchParams.get("action");
+  const importTaskIdsParam = searchParams.get("importTaskIds");
+  const previewParam = searchParams.get("preview");
   const invoiceHighlightParam = searchParams.get("invoice");
 
   const [previousHighlightParam, setPreviousHighlightParam] = useState(
@@ -414,12 +442,17 @@ export default function InvoicesView() {
   const linkedClient = clients.find(
     (client) => client.id === clientFilterParam,
   );
-  const isNewActive = isNewParam === "1" || isNewParam === "true";
+  const isNewActive =
+    isNewParam === "1" ||
+    isNewParam === "true" ||
+    actionParam === "new" ||
+    Boolean(importTaskIdsParam);
   const modalQueryKey = JSON.stringify([
     isNewActive,
     searchParams.get("t"),
     clientFilterParam,
     linkedClient?.currency,
+    importTaskIdsParam,
   ]);
   const [previousModalQueryKey, setPreviousModalQueryKey] = useState<
     string | null
@@ -435,6 +468,132 @@ export default function InvoicesView() {
       }
     }
   }
+
+  // Handle ?invoice=ID&preview=1 to automatically open the InvoiceDocumentSheet preview
+  useEffect(() => {
+    if (!invoiceHighlightParam || previewParam !== "1") return;
+    const targetInv = allInvoices.find((inv) => inv.id === invoiceHighlightParam);
+    if (targetInv) {
+      setPreviewInvoice(targetInv);
+    }
+  }, [invoiceHighlightParam, previewParam, allInvoices]);
+
+  // Helper to resolve default fee for an imported task
+  const getTaskDefaultFee = React.useCallback(
+    (task: TaskItem): string => {
+      if (task.outsourceBudget && task.outsourceBudget > 0) {
+        return String(task.outsourceBudget);
+      }
+      if (task.outsourceBudgetCents && task.outsourceBudgetCents > 0) {
+        return (task.outsourceBudgetCents / 100).toFixed(2);
+      }
+      const matchingCatalog = catalogItems.find(
+        (ci) =>
+          ci.title.toLowerCase() === task.title.toLowerCase() ||
+          ci.category?.toLowerCase() === task.category.toLowerCase(),
+      );
+      if (matchingCatalog && matchingCatalog.price) {
+        return String(matchingCatalog.price);
+      }
+      return "0.00";
+    },
+    [catalogItems],
+  );
+
+  // Auto-populate New Invoice modal when redirected with ?action=new&importTaskIds=id1,id2...
+  const importedFromQueryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!importTaskIdsParam || tasks.length === 0) return;
+    if (importedFromQueryRef.current === importTaskIdsParam) return;
+
+    const requestedIds = importTaskIdsParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (requestedIds.length === 0) return;
+
+    const matchedTasks = tasks.filter(
+      (t) =>
+        requestedIds.includes(t.id) &&
+        t.status === "done" &&
+        (!t.invoiceId || t.invoiceId.trim() === ""),
+    );
+    if (matchedTasks.length === 0) return;
+
+    importedFromQueryRef.current = importTaskIdsParam;
+
+    const due = new Date();
+    due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
+    setNewDueDate((prev) => prev || due.toISOString().slice(0, 10));
+
+    void getNextInvoiceCode()
+      .then((code) => setNewCode((prev) => prev || code))
+      .catch(() =>
+        setNewCode(
+          (prev) => prev || `INV-${new Date().getFullYear()}-001`,
+        ),
+      );
+
+    // Pre-populate client from first task with a clientId or clientName
+    const taskWithClient = matchedTasks.find(
+      (t) => t.clientId || t.clientName,
+    );
+    if (taskWithClient) {
+      const matchedClient = clients.find(
+        (c) =>
+          (taskWithClient.clientId && c.id === taskWithClient.clientId) ||
+          (taskWithClient.clientName &&
+            c.name.toLowerCase() === taskWithClient.clientName.toLowerCase()),
+      );
+      if (matchedClient) {
+        setClientMode("existing");
+        setNewClientId(matchedClient.id);
+        setNewCurrency(matchedClient.currency);
+        if (matchedClient.driveUrl) {
+          setNewDeliveryUrl(matchedClient.driveUrl);
+        }
+      } else if (taskWithClient.clientName) {
+        setClientMode("new");
+        setClientName(taskWithClient.clientName);
+      }
+    }
+
+    // Pre-populate delivery URL from task if available
+    const taskWithDelivery = matchedTasks.find((t) => t.deliveryUrl);
+    if (taskWithDelivery?.deliveryUrl) {
+      setNewDeliveryUrl((prev) => prev || taskWithDelivery.deliveryUrl || "");
+    }
+
+    // Build line items from matched tasks
+    const generatedItems: LineItemDraft[] = matchedTasks.map((t) => {
+      const completedSubtaskTitles = t.subtasks
+        .filter((st) => st.completed)
+        .map((st) => st.title.trim())
+        .filter(Boolean);
+      const detailsSuffix =
+        completedSubtaskTitles.length > 0
+          ? ` (${completedSubtaskTitles.join(", ")})`
+          : "";
+      return {
+        id: `task-item-${t.id}`,
+        sourceTaskId: t.id,
+        description: `${t.title}${detailsSuffix}`.slice(0, 300),
+        quantity: 1,
+        unitPrice: getTaskDefaultFee(t),
+      };
+    });
+
+    setNewLineItems(generatedItems);
+    setLinkedTaskIds(matchedTasks.map((t) => t.id));
+    setShowAddInvoiceModal(true);
+  }, [
+    importTaskIdsParam,
+    tasks,
+    clients,
+    settings?.defaultDueDays,
+    getNextInvoiceCode,
+    getTaskDefaultFee,
+  ]);
 
   const isInvoiceFormDirty = () => {
     const hasItems = newLineItems.some(
@@ -521,12 +680,17 @@ export default function InvoicesView() {
       saveInvoiceDraft();
     }
     setShowAddInvoiceModal(false);
+    setShowImportTasksModal(false);
     if (
       typeof window !== "undefined" &&
-      window.location.search.includes("new=")
+      (window.location.search.includes("new=") ||
+        window.location.search.includes("action=new") ||
+        window.location.search.includes("importTaskIds="))
     ) {
       const url = new URL(window.location.href);
       url.searchParams.delete("new");
+      url.searchParams.delete("action");
+      url.searchParams.delete("importTaskIds");
       url.searchParams.delete("t");
       window.history.replaceState(
         null,
@@ -575,6 +739,7 @@ export default function InvoicesView() {
     due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
     setNewDueDate(due.toISOString().slice(0, 10));
     setNewLineItems([{ id: "1", description: "", quantity: 1, unitPrice: "" }]);
+    setLinkedTaskIds([]);
     setNewDiscount("");
     setNewTaxRate("");
     setRequireAdvance(true);
@@ -1032,6 +1197,12 @@ export default function InvoicesView() {
   };
 
   const handleRemoveLineItem = (id: string) => {
+    const target = newLineItems.find((it) => it.id === id);
+    if (target?.sourceTaskId) {
+      setLinkedTaskIds((prev) =>
+        prev.filter((taskId) => taskId !== target.sourceTaskId),
+      );
+    }
     setNewLineItems((prev) =>
       prev.length > 1 ? prev.filter((it) => it.id !== id) : prev,
     );
@@ -1077,6 +1248,190 @@ export default function InvoicesView() {
     }
   };
 
+  // Unbilled completed tasks eligible for import (excluding any already added in the current draft)
+  const alreadyDraftedTaskIds = React.useMemo(() => {
+    const ids = new Set<string>(linkedTaskIds);
+    for (const item of newLineItems) {
+      if (item.sourceTaskId) ids.add(item.sourceTaskId);
+    }
+    return ids;
+  }, [linkedTaskIds, newLineItems]);
+
+  const activeDraftClientObj = React.useMemo(() => {
+    if (clientMode === "existing" && newClientId) {
+      return clients.find((c) => c.id === newClientId) || null;
+    }
+    return null;
+  }, [clientMode, newClientId, clients]);
+
+  const allUnbilledTasks = React.useMemo(() => {
+    return getUnbilledCompletedTasks({ includeAllClients: true }).filter(
+      (t) => !alreadyDraftedTaskIds.has(t.id),
+    );
+  }, [getUnbilledCompletedTasks, alreadyDraftedTaskIds]);
+
+  const clientFilteredUnbilledTasks = React.useMemo(() => {
+    const targetClientId =
+      clientMode === "existing" ? newClientId || null : null;
+    const targetClientName =
+      clientMode === "existing"
+        ? activeDraftClientObj?.name || null
+        : clientName.trim() || null;
+    return getUnbilledCompletedTasks({
+      clientId: targetClientId,
+      clientName: targetClientName,
+      includeAllClients: false,
+    }).filter((t) => !alreadyDraftedTaskIds.has(t.id));
+  }, [
+    getUnbilledCompletedTasks,
+    clientMode,
+    newClientId,
+    activeDraftClientObj,
+    clientName,
+    alreadyDraftedTaskIds,
+  ]);
+
+  const displayedImportTasks = importTasksShowAllClients
+    ? allUnbilledTasks
+    : clientFilteredUnbilledTasks;
+
+  const handleOpenImportTasksModal = () => {
+    // Initialize fee and quantity map for all eligible unbilled tasks
+    const nextFees: Record<string, string> = { ...importTaskFees };
+    const nextQtys: Record<string, number> = { ...importTaskQuantities };
+    for (const t of allUnbilledTasks) {
+      if (nextFees[t.id] === undefined) {
+        nextFees[t.id] = getTaskDefaultFee(t);
+      }
+      if (nextQtys[t.id] === undefined) {
+        nextQtys[t.id] = 1;
+      }
+    }
+    setImportTaskFees(nextFees);
+    setImportTaskQuantities(nextQtys);
+
+    // If the currently selected client has no tasks, default to showing all clients so the dialog isn't empty
+    const hasClientTasks = clientFilteredUnbilledTasks.length > 0;
+    setImportTasksShowAllClients(!hasClientTasks);
+    setSelectedImportTaskIds([]);
+    setShowImportTasksModal(true);
+  };
+
+  const handleToggleImportTask = (task: TaskItem) => {
+    setSelectedImportTaskIds((prev) => {
+      const isRemoving = prev.includes(task.id);
+      const next = isRemoving
+        ? prev.filter((id) => id !== task.id)
+        : [...prev, task.id];
+
+      // If no client is selected yet (or when selecting a task belonging to a client), pre-fill the client in the invoice form
+      if (!isRemoving && (task.clientId || task.clientName)) {
+        const matchedClient = clients.find(
+          (c) =>
+            (task.clientId && c.id === task.clientId) ||
+            (task.clientName &&
+              c.name.toLowerCase() === task.clientName.toLowerCase()),
+        );
+        if (matchedClient && (!newClientId || importTasksShowAllClients)) {
+          setClientMode("existing");
+          setNewClientId(matchedClient.id);
+          setNewCurrency(matchedClient.currency);
+          if (matchedClient.driveUrl && !newDeliveryUrl) {
+            setNewDeliveryUrl(matchedClient.driveUrl);
+          }
+        } else if (
+          !matchedClient &&
+          task.clientName &&
+          clientMode === "new" &&
+          !clientName.trim()
+        ) {
+          setClientName(task.clientName);
+        }
+      }
+
+      return next;
+    });
+  };
+
+  const handleSelectAllImportTasks = () => {
+    const ids = displayedImportTasks.map((t) => t.id);
+    setSelectedImportTaskIds(ids);
+    const firstWithClient = displayedImportTasks.find(
+      (t) => t.clientId || t.clientName,
+    );
+    if (firstWithClient) {
+      const matchedClient = clients.find(
+        (c) =>
+          (firstWithClient.clientId && c.id === firstWithClient.clientId) ||
+          (firstWithClient.clientName &&
+            c.name.toLowerCase() === firstWithClient.clientName.toLowerCase()),
+      );
+      if (matchedClient && !newClientId) {
+        setClientMode("existing");
+        setNewClientId(matchedClient.id);
+        setNewCurrency(matchedClient.currency);
+      }
+    }
+  };
+
+  const handleDeselectAllImportTasks = () => {
+    setSelectedImportTaskIds([]);
+  };
+
+  const handleImportSelectedTasks = () => {
+    const selectedTasks = allUnbilledTasks.filter((t) =>
+      selectedImportTaskIds.includes(t.id),
+    );
+    if (selectedTasks.length === 0) {
+      showToast("Select at least one completed task to import", "error");
+      return;
+    }
+
+    const importedLines: LineItemDraft[] = selectedTasks.map((t) => {
+      const completedSubtaskTitles = t.subtasks
+        .filter((st) => st.completed)
+        .map((st) => st.title.trim())
+        .filter(Boolean);
+      const noteSuffix =
+        completedSubtaskTitles.length > 0
+          ? ` (${completedSubtaskTitles.join(", ")})`
+          : "";
+      return {
+        id: `task-item-${t.id}`,
+        sourceTaskId: t.id,
+        description: `${t.title}${noteSuffix}`.slice(0, 300),
+        quantity: Math.max(1, importTaskQuantities[t.id] || 1),
+        unitPrice: importTaskFees[t.id] ?? getTaskDefaultFee(t),
+      };
+    });
+
+    setNewLineItems((prev) => {
+      if (
+        prev.length === 1 &&
+        !prev[0].description.trim() &&
+        !prev[0].unitPrice.trim()
+      ) {
+        return importedLines;
+      }
+      return [...prev, ...importedLines];
+    });
+
+    setLinkedTaskIds((prev) =>
+      Array.from(new Set([...prev, ...selectedTasks.map((t) => t.id)])),
+    );
+
+    const taskWithDelivery = selectedTasks.find((t) => t.deliveryUrl);
+    if (taskWithDelivery?.deliveryUrl && !newDeliveryUrl) {
+      setNewDeliveryUrl(taskWithDelivery.deliveryUrl);
+    }
+
+    setShowImportTasksModal(false);
+    setSelectedImportTaskIds([]);
+    showToast(
+      `Imported ${selectedTasks.length} completed ${selectedTasks.length === 1 ? "task" : "tasks"} into invoice draft.`,
+    );
+  };
+
   // Math for Add Invoice Modal
   const itemsSubtotal = newLineItems.reduce((sum, it) => {
     const q = it.quantity > 0 ? it.quantity : 1;
@@ -1111,10 +1466,19 @@ export default function InvoicesView() {
       const today = new Date().toISOString().split("T")[0];
       const itemsPayload = validItems.map((it) => ({
         catalogId: it.catalogId || undefined,
+        sourceTaskId: it.sourceTaskId || undefined,
         description: it.description.trim(),
         quantity: it.quantity > 0 ? it.quantity : 1,
         unitPriceCents: parseAmountToCents(it.unitPrice || "0"),
       }));
+      const allLinkedTaskIds = Array.from(
+        new Set([
+          ...linkedTaskIds,
+          ...(validItems
+            .map((it) => it.sourceTaskId)
+            .filter(Boolean) as string[]),
+        ]),
+      );
 
       const finalAmountCents = parseAmountToCents(calculatedTotal.toFixed(2));
       const discountCents = parseAmountToCents(discountVal.toFixed(2));
@@ -1142,6 +1506,8 @@ export default function InvoicesView() {
         code: newCode.trim() || undefined,
         title: validItems[0]?.description || undefined,
         items: itemsPayload,
+        linkedTaskIds:
+          allLinkedTaskIds.length > 0 ? allLinkedTaskIds : undefined,
         amountCents: finalAmountCents,
         discountCents,
         taxCents,
@@ -1154,12 +1520,17 @@ export default function InvoicesView() {
         status: newStatus,
       });
 
+      if (allLinkedTaskIds.length > 0) {
+        await linkTasksToInvoice(created.id, created.code, allLinkedTaskIds);
+      }
+
       clearInvoiceDraft();
       closeAddInvoiceModal(false);
       requestId.current = null;
       setNewLineItems([
         { id: "1", description: "", quantity: 1, unitPrice: "" },
       ]);
+      setLinkedTaskIds([]);
       setNewDiscount("");
       setNewTaxRate("");
       setNewDeliveryUrl("");
@@ -2311,29 +2682,48 @@ export default function InvoicesView() {
                       </p>
                     </div>
 
-                    {catalogItems.length > 0 && (
-                      <div className="w-56">
-                        <select
-                          className="ui-field w-full px-3.5 text-xs"
-                          defaultValue=""
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleCatalogSelect(e.target.value);
-                              e.target.value = "";
-                            }
-                          }}
-                        >
-                          <option value="" disabled>
-                            + Add from Catalog...
-                          </option>
-                          {catalogItems.map((ci) => (
-                            <option key={ci.id} value={ci.id}>
-                              {ci.title} ({ci.currency} {ci.price})
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        type="button"
+                        onClick={handleOpenImportTasksModal}
+                        className="text-xs gap-1.5 border-accent/30 text-accent hover:bg-accent/10"
+                        title="Import completed unbilled tasks from your Kanban board"
+                      >
+                        <ListChecks className="w-3.5 h-3.5" />
+                        <span>Import Completed Tasks</span>
+                        {allUnbilledTasks.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold tabular-nums">
+                            {allUnbilledTasks.length}
+                          </span>
+                        )}
+                      </Button>
+
+                      {catalogItems.length > 0 && (
+                        <div className="w-52">
+                          <select
+                            className="ui-field w-full px-3.5 text-xs"
+                            defaultValue=""
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleCatalogSelect(e.target.value);
+                                e.target.value = "";
+                              }
+                            }}
+                          >
+                            <option value="" disabled>
+                              + Add from Catalog...
                             </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                            {catalogItems.map((ci) => (
+                              <option key={ci.id} value={ci.id}>
+                                {ci.title} ({ci.currency} {ci.price})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -2653,6 +3043,228 @@ export default function InvoicesView() {
                 </Button>
               </div>
             </form>
+          </Dialog>
+        )}
+      </MotionPresence>
+
+      {/* Import Completed Tasks Modal */}
+      <MotionPresence>
+        {showImportTasksModal && (
+          <Dialog
+            onClose={() => setShowImportTasksModal(false)}
+            width={680}
+          >
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
+                  <ListChecks className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-content-neutral-900">
+                    Import Completed Tasks
+                  </h3>
+                  <p className="text-xs text-content-neutral-400">
+                    Select unbilled completed deliverables to add as line items
+                    and link to this invoice.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="app-dialog-body">
+              <div className="app-dialog-section p-5 space-y-4">
+                {/* Filter & Bulk Selection Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line-neutral-100">
+                  <div className="flex items-center gap-2">
+                    {(activeDraftClientObj ||
+                      (clientMode === "new" && clientName.trim())) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setImportTasksShowAllClients((prev) => !prev)
+                        }
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
+                          !importTasksShowAllClients
+                            ? "bg-accent/10 border-accent/30 text-accent"
+                            : "bg-surface-neutral-100 border-line-neutral-200 text-content-neutral-600 hover:text-content-neutral-900"
+                        }`}
+                      >
+                        {importTasksShowAllClients
+                          ? `Showing all clients (${allUnbilledTasks.length}) · Filter by ${activeDraftClientObj?.name || clientName.trim()}`
+                          : `Filtered: ${activeDraftClientObj?.name || clientName.trim()} (${clientFilteredUnbilledTasks.length}) · Show all clients`}
+                      </button>
+                    )}
+                  </div>
+
+                  {displayedImportTasks.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="small"
+                        type="button"
+                        onClick={handleSelectAllImportTasks}
+                        className="text-xs h-7 px-2.5"
+                      >
+                        Select All ({displayedImportTasks.length})
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="small"
+                        type="button"
+                        onClick={handleDeselectAllImportTasks}
+                        disabled={selectedImportTaskIds.length === 0}
+                        className="text-xs h-7 px-2.5"
+                      >
+                        Deselect All
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Task Rows */}
+                {displayedImportTasks.length === 0 ? (
+                  <div className="py-10 text-center space-y-2">
+                    <CheckSquare className="w-8 h-8 text-content-neutral-300 mx-auto" />
+                    <p className="text-sm font-semibold text-content-neutral-700">
+                      No unbilled completed tasks found
+                    </p>
+                    <p className="text-xs text-content-neutral-400 max-w-md mx-auto">
+                      {!importTasksShowAllClients && allUnbilledTasks.length > 0
+                        ? `No completed unbilled tasks match "${activeDraftClientObj?.name || clientName.trim()}", but ${allUnbilledTasks.length} completed task(s) exist across other clients.`
+                        : "Move tasks to the Done column on the Kanban board to import them into an invoice."}
+                    </p>
+                    {!importTasksShowAllClients &&
+                      allUnbilledTasks.length > 0 && (
+                        <div className="pt-2">
+                          <Button
+                            variant="secondary"
+                            size="small"
+                            type="button"
+                            onClick={() => setImportTasksShowAllClients(true)}
+                          >
+                            Show All Clients ({allUnbilledTasks.length})
+                          </Button>
+                        </div>
+                      )}
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
+                    {displayedImportTasks.map((task) => {
+                      const isChecked = selectedImportTaskIds.includes(task.id);
+                      const feeVal =
+                        importTaskFees[task.id] ?? getTaskDefaultFee(task);
+                      const loggedHours =
+                        task.activeMilliseconds && task.activeMilliseconds > 0
+                          ? (task.activeMilliseconds / 3600000).toFixed(1)
+                          : null;
+
+                      return (
+                        <div
+                          key={task.id}
+                          onClick={() => handleToggleImportTask(task)}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isChecked
+                              ? "border-accent bg-accent/5 ring-1 ring-accent/25"
+                              : "border-line-neutral-200 bg-surface-neutral-50/60 hover:border-line-neutral-300"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}}
+                              className="mt-0.5 w-4 h-4 rounded text-accent focus:ring-accent cursor-pointer shrink-0"
+                              aria-label={`Select task ${task.title}`}
+                            />
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-content-neutral-900 truncate">
+                                  {task.title}
+                                </span>
+                                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface border border-line-neutral-200 text-content-neutral-600">
+                                  {task.category}
+                                </span>
+                                {task.clientName && (
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent">
+                                    {task.clientName}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-content-neutral-400">
+                                <span>
+                                  Completed:{" "}
+                                  {task.completedAt
+                                    ? formatDateDisplay(task.completedAt)
+                                    : task.dueDate || "Done"}
+                                </span>
+                                {loggedHours && (
+                                  <span>Logged: {loggedHours}h</span>
+                                )}
+                                {task.outsourceBudget ? (
+                                  <span>
+                                    Est. Budget:{" "}
+                                    {formatCents(
+                                      Math.round(task.outsourceBudget * 100),
+                                      task.currency || newCurrency,
+                                    )}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Editable Fee Input */}
+                          <div
+                            className="flex items-center gap-2 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <label className="text-[10px] uppercase font-bold text-content-neutral-400">
+                              Fee ({newCurrency})
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              aria-label={`Fee for ${task.title}`}
+                              value={feeVal}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setImportTaskFees((prev) => ({
+                                  ...prev,
+                                  [task.id]: val,
+                                }));
+                                if (!isChecked) {
+                                  handleToggleImportTask(task);
+                                }
+                              }}
+                              className="ui-field w-28 px-2.5 py-1 text-xs text-right font-mono"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setShowImportTasksModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                disabled={selectedImportTaskIds.length === 0}
+                onClick={handleImportSelectedTasks}
+              >
+                Import Selected Tasks ({selectedImportTaskIds.length})
+              </Button>
+            </div>
           </Dialog>
         )}
       </MotionPresence>

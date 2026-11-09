@@ -73,6 +73,16 @@ interface DataContextType {
   tasks: TaskItem[];
   trackingOffers: TrackingOffer[];
   workflow: WorkflowAPI;
+  getUnbilledCompletedTasks: (options?: {
+    clientId?: string | null;
+    clientName?: string | null;
+    includeAllClients?: boolean;
+  }) => TaskItem[];
+  linkTasksToInvoice: (
+    invoiceId: string,
+    invoiceCode: string,
+    taskIds: string[],
+  ) => Promise<void>;
 
   clients: ClientWithStats[];
   invoices: InvoiceWithClient[];
@@ -182,6 +192,45 @@ async function loadBrowserSnapshot() {
       recentInvoices: memoryInvoices.slice(0, 5),
     },
   };
+}
+
+export function isTaskEligibleForInvoicing(task: TaskItem): boolean {
+  return (
+    task.status === "done" &&
+    (task.invoiceId === null ||
+      task.invoiceId === undefined ||
+      task.invoiceId.trim() === "")
+  );
+}
+
+export function filterUnbilledCompletedTasks(
+  tasks: TaskItem[],
+  options?: {
+    clientId?: string | null;
+    clientName?: string | null;
+    includeAllClients?: boolean;
+  },
+): TaskItem[] {
+  const unbilledDone = tasks.filter(isTaskEligibleForInvoicing);
+  if (!options || options.includeAllClients) {
+    return unbilledDone;
+  }
+  const targetClientId = options.clientId?.trim() || "";
+  const targetClientName = options.clientName?.trim().toLowerCase() || "";
+  if (!targetClientId && !targetClientName) {
+    return unbilledDone;
+  }
+  return unbilledDone.filter((t) => {
+    if (targetClientId && t.clientId === targetClientId) return true;
+    if (
+      targetClientName &&
+      t.clientName &&
+      t.clientName.trim().toLowerCase() === targetClientName
+    ) {
+      return true;
+    }
+    return false;
+  });
 }
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
@@ -377,6 +426,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         payments: [],
       };
       memoryInvoices = [newInv, ...memoryInvoices];
+
+      // Link any imported tasks in browser fallback memory
+      const nowIso = new Date().toISOString();
+      const sourceItemMap = new Map<string, string>();
+      if (input.items && newInv.items) {
+        input.items.forEach((it, idx) => {
+          if (it.sourceTaskId && newInv.items?.[idx]) {
+            sourceItemMap.set(it.sourceTaskId, newInv.items[idx].id);
+          }
+        });
+      }
+      const linkedSet = new Set<string>([
+        ...(input.linkedTaskIds || []),
+        ...Array.from(sourceItemMap.keys()),
+      ]);
+      if (linkedSet.size > 0) {
+        memoryTasks = memoryTasks.map((t) => {
+          if (!linkedSet.has(t.id)) return t;
+          return {
+            ...t,
+            invoiceId: id,
+            invoiceCode: code,
+            invoiceItemId: sourceItemMap.get(t.id) ?? t.invoiceItemId ?? null,
+            clientId: t.clientId || input.clientId || null,
+            clientName: t.clientName || client?.name,
+            updatedAt: nowIso,
+          };
+        });
+      }
+
       await refresh();
       return newInv;
     }
@@ -1381,6 +1460,52 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     },
   };
 
+  const getUnbilledCompletedTasks = useCallback(
+    (options?: {
+      clientId?: string | null;
+      clientName?: string | null;
+      includeAllClients?: boolean;
+    }): TaskItem[] => {
+      return filterUnbilledCompletedTasks(tasks, options);
+    },
+    [tasks],
+  );
+
+  const linkTasksToInvoice = useCallback(
+    async (
+      invoiceId: string,
+      invoiceCode: string,
+      taskIds: string[],
+    ): Promise<void> => {
+      const uniqueIds = Array.from(new Set(taskIds.filter(Boolean)));
+      if (uniqueIds.length === 0) return;
+
+      if (checkIsElectron() && window.billflow) {
+        await Promise.all(
+          uniqueIds.map((taskId) =>
+            window.billflow!.tasks.update(taskId, { invoiceId }).catch(() => null),
+          ),
+        );
+        await refresh();
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      memoryTasks = memoryTasks.map((t) =>
+        uniqueIds.includes(t.id)
+          ? {
+              ...t,
+              invoiceId,
+              invoiceCode,
+              updatedAt: nowIso,
+            }
+          : t,
+      );
+      await refresh();
+    },
+    [checkIsElectron, refresh],
+  );
+
   const activeCurrency: Currency = useMemo(() => {
     return getSystemCurrency(
       settings?.defaultCurrency,
@@ -1395,6 +1520,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         tasks,
         trackingOffers,
         workflow,
+        getUnbilledCompletedTasks,
+        linkTasksToInvoice,
         clients,
         invoices,
         vendors,
