@@ -35,7 +35,7 @@ export function Dialog({
   return createPortal(
     <MotionSurface
       kind="dialog"
-      className="app-dialog-backdrop"
+      className="app-dialog-backdrop app-no-drag"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -45,24 +45,25 @@ export function Dialog({
       <MotionSurface
         kind="panel"
         onDismiss={onClose}
-        className={`app-dialog${compact ? " app-dialog--compact" : ""}`}
+        className={`app-dialog app-no-drag${compact ? " app-dialog--compact" : ""}`}
         style={{ width }}
       >
         {children}
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="icon"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             onClose();
           }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+          }}
           aria-label="Close dialog"
-          className="app-dialog-close"
+          className="ui-button ui-button--ghost ui-button--icon app-dialog-close app-no-drag"
         >
           <X className="w-4 h-4 pointer-events-none" />
-        </Button>
+        </button>
       </MotionSurface>
     </MotionSurface>,
     document.body,

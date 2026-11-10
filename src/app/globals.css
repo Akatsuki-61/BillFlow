@@ -2201,6 +2201,7 @@ button.record-status:focus-visible {
   padding: 24px;
   background: color-mix(in srgb, var(--theme-canvas) 55%, #14141b 20%);
   backdrop-filter: blur(9px);
+  -webkit-app-region: no-drag !important;
 }
 .app-dialog {
   position: relative;
@@ -2219,19 +2220,22 @@ button.record-status:focus-visible {
     inset 0 1px 0 #ffffff66;
   font-size: 13px;
   line-height: 1.65;
+  -webkit-app-region: no-drag !important;
 }
 .app-dialog .app-dialog-close {
   position: absolute;
   top: 24px;
   right: 24px;
-  z-index: 50;
+  z-index: 100;
   width: 36px;
   height: 36px;
+  border-radius: 50%;
   background: var(--ui-inset);
   color: var(--ui-secondary);
   border: 1px solid var(--ui-border);
   cursor: pointer;
-  pointer-events: auto;
+  pointer-events: auto !important;
+  -webkit-app-region: no-drag !important;
 }
 .app-dialog .app-dialog-close:hover {
   background: var(--ui-hover);

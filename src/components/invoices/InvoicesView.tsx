@@ -3562,27 +3562,29 @@ export default function InvoicesView() {
       )}
 
       {/* Visual Invoice Document Sheet Modal (from EPS template) */}
-      {previewInvoice && (
-        <InvoiceDocumentSheet
-          invoice={previewInvoice}
-          onClose={() => setPreviewInvoice(null)}
-          onOpenPdf={() => {
-            const inv = previewInvoice;
-            if (inv.id === "sample-preview" || inv.id === "draft-preview") {
-              window.print();
-            } else {
-              void handleOpenPdf(inv);
-            }
-          }}
-          onRecordPayment={() => {
-            const inv = previewInvoice;
-            setPreviewInvoice(null);
-            if (inv.id !== "sample-preview" && inv.id !== "draft-preview") {
-              handleOpenPayment(inv);
-            }
-          }}
-        />
-      )}
+      <MotionPresence>
+        {previewInvoice && (
+          <InvoiceDocumentSheet
+            invoice={previewInvoice}
+            onClose={() => setPreviewInvoice(null)}
+            onOpenPdf={() => {
+              const inv = previewInvoice;
+              if (inv.id === "sample-preview" || inv.id === "draft-preview") {
+                window.print();
+              } else {
+                void handleOpenPdf(inv);
+              }
+            }}
+            onRecordPayment={() => {
+              const inv = previewInvoice;
+              setPreviewInvoice(null);
+              if (inv.id !== "sample-preview" && inv.id !== "draft-preview") {
+                handleOpenPayment(inv);
+              }
+            }}
+          />
+        )}
+      </MotionPresence>
     </div>
   );
 }
