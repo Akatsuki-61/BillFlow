@@ -110,10 +110,10 @@ contextBridge.exposeInMainWorld("billflow", {
       ipcRenderer.invoke("invoices:recordPayment", input),
     listPayments: (invoiceId: string): Promise<InvoicePayment[]> =>
       ipcRenderer.invoke("invoices:listPayments", invoiceId),
-    exportPdf: (invoiceId: string): Promise<{ success: boolean; filePath: string }> =>
-      ipcRenderer.invoke("invoices:exportPdf", invoiceId),
-    savePdfAs: (invoiceId: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> =>
-      ipcRenderer.invoke("invoices:savePdfAs", invoiceId),
+    exportPdf: (invoiceId: string, template?: string): Promise<{ success: boolean; filePath: string }> =>
+      ipcRenderer.invoke("invoices:exportPdf", invoiceId, template),
+    savePdfAs: (invoiceId: string, template?: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> =>
+      ipcRenderer.invoke("invoices:savePdfAs", invoiceId, template),
     remove: (id: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke("invoices:remove", id),
   },

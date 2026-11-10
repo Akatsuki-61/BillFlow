@@ -127,6 +127,7 @@ function SettingsContent() {
     defaultDueDays: 14,
     defaultTaxRate: 0,
     defaultNotes: "",
+    defaultInvoiceTemplate: "geometric-teal",
     dateFormat: "YYYY-MM-DD",
     currencyDisplay: "symbol",
     pdfExportDirectory: null,
@@ -168,6 +169,7 @@ function SettingsContent() {
         defaultDueDays: settings.defaultDueDays ?? 14,
         defaultTaxRate: settings.defaultTaxRate ?? 0,
         defaultNotes: settings.defaultNotes || "",
+        defaultInvoiceTemplate: settings.defaultInvoiceTemplate || "geometric-teal",
         dateFormat: settings.dateFormat || "YYYY-MM-DD",
         currencyDisplay: settings.currencyDisplay || "symbol",
         pdfExportDirectory: settings.pdfExportDirectory || null,
@@ -201,6 +203,7 @@ function SettingsContent() {
       formState.defaultDueDays !== settings.defaultDueDays ||
       formState.defaultTaxRate !== settings.defaultTaxRate ||
       (formState.defaultNotes ?? "") !== (settings.defaultNotes ?? "") ||
+      (formState.defaultInvoiceTemplate || "geometric-teal") !== (settings.defaultInvoiceTemplate || "geometric-teal") ||
       formState.dateFormat !== settings.dateFormat ||
       formState.currencyDisplay !== settings.currencyDisplay ||
       (formState.pdfExportDirectory || null) !==
@@ -1087,6 +1090,98 @@ function SettingsContent() {
               {/* TAB 2: INVOICES */}
               {activeTab === "invoices" && (
                 <div className="settings-section space-y-6">
+                  {/* Default Invoice Template */}
+                  <div className="ui-card p-6 space-y-4">
+                    <div>
+                      <h2 className="text-sm font-semibold text-content-neutral-900">
+                        Default Invoice Design Template
+                      </h2>
+                      <p className="text-xs text-content-neutral-500 mt-0.5">
+                        Choose the layout and style used for generating invoice previews and exported PDF documents.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Template 1: Geometric Teal */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            defaultInvoiceTemplate: "geometric-teal",
+                          }))
+                        }
+                        className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
+                          (formState.defaultInvoiceTemplate || "geometric-teal") === "geometric-teal"
+                            ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                            : "border-line-neutral-200 dark:border-white/10 hover:border-line-neutral-300 dark:hover:border-white/20 bg-surface"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-content-neutral-900 flex items-center gap-2">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#00A887] inline-block shadow-sm" />
+                            Geometric Teal
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent/10 text-accent uppercase">
+                            Template 1
+                          </span>
+                        </div>
+                        <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
+                          Modern geometric ribbons with deep slate contrast header, sharp angles, and vibrant teal highlights.
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
+                          {(formState.defaultInvoiceTemplate || "geometric-teal") === "geometric-teal" ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                              <span>Active Default</span>
+                            </>
+                          ) : (
+                            <span className="text-content-neutral-400">Click to set as default</span>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Template 2: Executive Wave */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            defaultInvoiceTemplate: "executive-wave",
+                          }))
+                        }
+                        className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
+                          formState.defaultInvoiceTemplate === "executive-wave"
+                            ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                            : "border-line-neutral-200 dark:border-white/10 hover:border-line-neutral-300 dark:hover:border-white/20 bg-surface"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-content-neutral-900 flex items-center gap-2">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#EAA828] inline-block shadow-sm" />
+                            Executive Wave
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 uppercase">
+                            Template 2
+                          </span>
+                        </div>
+                        <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
+                          Premium dark charcoal wave header, warm golden amber accents, alternating rows, and grand total bar.
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
+                          {formState.defaultInvoiceTemplate === "executive-wave" ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                              <span>Active Default</span>
+                            </>
+                          ) : (
+                            <span className="text-content-neutral-400">Click to set as default</span>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="ui-card p-6 space-y-3">
                     <h2 className="text-sm font-semibold">
                       Invoice PDF folder

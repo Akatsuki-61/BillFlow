@@ -15,7 +15,7 @@ import {
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
 import { formatCents, formatDateDisplay } from "@/lib/format";
-import type { InvoiceWithClient } from "@/types/billing";
+import type { InvoiceWithClient, InvoiceTemplateId } from "@/types/billing";
 import { useSettings, useClients, useInvoices } from "@/lib/data/DataProvider";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import {
@@ -40,10 +40,27 @@ export default function InvoiceDocumentSheet({
   const { clients } = useClients();
   const { saveInvoicePdfAs } = useInvoices();
 
+  const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplateId>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("billflow_invoice_template");
+      if (stored === "geometric-teal" || stored === "executive-wave") {
+        return stored;
+      }
+    }
+    return settings?.defaultInvoiceTemplate || "geometric-teal";
+  });
+
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isSavingPdf, setIsSavingPdf] = useState(false);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const shareDropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleSelectTemplate = (templateId: InvoiceTemplateId) => {
+    setSelectedTemplate(templateId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("billflow_invoice_template", templateId);
+    }
+  };
 
   const businessName =
     settings?.businessName || "CHETHAKA LAKSHITHA";
@@ -67,6 +84,17 @@ export default function InvoiceDocumentSheet({
 
   const delivery = resolveDeliveryUrl(invoice, { clients });
   const client = clients.find((c) => c.id === invoice.clientId);
+
+  const displayItems =
+    invoice.items && invoice.items.length > 0
+      ? invoice.items
+      : [
+          {
+            description: "Professional Services & Development Sprint",
+            quantity: 1,
+            unitPriceCents: invoice.amountCents,
+          },
+        ];
 
   // Close share dropdown when clicking outside
   useEffect(() => {
@@ -102,7 +130,7 @@ export default function InvoiceDocumentSheet({
     setSavedNotice(null);
     try {
       if (window.billflow?.invoices?.savePdfAs) {
-        const result = await window.billflow.invoices.savePdfAs(invoice.id);
+        const result = await window.billflow.invoices.savePdfAs(invoice.id, selectedTemplate);
         if (result.success && result.filePath) {
           const fileName = result.filePath.split(/[\\/]/).pop() || "invoice.pdf";
           setSavedNotice(`Saved: ${fileName}`);
@@ -110,7 +138,7 @@ export default function InvoiceDocumentSheet({
           return;
         }
       } else if (saveInvoicePdfAs) {
-        const result = await saveInvoicePdfAs(invoice.id);
+        const result = await saveInvoicePdfAs(invoice.id, selectedTemplate);
         if (result.success && result.filePath) {
           const fileName = result.filePath.split(/[\\/]/).pop() || "invoice.pdf";
           setSavedNotice(`Saved: ${fileName}`);
@@ -142,7 +170,7 @@ export default function InvoiceDocumentSheet({
         invoice.id !== "sample-preview" &&
         invoice.id !== "draft-preview"
       ) {
-        await window.billflow.invoices.exportPdf(invoice.id);
+        await window.billflow.invoices.exportPdf(invoice.id, selectedTemplate);
         if (window.billflow?.files?.openInvoicePdf) {
           await window.billflow.files.openInvoicePdf(invoice.id, true);
           pdfExported = true;
@@ -186,7 +214,7 @@ export default function InvoiceDocumentSheet({
         invoice.id !== "sample-preview" &&
         invoice.id !== "draft-preview"
       ) {
-        await window.billflow.invoices.exportPdf(invoice.id);
+        await window.billflow.invoices.exportPdf(invoice.id, selectedTemplate);
         if (window.billflow?.files?.openInvoicePdf) {
           await window.billflow.files.openInvoicePdf(invoice.id, true);
           pdfExported = true;
@@ -221,8 +249,8 @@ export default function InvoiceDocumentSheet({
 
   return (
     <Dialog onClose={onClose} width={880}>
-      {/* 1. DIALOG HEADER (App-native header from 1st clone version) */}
-      <div className="app-dialog-header">
+      {/* 1. DIALOG HEADER WITH TEMPLATE PICKER */}
+      <div className="app-dialog-header flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3>Invoice Preview</h3>
           <p className="flex items-center gap-2 mt-1 text-xs">
@@ -237,15 +265,44 @@ export default function InvoiceDocumentSheet({
             </span>
           </p>
         </div>
+
+        {/* Template Switcher */}
+        <div className="flex items-center gap-1 bg-surface-neutral-100 dark:bg-white/5 p-1 rounded-xl border border-line-neutral-200 dark:border-white/10 mr-10">
+          <button
+            type="button"
+            onClick={() => handleSelectTemplate("geometric-teal")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              selectedTemplate === "geometric-teal"
+                ? "bg-white dark:bg-neutral-800 text-content-neutral-900 dark:text-white shadow-sm border border-line-neutral-200 dark:border-white/10"
+                : "text-content-neutral-500 hover:text-content-neutral-900 dark:hover:text-white"
+            }`}
+            title="Switch to Geometric Teal template"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-[#00A887]" />
+            <span>Geometric Teal</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSelectTemplate("executive-wave")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              selectedTemplate === "executive-wave"
+                ? "bg-white dark:bg-neutral-800 text-content-neutral-900 dark:text-white shadow-sm border border-line-neutral-200 dark:border-white/10"
+                : "text-content-neutral-500 hover:text-content-neutral-900 dark:hover:text-white"
+            }`}
+            title="Switch to Executive Wave template"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-[#EAA828]" />
+            <span>Executive Wave</span>
+          </button>
+        </div>
       </div>
 
-      {/* 2. DIALOG BODY (Scrollable container hosting the authentic invoice document) */}
+      {/* 2. DIALOG BODY (Hosting Document Sheet) */}
       <div className="app-dialog-body flex justify-center py-4 bg-surface-neutral-50 dark:bg-black/20 rounded-xl overflow-y-auto">
-        {/* Nunito Rounded Corner Font Import */}
         <style
           dangerouslySetInnerHTML={{
             __html: `
-              @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+              @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
               .invoice-sheet-font {
                 font-family: 'Nunito', 'Plus Jakarta Sans', ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', system-ui, sans-serif;
               }
@@ -253,320 +310,606 @@ export default function InvoiceDocumentSheet({
           }}
         />
 
-        {/* INVOICE SHEET (Authentic Portrait A4 Document Sheet with Rounded Font) */}
-        <div
-          id="invoice-document-sheet"
-          className="invoice-sheet-font w-full max-w-[720px] bg-white text-[#1f262e] rounded-sm shadow-xl min-h-[1020px] relative overflow-hidden select-text border border-black/5"
-        >
-          {/* TOP-LEFT GEOMETRIC ARTWORK */}
-          <div className="absolute top-0 left-0 w-[420px] h-[340px] pointer-events-none z-0">
-            <svg
-              viewBox="0 0 420 340"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-full h-full"
-            >
-              {/* 1. Slate Shadow Tab behind ribbons */}
-              <path
-                d="M 180 0 L 275 0 L 187 150 L 92 150 Z"
-                fill="#6B7685"
-                fillOpacity="0.35"
-              />
-              {/* 2. Dark Slate Stripe */}
-              <path d="M 0 0 L 55 0 L 0 94 Z" fill="#38414D" />
-              {/* 3. Dark Teal Stripe */}
-              <path d="M 55 0 L 115 0 L 0 196 L 0 94 Z" fill="#006758" />
-              {/* 4. Vibrant Bright Teal Stripe */}
-              <path d="M 115 0 L 180 0 L 0 306 L 0 196 Z" fill="#00A887" />
-              {/* 5. Horizontal Banner Slate Accent Tab */}
-              <path d="M 0 68 L 360 68 L 312 150 L 0 150 Z" fill="#5A6577" />
-              {/* 6. Horizontal Banner Charcoal Trapezoid */}
-              <path d="M 0 68 L 330 68 L 282 150 L 0 150 Z" fill="#222831" />
-            </svg>
-          </div>
-
-          {/* Brand Identity inside the Horizontal Charcoal Banner (With Official BillFlow Logo) */}
-          <div className="absolute top-[68px] left-0 h-[82px] flex items-center pl-7 sm:pl-9 pr-6 z-10 max-w-[320px]">
-            <div className="flex items-center gap-3">
-              {/* BillFlow App Logo */}
-              <div className="relative w-8 h-8 flex-shrink-0 flex items-center justify-center">
-                <img
-                  src="/brand/logo-white.png"
-                  alt="BillFlow"
-                  className="w-7 h-7 object-contain drop-shadow-sm"
+        {selectedTemplate === "geometric-teal" ? (
+          /* TEMPLATE 1: GEOMETRIC TEAL */
+          <div
+            id="invoice-document-sheet"
+            className="invoice-sheet-font w-full max-w-[720px] bg-white text-[#1f262e] rounded-sm shadow-xl min-h-[1020px] relative overflow-hidden select-text border border-black/5"
+          >
+            {/* TOP-LEFT GEOMETRIC ARTWORK */}
+            <div className="absolute top-0 left-0 w-[420px] h-[340px] pointer-events-none z-0">
+              <svg
+                viewBox="0 0 420 340"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-full h-full"
+              >
+                <path
+                  d="M 180 0 L 275 0 L 187 150 L 92 150 Z"
+                  fill="#6B7685"
+                  fillOpacity="0.35"
                 />
+                <path d="M 0 0 L 55 0 L 0 94 Z" fill="#38414D" />
+                <path d="M 55 0 L 115 0 L 0 196 L 0 94 Z" fill="#006758" />
+                <path d="M 115 0 L 180 0 L 0 306 L 0 196 Z" fill="#00A887" />
+                <path d="M 0 68 L 360 68 L 312 150 L 0 150 Z" fill="#5A6577" />
+                <path d="M 0 68 L 330 68 L 282 150 L 0 150 Z" fill="#222831" />
+              </svg>
+            </div>
+
+            {/* Brand Banner */}
+            <div className="absolute top-[68px] left-0 h-[82px] flex items-center pl-7 sm:pl-9 pr-6 z-10 max-w-[320px]">
+              <div className="flex items-center gap-3">
+                <div className="relative w-8 h-8 flex-shrink-0 flex items-center justify-center">
+                  <img
+                    src="/brand/logo-white.png"
+                    alt="BillFlow"
+                    className="w-7 h-7 object-contain drop-shadow-sm"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-[15px] sm:text-[16px] font-extrabold tracking-wide text-white uppercase truncate drop-shadow-sm leading-tight">
+                    {businessName}
+                  </h1>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-300 uppercase tracking-wider truncate mt-0.5">
+                    {professionalTitle}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom-Right Geometric Accent */}
+            <div className="absolute bottom-0 right-0 w-[200px] h-[180px] pointer-events-none z-0">
+              <svg
+                viewBox="0 0 200 180"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-full h-full"
+              >
+                <path d="M 55 180 L 160 0 L 178 0 L 73 180 Z" fill="#5A6577" />
+                <path
+                  d="M 73 180 L 178 0 L 200 0 L 200 36 L 105 180 Z"
+                  fill="#006758"
+                />
+                <path d="M 105 180 L 200 36 L 200 180 Z" fill="#00A887" />
+              </svg>
+            </div>
+
+            {/* Main Document Body */}
+            <div className="relative z-10 px-8 sm:px-11 pt-8 pb-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start pb-6">
+                <div className="pt-[160px]">
+                  <div className="text-[11.5px] text-[#718096] space-y-0.5 pl-1 font-medium leading-relaxed">
+                    {settings?.email && <p>{settings.email}</p>}
+                    {settings?.phone && <p>{settings.phone}</p>}
+                    {settings?.taxId && <p>Tax / Reg: {settings.taxId}</p>}
+                  </div>
+                </div>
+
+                <div className="sm:text-right pt-6">
+                  <div className="text-[38px] sm:text-[42px] font-black tracking-wide text-[#00A887] uppercase leading-none">
+                    INVOICE
+                  </div>
+                  <div className="mt-4 space-y-1.5 text-xs">
+                    <div className="flex sm:justify-end gap-4">
+                      <span className="font-bold text-[#718096]">Invoice#:</span>
+                      <span className="font-extrabold text-[#1f262e] tabular-nums min-w-[90px] sm:text-right">
+                        {invoice.code}
+                      </span>
+                    </div>
+                    <div className="flex sm:justify-end gap-4">
+                      <span className="font-bold text-[#718096]">Date:</span>
+                      <span className="font-semibold text-[#1f262e] min-w-[90px] sm:text-right">
+                        {formatDateDisplay(invoice.issueDate)}
+                      </span>
+                    </div>
+                    {invoice.dueDate && (
+                      <div className="flex sm:justify-end gap-4">
+                        <span className="font-bold text-[#718096]">Due Date:</span>
+                        <span className="font-semibold text-[#1f262e] min-w-[90px] sm:text-right">
+                          {formatDateDisplay(invoice.dueDate)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="pt-1.5 flex sm:justify-end">
+                      <span className="inline-flex items-center px-3 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase border border-[#00A887]/40 bg-[#00A887]/10 text-[#00A887]">
+                        {invoice.status.replace("_", " ")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Business Name and Subtitle in rounded typography */}
-              <div className="min-w-0">
-                <h1 className="text-[15px] sm:text-[16px] font-extrabold tracking-wide text-white uppercase truncate drop-shadow-sm leading-tight">
-                  {businessName}
-                </h1>
-                <p className="text-[9px] sm:text-[10px] font-bold text-slate-300 uppercase tracking-wider truncate mt-0.5">
-                  {professionalTitle}
-                </p>
+              {/* Items Table */}
+              <div className="mt-4 overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-[#00A887] text-[11px] font-extrabold uppercase tracking-wider text-[#00A887]">
+                      <th className="pb-3 pl-2 w-12 font-black">SL.</th>
+                      <th className="pb-3 pr-4 font-black">Item Description</th>
+                      <th className="pb-3 text-right pr-4 w-28 font-black">Price</th>
+                      <th className="pb-3 text-center pr-4 w-16 font-black">Qty.</th>
+                      <th className="pb-3 text-right pr-2 w-28 font-black">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E2E8F0] text-xs">
+                    {displayItems.map((item, index) => (
+                      <tr key={index} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-4 pl-2 font-bold text-[#718096] tabular-nums align-top">
+                          {index + 1}
+                        </td>
+                        <td className="py-4 pr-4 align-top">
+                          <p className="font-bold text-[#1f262e] leading-snug">
+                            {item.description}
+                          </p>
+                        </td>
+                        <td className="py-4 text-right pr-4 font-semibold text-[#1f262e] tabular-nums align-top">
+                          {formatCents(item.unitPriceCents, invoice.currency)}
+                        </td>
+                        <td className="py-4 text-center pr-4 font-semibold text-[#718096] tabular-nums align-top">
+                          {item.quantity}
+                        </td>
+                        <td className="py-4 text-right pr-2 font-black text-[#1f262e] tabular-nums align-top">
+                          {formatCents(item.quantity * item.unitPriceCents, invoice.currency)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary and Payment Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-8 items-start border-t border-[#E2E8F0] mt-4">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-[#00A887] mb-2">
+                      Invoice to:
+                    </h3>
+                    <div className="text-xs text-[#1f262e] space-y-1 font-medium">
+                      <p className="font-bold text-sm text-[#1f262e]">
+                        {invoice.clientName}
+                      </p>
+                      {client?.contactPerson && (
+                        <p className="text-[#718096]">Attn: {client.contactPerson}</p>
+                      )}
+                      {client?.phone && <p className="text-[#718096]">{client.phone}</p>}
+                      {invoice.clientEmail && <p className="text-[#718096]">{invoice.clientEmail}</p>}
+                    </div>
+
+                    {delivery.hasLink && (
+                      <div className="mt-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                        <span className="font-bold text-[#00A887] block mb-1">
+                          Delivery Location
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openExternalLink(delivery.formattedUrl)}
+                          className="text-slate-800 hover:text-[#00A887] font-semibold flex items-center gap-1.5 transition-colors group text-left break-all"
+                        >
+                          <span className="underline decoration-slate-300 group-hover:decoration-[#00A887]">
+                            {delivery.label}
+                          </span>
+                          <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-[#00A887]" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-extrabold text-[#00A887] mb-1.5">
+                      Payment Info:
+                    </h3>
+                    <p className="text-xs text-[#718096] leading-relaxed font-medium whitespace-pre-line">
+                      {settings?.paymentDetails ||
+                        "Bank transfer details provided upon request."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="sm:text-right space-y-2 text-xs">
+                  <div className="flex sm:justify-end gap-8 text-[#718096] font-semibold">
+                    <span>Sub Total:</span>
+                    <span className="font-bold text-[#1f262e] tabular-nums min-w-[90px]">
+                      {formatCents(subtotalCents, invoice.currency)}
+                    </span>
+                  </div>
+
+                  {invoice.discountCents ? (
+                    <div className="flex sm:justify-end gap-8 text-rose-600 font-semibold">
+                      <span>Discount:</span>
+                      <span className="font-bold tabular-nums min-w-[90px]">
+                        -{formatCents(invoice.discountCents, invoice.currency)}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {invoice.taxCents ? (
+                    <div className="flex sm:justify-end gap-8 text-[#718096] font-semibold">
+                      <span>Tax / VAT:</span>
+                      <span className="font-bold text-[#1f262e] tabular-nums min-w-[90px]">
+                        {formatCents(invoice.taxCents, invoice.currency)}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <div className="border-t-2 border-[#00A887] pt-2 my-1" />
+
+                  <div className="flex sm:justify-end items-baseline gap-6">
+                    <span className="text-base font-black text-[#00A887] uppercase tracking-wide">
+                      Total:
+                    </span>
+                    <span className="text-2xl font-black text-[#00A887] tabular-nums min-w-[120px]">
+                      {formatCents(invoice.amountCents, invoice.currency)}
+                    </span>
+                  </div>
+
+                  {invoice.advanceCents ? (
+                    <div className="flex sm:justify-end gap-8 text-slate-700 font-bold pt-2">
+                      <span>Required Advance:</span>
+                      <span className="tabular-nums min-w-[90px]">
+                        {formatCents(invoice.advanceCents, invoice.currency)}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {paidCents > 0 ? (
+                    <div className="flex sm:justify-end gap-8 text-emerald-600 font-bold">
+                      <span>Amount Paid:</span>
+                      <span className="tabular-nums min-w-[90px]">
+                        {formatCents(paidCents, invoice.currency)}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <div className="flex sm:justify-end gap-8 text-[#1f262e] font-black pt-1">
+                    <span>Balance Due:</span>
+                    <span className="tabular-nums min-w-[90px]">
+                      {formatCents(balanceDueCents, invoice.currency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Terms */}
+              <div className="pt-6">
+                <div className="space-y-1 max-w-md">
+                  <h4 className="text-xs font-extrabold text-[#00A887]">
+                    Terms & Conditions
+                  </h4>
+                  <p className="text-[11px] text-[#718096] leading-relaxed font-medium">
+                    {invoice.notes ||
+                      "Payment is due within agreed terms. Development milestones proceed upon receipt of the advance."}
+                  </p>
+                  <div className="w-64 border-b border-[#E2E8F0] my-2" />
+                  <p className="text-xs font-extrabold text-[#1f262e]">
+                    Thank you for your business!
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* BOTTOM-RIGHT GEOMETRIC ACCENT (SVG from template) */}
-          <div className="absolute bottom-0 right-0 w-[200px] h-[180px] pointer-events-none z-0">
-            <svg
-              viewBox="0 0 200 180"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-full h-full"
-            >
-              {/* 1. Slate Stripe */}
-              <path d="M 55 180 L 160 0 L 178 0 L 73 180 Z" fill="#5A6577" />
-              {/* 2. Dark Teal Stripe */}
-              <path
-                d="M 73 180 L 178 0 L 200 0 L 200 36 L 105 180 Z"
-                fill="#006758"
-              />
-              {/* 3. Vibrant Bright Teal Corner Polygon */}
-              <path
-                d="M 105 180 L 200 36 L 200 180 Z"
-                fill="#00A887"
-              />
-            </svg>
-          </div>
-
-          {/* MAIN DOCUMENT BODY */}
-          <div className="relative z-10 px-8 sm:px-11 pt-8 pb-12">
-            {/* 1. Header Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start pb-6">
-              {/* Left Column Spacer & Contact Information under banner */}
-              <div className="pt-[160px]">
-                <div className="text-[11.5px] text-[#718096] space-y-0.5 pl-1 font-medium leading-relaxed">
-                  {settings?.email && <p>{settings.email}</p>}
-                  {settings?.phone && <p>{settings.phone}</p>}
-                  {settings?.taxId && <p>Tax / Reg: {settings.taxId}</p>}
-                </div>
+        ) : (
+          /* TEMPLATE 2: EXECUTIVE WAVE (Design matching media_1794338948279_15dab72f.jpg) */
+          <div
+            id="invoice-document-sheet"
+            className="w-full max-w-[720px] bg-white text-[#1F242D] rounded-sm shadow-xl min-h-[1020px] relative overflow-hidden select-text border border-black/5 flex flex-col font-sans"
+          >
+            {/* 1. TOP WAVE HEADER */}
+            <div className="relative w-full h-[205px] bg-[#20232A] overflow-hidden shrink-0">
+              {/* Smooth Layered Wave SVGs at bottom */}
+              <div className="absolute bottom-0 left-0 w-full h-[90px] pointer-events-none">
+                <svg
+                  viewBox="0 0 720 90"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-full h-full"
+                  preserveAspectRatio="none"
+                >
+                  {/* Layer 1: Dark Slate Wave */}
+                  <path
+                    d="M 0 50 C 180 85 360 15 540 60 C 620 80 680 50 720 40 L 720 90 L 0 90 Z"
+                    fill="#6B7280"
+                    fillOpacity="0.4"
+                  />
+                  {/* Layer 2: Medium Grey Wave */}
+                  <path
+                    d="M 0 65 C 200 95 380 35 560 70 C 640 85 690 65 720 58 L 720 90 L 0 90 Z"
+                    fill="#9CA3AF"
+                    fillOpacity="0.5"
+                  />
+                  {/* Layer 3: Soft White Bottom Flow */}
+                  <path
+                    d="M 0 78 C 190 98 420 52 580 80 C 650 90 690 82 720 78 L 720 90 L 0 90 Z"
+                    fill="#FFFFFF"
+                  />
+                </svg>
               </div>
 
-              {/* Right: INVOICE Heading and Metadata */}
-              <div className="sm:text-right pt-6">
-                <div className="text-[38px] sm:text-[42px] font-black tracking-wide text-[#00A887] uppercase leading-none">
-                  INVOICE
+              {/* Header Content */}
+              <div className="relative z-10 flex justify-between items-start px-8 pt-7 text-white">
+                {/* Brand Logo & Name */}
+                <div className="flex items-center gap-3">
+                  <div className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-amber-500/15 border border-amber-400/30">
+                    <img
+                      src="/brand/logo-white.png"
+                      alt="Logo"
+                      className="w-7 h-7 object-contain"
+                    />
+                  </div>
+                  <div>
+                    <h1 className="text-[17px] font-black tracking-wide uppercase leading-tight text-white">
+                      {businessName}
+                    </h1>
+                    <p className="text-[10px] font-bold tracking-widest text-[#EAA828] uppercase mt-0.5">
+                      {professionalTitle}
+                    </p>
+                  </div>
                 </div>
-                <div className="mt-4 space-y-1.5 text-xs">
-                  <div className="flex sm:justify-end gap-4">
-                    <span className="font-bold text-[#718096]">Invoice#:</span>
-                    <span className="font-extrabold text-[#1f262e] tabular-nums min-w-[90px] sm:text-right">
-                      {invoice.code}
-                    </span>
-                  </div>
-                  <div className="flex sm:justify-end gap-4">
-                    <span className="font-bold text-[#718096]">Date:</span>
-                    <span className="font-semibold text-[#1f262e] min-w-[90px] sm:text-right">
-                      {formatDateDisplay(invoice.issueDate)}
-                    </span>
-                  </div>
-                  {invoice.dueDate && (
-                    <div className="flex sm:justify-end gap-4">
-                      <span className="font-bold text-[#718096]">Due Date:</span>
-                      <span className="font-semibold text-[#1f262e] min-w-[90px] sm:text-right">
-                        {formatDateDisplay(invoice.dueDate)}
+
+                {/* Contact Info (3 Columns with Golden Labels) */}
+                <div className="flex gap-6 text-right">
+                  {settings?.phone && (
+                    <div className="text-left">
+                      <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
+                        Phone:
+                      </span>
+                      <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5">
+                        {settings.phone}
                       </span>
                     </div>
                   )}
-                  <div className="pt-1.5 flex sm:justify-end">
-                    <span className="inline-flex items-center px-3 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase border border-[#00A887]/40 bg-[#00A887]/10 text-[#00A887]">
-                      {invoice.status.replace("_", " ")}
-                    </span>
-                  </div>
+                  {(settings?.email || settings?.website) && (
+                    <div className="text-left">
+                      <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
+                        Web:
+                      </span>
+                      <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5 max-w-[150px] truncate">
+                        {settings?.email || settings?.website}
+                      </span>
+                    </div>
+                  )}
+                  {settings?.address && (
+                    <div className="text-left">
+                      <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
+                        Area:
+                      </span>
+                      <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5 max-w-[130px] truncate">
+                        {settings.address}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* 2. Items Table (Clean white header, rounded teal font, thin line) */}
-            <div className="mt-6 mb-8">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-[#00A887] text-[#00A887] text-[12px] uppercase tracking-wider font-extrabold">
-                    <th className="py-2.5 px-3 w-12 font-extrabold">SL.</th>
-                    <th className="py-2.5 px-3 font-extrabold">Item Description</th>
-                    <th className="py-2.5 px-3 text-right w-28 font-extrabold">Price</th>
-                    <th className="py-2.5 px-3 text-center w-16 font-extrabold">Qty.</th>
-                    <th className="py-2.5 px-3 text-right w-32 font-extrabold">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#E2E8F0] text-xs">
-                  {invoice.items && invoice.items.length > 0 ? (
-                    invoice.items.map((it, idx) => (
-                      <tr key={it.id || idx} className="hover:bg-slate-50/50">
-                        <td className="py-3.5 px-3 text-[#718096] font-semibold">
-                          {idx + 1}
+            {/* 2. BODY CONTENT */}
+            <div className="px-8 pt-6 pb-8 flex-1 flex flex-col">
+              {/* Client & Invoice Hero Meta */}
+              <div className="flex justify-between items-start mb-6">
+                {/* To: Client */}
+                <div className="max-w-[320px]">
+                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    To:
+                  </span>
+                  <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                    {invoice.clientName}
+                  </h2>
+                  {client?.contactPerson && (
+                    <p className="text-xs text-slate-600 mt-1">Attn: {client.contactPerson}</p>
+                  )}
+                  {client?.phone && (
+                    <p className="text-xs text-slate-600 mt-0.5">Phone: {client.phone}</p>
+                  )}
+                  {invoice.clientEmail && (
+                    <p className="text-xs text-slate-600 mt-0.5">{invoice.clientEmail}</p>
+                  )}
+                  {delivery.hasLink && (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-700 font-medium">
+                      <span className="font-bold text-slate-500">Delivery:</span>
+                      <button
+                        type="button"
+                        onClick={() => openExternalLink(delivery.formattedUrl)}
+                        className="text-amber-600 hover:underline flex items-center gap-1 truncate max-w-[200px]"
+                      >
+                        <span className="truncate">{delivery.label}</span>
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: INVOICE Title & Metadata */}
+                <div className="text-right">
+                  <div className="text-[34px] font-black tracking-[3px] text-slate-900 uppercase leading-none mb-3">
+                    INVOICE
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-end gap-3">
+                      <span className="text-slate-500 font-semibold">Invoice No :</span>
+                      <span className="font-extrabold text-slate-900 tabular-nums min-w-[80px] text-right">
+                        {invoice.code}
+                      </span>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                      <span className="text-slate-500 font-semibold">Date :</span>
+                      <span className="font-semibold text-slate-900 min-w-[80px] text-right">
+                        {formatDateDisplay(invoice.issueDate)}
+                      </span>
+                    </div>
+                    {invoice.dueDate && (
+                      <div className="flex justify-end gap-3">
+                        <span className="text-slate-500 font-semibold">Due Date :</span>
+                        <span className="font-semibold text-slate-900 min-w-[80px] text-right">
+                          {formatDateDisplay(invoice.dueDate)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="pt-1.5 flex justify-end">
+                      <span className="inline-flex items-center px-3 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase border border-amber-400 bg-amber-50 text-amber-800">
+                        {invoice.status.replace("_", " ")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Line Items Table (Split Header: Amber & Dark Charcoal) */}
+              <div className="w-full mb-6 rounded overflow-hidden">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="text-xs font-extrabold uppercase tracking-wider text-white">
+                      <th className="py-2.5 px-3 bg-[#EAA828] text-slate-950 w-10 text-center">
+                        SL.
+                      </th>
+                      <th className="py-2.5 px-4 bg-[#EAA828] text-slate-950">
+                        Item Description
+                      </th>
+                      <th className="py-2.5 px-4 bg-[#20232A] text-right w-28">
+                        Price
+                      </th>
+                      <th className="py-2.5 px-3 bg-[#20232A] text-center w-16">
+                        Qty
+                      </th>
+                      <th className="py-2.5 px-4 bg-[#20232A] text-right w-28">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {displayItems.map((item, index) => (
+                      <tr
+                        key={index}
+                        className={index % 2 === 1 ? "bg-[#F1F3F7]" : "bg-white"}
+                      >
+                        <td className="py-3 px-3 text-center text-xs font-bold text-slate-400 tabular-nums">
+                          {index + 1}
                         </td>
-                        <td className="py-3.5 px-3 font-semibold text-[#1f262e]">
-                          {it.description}
+                        <td className="py-3 px-4">
+                          <div className="text-xs font-bold text-slate-900">
+                            {item.description}
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            Deliverable milestone &amp; software sprint scope
+                          </div>
                         </td>
-                        <td className="py-3.5 px-3 text-right text-[#4A5568] tabular-nums font-medium">
-                          {formatCents(it.unitPriceCents, invoice.currency)}
+                        <td className="py-3 px-4 text-right text-xs font-semibold text-slate-700 tabular-nums">
+                          {formatCents(item.unitPriceCents, invoice.currency)}
                         </td>
-                        <td className="py-3.5 px-3 text-center text-[#4A5568] tabular-nums font-medium">
-                          {it.quantity}
+                        <td className="py-3 px-3 text-center text-xs font-semibold text-slate-700 tabular-nums">
+                          {item.quantity}
                         </td>
-                        <td className="py-3.5 px-3 text-right font-extrabold text-[#1f262e] tabular-nums">
-                          {formatCents(
-                            it.quantity * it.unitPriceCents,
-                            invoice.currency,
-                          )}
+                        <td className="py-3 px-4 text-right text-xs font-extrabold text-slate-900 tabular-nums">
+                          {formatCents(item.quantity * item.unitPriceCents, invoice.currency)}
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td className="py-3.5 px-3 text-[#718096] font-semibold">1</td>
-                      <td className="py-3.5 px-3 font-semibold text-[#1f262e]">
-                        {invoice.title || "Professional Services"}
-                      </td>
-                      <td className="py-3.5 px-3 text-right text-[#4A5568] tabular-nums font-medium">
-                        {formatCents(invoice.amountCents, invoice.currency)}
-                      </td>
-                      <td className="py-3.5 px-3 text-center text-[#4A5568] font-medium">1</td>
-                      <td className="py-3.5 px-3 text-right font-extrabold text-[#1f262e] tabular-nums">
-                        {formatCents(invoice.amountCents, invoice.currency)}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            {/* 3. Three-Column Section (Invoice to: | Payment Info: | Totals) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 pb-8 border-b border-[#E2E8F0]">
-              {/* Col 1: Invoice to */}
-              <div className="space-y-1.5">
-                <h3 className="text-xs font-extrabold text-[#00A887] uppercase tracking-wider">
-                  Invoice to:
-                </h3>
-                <p className="text-sm font-extrabold text-[#1f262e]">
-                  {invoice.clientName}
-                </p>
-                {invoice.clientEmail && (
-                  <p className="text-xs text-[#718096] font-medium">{invoice.clientEmail}</p>
-                )}
-                {client?.phone && (
-                  <p className="text-xs text-[#718096] font-medium">
-                    {client.phone}
+              {/* Summary & Payment Grid */}
+              <div className="grid grid-cols-2 gap-8 items-start mb-6 pt-2">
+                {/* Left: Payment Info */}
+                <div>
+                  <h4 className="text-xs font-black tracking-wider text-slate-900 uppercase mb-2">
+                    Payment Info
+                  </h4>
+                  <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    {settings?.paymentDetails ||
+                      "Payment via Bank Transfer / Wire Transfer\nDetails provided upon invoice issue."}
+                  </div>
+                </div>
+
+                {/* Right: Totals with Golden Amber Banner */}
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between text-slate-600 py-0.5">
+                    <span className="font-semibold">Sub Total:</span>
+                    <span className="font-bold text-slate-900 tabular-nums">
+                      {formatCents(subtotalCents, invoice.currency)}
+                    </span>
+                  </div>
+
+                  {invoice.discountCents ? (
+                    <div className="flex justify-between text-rose-600 py-0.5">
+                      <span className="font-semibold">Discount:</span>
+                      <span className="font-bold tabular-nums">
+                        -{formatCents(invoice.discountCents, invoice.currency)}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {invoice.taxCents ? (
+                    <div className="flex justify-between text-slate-600 py-0.5">
+                      <span className="font-semibold">Tax / VAT:</span>
+                      <span className="font-bold text-slate-900 tabular-nums">
+                        {formatCents(invoice.taxCents, invoice.currency)}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* Grand Total Solid Amber Bar */}
+                  <div className="mt-2 bg-[#EAA828] text-slate-950 px-4 py-2.5 rounded-sm flex justify-between items-center font-black">
+                    <span className="text-xs uppercase tracking-wider">Grand Total</span>
+                    <span className="text-base tabular-nums">
+                      {formatCents(invoice.amountCents, invoice.currency)}
+                    </span>
+                  </div>
+
+                  {invoice.advanceCents ? (
+                    <div className="flex justify-between text-slate-700 pt-2 py-0.5">
+                      <span className="font-bold">Required Advance:</span>
+                      <span className="font-extrabold text-slate-900 tabular-nums">
+                        {formatCents(invoice.advanceCents, invoice.currency)}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {paidCents > 0 ? (
+                    <div className="flex justify-between text-emerald-600 py-0.5">
+                      <span className="font-bold">Amount Paid:</span>
+                      <span className="font-extrabold tabular-nums">
+                        {formatCents(paidCents, invoice.currency)}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <div className="flex justify-between text-slate-900 pt-1 border-t border-slate-200 py-0.5 font-black">
+                    <span>Balance Due:</span>
+                    <span className="text-sm tabular-nums">
+                      {formatCents(balanceDueCents, invoice.currency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="mt-auto pt-4 border-t border-slate-200 flex justify-between items-end">
+                <div className="max-w-[420px]">
+                  <h5 className="text-xs font-black text-slate-900 mb-1">
+                    Thank you for your business!
+                  </h5>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    <strong className="text-slate-700">TERMS: </strong>
+                    {invoice.notes ||
+                      "Payment due within specified due date. All software deliverables and intellectual property transfer upon final settlement."}
                   </p>
-                )}
-                {delivery.hasLink && (
-                  <div className="pt-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => openExternalLink(delivery.formattedUrl, e)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#00A887] hover:underline"
-                    >
-                      <span>{delivery.label}</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Col 2: Payment Info */}
-              <div className="space-y-1.5">
-                <h3 className="text-xs font-extrabold text-[#00A887] uppercase tracking-wider">
-                  Payment Info:
-                </h3>
-                {settings?.paymentDetails ? (
-                  <div className="text-xs text-[#4A5568] whitespace-pre-line leading-relaxed font-medium">
-                    {settings.paymentDetails}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#718096] italic font-medium">
-                    Bank transfer details provided upon request.
-                  </p>
-                )}
-              </div>
-
-              {/* Col 3: Totals & Balance */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs text-[#718096] font-medium">
-                  <span>Sub Total:</span>
-                  <span className="font-bold text-[#1f262e] tabular-nums">
-                    {formatCents(subtotalCents, invoice.currency)}
-                  </span>
                 </div>
 
-                {invoice.discountCents ? (
-                  <div className="flex justify-between text-xs text-rose-600 font-medium">
-                    <span>Discount:</span>
-                    <span className="font-bold tabular-nums">
-                      -{formatCents(invoice.discountCents, invoice.currency)}
-                    </span>
+                <div className="text-right">
+                  <div className="text-sm font-black text-slate-900">
+                    {businessName}
                   </div>
-                ) : null}
-
-                {invoice.taxCents ? (
-                  <div className="flex justify-between text-xs text-[#718096] font-medium">
-                    <span>Tax:</span>
-                    <span className="font-bold text-[#1f262e] tabular-nums">
-                      {formatCents(invoice.taxCents, invoice.currency)}
-                    </span>
+                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">
+                    {professionalTitle}
                   </div>
-                ) : null}
-
-                <div className="pt-2 border-t-2 border-[#00A887] flex justify-between items-baseline">
-                  <span className="text-sm font-black text-[#00A887] uppercase tracking-wider">
-                    Total:
-                  </span>
-                  <span className="text-xl font-black text-[#00A887] tabular-nums">
-                    {formatCents(invoice.amountCents, invoice.currency)}
-                  </span>
                 </div>
-
-                {invoice.advanceCents ? (
-                  <div className="flex justify-between text-xs text-[#4A5568] pt-1 font-medium">
-                    <span className="font-bold">Required Advance:</span>
-                    <span className="font-extrabold tabular-nums">
-                      {formatCents(invoice.advanceCents, invoice.currency)}
-                    </span>
-                  </div>
-                ) : null}
-
-                {paidCents > 0 && (
-                  <div className="flex justify-between text-xs text-emerald-600 font-medium">
-                    <span>Amount Paid:</span>
-                    <span className="font-extrabold tabular-nums">
-                      {formatCents(paidCents, invoice.currency)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-xs font-black text-[#1f262e] pt-1">
-                  <span>Balance Due:</span>
-                  <span className="tabular-nums font-black">
-                    {formatCents(balanceDueCents, invoice.currency)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 4. Footer Section (Terms & Conditions - NO SIGNATURE) */}
-            <div className="pt-6">
-              <div className="space-y-1 max-w-md">
-                <h4 className="text-xs font-extrabold text-[#00A887]">
-                  Terms & Conditions
-                </h4>
-                <p className="text-[11px] text-[#718096] leading-relaxed font-medium">
-                  {invoice.notes ||
-                    "Payment is due within agreed terms. Development milestones proceed upon receipt of the advance."}
-                </p>
-                <div className="w-64 border-b border-[#E2E8F0] my-2" />
-                <p className="text-xs font-extrabold text-[#1f262e]">
-                  Thank you for your business!
-                </p>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* 3. DIALOG FOOTER (App-native footer with BillFlow standard Buttons from 1st clone version) */}
+      {/* 3. DIALOG FOOTER */}
       <div className="app-dialog-footer">
         <div className="mr-auto flex items-center gap-2">
           {savedNotice && (
@@ -612,7 +955,9 @@ export default function InvoiceDocumentSheet({
                 </div>
                 <div>
                   <div className="font-bold">WhatsApp</div>
-                  <div className="text-[10px] text-content-neutral-400 font-normal">Share invoice PDF & brief</div>
+                  <div className="text-[10px] text-content-neutral-400 font-normal">
+                    Share invoice PDF & brief
+                  </div>
                 </div>
               </button>
 
@@ -626,7 +971,9 @@ export default function InvoiceDocumentSheet({
                 </div>
                 <div>
                   <div className="font-bold">Email</div>
-                  <div className="text-[10px] text-content-neutral-400 font-normal">Draft email with PDF attached</div>
+                  <div className="text-[10px] text-content-neutral-400 font-normal">
+                    Draft email with PDF attached
+                  </div>
                 </div>
               </button>
             </div>

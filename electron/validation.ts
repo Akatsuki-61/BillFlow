@@ -158,6 +158,7 @@ export const updateSettingsSchema = z.object({
   defaultDueDays: z.number().int().min(0).max(365).optional(),
   defaultTaxRate: z.number().min(0).max(100).optional(),
   defaultNotes: z.string().trim().max(1000).nullable().optional(),
+  defaultInvoiceTemplate: z.enum(["geometric-teal", "executive-wave"]).optional(),
   dateFormat: z.enum(["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"]).optional(),
   currencyDisplay: z.enum(["symbol", "code"]).optional(),
   pdfExportDirectory: z.string().max(4096).refine(value => path.isAbsolute(value), "Choose an absolute export folder").nullable().optional(),

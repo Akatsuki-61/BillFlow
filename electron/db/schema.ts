@@ -92,6 +92,7 @@ export const settings = sqliteTable("settings", {
   defaultDueDays: integer("default_due_days").notNull().default(14),
   defaultTaxRate: integer("default_tax_rate").notNull().default(0),
   defaultNotes: text("default_notes"),
+  defaultInvoiceTemplate: text("default_invoice_template").default("geometric-teal"),
   dateFormat: text("date_format").notNull().default("YYYY-MM-DD"),
   currencyDisplay: text("currency_display").notNull().default("symbol"),
   pdfExportDirectory: text("pdf_export_directory"),

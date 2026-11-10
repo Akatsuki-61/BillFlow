@@ -56,11 +56,15 @@ export function Dialog({
             e.stopPropagation();
             onClose();
           }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
           onPointerDown={(e) => {
             e.stopPropagation();
           }}
           aria-label="Close dialog"
           className="ui-button ui-button--ghost ui-button--icon app-dialog-close app-no-drag"
+          style={{ ["WebkitAppRegion" as any]: "no-drag" }}
         >
           <X className="w-4 h-4 pointer-events-none" />
         </button>

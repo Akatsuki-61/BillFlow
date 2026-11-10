@@ -63,6 +63,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultDueDays: 14,
   defaultTaxRate: 0,
   defaultNotes: "Payment due within specified due date. Thank you for your business.",
+  defaultInvoiceTemplate: "geometric-teal",
   dateFormat: "YYYY-MM-DD",
   currencyDisplay: "symbol",
   pdfExportDirectory: "",
@@ -97,8 +98,8 @@ interface DataContextType {
   setInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
   recordPayment: (input: RecordPaymentInput) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
   listPayments: (invoiceId: string) => Promise<InvoicePayment[]>;
-  exportInvoicePdf: (invoiceId: string) => Promise<{ success: boolean; filePath: string }>;
-  saveInvoicePdfAs: (invoiceId: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
+  exportInvoicePdf: (invoiceId: string, template?: string) => Promise<{ success: boolean; filePath: string }>;
+  saveInvoicePdfAs: (invoiceId: string, template?: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
   openInvoicePdf: (invoiceId: string, reveal?: boolean) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
   getNextInvoiceCode: () => Promise<string>;
@@ -512,16 +513,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return memoryPayments.filter((p) => p.invoiceId === invoiceId);
   };
 
-  const exportInvoicePdf = async (invoiceId: string): Promise<{ success: boolean; filePath: string }> => {
+  const exportInvoicePdf = async (invoiceId: string, template?: string): Promise<{ success: boolean; filePath: string }> => {
     if (checkIsElectron() && window.billflow) {
-      return await window.billflow.invoices.exportPdf(invoiceId);
+      return await window.billflow.invoices.exportPdf(invoiceId, template);
     }
     return { success: true, filePath: "invoice.pdf" };
   };
 
-  const saveInvoicePdfAs = async (invoiceId: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> => {
+  const saveInvoicePdfAs = async (invoiceId: string, template?: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> => {
     if (checkIsElectron() && window.billflow?.invoices?.savePdfAs) {
-      return await window.billflow.invoices.savePdfAs(invoiceId);
+      return await window.billflow.invoices.savePdfAs(invoiceId, template);
     }
     window.print();
     return { success: true, canceled: false };

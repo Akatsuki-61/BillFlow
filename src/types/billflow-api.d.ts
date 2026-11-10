@@ -92,8 +92,8 @@ export interface BillFlowAPI extends WorkflowAPI {
     setStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
     recordPayment: (input: RecordPaymentInput) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
     listPayments: (invoiceId: string) => Promise<InvoicePayment[]>;
-    exportPdf: (invoiceId: string) => Promise<{ success: boolean; filePath: string }>;
-    savePdfAs?: (invoiceId: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
+    exportPdf: (invoiceId: string, template?: string) => Promise<{ success: boolean; filePath: string }>;
+    savePdfAs?: (invoiceId: string, template?: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
     remove: (id: string) => Promise<{ success: boolean }>;
   };
   /** Reusable subcontractor directory management */

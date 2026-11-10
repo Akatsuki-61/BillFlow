@@ -125,8 +125,9 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
   });
 }
 
-export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string): Promise<{ invoice: any; pdfBuffer: Buffer }> {
+export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string, templateOverride?: string): Promise<{ invoice: any; pdfBuffer: Buffer }> {
   const profile = getOrCreateSettings();
+  const template = templateOverride || (profile as any).defaultInvoiceTemplate || "geometric-teal";
 
   if (invoiceId === "sample-preview" || invoiceId === "draft-preview") {
     const payload = {
@@ -135,6 +136,7 @@ export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string): Promis
       dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
       currency: profile.defaultCurrency || "USD",
       status: "ADVANCE_PAID",
+      template,
       items: [
         { description: "Business Website Development & Integration", quantity: 1, unitPriceCents: 8000000 },
         { description: "AI Consulting Session & Support Automation Roadmap", quantity: 1, unitPriceCents: 2000000 }
@@ -184,6 +186,7 @@ export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string): Promis
     dueDate: invoice.dueDate,
     currency: invoice.currency,
     status: invoice.status,
+    template,
     items: items.map((i) => ({
       description: i.description,
       quantity: i.quantity,
@@ -203,13 +206,13 @@ export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string): Promis
   return { invoice, pdfBuffer };
 }
 
-export async function exportInvoicePdf(invoiceId: string): Promise<string> {
-  const { pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(invoiceId);
+export async function exportInvoicePdf(invoiceId: string, template?: string): Promise<string> {
+  const { pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(invoiceId, template);
   return saveInvoicePdf(invoiceId, pdfBuffer);
 }
 
-export async function saveInvoicePdfAs(invoiceId: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> {
-  const { invoice, pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(invoiceId);
+export async function saveInvoicePdfAs(invoiceId: string, template?: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> {
+  const { invoice, pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(invoiceId, template);
   const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
   const defaultName = `Invoice-${(invoice.code || "INV").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
   const options = {
@@ -863,18 +866,18 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
     }
   });
 
-  ipcMain.handle("invoices:exportPdf", async (_event, invoiceId: string) => {
+  ipcMain.handle("invoices:exportPdf", async (_event, invoiceId: string, template?: string) => {
     try {
-      const filePath = await exportInvoicePdf(invoiceId);
+      const filePath = await exportInvoicePdf(invoiceId, template);
       return { success: true, filePath };
     } catch (err) {
       throw formatError(err);
     }
   });
 
-  ipcMain.handle("invoices:savePdfAs", async (_event, invoiceId: string) => {
+  ipcMain.handle("invoices:savePdfAs", async (_event, invoiceId: string, template?: string) => {
     try {
-      return await saveInvoicePdfAs(invoiceId);
+      return await saveInvoicePdfAs(invoiceId, template);
     } catch (err) {
       throw formatError(err);
     }

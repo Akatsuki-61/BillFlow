@@ -1,4 +1,4 @@
-import type { Currency } from "./billing";
+import type { Currency, InvoiceTemplateId } from "./billing";
 
 export type DateFormat = "YYYY-MM-DD" | "DD/MM/YYYY" | "MM/DD/YYYY";
 export type CurrencyDisplayMode = "symbol" | "code";
@@ -19,6 +19,7 @@ export interface AppSettings {
   defaultDueDays: number;
   defaultTaxRate: number;
   defaultNotes?: string | null;
+  defaultInvoiceTemplate?: InvoiceTemplateId;
   dateFormat: DateFormat;
   currencyDisplay: CurrencyDisplayMode;
   pdfExportDirectory?: string | null;

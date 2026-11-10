@@ -2226,7 +2226,7 @@ button.record-status:focus-visible {
   position: absolute;
   top: 24px;
   right: 24px;
-  z-index: 100;
+  z-index: 999;
   width: 36px;
   height: 36px;
   border-radius: 50%;

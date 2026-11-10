@@ -152,6 +152,15 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
     }
   }
 
+  // Ensure settings has default_invoice_template column
+  const hasSettings = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'").get();
+  if (hasSettings) {
+    const sColumns = (sqlite.prepare("PRAGMA table_info(settings)").all() as Array<{ name: string }>).map(c => c.name);
+    if (!sColumns.includes("default_invoice_template")) {
+      sqlite.exec('ALTER TABLE "settings" ADD COLUMN "default_invoice_template" text DEFAULT \'geometric-teal\'');
+    }
+  }
+
   // Ensure user_profiles table exists on all databases (including reconciled dev databases)
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS "user_profiles" (
