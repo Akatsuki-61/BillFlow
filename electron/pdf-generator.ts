@@ -621,13 +621,13 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       -webkit-font-smoothing: antialiased;
     }
 
-    /* TOP WAVE ARTWORK */
+    /* TOP WAVE ARTWORK (Compact height) */
     .wave-bg-svg {
       position: absolute;
       top: 0;
       left: 0;
       width: 794px;
-      height: 320px;
+      height: 148px;
       pointer-events: none;
       z-index: 0;
     }
@@ -637,20 +637,21 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      padding: 34px 48px 0;
+      padding: 22px 48px 0;
+      height: 148px;
     }
     .brand-side {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
     }
     .brand-logo {
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
       object-fit: contain;
     }
     .brand-name {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 900;
       letter-spacing: 0.5px;
       color: #FFFFFF;
@@ -658,7 +659,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       line-height: 1.2;
     }
     .brand-title {
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 700;
       letter-spacing: 1.2px;
       color: #EAA828;
@@ -669,23 +670,23 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
     .contact-side {
       text-align: right;
       display: flex;
-      gap: 28px;
+      gap: 24px;
     }
     .contact-item {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
       text-align: left;
     }
     .c-label {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 800;
       color: #EAA828;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .c-val {
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 600;
       color: #F1F5F9;
       line-height: 1.35;
@@ -695,7 +696,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
     .body-content {
       position: relative;
       z-index: 2;
-      padding: 36px 48px 24px;
+      padding: 12px 48px 24px;
       display: flex;
       flex-direction: column;
     }
@@ -942,22 +943,22 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
   </style>
 </head>
 <body>
-  <!-- Full-width Multi-Layered Wave Background (Flows continuously without container cutoff) -->
-  <svg class="wave-bg-svg" viewBox="0 0 794 320" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Full-width Multi-Layered Wave Background (Flows continuously without container cutoff, compact header) -->
+  <svg class="wave-bg-svg" viewBox="0 0 794 148" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
     <!-- 1. Deep Charcoal Header Base -->
-    <path d="M 0 0 L 794 0 L 794 152 C 735 138, 662 123, 572 125 C 471 127, 370 158, 264 180 C 202 194, 135 207, 67 213 C 33 215, 0 212, 0 210 Z" fill="#23262B" />
+    <path d="M 0 0 L 794 0 L 794 75 C 735 67, 662 60, 572 61 C 471 62, 370 77, 264 88 C 202 95, 135 101, 67 104 C 33 105, 0 104, 0 102 Z" fill="#23262B" />
 
     <!-- 2. Top-Right Dark Slate Accent Curve -->
-    <path d="M 605 0 C 670 40, 740 70, 794 85 L 794 0 Z" fill="#383D46" />
+    <path d="M 605 0 C 670 20, 740 34, 794 42 L 794 0 Z" fill="#383D46" />
 
     <!-- 3. Medium Charcoal Grey Ribbon -->
-    <path d="M 264 180 C 370 158, 471 127, 572 125 C 662 123, 735 138, 794 152 L 794 210 C 730 186, 651 162, 561 162 C 460 162, 370 172, 280 180 Z" fill="#8B8F96" />
+    <path d="M 264 88 C 370 77, 471 62, 572 61 C 662 60, 735 67, 794 75 L 794 102 C 730 90, 651 78, 561 78 C 460 78, 370 84, 280 88 Z" fill="#8B8F96" />
 
     <!-- 4. Light Silvery Grey Ribbon -->
-    <path d="M 292 178 C 382 170, 471 162, 561 162 C 651 162, 730 186, 794 210 L 794 286 C 735 258, 651 218, 561 194 C 471 174, 393 173, 314 178 Z" fill="#CCD0D7" />
+    <path d="M 292 87 C 382 83, 471 78, 561 78 C 651 78, 730 90, 794 102 L 794 139 C 735 126, 651 106, 561 95 C 471 85, 393 85, 314 87 Z" fill="#CCD0D7" />
 
     <!-- 5. Soft Edge Accent Ribbon -->
-    <path d="M 370 172 C 460 173, 550 190, 628 219 C 696 245, 746 268, 794 286 L 794 292 C 746 274, 696 251, 628 224 C 550 194, 460 175, 370 174 Z" fill="#E4E6EA" />
+    <path d="M 370 84 C 460 85, 550 93, 628 107 C 696 119, 746 130, 794 139 L 794 142 C 746 133, 696 122, 628 109 C 550 95, 460 86, 370 85 Z" fill="#E4E6EA" />
   </svg>
 
   <div class="header-content">
