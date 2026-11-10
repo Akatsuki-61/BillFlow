@@ -1,6 +1,10 @@
 export type Currency = "USD" | "LKR" | "EUR" | "GBP" | "CAD";
 
-export type InvoiceTemplateId = "geometric-teal" | "executive-wave" | "scarlet-modern";
+export type InvoiceTemplateId =
+  | "geometric-teal"
+  | "executive-wave"
+  | "scarlet-modern"
+  | "apex-orange";
 
 export type ClientCategory = "Enterprise" | "Startup" | "Agency" | string;
 

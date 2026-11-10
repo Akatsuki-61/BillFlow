@@ -37,7 +37,7 @@ it("returns the PDF result promised by the preload API", async () => {
   expect(fs.readFileSync(result.filePath).subarray(0, 5).toString()).toBe("%PDF-");
 });
 
-it("renders Geometric Teal, Executive Wave, and Scarlet Modern templates correctly", () => {
+it("renders Geometric Teal, Executive Wave, Scarlet Modern, and Apex Orange templates correctly", () => {
   const payload = {
     code: "INV-2026-001",
     issueDate: "2026-11-04",
@@ -63,6 +63,13 @@ it("renders Geometric Teal, Executive Wave, and Scarlet Modern templates correct
   expect(scarletHtml).toContain("header-svg");
   expect(scarletHtml).toContain("th-red");
   expect(scarletHtml).toContain("due-amount");
+
+  const orangeHtml = buildInvoiceHtml({ ...payload, template: "apex-orange" });
+  expect(orangeHtml).toContain("header-svg");
+  expect(orangeHtml).toContain("#F25C05");
+  expect(orangeHtml).toContain("table-container");
+  expect(orangeHtml).toContain("Terms &amp; Conditions:");
+  expect(orangeHtml).toContain("Thank you for your business with us.");
 });
 
 it("supports setting defaultInvoiceTemplate in settings", () => {

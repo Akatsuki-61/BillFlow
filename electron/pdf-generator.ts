@@ -5,6 +5,7 @@ import {
   buildInvoiceHtmlGeometricTeal,
   buildInvoiceHtmlExecutiveWave,
   buildInvoiceHtmlScarletModern,
+  buildInvoiceHtmlApexOrange,
   InvoicePdfPayload,
   InvoicePdfItem,
   formatMoney,
@@ -18,6 +19,7 @@ export {
   buildInvoiceHtmlGeometricTeal,
   buildInvoiceHtmlExecutiveWave,
   buildInvoiceHtmlScarletModern,
+  buildInvoiceHtmlApexOrange,
 };
 
 export interface WorkOrderPdfPayload {
@@ -62,6 +64,9 @@ export function buildInvoiceHtml(data: InvoicePdfPayload): string {
   }
   if (data.template === "scarlet-modern") {
     return buildInvoiceHtmlScarletModern(data);
+  }
+  if (data.template === "apex-orange") {
+    return buildInvoiceHtmlApexOrange(data);
   }
   return buildInvoiceHtmlGeometricTeal(data);
 }
