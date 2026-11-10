@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Check,
   ChevronDown,
+  LayoutTemplate,
 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
@@ -29,6 +30,29 @@ interface InvoiceDocumentSheetProps {
   onOpenPdf?: () => void;
   onRecordPayment?: () => void;
 }
+
+const TEMPLATES: Array<{
+  id: InvoiceTemplateId;
+  name: string;
+  badge: string;
+  color: string;
+  description: string;
+}> = [
+  {
+    id: "geometric-teal",
+    name: "Geometric Teal",
+    badge: "Template 1",
+    color: "#00A887",
+    description: "Modern teal ribbons & dark slate header",
+  },
+  {
+    id: "executive-wave",
+    name: "Executive Wave",
+    badge: "Template 2",
+    color: "#EAA828",
+    description: "Charcoal wave header & golden amber accents",
+  },
+];
 
 export default function InvoiceDocumentSheet({
   invoice,
@@ -51,9 +75,11 @@ export default function InvoiceDocumentSheet({
   });
 
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const [isSavingPdf, setIsSavingPdf] = useState(false);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const shareDropdownRef = useRef<HTMLDivElement>(null);
+  const templateDropdownRef = useRef<HTMLDivElement>(null);
 
   const handleSelectTemplate = (templateId: InvoiceTemplateId) => {
     setSelectedTemplate(templateId);
@@ -96,7 +122,7 @@ export default function InvoiceDocumentSheet({
           },
         ];
 
-  // Close share dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -104,6 +130,12 @@ export default function InvoiceDocumentSheet({
         !shareDropdownRef.current.contains(e.target as Node)
       ) {
         setIsShareOpen(false);
+      }
+      if (
+        templateDropdownRef.current &&
+        !templateDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsTemplateDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -113,13 +145,23 @@ export default function InvoiceDocumentSheet({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (isTemplateDropdownOpen) {
+          e.preventDefault();
+          setIsTemplateDropdownOpen(false);
+          return;
+        }
+        if (isShareOpen) {
+          e.preventDefault();
+          setIsShareOpen(false);
+          return;
+        }
         e.preventDefault();
         onClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isTemplateDropdownOpen, isShareOpen]);
 
   const handlePrint = () => {
     window.print();
@@ -266,34 +308,83 @@ export default function InvoiceDocumentSheet({
           </p>
         </div>
 
-        {/* Template Switcher */}
-        <div className="flex items-center gap-1 bg-surface-neutral-100 dark:bg-white/5 p-1 rounded-xl border border-line-neutral-200 dark:border-white/10 mr-10">
+        {/* Template Dropdown Picker */}
+        <div className="relative mr-10" ref={templateDropdownRef}>
           <button
             type="button"
-            onClick={() => handleSelectTemplate("geometric-teal")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              selectedTemplate === "geometric-teal"
-                ? "bg-white dark:bg-neutral-800 text-content-neutral-900 dark:text-white shadow-sm border border-line-neutral-200 dark:border-white/10"
-                : "text-content-neutral-500 hover:text-content-neutral-900 dark:hover:text-white"
-            }`}
-            title="Switch to Geometric Teal template"
+            onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-neutral-100 hover:bg-surface-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 border border-line-neutral-200 dark:border-white/10 text-xs font-semibold text-content-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer shadow-sm select-none"
+            aria-expanded={isTemplateDropdownOpen}
+            aria-haspopup="listbox"
+            title="Choose invoice design template"
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-[#00A887]" />
-            <span>Geometric Teal</span>
+            <LayoutTemplate className="w-3.5 h-3.5 text-accent opacity-90" />
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+              style={{
+                backgroundColor:
+                  selectedTemplate === "executive-wave" ? "#EAA828" : "#00A887",
+              }}
+            />
+            <span className="font-bold">
+              {selectedTemplate === "executive-wave"
+                ? "Executive Wave"
+                : "Geometric Teal"}
+            </span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-content-neutral-400 transition-transform duration-200 ${
+                isTemplateDropdownOpen ? "rotate-180" : ""
+              }`}
+            />
           </button>
-          <button
-            type="button"
-            onClick={() => handleSelectTemplate("executive-wave")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              selectedTemplate === "executive-wave"
-                ? "bg-white dark:bg-neutral-800 text-content-neutral-900 dark:text-white shadow-sm border border-line-neutral-200 dark:border-white/10"
-                : "text-content-neutral-500 hover:text-content-neutral-900 dark:hover:text-white"
-            }`}
-            title="Switch to Executive Wave template"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-[#EAA828]" />
-            <span>Executive Wave</span>
-          </button>
+
+          {/* Dropdown Popover */}
+          {isTemplateDropdownOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-64 rounded-xl bg-surface border border-line-neutral-200 dark:border-white/10 shadow-2xl p-1.5 z-[150] text-content-neutral-900 dark:text-white animate-in fade-in-50 zoom-in-95">
+              <div className="px-2.5 py-1 text-[10px] font-bold text-content-neutral-400 uppercase tracking-wider">
+                Invoice Template
+              </div>
+              {TEMPLATES.map((tmpl) => {
+                const isSelected = selectedTemplate === tmpl.id;
+                return (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => {
+                      handleSelectTemplate(tmpl.id);
+                      setIsTemplateDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                      isSelected
+                        ? "bg-accent/10 text-accent font-bold"
+                        : "hover:bg-surface-neutral-50 dark:hover:bg-white/10 text-content-neutral-800 dark:text-neutral-200 font-medium"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                        style={{ backgroundColor: tmpl.color }}
+                      />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold truncate flex items-center gap-1.5">
+                          <span>{tmpl.name}</span>
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-content-neutral-500 dark:text-neutral-400">
+                            {tmpl.badge}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-content-neutral-400 font-normal truncate mt-0.5">
+                          {tmpl.description}
+                        </div>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <Check className="w-3.5 h-3.5 text-accent shrink-0 ml-1" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
