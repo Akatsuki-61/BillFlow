@@ -685,108 +685,105 @@ export default function InvoiceDocumentSheet({
             id="invoice-document-sheet"
             className="w-full max-w-[720px] bg-white text-[#1F242D] rounded-sm shadow-xl min-h-[1020px] relative overflow-hidden select-text border border-black/5 flex flex-col font-sans"
           >
-            {/* 1. TOP WAVE HEADER */}
-            <div className="relative w-full h-[225px] bg-[#23262B] overflow-hidden shrink-0">
-              {/* Accurately traced multi-layered waves matching reference */}
-              <div className="absolute inset-0 w-full h-full pointer-events-none">
-                <svg
-                  viewBox="0 0 720 225"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-full h-full"
-                  preserveAspectRatio="none"
-                >
-                  {/* Top-Right Dark Slate Accent Curve */}
-                  <path
-                    d="M 548 0 C 608 40, 672 70, 720 85 L 720 0 Z"
-                    fill="#383D46"
-                  />
+            {/* Full-width Multi-Layered Wave Artwork (Flows continuously without container cutoff) */}
+            <div className="absolute top-0 left-0 w-full h-[320px] pointer-events-none z-0">
+              <svg
+                viewBox="0 0 720 320"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-full h-full"
+                preserveAspectRatio="none"
+              >
+                {/* 1. Deep Charcoal Header Base */}
+                <path
+                  d="M 0 0 L 720 0 L 720 152 C 666 138, 600 123, 519 125 C 427 127, 335 158, 239 180 C 183 194, 122 207, 61 213 C 30 215, 0 212, 0 210 Z"
+                  fill="#23262B"
+                />
 
-                  {/* Layer 1: Medium Charcoal Grey Ribbon */}
-                  <path
-                    d="M 239 180 C 335 158, 427 127, 519 125 C 600 123, 666 138, 720 152 L 720 210 C 662 186, 590 162, 509 162 C 417 162, 335 172, 254 180 Z"
-                    fill="#8B8F96"
-                  />
+                {/* 2. Top-Right Dark Slate Accent Curve */}
+                <path
+                  d="M 548 0 C 608 40, 672 70, 720 85 L 720 0 Z"
+                  fill="#383D46"
+                />
 
-                  {/* Layer 2: Light Silvery Grey Ribbon */}
-                  <path
-                    d="M 264 178 C 346 170, 427 162, 509 162 C 590 162, 662 186, 720 210 L 720 280 C 666 255, 590 216, 509 194 C 427 174, 356 173, 285 178 Z"
-                    fill="#CCD0D7"
-                  />
+                {/* 3. Medium Charcoal Grey Ribbon */}
+                <path
+                  d="M 239 180 C 335 158, 427 127, 519 125 C 600 123, 666 138, 720 152 L 720 210 C 662 186, 590 162, 509 162 C 417 162, 335 172, 254 180 Z"
+                  fill="#8B8F96"
+                />
 
-                  {/* Layer 3: Soft Edge Accent Ribbon */}
-                  <path
-                    d="M 335 172 C 417 173, 498 190, 570 219 C 631 245, 677 266, 720 279 L 720 285 C 677 272, 631 251, 570 224 C 498 194, 417 175, 335 174 Z"
-                    fill="#E4E6EA"
-                  />
+                {/* 4. Light Silvery Grey Ribbon */}
+                <path
+                  d="M 264 178 C 346 170, 427 162, 509 162 C 590 162, 662 186, 720 210 L 720 286 C 666 258, 590 218, 509 194 C 427 174, 356 173, 285 178 Z"
+                  fill="#CCD0D7"
+                />
 
-                  {/* Layer 4: White Page Body Wave (cutting across from left) */}
-                  <path
-                    d="M 0 210 C 61 213, 122 207, 183 194 C 244 181, 305 172, 366 172 C 448 172, 529 191, 605 240 C 651 265, 687 277, 720 280 L 720 330 L 0 330 Z"
-                    fill="#FFFFFF"
+                {/* 5. Soft Edge Accent Ribbon */}
+                <path
+                  d="M 335 172 C 417 173, 498 190, 570 219 C 631 245, 677 268, 720 286 L 720 292 C 677 274, 631 251, 570 224 C 498 194, 417 175, 335 174 Z"
+                  fill="#E4E6EA"
+                />
+              </svg>
+            </div>
+
+            {/* Header Content */}
+            <div className="relative z-10 flex justify-between items-start px-8 pt-7 text-white">
+              {/* Brand Logo & Name */}
+              <div className="flex items-center gap-3">
+                <div className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-amber-500/15 border border-amber-400/30">
+                  <img
+                    src="/brand/logo-white.png"
+                    alt="Logo"
+                    className="w-7 h-7 object-contain"
                   />
-                </svg>
+                </div>
+                <div>
+                  <h1 className="text-[17px] font-black tracking-wide uppercase leading-tight text-white">
+                    {businessName}
+                  </h1>
+                  <p className="text-[10px] font-bold tracking-widest text-[#EAA828] uppercase mt-0.5">
+                    {professionalTitle}
+                  </p>
+                </div>
               </div>
 
-              {/* Header Content */}
-              <div className="relative z-10 flex justify-between items-start px-8 pt-7 text-white">
-                {/* Brand Logo & Name */}
-                <div className="flex items-center gap-3">
-                  <div className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-amber-500/15 border border-amber-400/30">
-                    <img
-                      src="/brand/logo-white.png"
-                      alt="Logo"
-                      className="w-7 h-7 object-contain"
-                    />
+              {/* Contact Info (3 Columns with Golden Labels) */}
+              <div className="flex gap-6 text-right">
+                {settings?.phone && (
+                  <div className="text-left">
+                    <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
+                      Phone:
+                    </span>
+                    <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5">
+                      {settings.phone}
+                    </span>
                   </div>
-                  <div>
-                    <h1 className="text-[17px] font-black tracking-wide uppercase leading-tight text-white">
-                      {businessName}
-                    </h1>
-                    <p className="text-[10px] font-bold tracking-widest text-[#EAA828] uppercase mt-0.5">
-                      {professionalTitle}
-                    </p>
+                )}
+                {(settings?.email || settings?.website) && (
+                  <div className="text-left">
+                    <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
+                      Web:
+                    </span>
+                    <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5 max-w-[150px] truncate">
+                      {settings?.email || settings?.website}
+                    </span>
                   </div>
-                </div>
-
-                {/* Contact Info (3 Columns with Golden Labels) */}
-                <div className="flex gap-6 text-right">
-                  {settings?.phone && (
-                    <div className="text-left">
-                      <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
-                        Phone:
-                      </span>
-                      <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5">
-                        {settings.phone}
-                      </span>
-                    </div>
-                  )}
-                  {(settings?.email || settings?.website) && (
-                    <div className="text-left">
-                      <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
-                        Web:
-                      </span>
-                      <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5 max-w-[150px] truncate">
-                        {settings?.email || settings?.website}
-                      </span>
-                    </div>
-                  )}
-                  {settings?.address && (
-                    <div className="text-left">
-                      <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
-                        Area:
-                      </span>
-                      <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5 max-w-[130px] truncate">
-                        {settings.address}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                )}
+                {settings?.address && (
+                  <div className="text-left">
+                    <span className="block text-[9.5px] font-extrabold text-[#EAA828] uppercase tracking-wider">
+                      Area:
+                    </span>
+                    <span className="block text-[10.5px] font-semibold text-neutral-200 mt-0.5 max-w-[130px] truncate">
+                      {settings.address}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* 2. BODY CONTENT */}
-            <div className="px-8 pt-6 pb-8 flex-1 flex flex-col">
+            <div className="relative z-10 px-8 pt-10 pb-8 flex-1 flex flex-col">
               {/* Client & Invoice Hero Meta */}
               <div className="flex justify-between items-start mb-6">
                 {/* To: Client */}

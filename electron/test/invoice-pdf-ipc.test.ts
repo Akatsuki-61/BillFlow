@@ -55,7 +55,7 @@ it("renders both Geometric Teal and Executive Wave templates correctly", () => {
   expect(tealHtml).toContain("INVOICE");
 
   const waveHtml = buildInvoiceHtml({ ...payload, template: "executive-wave" });
-  expect(waveHtml).toContain("wave-header");
+  expect(waveHtml).toContain("wave-bg-svg");
   expect(waveHtml).toContain("grand-total-banner");
   expect(waveHtml).toContain("th-gold");
 });
