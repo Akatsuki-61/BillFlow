@@ -625,16 +625,16 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
     .wave-header {
       position: relative;
       width: 100%;
-      height: 195px;
-      background: #20232A;
+      height: 225px;
+      background: #23262B;
       overflow: hidden;
     }
     .wave-svg {
       position: absolute;
-      bottom: -1px;
+      top: 0;
       left: 0;
       width: 794px;
-      height: 85px;
+      height: 225px;
       pointer-events: none;
     }
     .header-content {
@@ -700,7 +700,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
     /* BODY */
     .body-content {
       padding: 24px 48px;
-      height: calc(1123px - 195px);
+      height: calc(1123px - 225px);
       display: flex;
       flex-direction: column;
     }
@@ -949,9 +949,21 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
 <body>
   <!-- HEADER -->
   <div class="wave-header">
-    <svg class="wave-svg" viewBox="0 0 794 85" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M 0 0 L 794 0 L 794 45 C 650 75 480 30 280 60 C 140 80 60 70 0 75 Z" fill="#4B5563" fill-opacity="0.35" />
-      <path d="M 0 0 L 794 0 L 794 25 C 630 65 420 15 240 50 C 120 70 50 55 0 60 Z" fill="#20232A" />
+    <svg class="wave-svg" viewBox="0 0 794 225" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Top-Right Dark Slate Accent Curve -->
+      <path d="M 605 0 C 670 40, 740 70, 794 85 L 794 0 Z" fill="#383D46" />
+      
+      <!-- Layer 1: Medium Charcoal Grey Ribbon -->
+      <path d="M 264 180 C 370 158, 471 127, 572 125 C 662 123, 735 138, 794 152 L 794 210 C 730 186, 651 162, 561 162 C 460 162, 370 172, 280 180 Z" fill="#8B8F96" />
+      
+      <!-- Layer 2: Light Silvery Grey Ribbon -->
+      <path d="M 292 178 C 382 170, 471 162, 561 162 C 651 162, 730 186, 794 210 L 794 280 C 735 255, 651 216, 561 194 C 471 174, 393 173, 314 178 Z" fill="#CCD0D7" />
+      
+      <!-- Layer 3: Soft Edge Accent Ribbon -->
+      <path d="M 370 172 C 460 173, 550 190, 628 219 C 696 245, 746 266, 794 279 L 794 285 C 746 272, 696 251, 628 224 C 550 194, 460 175, 370 174 Z" fill="#E4E6EA" />
+      
+      <!-- Layer 4: White Page Body Wave -->
+      <path d="M 0 210 C 67 213, 135 207, 202 194 C 269 181, 337 172, 404 172 C 494 172, 584 191, 668 240 C 718 265, 758 277, 794 280 L 794 330 L 0 330 Z" fill="#FFFFFF" />
     </svg>
     <div class="header-content">
       <div class="brand-side">
