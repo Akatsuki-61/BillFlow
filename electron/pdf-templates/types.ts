@@ -10,7 +10,7 @@ export interface InvoicePdfPayload {
   dueDate?: string | null;
   currency: string;
   status: string;
-  template?: "geometric-teal" | "executive-wave" | string;
+  template?: "geometric-teal" | "executive-wave" | "scarlet-modern" | string;
   items: InvoicePdfItem[];
   discountCents?: number;
   taxCents?: number;

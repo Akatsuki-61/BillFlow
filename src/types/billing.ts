@@ -1,6 +1,6 @@
 export type Currency = "USD" | "LKR" | "EUR" | "GBP" | "CAD";
 
-export type InvoiceTemplateId = "geometric-teal" | "executive-wave";
+export type InvoiceTemplateId = "geometric-teal" | "executive-wave" | "scarlet-modern";
 
 export type ClientCategory = "Enterprise" | "Startup" | "Agency" | string;
 

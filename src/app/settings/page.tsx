@@ -1101,7 +1101,7 @@ function SettingsContent() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {/* Template 1: Geometric Teal */}
                       <button
                         type="button"
@@ -1170,6 +1170,45 @@ function SettingsContent() {
                         </p>
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
                           {formState.defaultInvoiceTemplate === "executive-wave" ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                              <span>Active Default</span>
+                            </>
+                          ) : (
+                            <span className="text-content-neutral-400">Click to set as default</span>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Template 3: Scarlet Modern */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            defaultInvoiceTemplate: "scarlet-modern",
+                          }))
+                        }
+                        className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
+                          formState.defaultInvoiceTemplate === "scarlet-modern"
+                            ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                            : "border-line-neutral-200 dark:border-white/10 hover:border-line-neutral-300 dark:hover:border-white/20 bg-surface"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-content-neutral-900 flex items-center gap-2">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#E5252A] inline-block shadow-sm" />
+                            Scarlet Modern
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 uppercase">
+                            Template 3
+                          </span>
+                        </div>
+                        <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
+                          Vibrant crimson &amp; dark slate angled header, dotted rows, large total due, and geometric footer.
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
+                          {formState.defaultInvoiceTemplate === "scarlet-modern" ? (
                             <>
                               <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
                               <span>Active Default</span>

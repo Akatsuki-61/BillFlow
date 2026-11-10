@@ -4,6 +4,7 @@ import path from "path";
 import {
   buildInvoiceHtmlGeometricTeal,
   buildInvoiceHtmlExecutiveWave,
+  buildInvoiceHtmlScarletModern,
   InvoicePdfPayload,
   InvoicePdfItem,
   formatMoney,
@@ -13,7 +14,11 @@ import {
 } from "./pdf-templates";
 
 export type { InvoicePdfPayload, InvoicePdfItem };
-export { buildInvoiceHtmlGeometricTeal, buildInvoiceHtmlExecutiveWave };
+export {
+  buildInvoiceHtmlGeometricTeal,
+  buildInvoiceHtmlExecutiveWave,
+  buildInvoiceHtmlScarletModern,
+};
 
 export interface WorkOrderPdfPayload {
   voucherNumber: string;
@@ -54,6 +59,9 @@ export interface WorkOrderPdfPayload {
 export function buildInvoiceHtml(data: InvoicePdfPayload): string {
   if (data.template === "executive-wave") {
     return buildInvoiceHtmlExecutiveWave(data);
+  }
+  if (data.template === "scarlet-modern") {
+    return buildInvoiceHtmlScarletModern(data);
   }
   return buildInvoiceHtmlGeometricTeal(data);
 }

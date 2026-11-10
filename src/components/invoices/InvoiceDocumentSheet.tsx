@@ -25,6 +25,7 @@ import {
 import {
   GeometricTealTemplate,
   ExecutiveWaveTemplate,
+  ScarletModernTemplate,
 } from "./templates";
 
 interface InvoiceDocumentSheetProps {
@@ -54,6 +55,13 @@ const TEMPLATES: Array<{
     badge: "Template 2",
     color: "#EAA828",
     description: "Charcoal wave header & golden amber accents",
+  },
+  {
+    id: "scarlet-modern",
+    name: "Scarlet Modern",
+    badge: "Template 3",
+    color: "#E5252A",
+    description: "Crimson red & dark slate geometric header with dotted rows",
   },
 ];
 
@@ -326,13 +334,19 @@ export default function InvoiceDocumentSheet({
               className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
               style={{
                 backgroundColor:
-                  selectedTemplate === "executive-wave" ? "#EAA828" : "#00A887",
+                  selectedTemplate === "scarlet-modern"
+                    ? "#E5252A"
+                    : selectedTemplate === "executive-wave"
+                      ? "#EAA828"
+                      : "#00A887",
               }}
             />
             <span className="font-bold">
-              {selectedTemplate === "executive-wave"
-                ? "Executive Wave"
-                : "Geometric Teal"}
+              {selectedTemplate === "scarlet-modern"
+                ? "Scarlet Modern"
+                : selectedTemplate === "executive-wave"
+                  ? "Executive Wave"
+                  : "Geometric Teal"}
             </span>
             <ChevronDown
               className={`w-3.5 h-3.5 text-content-neutral-400 transition-transform duration-200 ${
@@ -404,7 +418,20 @@ export default function InvoiceDocumentSheet({
           }}
         />
 
-        {selectedTemplate === "executive-wave" ? (
+        {selectedTemplate === "scarlet-modern" ? (
+          <ScarletModernTemplate
+            invoice={invoice}
+            client={client}
+            clients={clients}
+            settings={settings}
+            delivery={delivery}
+            businessName={businessName}
+            professionalTitle={professionalTitle}
+            openExternalLink={openExternalLink}
+            formatMoney={formatCents}
+            formatDate={formatDateDisplay}
+          />
+        ) : selectedTemplate === "executive-wave" ? (
           <ExecutiveWaveTemplate
             invoice={invoice}
             client={client}

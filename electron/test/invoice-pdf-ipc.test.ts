@@ -37,7 +37,7 @@ it("returns the PDF result promised by the preload API", async () => {
   expect(fs.readFileSync(result.filePath).subarray(0, 5).toString()).toBe("%PDF-");
 });
 
-it("renders both Geometric Teal and Executive Wave templates correctly", () => {
+it("renders Geometric Teal, Executive Wave, and Scarlet Modern templates correctly", () => {
   const payload = {
     code: "INV-2026-001",
     issueDate: "2026-11-04",
@@ -58,6 +58,11 @@ it("renders both Geometric Teal and Executive Wave templates correctly", () => {
   expect(waveHtml).toContain("wave-bg-svg");
   expect(waveHtml).toContain("grand-total-banner");
   expect(waveHtml).toContain("th-gold");
+
+  const scarletHtml = buildInvoiceHtml({ ...payload, template: "scarlet-modern" });
+  expect(scarletHtml).toContain("header-svg");
+  expect(scarletHtml).toContain("th-red");
+  expect(scarletHtml).toContain("due-amount");
 });
 
 it("supports setting defaultInvoiceTemplate in settings", () => {
