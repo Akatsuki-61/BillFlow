@@ -15,6 +15,7 @@ export interface InvoicePdfPayload {
     | "executive-wave"
     | "scarlet-modern"
     | "apex-orange"
+    | "noir-crimson"
     | string;
   items: InvoicePdfItem[];
   discountCents?: number;

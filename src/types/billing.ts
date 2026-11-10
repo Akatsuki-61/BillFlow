@@ -4,7 +4,8 @@ export type InvoiceTemplateId =
   | "geometric-teal"
   | "executive-wave"
   | "scarlet-modern"
-  | "apex-orange";
+  | "apex-orange"
+  | "noir-crimson";
 
 export type ClientCategory = "Enterprise" | "Startup" | "Agency" | string;
 

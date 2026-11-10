@@ -1257,6 +1257,45 @@ function SettingsContent() {
                           )}
                         </div>
                       </button>
+
+                      {/* Template 5: Noir Crimson */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            defaultInvoiceTemplate: "noir-crimson",
+                          }))
+                        }
+                        className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
+                          formState.defaultInvoiceTemplate === "noir-crimson"
+                            ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                            : "border-line-neutral-200 dark:border-white/10 hover:border-line-neutral-300 dark:hover:border-white/20 bg-surface"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-content-neutral-900 flex items-center gap-2">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#D9383A] inline-block shadow-sm" />
+                            Noir Crimson
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 uppercase">
+                            Template 5
+                          </span>
+                        </div>
+                        <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
+                          Dark obsidian canvas with crimson capsules, chevron accents, stadium terms, and solid crimson footer.
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
+                          {formState.defaultInvoiceTemplate === "noir-crimson" ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                              <span>Active Default</span>
+                            </>
+                          ) : (
+                            <span className="text-content-neutral-400">Click to set as default</span>
+                          )}
+                        </div>
+                      </button>
                     </div>
                   </div>
 

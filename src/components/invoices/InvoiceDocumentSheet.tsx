@@ -27,6 +27,7 @@ import {
   ExecutiveWaveTemplate,
   ScarletModernTemplate,
   ApexOrangeTemplate,
+  NoirCrimsonTemplate,
 } from "./templates";
 
 interface InvoiceDocumentSheetProps {
@@ -71,6 +72,13 @@ const TEMPLATES: Array<{
     color: "#F25C05",
     description: "Tangerine diagonal header, full orange table with grid borders & numbered terms",
   },
+  {
+    id: "noir-crimson",
+    name: "Noir Crimson",
+    badge: "Template 5",
+    color: "#D9383A",
+    description: "Dark obsidian canvas with crimson capsules & chevron accents",
+  },
 ];
 
 export default function InvoiceDocumentSheet({
@@ -90,7 +98,8 @@ export default function InvoiceDocumentSheet({
         stored === "geometric-teal" ||
         stored === "executive-wave" ||
         stored === "scarlet-modern" ||
-        stored === "apex-orange"
+        stored === "apex-orange" ||
+        stored === "noir-crimson"
       ) {
         return stored;
       }
@@ -347,23 +356,27 @@ export default function InvoiceDocumentSheet({
               className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
               style={{
                 backgroundColor:
-                  selectedTemplate === "apex-orange"
-                    ? "#F25C05"
-                    : selectedTemplate === "scarlet-modern"
-                      ? "#E5252A"
-                      : selectedTemplate === "executive-wave"
-                        ? "#EAA828"
-                        : "#00A887",
+                  selectedTemplate === "noir-crimson"
+                    ? "#D9383A"
+                    : selectedTemplate === "apex-orange"
+                      ? "#F25C05"
+                      : selectedTemplate === "scarlet-modern"
+                        ? "#E5252A"
+                        : selectedTemplate === "executive-wave"
+                          ? "#EAA828"
+                          : "#00A887",
               }}
             />
             <span className="font-bold">
-              {selectedTemplate === "apex-orange"
-                ? "Apex Orange"
-                : selectedTemplate === "scarlet-modern"
-                  ? "Scarlet Modern"
-                  : selectedTemplate === "executive-wave"
-                    ? "Executive Wave"
-                    : "Geometric Teal"}
+              {selectedTemplate === "noir-crimson"
+                ? "Noir Crimson"
+                : selectedTemplate === "apex-orange"
+                  ? "Apex Orange"
+                  : selectedTemplate === "scarlet-modern"
+                    ? "Scarlet Modern"
+                    : selectedTemplate === "executive-wave"
+                      ? "Executive Wave"
+                      : "Geometric Teal"}
             </span>
             <ChevronDown
               className={`w-3.5 h-3.5 text-content-neutral-400 transition-transform duration-200 ${
@@ -435,7 +448,20 @@ export default function InvoiceDocumentSheet({
           }}
         />
 
-        {selectedTemplate === "apex-orange" ? (
+        {selectedTemplate === "noir-crimson" ? (
+          <NoirCrimsonTemplate
+            invoice={invoice}
+            client={client}
+            clients={clients}
+            settings={settings}
+            delivery={delivery}
+            businessName={businessName}
+            professionalTitle={professionalTitle}
+            openExternalLink={openExternalLink}
+            formatMoney={formatCents}
+            formatDate={formatDateDisplay}
+          />
+        ) : selectedTemplate === "apex-orange" ? (
           <ApexOrangeTemplate
             invoice={invoice}
             client={client}

@@ -70,6 +70,13 @@ it("renders Geometric Teal, Executive Wave, Scarlet Modern, and Apex Orange temp
   expect(orangeHtml).toContain("table-container");
   expect(orangeHtml).toContain("Terms &amp; Conditions:");
   expect(orangeHtml).toContain("Thank you for your business with us.");
+
+  const noirHtml = buildInvoiceHtml({ ...payload, template: "noir-crimson" });
+  expect(noirHtml).toContain("#111215");
+  expect(noirHtml).toContain("#D9383A");
+  expect(noirHtml).toContain("table-head");
+  expect(noirHtml).toContain("Terms &amp; Condition.");
+  expect(noirHtml).toContain("footer-bar");
 });
 
 it("supports setting defaultInvoiceTemplate in settings", () => {
