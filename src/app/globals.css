@@ -2224,15 +2224,21 @@ button.record-status:focus-visible {
   position: absolute;
   top: 24px;
   right: 24px;
-  z-index: 2;
+  z-index: 50;
   width: 36px;
   height: 36px;
   background: var(--ui-inset);
   color: var(--ui-secondary);
   border: 1px solid var(--ui-border);
+  cursor: pointer;
+  pointer-events: auto;
 }
 .app-dialog .app-dialog-close:hover {
   background: var(--ui-hover);
+  color: var(--foreground);
+}
+.app-dialog .app-dialog-close svg {
+  pointer-events: none;
 }
 .app-dialog .app-dialog-header {
   display: flex;

@@ -120,7 +120,27 @@ export default function InvoiceDocumentSheet({
     }
   };
 
-  const handleShareWhatsApp = () => {
+  const handleShareWhatsApp = async () => {
+    setIsShareOpen(false);
+    setSavedNotice("Preparing invoice PDF...");
+
+    let pdfExported = false;
+    try {
+      if (
+        window.billflow?.invoices?.exportPdf &&
+        invoice.id !== "sample-preview" &&
+        invoice.id !== "draft-preview"
+      ) {
+        await window.billflow.invoices.exportPdf(invoice.id);
+        if (window.billflow?.files?.openInvoicePdf) {
+          await window.billflow.files.openInvoicePdf(invoice.id, true);
+          pdfExported = true;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not auto-reveal exported PDF:", err);
+    }
+
     const link = generateInvoiceWhatsAppLink({
       clientName: invoice.clientName,
       clientPhone: client?.phone,
@@ -136,10 +156,35 @@ export default function InvoiceDocumentSheet({
       businessName,
     });
     openExternalLink(link);
-    setIsShareOpen(false);
+    setSavedNotice(
+      pdfExported
+        ? "Invoice PDF ready in Explorer to attach in WhatsApp!"
+        : "WhatsApp opened with invoice message!"
+    );
+    setTimeout(() => setSavedNotice(null), 5000);
   };
 
-  const handleShareEmail = () => {
+  const handleShareEmail = async () => {
+    setIsShareOpen(false);
+    setSavedNotice("Preparing invoice PDF...");
+
+    let pdfExported = false;
+    try {
+      if (
+        window.billflow?.invoices?.exportPdf &&
+        invoice.id !== "sample-preview" &&
+        invoice.id !== "draft-preview"
+      ) {
+        await window.billflow.invoices.exportPdf(invoice.id);
+        if (window.billflow?.files?.openInvoicePdf) {
+          await window.billflow.files.openInvoicePdf(invoice.id, true);
+          pdfExported = true;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not auto-reveal exported PDF:", err);
+    }
+
     const link = generateInvoiceEmailLink({
       clientEmail: invoice.clientEmail,
       clientName: invoice.clientName,
@@ -155,7 +200,12 @@ export default function InvoiceDocumentSheet({
       businessName,
     });
     window.open(link);
-    setIsShareOpen(false);
+    setSavedNotice(
+      pdfExported
+        ? "Invoice PDF ready in Explorer to attach to your email!"
+        : "Email draft opened with invoice message!"
+    );
+    setTimeout(() => setSavedNotice(null), 5000);
   };
 
   return (
@@ -519,14 +569,6 @@ export default function InvoiceDocumentSheet({
         <Button
           variant="secondary"
           type="button"
-          onClick={onClose}
-        >
-          Close
-        </Button>
-
-        <Button
-          variant="secondary"
-          type="button"
           onClick={handlePrint}
           title="Print this invoice document"
         >
@@ -540,7 +582,7 @@ export default function InvoiceDocumentSheet({
             variant="secondary"
             type="button"
             onClick={() => setIsShareOpen(!isShareOpen)}
-            title="Share invoice via WhatsApp or Email"
+            title="Share invoice PDF via WhatsApp or Email"
           >
             <Share2 className="w-4 h-4 text-sky-500" />
             <span>Share</span>
@@ -559,7 +601,7 @@ export default function InvoiceDocumentSheet({
                 </div>
                 <div>
                   <div className="font-bold">WhatsApp</div>
-                  <div className="text-[10px] text-content-neutral-400 font-normal">Pre-filled message</div>
+                  <div className="text-[10px] text-content-neutral-400 font-normal">Share invoice PDF & brief</div>
                 </div>
               </button>
 
@@ -573,7 +615,7 @@ export default function InvoiceDocumentSheet({
                 </div>
                 <div>
                   <div className="font-bold">Email</div>
-                  <div className="text-[10px] text-content-neutral-400 font-normal">Open mail app draft</div>
+                  <div className="text-[10px] text-content-neutral-400 font-normal">Draft email with PDF attached</div>
                 </div>
               </button>
             </div>

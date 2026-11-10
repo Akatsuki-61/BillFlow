@@ -33,23 +33,36 @@ export function Dialog({
 
   if (typeof document === "undefined") return null;
   return createPortal(
-    <MotionSurface kind="dialog" className="app-dialog-backdrop">
+    <MotionSurface
+      kind="dialog"
+      className="app-dialog-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <MotionSurface
         kind="panel"
         onDismiss={onClose}
         className={`app-dialog${compact ? " app-dialog--compact" : ""}`}
         style={{ width }}
       >
+        {children}
         <Button
+          type="button"
           variant="ghost"
           size="icon"
-          onClick={onClose}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
           aria-label="Close dialog"
           className="app-dialog-close"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4 pointer-events-none" />
         </Button>
-        {children}
       </MotionSurface>
     </MotionSurface>,
     document.body,

@@ -90,30 +90,21 @@ export function generateWhatsAppLink(data: WhatsAppTaskPayload): string {
 
 /**
  * Builds a professional invoice delivery message for client via WhatsApp.
+ * Uses a concise note referencing the attached invoice PDF and expressing thanks.
  */
 export function buildInvoiceWhatsAppMessage(data: WhatsAppInvoicePayload): string {
   const parts: string[] = [];
-  parts.push(`Hi ${data.clientName.trim()}, here is your invoice summary:`);
-  parts.push("");
-  parts.push(`📄 *Invoice Ref:* ${data.invoiceCode}`);
-  parts.push(`💰 *Total Amount:* ${data.totalFormatted}`);
+  const clientGreeting = data.clientName?.trim() ? `Hi ${data.clientName.trim()},` : "Hello,";
+  parts.push(`${clientGreeting} here is your invoice ${data.invoiceCode} (${data.totalFormatted}).`);
+  parts.push("Please find the attached invoice PDF.");
   if (data.advanceFormatted) {
-    parts.push(`💳 *Required Advance:* ${data.advanceFormatted}`);
-  }
-  parts.push(`⚖️ *Balance Due:* ${data.balanceFormatted}`);
-  if (data.dueDate) {
-    parts.push(`📅 *Due Date:* ${data.dueDate}`);
-  }
-  if (data.deliveryUrl) {
-    parts.push(`🔗 *Project Workspace / Delivery Link:* ${data.deliveryUrl}`);
+    parts.push(`Required Advance: ${data.advanceFormatted}`);
   }
   if (data.paymentDetails) {
-    parts.push("");
-    parts.push(`🏦 *Payment Instructions:*`);
-    parts.push(data.paymentDetails);
+    parts.push(`Payment Details: ${data.paymentDetails}`);
   }
   parts.push("");
-  parts.push("Thank you for your business! Please reply or share the payment confirmation once transferred.");
+  parts.push("Thank you!");
   if (data.businessName) {
     parts.push(`— ${data.businessName}`);
   }
@@ -132,6 +123,7 @@ export function generateInvoiceWhatsAppLink(data: WhatsAppInvoicePayload): strin
 
 /**
  * Generates an email `mailto:` link for sharing an invoice with pre-filled subject and body.
+ * References the attached invoice PDF with a clear, concise note.
  */
 export function generateInvoiceEmailLink(data: {
   clientEmail?: string | null;
@@ -147,29 +139,19 @@ export function generateInvoiceEmailLink(data: {
 }): string {
   const subject = encodeURIComponent(`Invoice ${data.invoiceCode} from ${data.businessName || "BillFlow"}`);
   const lines: string[] = [
-    `Hi ${data.clientName},`,
+    `Hi ${data.clientName?.trim() || "there"},`,
     "",
-    `Here is the summary for invoice ${data.invoiceCode}:`,
-    "",
-    `Total Amount: ${data.totalFormatted}`,
+    `Here is your invoice ${data.invoiceCode} (Total Amount: ${data.totalFormatted}).`,
+    "Please find the attached invoice PDF file.",
   ];
   if (data.advanceFormatted) {
     lines.push(`Required Advance: ${data.advanceFormatted}`);
   }
-  lines.push(`Balance Due: ${data.balanceFormatted}`);
-  if (data.dueDate) {
-    lines.push(`Due Date: ${data.dueDate}`);
-  }
-  if (data.deliveryUrl) {
-    lines.push(`Project Workspace / Delivery Link: ${data.deliveryUrl}`);
-  }
   if (data.paymentDetails) {
-    lines.push("");
-    lines.push("Payment Instructions:");
-    lines.push(data.paymentDetails);
+    lines.push(`Payment Details: ${data.paymentDetails}`);
   }
   lines.push("");
-  lines.push("Thank you for your business!");
+  lines.push("Thank you!");
   if (data.businessName) {
     lines.push(`— ${data.businessName}`);
   }
