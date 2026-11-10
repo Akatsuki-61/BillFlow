@@ -74,7 +74,7 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
       z-index: 2;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       height: 135px;
       padding: 0 48px;
       color: #FFFFFF;
@@ -83,13 +83,14 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
       display: flex;
       align-items: center;
       gap: 14px;
-      max-width: 240px;
+      max-width: 380px;
+      height: 104px;
     }
     .brand-badge {
-      width: 42px;
-      height: 42px;
+      width: 40px;
+      height: 40px;
       border-radius: 8px;
-      background: rgba(0, 0, 0, 0.25);
+      background: rgba(255, 255, 255, 0.15);
       border: 1px solid rgba(255, 255, 255, 0.25);
       display: flex;
       align-items: center;
@@ -102,12 +103,13 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
       object-fit: contain;
     }
     .brand-name {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 900;
       letter-spacing: 0.5px;
       color: #FFFFFF;
       text-transform: uppercase;
       line-height: 1.2;
+      white-space: nowrap;
     }
     .brand-title {
       font-size: 9px;
@@ -120,6 +122,10 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
 
     .meta-side {
       text-align: right;
+      height: 135px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     .invoice-title {
       font-size: 34px;
@@ -408,12 +414,12 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
   <!-- 1. TOP APEX ORANGE HEADER -->
   <div class="header-container">
     <svg class="header-svg" viewBox="0 0 794 135" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Main Orange Polygon -->
-      <polygon points="0,0 240,0 365,135 0,135" fill="#F25C05" />
-      <!-- Parallel Orange Diagonal Slash -->
-      <polygon points="280,0 335,0 460,135 405,135" fill="#F25C05" />
-      <!-- Right Solid Black Polygon -->
-      <polygon points="375,0 794,0 794,135 500,135" fill="#111315" />
+      <!-- 1. Main Orange Banner (Stops at y=104, pure white underneath) -->
+      <polygon points="0,0 310,0 408,104 0,104" fill="#F25C05" />
+      <!-- 2. Orange Accent Stripe (Height 120, parallel diagonal) -->
+      <polygon points="342,0 382,0 495,120 455,120" fill="#F25C05" />
+      <!-- 3. Black Banner (Height 135, directly flush against Orange Stripe) -->
+      <polygon points="382,0 794,0 794,135 509,135" fill="#111315" />
     </svg>
 
     <div class="header-content">

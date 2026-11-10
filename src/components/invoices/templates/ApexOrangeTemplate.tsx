@@ -47,49 +47,49 @@ export function ApexOrangeTemplate({
       className="w-full max-w-[720px] bg-white text-[#1F242D] rounded-sm shadow-xl min-h-[1020px] relative overflow-hidden select-text border border-black/5 flex flex-col font-sans"
     >
       {/* 1. TOP DIAGONAL APEX HEADER */}
-      <div className="relative w-full h-[130px] overflow-hidden select-none">
+      <div className="relative w-full h-[125px] overflow-hidden select-none">
         {/* Background SVG Polygons */}
         <div className="absolute inset-0 pointer-events-none z-0">
           <svg
-            viewBox="0 0 720 130"
+            viewBox="0 0 720 125"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className="w-full h-full"
             preserveAspectRatio="none"
           >
-            {/* Main Orange Polygon */}
-            <polygon points="0,0 220,0 335,130 0,130" fill="#F25C05" />
-            {/* Parallel Orange Diagonal Slash */}
-            <polygon points="255,0 305,0 420,130 370,130" fill="#F25C05" />
-            {/* Right Solid Black Polygon */}
-            <polygon points="340,0 720,0 720,130 455,130" fill="#111315" />
+            {/* 1. Main Orange Banner (Stops at y=96, pure white underneath) */}
+            <polygon points="0,0 280,0 370,96 0,96" fill="#F25C05" />
+            {/* 2. Parallel Orange Accent Stripe (Height 110) */}
+            <polygon points="310,0 346,0 449,110 413,110" fill="#F25C05" />
+            {/* 3. Black Polygon (Height 125, directly flush against Orange Stripe) */}
+            <polygon points="346,0 720,0 720,125 463,125" fill="#111315" />
           </svg>
         </div>
 
         {/* Content Over Header */}
-        <div className="relative z-10 flex justify-between items-center h-full px-8 text-white">
-          {/* Left: Brand Identity inside Orange Polygon */}
-          <div className="flex items-center gap-3.5 max-w-[210px]">
-            <div className="w-10 h-10 rounded-lg bg-black/20 flex items-center justify-center p-2 shadow-sm flex-shrink-0 border border-white/20">
+        <div className="relative z-10 flex justify-between items-start h-full px-8 text-white">
+          {/* Left: Brand Identity & Full Name inside Orange Banner (height 96px) */}
+          <div className="flex items-center gap-3.5 max-w-[340px] h-[96px]">
+            <div className="w-9 h-9 rounded-md bg-white/10 flex items-center justify-center p-1.5 shadow-sm shrink-0 border border-white/20">
               <img
                 src="/brand/logo-white.png"
                 alt="Logo"
-                className="w-6 h-6 object-contain"
+                className="w-5 h-5 object-contain"
               />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-[16px] font-black uppercase tracking-wider leading-tight text-white truncate">
+            <div className="min-w-0 pr-4">
+              <h1 className="text-[17px] font-black uppercase tracking-wider leading-tight text-white whitespace-nowrap">
                 {businessName}
               </h1>
-              <p className="text-[9px] font-bold text-orange-100 uppercase tracking-widest truncate mt-0.5">
+              <p className="text-[9.5px] font-bold text-orange-100 uppercase tracking-widest truncate mt-0.5">
                 {professionalTitle}
               </p>
             </div>
           </div>
 
-          {/* Right: INVOICE Title & Metadata inside Black Polygon */}
-          <div className="text-right">
-            <div className="text-[32px] font-black tracking-[2.5px] text-white uppercase leading-none mb-2">
+          {/* Right: INVOICE Title & Metadata inside Black Polygon (height 125px) */}
+          <div className="text-right h-[125px] flex flex-col justify-center">
+            <div className="text-[30px] font-black tracking-[2.5px] text-white uppercase leading-none mb-2">
               INVOICE
             </div>
             <div className="space-y-0.5 text-[11px] text-white/90 font-medium">
