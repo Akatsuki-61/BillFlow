@@ -92,27 +92,27 @@ export function ApexOrangeTemplate({
             <div className="text-[30px] font-black tracking-[2.5px] text-white uppercase leading-none mb-2">
               INVOICE
             </div>
-            <div className="space-y-0.5 text-[11px] text-white/90 font-medium">
-              <div className="flex justify-end gap-3">
-                <span className="text-white/60 font-semibold">Invoice No:</span>
-                <span className="font-bold tabular-nums">
-                  #{invoice.code}
+            <div className="space-y-1.5 text-xs text-white/90">
+              <div className="flex justify-end gap-4">
+                <span className="text-white/75 font-bold">Invoice No.:</span>
+                <span className="font-extrabold text-white tabular-nums min-w-[95px] text-right">
+                  {invoice.code}
+                </span>
+              </div>
+              <div className="flex justify-end gap-4">
+                <span className="text-white/75 font-bold">Date:</span>
+                <span className="font-semibold text-white min-w-[95px] text-right">
+                  {formatDate(invoice.issueDate)}
                 </span>
               </div>
               {invoice.dueDate && (
-                <div className="flex justify-end gap-3">
-                  <span className="text-white/60 font-semibold">Due Date:</span>
-                  <span className="font-bold">
+                <div className="flex justify-end gap-4">
+                  <span className="text-white/75 font-bold">Due Date:</span>
+                  <span className="font-semibold text-white min-w-[95px] text-right">
                     {formatDate(invoice.dueDate)}
                   </span>
                 </div>
               )}
-              <div className="flex justify-end gap-3">
-                <span className="text-white/60 font-semibold">Invoice Date:</span>
-                <span className="font-bold">
-                  {formatDate(invoice.issueDate)}
-                </span>
-              </div>
             </div>
           </div>
         </div>

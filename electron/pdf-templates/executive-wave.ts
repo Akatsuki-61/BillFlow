@@ -173,15 +173,22 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       text-transform: uppercase;
       margin-bottom: 12px;
     }
-    .meta-line {
-      font-size: 11.5px;
+    .meta-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 16px;
       margin-bottom: 4px;
-      color: #64748B;
+      font-size: 11.5px;
     }
-    .meta-line strong {
+    .meta-label {
+      color: #64748B;
+      font-weight: 700;
+    }
+    .meta-val {
       color: #0F172A;
       font-weight: 800;
-      margin-left: 6px;
+      min-width: 95px;
+      text-align: right;
     }
     .status-badge {
       display: inline-block;
@@ -435,11 +442,22 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
 
       <div class="invoice-meta-box">
         <div class="invoice-hero">INVOICE</div>
-        <div class="meta-line">Invoice No : <strong>${escapeHtml(data.code)}</strong></div>
-        <div class="meta-line">Account No : <strong>${escapeHtml(data.code.replace(/[^0-9]/g, "") || "45562784591")}</strong></div>
-        <div class="meta-line">Date : <strong>${escapeHtml(data.issueDate)}</strong></div>
-        ${data.dueDate ? `<div class="meta-line">Due Date : <strong>${escapeHtml(data.dueDate)}</strong></div>` : ""}
-        <div class="status-badge">${escapeHtml(data.status.replace("_", " "))}</div>
+        <div class="meta-row">
+          <span class="meta-label">Invoice No.:</span>
+          <span class="meta-val">${escapeHtml(data.code)}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Date:</span>
+          <span class="meta-val">${escapeHtml(data.issueDate)}</span>
+        </div>
+        ${data.dueDate ? `
+        <div class="meta-row">
+          <span class="meta-label">Due Date:</span>
+          <span class="meta-val">${escapeHtml(data.dueDate)}</span>
+        </div>` : ""}
+        <div style="text-align: right; margin-top: 4px;">
+          <span class="status-badge">${escapeHtml(data.status.replace("_", " "))}</span>
+        </div>
       </div>
     </div>
 

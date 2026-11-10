@@ -193,15 +193,15 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
 
   let metaY = H - 100;
   const drawMetaRow = (label: string, val: string) => {
-    page.drawText(label, { x: rightX - 128, y: metaY, size: 8.5, font: fontBold, color: cTextPrimary });
+    page.drawText(label, { x: rightX - 138, y: metaY, size: 8.5, font: fontBold, color: cTextPrimary });
     const tw = fontRegular.widthOfTextAtSize(val, 8.5);
     page.drawText(val, { x: rightX - tw, y: metaY, size: 8.5, font: fontRegular, color: cTextPrimary });
     metaY -= 13;
   };
 
-  drawMetaRow("Invoice#", data.code);
-  drawMetaRow("Date", data.issueDate);
-  if (data.dueDate) drawMetaRow("Due Date", data.dueDate);
+  drawMetaRow("Invoice No.:", data.code);
+  drawMetaRow("Date:", data.issueDate);
+  if (data.dueDate) drawMetaRow("Due Date:", data.dueDate);
 
   // Status Badge
   const statusDisplay = data.status.replace("_", " ");

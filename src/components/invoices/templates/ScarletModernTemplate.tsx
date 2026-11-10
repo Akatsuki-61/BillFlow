@@ -90,23 +90,23 @@ export function ScarletModernTemplate({
             <div className="text-[32px] font-black tracking-[2px] text-white uppercase leading-none mb-2">
               INVOICE
             </div>
-            <div className="space-y-0.5 text-[11px] text-white/90 font-medium">
-              <div className="flex justify-end gap-2.5">
-                <span className="text-white/70 font-semibold">Account No:</span>
-                <span className="font-bold tabular-nums">
-                  {invoice.code.replace(/[^0-9]/g, "") || "1234 5678 9101"}
+            <div className="space-y-1.5 text-xs text-white/90">
+              <div className="flex justify-end gap-4">
+                <span className="text-white/75 font-bold">Invoice No.:</span>
+                <span className="font-extrabold text-white tabular-nums min-w-[95px] text-right">
+                  {invoice.code}
                 </span>
               </div>
-              <div className="flex justify-end gap-2.5">
-                <span className="text-white/70 font-semibold">Invoice Date:</span>
-                <span className="font-bold">
+              <div className="flex justify-end gap-4">
+                <span className="text-white/75 font-bold">Date:</span>
+                <span className="font-semibold text-white min-w-[95px] text-right">
                   {formatDate(invoice.issueDate)}
                 </span>
               </div>
               {invoice.dueDate && (
-                <div className="flex justify-end gap-2.5">
-                  <span className="text-white/70 font-semibold">Due Date:</span>
-                  <span className="font-bold">
+                <div className="flex justify-end gap-4">
+                  <span className="text-white/75 font-bold">Due Date:</span>
+                  <span className="font-semibold text-white min-w-[95px] text-right">
                     {formatDate(invoice.dueDate)}
                   </span>
                 </div>

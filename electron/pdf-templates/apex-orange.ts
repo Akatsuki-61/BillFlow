@@ -136,18 +136,22 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
       text-transform: uppercase;
       margin-bottom: 8px;
     }
-    .meta-line {
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.9);
+    .meta-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 16px;
       margin-bottom: 2px;
+      font-size: 11px;
     }
-    .meta-line span {
-      color: rgba(255, 255, 255, 0.65);
-      font-weight: 600;
-      margin-right: 6px;
-    }
-    .meta-line strong {
+    .meta-label {
+      color: rgba(255, 255, 255, 0.75);
       font-weight: 700;
+    }
+    .meta-val {
+      color: #FFFFFF;
+      font-weight: 800;
+      min-width: 95px;
+      text-align: right;
     }
 
     /* BODY */
@@ -435,9 +439,19 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
 
       <div class="meta-side">
         <div class="invoice-title">INVOICE</div>
-        <div class="meta-line"><span>Invoice No:</span> <strong>#${escapeHtml(data.code)}</strong></div>
-        ${data.dueDate ? `<div class="meta-line"><span>Due Date:</span> <strong>${escapeHtml(data.dueDate)}</strong></div>` : ""}
-        <div class="meta-line"><span>Invoice Date:</span> <strong>${escapeHtml(data.issueDate)}</strong></div>
+        <div class="meta-row">
+          <span class="meta-label">Invoice No.:</span>
+          <span class="meta-val">${escapeHtml(data.code)}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Date:</span>
+          <span class="meta-val">${escapeHtml(data.issueDate)}</span>
+        </div>
+        ${data.dueDate ? `
+        <div class="meta-row">
+          <span class="meta-label">Due Date:</span>
+          <span class="meta-val">${escapeHtml(data.dueDate)}</span>
+        </div>` : ""}
       </div>
     </div>
   </div>

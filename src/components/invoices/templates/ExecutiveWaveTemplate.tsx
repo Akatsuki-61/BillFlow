@@ -184,23 +184,23 @@ export function ExecutiveWaveTemplate({
             <div className="text-[34px] font-black tracking-[3px] text-slate-900 uppercase leading-none mb-3">
               INVOICE
             </div>
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-end gap-3">
-                <span className="text-slate-500 font-semibold">Invoice No :</span>
-                <span className="font-extrabold text-slate-900 tabular-nums min-w-[80px] text-right">
+            <div className="space-y-1.5 text-xs">
+              <div className="flex justify-end gap-4">
+                <span className="text-slate-500 font-bold">Invoice No.:</span>
+                <span className="font-extrabold text-slate-900 tabular-nums min-w-[95px] text-right">
                   {invoice.code}
                 </span>
               </div>
-              <div className="flex justify-end gap-3">
-                <span className="text-slate-500 font-semibold">Date :</span>
-                <span className="font-semibold text-slate-900 min-w-[80px] text-right">
+              <div className="flex justify-end gap-4">
+                <span className="text-slate-500 font-bold">Date:</span>
+                <span className="font-semibold text-slate-900 min-w-[95px] text-right">
                   {formatDate(invoice.issueDate)}
                 </span>
               </div>
               {invoice.dueDate && (
-                <div className="flex justify-end gap-3">
-                  <span className="text-slate-500 font-semibold">Due Date :</span>
-                  <span className="font-semibold text-slate-900 min-w-[80px] text-right">
+                <div className="flex justify-end gap-4">
+                  <span className="text-slate-500 font-bold">Due Date:</span>
+                  <span className="font-semibold text-slate-900 min-w-[95px] text-right">
                     {formatDate(invoice.dueDate)}
                   </span>
                 </div>

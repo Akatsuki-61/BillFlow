@@ -122,21 +122,21 @@ export function GeometricTealTemplate({
             </div>
             <div className="mt-4 space-y-1.5 text-xs">
               <div className="flex sm:justify-end gap-4">
-                <span className="font-bold text-[#718096]">Invoice#:</span>
-                <span className="font-extrabold text-[#1f262e] tabular-nums min-w-[90px] sm:text-right">
+                <span className="font-bold text-[#718096]">Invoice No.:</span>
+                <span className="font-extrabold text-[#1f262e] tabular-nums min-w-[95px] sm:text-right">
                   {invoice.code}
                 </span>
               </div>
               <div className="flex sm:justify-end gap-4">
                 <span className="font-bold text-[#718096]">Date:</span>
-                <span className="font-semibold text-[#1f262e] min-w-[90px] sm:text-right">
+                <span className="font-semibold text-[#1f262e] min-w-[95px] sm:text-right">
                   {formatDate(invoice.issueDate)}
                 </span>
               </div>
               {invoice.dueDate && (
                 <div className="flex sm:justify-end gap-4">
                   <span className="font-bold text-[#718096]">Due Date:</span>
-                  <span className="font-semibold text-[#1f262e] min-w-[90px] sm:text-right">
+                  <span className="font-semibold text-[#1f262e] min-w-[95px] sm:text-right">
                     {formatDate(invoice.dueDate)}
                   </span>
                 </div>

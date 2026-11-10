@@ -145,7 +145,7 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
     .meta-val {
       color: #1F262E;
       font-weight: 800;
-      min-width: 90px;
+      min-width: 95px;
       text-align: right;
     }
     .status-badge {
@@ -367,7 +367,7 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
         <div class="invoice-title">INVOICE</div>
         <div class="meta-table">
           <div class="meta-row">
-            <span class="meta-label">Invoice#:</span>
+            <span class="meta-label">Invoice No.:</span>
             <span class="meta-val">${escapeHtml(data.code)}</span>
           </div>
           <div class="meta-row">
