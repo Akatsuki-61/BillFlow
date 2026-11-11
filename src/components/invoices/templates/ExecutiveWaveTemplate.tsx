@@ -268,21 +268,10 @@ export function ExecutiveWaveTemplate({
           </table>
         </div>
 
-        {/* Summary & Payment Grid */}
-        <div className="grid grid-cols-2 gap-8 items-start mb-6 pt-2">
-          {/* Left: Payment Info */}
-          <div>
-            <h4 className="text-xs font-black tracking-wider text-slate-900 uppercase mb-2">
-              Payment Info
-            </h4>
-            <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50 p-3 rounded-lg border border-slate-100">
-              {settings?.paymentDetails ||
-                "Payment via Bank Transfer / Wire Transfer\nDetails provided upon invoice issue."}
-            </div>
-          </div>
-
+        {/* Summary Totals */}
+        <div className="flex justify-end mb-6 pt-2">
           {/* Right: Totals with Golden Amber Banner */}
-          <div className="space-y-1.5 text-xs">
+          <div className="w-full max-w-xs space-y-1.5 text-xs">
             <div className="flex justify-between text-slate-600 py-0.5">
               <span className="font-semibold">Sub Total:</span>
               <span className="font-bold text-slate-900 tabular-nums">
@@ -344,8 +333,8 @@ export function ExecutiveWaveTemplate({
         </div>
 
         {/* Footer */}
-        <div className="mt-auto pt-4 border-t border-slate-200 flex justify-between items-end">
-          <div className="max-w-[420px]">
+        <div className="mt-auto pt-4 border-t border-slate-200">
+          <div className="max-w-xl">
             <h5 className="text-xs font-black text-slate-900 mb-1">
               Thank you for your business!
             </h5>
@@ -354,15 +343,6 @@ export function ExecutiveWaveTemplate({
               {invoice.notes ||
                 "Payment due within specified due date. All software deliverables and intellectual property transfer upon final settlement."}
             </p>
-          </div>
-
-          <div className="text-right">
-            <div className="text-sm font-black text-slate-900">
-              {businessName}
-            </div>
-            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">
-              {professionalTitle}
-            </div>
           </div>
         </div>
       </div>

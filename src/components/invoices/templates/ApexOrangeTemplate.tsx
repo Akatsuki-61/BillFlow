@@ -120,8 +120,8 @@ export function ApexOrangeTemplate({
 
       {/* 2. BODY CONTENT */}
       <div className="relative z-10 px-8 pt-6 pb-4 flex-1 flex flex-col">
-        {/* Client & Payment Method Two-Column Header */}
-        <div className="grid grid-cols-2 gap-8 items-start mb-6">
+        {/* Client Header */}
+        <div className="mb-6">
           {/* Left: INVOICE TO */}
           <div>
             <div className="text-[11px] font-black text-[#F25C05] uppercase tracking-wider mb-1">
@@ -155,31 +155,6 @@ export function ApexOrangeTemplate({
                 </button>
               </div>
             )}
-          </div>
-
-          {/* Right: Payment Method */}
-          <div className="text-right sm:text-left sm:pl-8">
-            <div className="text-[11px] font-black text-[#F25C05] uppercase tracking-wider mb-1.5">
-              Payment Method
-            </div>
-            <div className="text-xs space-y-1 text-slate-600 font-medium">
-              <div className="flex sm:justify-start gap-2">
-                <span className="font-bold text-slate-800 min-w-[95px]">Account No:</span>
-                <span className="tabular-nums">
-                  {settings?.taxId || "1234 5678 910"}
-                </span>
-              </div>
-              <div className="flex sm:justify-start gap-2">
-                <span className="font-bold text-slate-800 min-w-[95px]">Account Name:</span>
-                <span className="truncate">{businessName}</span>
-              </div>
-              <div className="flex sm:justify-start gap-2">
-                <span className="font-bold text-slate-800 min-w-[95px]">Branch / Info:</span>
-                <span className="truncate">
-                  {settings?.paymentDetails || "Bank transfer details upon request"}
-                </span>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -319,17 +294,6 @@ export function ApexOrangeTemplate({
               <span className="text-lg font-black text-white tabular-nums tracking-wide">
                 {formatMoney(invoice.amountCents, invoice.currency)}
               </span>
-            </div>
-
-            {/* Signature Area */}
-            <div className="text-right pt-6">
-              <div className="w-44 border-b border-slate-300 ml-auto mb-1.5" />
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Your Name &amp; Signature
-              </div>
-              <div className="text-xs font-black text-slate-900 mt-0.5">
-                {businessName}
-              </div>
             </div>
           </div>
         </div>

@@ -165,9 +165,6 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
     }
 
     .sub-header-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 36px;
       margin-bottom: 24px;
     }
     .section-label {
@@ -467,22 +464,6 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
         ${data.client.email ? `<div class="client-detail">${escapeHtml(data.client.email)}</div>` : ""}
         ${data.deliveryUrl ? `<div class="delivery-link">Delivery: ${escapeHtml(data.deliveryUrl)}</div>` : ""}
       </div>
-
-      <div>
-        <div class="section-label">Payment Method</div>
-        <div class="payment-row">
-          <strong>Account No:</strong>
-          <span>${escapeHtml(data.business.taxId || "1234 5678 910")}</span>
-        </div>
-        <div class="payment-row">
-          <strong>Account Name:</strong>
-          <span>${escapeHtml(data.business.businessName || "Chethaka Lakshitha")}</span>
-        </div>
-        <div class="payment-row">
-          <strong>Branch / Info:</strong>
-          <span>${escapeHtml(data.business.paymentDetails || "Bank transfer details upon request")}</span>
-        </div>
-      </div>
     </div>
 
     <!-- TABLE WITH FULL ORANGE HEADER & GRID BORDERS -->
@@ -551,13 +532,6 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
           <span class="gt-amount">${formatMoney(data.amountCents, data.currency)}</span>
         </div>
       </div>
-    </div>
-
-    <!-- SIGNATURE -->
-    <div class="signature-container">
-      <div class="sig-line"></div>
-      <div class="sig-title">Your Name &amp; Signature</div>
-      <div class="sig-name">${escapeHtml(data.business.businessName || "Chethaka Lakshitha")}</div>
     </div>
   </div>
 

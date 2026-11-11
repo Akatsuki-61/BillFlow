@@ -284,30 +284,13 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
 
     /* SUMMARY ROW */
     .summary-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 32px;
-      align-items: flex-start;
+      display: flex;
+      justify-content: flex-end;
       padding-top: 8px;
-    }
-    .payment-box {
-      font-size: 11.5px;
-      color: #64748B;
-      line-height: 1.6;
-    }
-    .payment-title {
-      font-size: 11.5px;
-      font-weight: 800;
-      color: #0F172A;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-    }
-    .payment-text {
-      white-space: pre-line;
     }
 
     .totals-box {
+      width: 320px;
       font-size: 12px;
       display: flex;
       flex-direction: column;
@@ -477,13 +460,8 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       </tbody>
     </table>
 
-    <!-- SUMMARY & PAYMENT -->
+    <!-- SUMMARY -->
     <div class="summary-grid">
-      <div class="payment-box">
-        <div class="payment-title">PAYMENT INFO</div>
-        <div class="payment-text">${escapeHtml(data.business.paymentDetails || "Payment via Bank Transfer / Wire Transfer\nDetails provided upon invoice issue.")}</div>
-      </div>
-
       <div class="totals-box">
         <div class="totals-line">
           <span>Sub Total:</span>
@@ -522,13 +500,9 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
 
     <!-- FOOTER -->
     <div class="footer-bar">
-      <div class="terms-box">
+      <div class="terms-box" style="max-width: 600px;">
         <div class="thank-you-title">Thank you for your business!</div>
         <div class="terms-desc"><strong>TERMS : </strong>${escapeHtml(data.notes || "Payment is due within agreed terms. Development milestones proceed upon confirmation of the required advance.")}</div>
-      </div>
-      <div class="signature-box">
-        <div class="signer-name">${escapeHtml(data.business.businessName || "Chethaka Lakshitha")}</div>
-        <div class="signer-title">${escapeHtml(data.business.professionalTitle || "Software Freelancer & Consultant")}</div>
       </div>
     </div>
   </div>

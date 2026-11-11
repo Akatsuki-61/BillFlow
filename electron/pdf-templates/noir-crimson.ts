@@ -532,25 +532,16 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
 
     ${itemsRows}
 
-    <!-- 4. PAYMENT METHOD & SUMMARY CALCULATION -->
+    <!-- 4. SUMMARY CALCULATION -->
     <div class="summary-section">
-      <!-- Left: Payment Method -->
-      <div class="payment-side">
-        <div class="payment-title">Payment Method.</div>
-        <div class="payment-info">
-          <div>Account Name: <strong>${businessName}</strong></div>
-          <div>Account No: <strong>${escapeHtml(data.business?.paymentDetails || "012 345 678 900")}</strong></div>
-          <div>Bank Details: <strong>${escapeHtml(data.business?.taxId || "Novada Musimas Bank Details")}</strong></div>
-          ${
-            data.deliveryUrl
-              ? `<div><a class="delivery-pill" href="${escapeHtml(data.deliveryUrl)}">&#x2197; Open Delivery Location</a></div>`
-              : ""
-          }
-        </div>
+      <!-- Left: Delivery Link if present -->
+      <div>
+        ${
+          data.deliveryUrl
+            ? `<div><a class="delivery-pill" href="${escapeHtml(data.deliveryUrl)}">&#x2197; Open Delivery Location</a></div>`
+            : ""
+        }
       </div>
-
-      <!-- Divider -->
-      <div class="summary-divider"></div>
 
       <!-- Right: Financial Breakdown -->
       <div class="totals-side">
@@ -611,23 +602,8 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
       </div>
     </div>
 
-    <!-- 5. CENTERED SIGNATURE -->
-    <div class="signature-section">
-      <svg width="150" height="38" viewBox="0 0 140 38" fill="none">
-        <path
-          d="M10 24C22 18 35 12 45 22C52 28 42 34 32 30C22 26 28 10 40 8C52 6 62 25 75 22C85 19 92 14 105 18C115 21 125 15 135 12"
-          stroke="#E4E4E7"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-      <div class="sig-name">${businessName}</div>
-      <div class="sig-title">${professionalTitle}</div>
-    </div>
-
-    <!-- 6. TERMS & CONDITION CONTAINER -->
-    <div class="terms-container">
+    <!-- 5. TERMS & CONDITION CONTAINER -->
+    <div class="terms-container" style="margin-top: 36px; margin-bottom: 24px;">
       <div class="terms-box">
         <div class="terms-title">Terms &amp; Condition.</div>
         <p class="terms-text">

@@ -212,11 +212,11 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
       font-weight: 900;
     }
 
-    /* 3-Column Section */
-    .three-columns {
+    /* 2-Column Section */
+    .two-columns {
       display: grid;
-      grid-template-columns: 1.2fr 1.2fr 1.6fr;
-      gap: 24px;
+      grid-template-columns: 1.2fr 1.6fr;
+      gap: 32px;
       margin-top: 32px;
       padding-top: 16px;
       border-top: 1px solid #E2E8F0;
@@ -400,8 +400,8 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
       </tbody>
     </table>
 
-    <!-- 3-Column Info -->
-    <div class="three-columns">
+    <!-- 2-Column Info -->
+    <div class="two-columns">
       <div>
         <div class="col-heading">Invoice to:</div>
         <div class="client-name">${escapeHtml(data.client.name)}</div>
@@ -410,11 +410,6 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
           ${data.client.phone ? `<div>${escapeHtml(data.client.phone)}</div>` : ""}
           ${data.deliveryUrl ? `<div class="delivery-link">${escapeHtml(data.deliveryUrl)}</div>` : ""}
         </div>
-      </div>
-
-      <div>
-        <div class="col-heading">Payment Info:</div>
-        <div class="col-body" style="white-space: pre-line;">${data.business.paymentDetails ? escapeHtml(data.business.paymentDetails) : "Bank transfer details provided upon request."}</div>
       </div>
 
       <div>

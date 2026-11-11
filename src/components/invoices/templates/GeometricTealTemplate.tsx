@@ -188,7 +188,7 @@ export function GeometricTealTemplate({
           </table>
         </div>
 
-        {/* Summary and Payment Info Grid */}
+        {/* Summary and Client Details Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-8 items-start border-t border-[#E2E8F0] mt-4">
           <div className="space-y-6">
             <div>
@@ -223,16 +223,6 @@ export function GeometricTealTemplate({
                   </button>
                 </div>
               )}
-            </div>
-
-            <div>
-              <h3 className="text-sm font-extrabold text-[#00A887] mb-1.5">
-                Payment Info:
-              </h3>
-              <p className="text-xs text-[#718096] leading-relaxed font-medium whitespace-pre-line">
-                {settings?.paymentDetails ||
-                  "Bank transfer details provided upon request."}
-              </p>
             </div>
           </div>
 

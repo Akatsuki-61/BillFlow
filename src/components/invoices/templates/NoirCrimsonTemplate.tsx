@@ -266,47 +266,21 @@ export function NoirCrimsonTemplate({
           })}
         </div>
 
-        {/* 4. PAYMENT METHOD & SUMMARY CALCULATION */}
+        {/* 4. SUMMARY CALCULATION */}
         <div className="mt-6 flex justify-between items-start">
-          {/* Left: Payment Method */}
-          <div className="w-[46%]">
-            <div className="text-xs font-bold text-[#D9383A] uppercase tracking-wider mb-2">
-              Payment Method.
-            </div>
-            <div className="text-[11px] text-zinc-400 space-y-1.5 leading-relaxed">
-              <div>
-                <span className="text-zinc-500">Account Name: </span>
-                <span className="text-white font-semibold">{businessName}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500">Account: </span>
-                <span className="text-white font-semibold">
-                  {settings?.paymentDetails || "012 345 678 900"}
-                </span>
-              </div>
-              <div>
-                <span className="text-zinc-500">Bank Details: </span>
-                <span className="text-white font-semibold">
-                  {settings?.taxId || "Novada Musimas Bank Details"}
-                </span>
-              </div>
-              {delivery.hasLink && (
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => openExternalLink(delivery.formattedUrl)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#D9383A]/20 border border-[#D9383A]/50 text-[#D9383A] hover:bg-[#D9383A]/30 text-[10px] font-bold transition-colors cursor-pointer"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    <span>Open Delivery Location</span>
-                  </button>
-                </div>
-              )}
-            </div>
+          {/* Left: Delivery Link */}
+          <div>
+            {delivery.hasLink && (
+              <button
+                type="button"
+                onClick={() => openExternalLink(delivery.formattedUrl)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#D9383A]/20 border border-[#D9383A]/50 text-[#D9383A] hover:bg-[#D9383A]/30 text-[10px] font-bold transition-colors cursor-pointer"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Open Delivery Location</span>
+              </button>
+            )}
           </div>
-
-          {/* Middle vertical red line */}
-          <div className="w-[1px] h-28 bg-[#D9383A]/40 mx-4 shrink-0" />
 
           {/* Right: Calculations */}
           <div className="w-[46%] text-right space-y-1.5 text-xs">
@@ -373,29 +347,8 @@ export function NoirCrimsonTemplate({
           </div>
         </div>
 
-        {/* 5. CENTERED SIGNATURE */}
-        <div className="my-5 flex flex-col items-center justify-center text-center">
-          <div className="h-10 flex items-center justify-center">
-            <svg width="150" height="38" viewBox="0 0 140 38" fill="none">
-              <path
-                d="M10 24C22 18 35 12 45 22C52 28 42 34 32 30C22 26 28 10 40 8C52 6 62 25 75 22C85 19 92 14 105 18C115 21 125 15 135 12"
-                stroke="#E4E4E7"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-          <div className="text-sm font-bold text-white tracking-wide mt-1">
-            {businessName}
-          </div>
-          <div className="text-[10px] text-zinc-400 font-medium tracking-wider uppercase mt-0.5">
-            {professionalTitle}
-          </div>
-        </div>
-
-        {/* 6. TERMS & CONDITION STADIUM CAPSULE */}
-        <div className="my-3">
+        {/* 5. TERMS & CONDITION STADIUM CAPSULE */}
+        <div className="my-6">
           <div className="w-full border-[1.5px] border-[#D9383A] rounded-[28px] p-4 text-center">
             <div className="text-xs font-bold text-[#D9383A] uppercase tracking-wider mb-1.5">
               Terms &amp; Condition.
