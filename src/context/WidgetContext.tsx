@@ -6,8 +6,11 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
+import { Plus } from "lucide-react";
 import {
   WIDGET_CATALOG,
   DEFAULT_DASHBOARD_WIDGET_IDS,
@@ -26,6 +29,14 @@ export interface ToastAction {
   onClick: () => void;
 }
 
+export interface WidgetDragStartPayload {
+  widgetId: string;
+  source: "dashboard" | "analytics";
+  element: HTMLElement;
+  clientX: number;
+  clientY: number;
+}
+
 interface WidgetContextType {
   dashboardWidgets: string[];
   analyticsWidgets: string[];
@@ -33,6 +44,8 @@ interface WidgetContextType {
   isDashboardEditing: boolean;
   isDragging: boolean;
   draggedWidgetId: string | null;
+  dragSource: "dashboard" | "analytics" | null;
+  isHomeDropOver: boolean;
   toastMessage: string | null;
   toastAction: ToastAction | null;
   canUndo: boolean;
@@ -40,6 +53,9 @@ interface WidgetContextType {
   setIsDashboardEditing: (editing: boolean) => void;
   setDraggedWidgetId: (id: string | null) => void;
   setIsDragging: (dragging: boolean) => void;
+  setIsHomeDropOver: (over: boolean) => void;
+  startWidgetDrag: (payload: WidgetDragStartPayload) => void;
+  endWidgetDrag: () => void;
   pinToDashboard: (id: string) => void;
   removeFromDashboard: (id: string) => void;
   toggleDashboard: (id: string) => void;
@@ -53,6 +69,8 @@ interface WidgetContextType {
   toggleWidgetSize: (id: string) => void;
   reorderDashboardWidgets: (newOrder: string[]) => void;
   moveDashboardWidget: (fromIndex: number, toIndex: number) => void;
+  moveDashboardWidgetById: (fromId: string, toId: string) => void;
+  moveAnalyticsWidget: (fromId: string, toId: string) => void;
   showToast: (msg: string, action?: ToastAction) => void;
 }
 
@@ -75,8 +93,29 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
   const [isDashboardEditing, setIsDashboardEditing] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+  const [dragSource, setDragSource] = useState<"dashboard" | "analytics" | null>(
+    null,
+  );
+  const [isHomeDropOver, setIsHomeDropOver] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastAction, setToastAction] = useState<ToastAction | null>(null);
+
+  // Floating drag preview refs for 60/120fps cursor tracking + navbar shrink
+  const dragOverlayRef = useRef<HTMLDivElement | null>(null);
+  const dragCloneHostRef = useRef<HTMLDivElement | null>(null);
+  const dragBadgeRef = useRef<HTMLDivElement | null>(null);
+  const dragMetricsRef = useRef<{
+    width: number;
+    height: number;
+    offsetX: number;
+    offsetY: number;
+    lastX: number;
+    lastY: number;
+  } | null>(null);
+  const isHomeDropOverRef = useRef<boolean>(false);
+  useEffect(() => {
+    isHomeDropOverRef.current = isHomeDropOver;
+  }, [isHomeDropOver]);
 
   // History stack for dashboard layout operations (tracks up to 15 prior states for undo)
   const [dashboardHistory, setDashboardHistory] = useState<string[][]>([]);
@@ -384,6 +423,188 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
     [showToast, undoDashboard],
   );
 
+  /**
+   * Live-reorders dashboard widgets by widget ID during drag-over.
+   */
+  const moveDashboardWidgetById = useCallback(
+    (fromId: string, toId: string) => {
+      if (!fromId || !toId || fromId === toId) return;
+      setDashboardWidgets((prev) => {
+        const fromIndex = prev.indexOf(fromId);
+        const toIndex = prev.indexOf(toId);
+        if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+          return prev;
+        }
+        const updated = [...prev];
+        const [moved] = updated.splice(fromIndex, 1);
+        updated.splice(toIndex, 0, moved);
+        return updated;
+      });
+    },
+    [],
+  );
+
+  /**
+   * Live-reorders analytics widgets by widget ID during drag-over.
+   */
+  const moveAnalyticsWidget = useCallback((fromId: string, toId: string) => {
+    if (!fromId || !toId || fromId === toId) return;
+    setAnalyticsWidgets((prev) => {
+      const fromIndex = prev.indexOf(fromId);
+      const toIndex = prev.indexOf(toId);
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+        return prev;
+      }
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
+  }, []);
+
+  const updateDragPreviewPosition = useCallback(
+    (clientX: number, clientY: number) => {
+      const overlay = dragOverlayRef.current;
+      const metrics = dragMetricsRef.current;
+      if (!overlay || !metrics) return;
+      if (clientX === 0 && clientY === 0) return;
+
+      metrics.lastX = clientX;
+      metrics.lastY = clientY;
+
+      // Shrink smoothly as the cursor moves upward toward the top navbar (y < 260px -> y = 64px)
+      const rawProgress = Math.max(0, Math.min(1, (260 - clientY) / 190));
+      const eased = rawProgress * rawProgress * (3 - 2 * rawProgress);
+      const overHome = isHomeDropOverRef.current;
+
+      const baseScale = 0.92;
+      const minScale = overHome ? 0.24 : 0.28;
+      const scale = baseScale - eased * (baseScale - minScale);
+
+      // Anchor transitions smoothly from the original grab offset to centered below the cursor near the navbar
+      const grabX = metrics.offsetX * scale;
+      const grabY = metrics.offsetY * scale;
+      const navX = (metrics.width * scale) * 0.5;
+      const navY = -14;
+
+      const anchorX = grabX * (1 - eased) + navX * eased;
+      const anchorY = grabY * (1 - eased) + navY * eased;
+
+      const x = Math.round(clientX - anchorX);
+      const y = Math.round(clientY - anchorY);
+
+      overlay.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale.toFixed(4)})`;
+      overlay.style.opacity = overHome ? "0.98" : eased > 0.2 ? "0.95" : "0.92";
+
+      if (dragBadgeRef.current) {
+        const showBadge = eased > 0.25 || overHome;
+        dragBadgeRef.current.style.opacity = showBadge ? "1" : "0";
+        dragBadgeRef.current.style.transform = ` translateX(-50%) scale(${(1 / scale).toFixed(3)})`;
+      }
+    },
+    [],
+  );
+
+  const startWidgetDrag = useCallback(
+    ({
+      widgetId,
+      source,
+      element,
+      clientX,
+      clientY,
+    }: WidgetDragStartPayload) => {
+      const rect = element.getBoundingClientRect();
+      const width = Math.max(220, Math.round(rect.width));
+      const height = Math.max(120, Math.round(rect.height));
+      const offsetX = Math.max(24, Math.min(width - 24, clientX - rect.left));
+      const offsetY = Math.max(20, Math.min(height - 20, clientY - rect.top));
+
+      dragMetricsRef.current = {
+        width,
+        height,
+        offsetX,
+        offsetY,
+        lastX: clientX,
+        lastY: clientY,
+      };
+
+      setDraggedWidgetId(widgetId);
+      setDragSource(source);
+      setIsDragging(true);
+
+      // Clone the dragged tile DOM into the floating preview container after mount
+      requestAnimationFrame(() => {
+        const host = dragCloneHostRef.current;
+        const overlay = dragOverlayRef.current;
+        if (!host || !overlay) return;
+        host.innerHTML = "";
+        const clone = element.cloneNode(true) as HTMLElement;
+        clone.removeAttribute("draggable");
+        clone.style.width = `${width}px`;
+        clone.style.height = `${height}px`;
+        clone.style.margin = "0";
+        clone.style.pointerEvents = "none";
+
+        // Copy canvas bitmaps (e.g. ECharts) into the cloned canvases
+        const srcCanvases = element.querySelectorAll("canvas");
+        const destCanvases = clone.querySelectorAll("canvas");
+        srcCanvases.forEach((srcCanvas, idx) => {
+          const destCanvas = destCanvases[idx];
+          if (destCanvas && srcCanvas.width > 0 && srcCanvas.height > 0) {
+            destCanvas.width = srcCanvas.width;
+            destCanvas.height = srcCanvas.height;
+            const ctx = destCanvas.getContext("2d");
+            try {
+              ctx?.drawImage(srcCanvas, 0, 0);
+            } catch {
+              // Ignore cross-origin canvas errors
+            }
+          }
+        });
+
+        host.appendChild(clone);
+        overlay.style.width = `${width}px`;
+        overlay.style.height = `${height}px`;
+        updateDragPreviewPosition(clientX, clientY);
+      });
+    },
+    [updateDragPreviewPosition],
+  );
+
+  const endWidgetDrag = useCallback(() => {
+    setIsDragging(false);
+    setDraggedWidgetId(null);
+    setDragSource(null);
+    setIsHomeDropOver(false);
+    dragMetricsRef.current = null;
+    if (dragCloneHostRef.current) {
+      dragCloneHostRef.current.innerHTML = "";
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleWindowDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      updateDragPreviewPosition(e.clientX, e.clientY);
+    };
+    const handleWindowDragEnd = () => {
+      endWidgetDrag();
+    };
+    window.addEventListener("dragover", handleWindowDragOver, { passive: false });
+    window.addEventListener("dragend", handleWindowDragEnd);
+    window.addEventListener("drop", handleWindowDragEnd);
+    return () => {
+      window.removeEventListener("dragover", handleWindowDragOver);
+      window.removeEventListener("dragend", handleWindowDragEnd);
+      window.removeEventListener("drop", handleWindowDragEnd);
+    };
+  }, [isDragging, updateDragPreviewPosition, endWidgetDrag]);
+
+  const draggedMeta = draggedWidgetId
+    ? WIDGET_CATALOG.find((w) => w.id === draggedWidgetId)
+    : null;
+
   return (
     <WidgetContext.Provider
       value={{
@@ -393,6 +614,8 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
         isDashboardEditing,
         isDragging,
         draggedWidgetId,
+        dragSource,
+        isHomeDropOver,
         toastMessage,
         toastAction,
         canUndo,
@@ -400,6 +623,9 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
         setIsDashboardEditing,
         setDraggedWidgetId,
         setIsDragging,
+        setIsHomeDropOver,
+        startWidgetDrag,
+        endWidgetDrag,
         pinToDashboard,
         removeFromDashboard,
         toggleDashboard,
@@ -413,10 +639,64 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
         toggleWidgetSize,
         reorderDashboardWidgets,
         moveDashboardWidget,
+        moveDashboardWidgetById,
+        moveAnalyticsWidget,
         showToast,
       }}
     >
       {children}
+      {hydrated &&
+        isDragging &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={dragOverlayRef}
+            aria-hidden="true"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              zIndex: 9998,
+              pointerEvents: "none",
+              transformOrigin: "0 0",
+              willChange: "transform, opacity",
+              transition: "opacity 120ms ease",
+            }}
+          >
+            <div
+              ref={dragBadgeRef}
+              style={{
+                position: "absolute",
+                top: -14,
+                left: "50%",
+                transform: "translateX(-50%)",
+                transformOrigin: "bottom center",
+                opacity: 0,
+                transition: "opacity 140ms ease",
+                zIndex: 30,
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shadow-lg border ${
+                isHomeDropOver
+                  ? "bg-accent-solid text-white border-white/40 ring-4 ring-accent/30"
+                  : "bg-[#1c1c1f] text-white dark:bg-white dark:text-[#111115] border-white/15"
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>
+                {isHomeDropOver
+                  ? `Release to Pin "${draggedMeta?.title || "Widget"}" to Home`
+                  : `Drag to Home in Navbar to Pin`}
+              </span>
+            </div>
+            <div
+              ref={dragCloneHostRef}
+              className={`rounded-[24px] overflow-hidden shadow-[0_28px_60px_-12px_rgba(0,0,0,0.45)] ring-2 transition-shadow ${
+                isHomeDropOver ? "ring-accent-solid" : "ring-accent/60"
+              }`}
+            />
+          </div>,
+          document.body,
+        )}
     </WidgetContext.Provider>
   );
 }

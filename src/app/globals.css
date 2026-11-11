@@ -10,8 +10,11 @@
 
 :root {
   --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-liquid-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-press-in: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-fast: 150ms;
   --motion-normal: 240ms;
+  --motion-bounce: 310ms;
 }
 
 body {
@@ -35,7 +38,20 @@ body {
   -webkit-app-region: drag;
 }
 
-.app-no-drag {
+.app-no-drag,
+:where(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  [role="dialog"],
+  [data-motion-surface],
+  .app-dialog-backdrop,
+  .app-dialog,
+  .app-dialog-close
+) {
   -webkit-app-region: no-drag;
 }
 
@@ -56,21 +72,26 @@ body {
   letter-spacing: -0.03em;
 }
 
-/* Shared interaction rhythm: small movements, soft landings, no layout shifts. */
+/* Shared interaction rhythm: tactile Liquid Glass press + spring rebound on release, Windows ClearType safe (scale: 1 at rest & hover). */
 :where(button, a, input, select, textarea, [role="button"]) {
-  transition-property:
-    color, background-color, border-color, box-shadow, opacity, transform,
-    translate, scale;
-  transition-duration: var(--motion-fast);
-  transition-timing-function: var(--motion-ease);
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease),
+    transform var(--motion-bounce) var(--ease-liquid-bounce),
+    translate var(--motion-bounce) var(--ease-liquid-bounce),
+    scale var(--motion-bounce) var(--ease-liquid-bounce);
 }
 
 :where(button, [role="button"]):not(:disabled):not(
     [aria-disabled="true"]
   ):active {
-  scale: 0.99;
-  translate: 0 0;
-  transition-duration: 100ms;
+  scale: 0.96;
+  translate: 0 0.5px;
+  transition-duration: 75ms;
+  transition-timing-function: var(--ease-press-in);
 }
 
 :where(button, a, input, select, textarea, [role="button"]):focus-visible {
@@ -493,6 +514,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 }
 
 .ui-button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -508,13 +530,27 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   text-transform: none;
   white-space: nowrap;
   cursor: pointer;
-  translate: none;
+  translate: 0 0;
+  scale: 1;
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-normal) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease),
+    transform var(--motion-bounce) var(--ease-liquid-bounce),
+    translate var(--motion-bounce) var(--ease-liquid-bounce),
+    scale var(--motion-bounce) var(--ease-liquid-bounce);
+}
+.ui-button:hover:not(:disabled) {
+  translate: 0 -1px;
   scale: 1;
 }
-.ui-button:active,
-.ui-button:hover {
-  translate: none;
-  scale: 1;
+.ui-button:active:not(:disabled) {
+  translate: 0 0.5px;
+  scale: 0.955;
+  transition-duration: 70ms;
+  transition-timing-function: var(--ease-press-in);
 }
 .ui-button > svg,
 .ui-button > div > svg {
@@ -522,28 +558,44 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   height: 16px;
   flex-shrink: 0;
   scale: 1;
+  transition:
+    transform var(--motion-bounce) var(--ease-liquid-bounce),
+    scale var(--motion-bounce) var(--ease-liquid-bounce);
+}
+.ui-button:active:not(:disabled) > svg {
+  scale: 0.92;
 }
 .ui-button--primary {
   background: #1c1c1f;
   color: #ffffff;
   border-color: #1c1c1f;
   box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
     0px 4px 10px -2px rgba(0, 0, 0, 0.18),
     0px 1px 2px 0px rgba(0, 0, 0, 0.1);
 }
-.ui-button--primary:hover {
+.ui-button--primary:hover:not(:disabled) {
   background: #0d0d10;
   border-color: #0d0d10;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0px 6px 14px -2px rgba(0, 0, 0, 0.24),
+    0px 2px 4px 0px rgba(0, 0, 0, 0.12);
 }
 :root[data-theme="dark"] .ui-button--primary {
   background: #f4f4f6;
   color: #111115;
   border-color: #f4f4f6;
-  box-shadow: 0px 4px 12px -2px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0px 4px 12px -2px rgba(0, 0, 0, 0.4);
 }
-:root[data-theme="dark"] .ui-button--primary:hover {
+:root[data-theme="dark"] .ui-button--primary:hover:not(:disabled) {
   background: #ffffff;
   border-color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0px 6px 16px -2px rgba(0, 0, 0, 0.5);
 }
 .ui-button--primary svg {
   color: currentColor !important;
@@ -552,18 +604,26 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   background: #e6e6eb;
   border-color: transparent;
   color: #18181b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
-.ui-button--secondary:hover {
+.ui-button--secondary:hover:not(:disabled) {
   background: #dcdce2;
   border-color: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 2px 5px -1px rgba(0, 0, 0, 0.06);
 }
 :root[data-theme="dark"] .ui-button--secondary {
   background: #25252e;
   border-color: rgba(255, 255, 255, 0.06);
   color: #f4f4f6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
-:root[data-theme="dark"] .ui-button--secondary:hover {
+:root[data-theme="dark"] .ui-button--secondary:hover:not(:disabled) {
   background: #2f2f3a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 3px 8px -2px rgba(0, 0, 0, 0.35);
 }
 .ui-button--ghost {
   background: transparent;
@@ -622,6 +682,13 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   background-color: var(--ui-surface);
   border: 1px solid var(--ui-border);
   color: var(--ui-text);
+  caret-color: var(--ui-accent);
+  box-shadow: 0 0 0 0px transparent;
+  transition:
+    border-color 180ms var(--motion-ease),
+    box-shadow 220ms var(--motion-ease),
+    background-color 180ms var(--motion-ease),
+    translate 200ms var(--motion-ease);
 }
 
 .ui-field {
@@ -631,9 +698,18 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   font-size: 13px;
   line-height: 22px;
   background-color: var(--ui-surface);
+  caret-color: var(--ui-accent);
+  box-shadow: 0 0 0 0px transparent;
 }
 .ui-field::placeholder {
   color: var(--ui-placeholder);
+  transition:
+    opacity 180ms var(--motion-ease),
+    transform 200ms var(--motion-ease);
+}
+.ui-field:focus::placeholder {
+  opacity: 0.58;
+  transform: translateX(2px);
 }
 
 /* Ensure all select elements and options respect the application color theme */
@@ -682,7 +758,13 @@ input.ui-field-search {
 .ui-field:focus-visible {
   outline: none;
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 3px var(--theme-accent-soft, rgba(37, 99, 235, 0.16));
+  box-shadow: 0 0 0 3.5px var(--theme-accent-soft, rgba(37, 99, 235, 0.18));
+}
+
+/* Search wrapper icon focus tint & micro-scale when input inside is focused */
+:where(.relative, div):focus-within > svg.lucide-search {
+  color: var(--ui-accent);
+  transform: scale(1.08);
 }
 
 /* Custom Inset Select Chevrons (Prevents arrow touching corner border) */
@@ -723,6 +805,7 @@ input[type="checkbox"] {
 }
 
 .ui-segmented {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -734,6 +817,8 @@ input[type="checkbox"] {
   max-width: 100%;
 }
 .ui-segmented button {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -748,20 +833,45 @@ input[type="checkbox"] {
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-}
-.ui-segmented button:hover,
-.ui-segmented button:active {
-  translate: none;
   scale: 1;
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    scale var(--motion-bounce) var(--ease-liquid-bounce);
 }
 .ui-segmented button:hover {
+  translate: none;
+  scale: 1;
   color: var(--ui-text);
 }
+.ui-segmented button:active:not(:disabled) {
+  scale: 0.96;
+  transition-duration: 70ms;
+  transition-timing-function: var(--ease-press-in);
+}
 .ui-segmented button[aria-pressed="true"] {
+  color: var(--ui-text);
+}
+.ui-segmented button[aria-pressed="true"]:not([data-has-pill="true"]) {
   background: var(--ui-surface);
   border-color: var(--ui-border);
-  color: var(--ui-text);
   box-shadow: var(--ui-shadow);
+}
+.ui-segmented-pill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 9px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow:
+    var(--ui-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+:root[data-theme="dark"] .ui-segmented-pill {
+  box-shadow:
+    var(--ui-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .ui-segmented svg {
   width: 15px;
@@ -1273,6 +1383,7 @@ input[type="checkbox"] {
   gap: 8px;
 }
 .settings-sidebar nav button {
+  position: relative;
   display: flex;
   gap: 12px;
   align-items: center;
@@ -1283,16 +1394,34 @@ input[type="checkbox"] {
   border-radius: 16px;
   color: var(--ui-muted);
   cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    scale 260ms var(--ease-liquid-bounce);
+}
+.settings-sidebar nav button:active {
+  scale: 0.975;
+  transition-duration: 75ms;
+  transition-timing-function: var(--ease-press-in);
 }
 .settings-sidebar nav button:hover {
   background: var(--ui-subtle);
   color: var(--ui-text);
 }
 .settings-sidebar nav button[aria-current="page"] {
-  background: var(--ui-surface);
+  background: transparent;
   color: var(--ui-text);
-  border-color: var(--ui-border);
-  box-shadow: 0 3px 8px -6px rgb(0 0 0 / 25%);
+}
+.settings-nav-active-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow:
+    0 3px 8px -6px rgb(0 0 0 / 25%),
+    inset 0 1px 0 rgb(255 255 255 / 45%);
+  pointer-events: none;
 }
 .settings-nav-icon {
   flex-shrink: 0;
@@ -2300,7 +2429,7 @@ button.record-status:focus-visible {
 }
 .app-dialog .app-dialog-section {
   padding: 0;
-  margin: 0;
+  margin-inline: 0;
   max-height: none;
   overflow: visible;
 }
@@ -2341,18 +2470,31 @@ button.record-status:focus-visible {
   border-color: var(--ui-border);
   background-color: var(--ui-subtle);
   color: var(--foreground);
+  caret-color: var(--theme-accent);
   font-size: 13px;
   font-weight: 400;
   line-height: 1.5;
-  box-shadow: none;
+  box-shadow: 0 0 0 0px transparent;
+  transition:
+    border-color 180ms var(--motion-ease),
+    box-shadow 220ms var(--motion-ease),
+    background-color 180ms var(--motion-ease);
 }
 .app-dialog :is(input, textarea)::placeholder {
   color: var(--theme-text-placeholder);
+  transition:
+    opacity 180ms var(--motion-ease),
+    transform 200ms var(--motion-ease);
+}
+.app-dialog :is(input, textarea):focus::placeholder {
+  opacity: 0.58;
+  transform: translateX(2px);
 }
 .app-dialog :is(input, select, textarea):focus {
   outline: none;
   border-color: var(--theme-accent);
-  box-shadow: 0 0 0 3px var(--theme-accent-faint);
+  background-color: var(--ui-surface);
+  box-shadow: 0 0 0 3.5px var(--theme-accent-faint);
 }
 .app-dialog input:is([type="checkbox"], [type="radio"]) {
   accent-color: var(--theme-accent);
@@ -2420,4 +2562,406 @@ button.record-status:focus-visible {
 .app-dialog :is(.app-dialog-body, .app-dialog-banner) .uppercase {
   text-transform: none;
   letter-spacing: 0;
+}
+
+/* FontAwesome Solid Trash Icon (<i class="fa-solid fa-trash"></i>) offline-safe vector mask + hover/click animation */
+@keyframes fa-trash-shake {
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  20% {
+    transform: translateY(-2px) scale(1.16) rotate(-14deg);
+  }
+  45% {
+    transform: translateY(-2px) scale(1.16) rotate(12deg);
+  }
+  70% {
+    transform: translateY(-1px) scale(1.12) rotate(-8deg);
+  }
+  85% {
+    transform: translateY(-1px) scale(1.08) rotate(5deg);
+  }
+  100% {
+    transform: translateY(0) scale(1.08) rotate(0deg);
+  }
+}
+
+i.fa-solid.fa-trash {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  vertical-align: -0.125em;
+  font-style: normal;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex-shrink: 0;
+  transform-origin: 50% 85%;
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
+  will-change: transform;
+}
+
+button:hover:not(:disabled) i.fa-solid.fa-trash,
+button:focus-visible:not(:disabled) i.fa-solid.fa-trash,
+i.fa-solid.fa-trash:hover {
+  animation: fa-trash-shake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+button:active:not(:disabled) i.fa-solid.fa-trash {
+  animation: none;
+  transform: scale(0.86) rotate(-8deg);
+}
+
+/* FontAwesome Solid Plus & Circle Plus Icon (<i class="fa-solid fa-plus"></i> & <i class="fa-solid fa-circle-plus"></i>) vector mask + animations */
+@keyframes fa-plus-pop {
+  0% {
+    transform: scale(0.55) rotate(-60deg);
+    opacity: 0.2;
+  }
+  60% {
+    transform: scale(1.24) rotate(14deg);
+    opacity: 1;
+  }
+  82% {
+    transform: scale(0.94) rotate(-5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes fa-plus-spin {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.22) rotate(90deg);
+  }
+  80% {
+    transform: scale(1.08) rotate(90deg);
+  }
+  100% {
+    transform: scale(1.04) rotate(90deg);
+  }
+}
+
+i.fa-solid.fa-plus {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  vertical-align: -0.125em;
+  font-style: normal;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 448 512'%3E%3Cpath d='M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex-shrink: 0;
+  transform-origin: center center;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
+  will-change: transform;
+}
+
+i.fa-solid.fa-circle-plus {
+  display: inline-block;
+  width: 0.95rem;
+  height: 0.95rem;
+  vertical-align: -0.125em;
+  font-style: normal;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 344V280H168c-13.3 0-24-10.7-24-24s10.7-24 24-24h64V168c0-13.3 10.7-24 24-24s24 10.7 24 24v64h64c13.3 0 24 10.7 24 24s-10.7 24-24 24H280v64c0 13.3-10.7 24-24 24s-24-10.7-24-24z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 344V280H168c-13.3 0-24-10.7-24-24s10.7-24 24-24h64V168c0-13.3 10.7-24 24-24s24 10.7 24 24v64h64c13.3 0 24 10.7 24 24s-10.7 24-24 24H280v64c0 13.3-10.7 24-24 24s-24-10.7-24-24z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex-shrink: 0;
+  transform-origin: center center;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
+  will-change: transform;
+}
+
+button:hover:not(:disabled) i.fa-solid.fa-plus,
+button:focus-visible:not(:disabled) i.fa-solid.fa-plus,
+i.fa-solid.fa-plus:hover {
+  animation: fa-plus-spin 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+button:hover:not(:disabled) i.fa-solid.fa-circle-plus,
+button:focus-visible:not(:disabled) i.fa-solid.fa-circle-plus,
+i.fa-solid.fa-circle-plus:hover {
+  animation: fa-plus-pop 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+button:active:not(:disabled) i.fa-solid.fa-plus,
+button:active:not(:disabled) i.fa-solid.fa-circle-plus {
+  animation: none;
+  transform: scale(0.85);
+}
+
+/* FontAwesome Solid Edit & Rotate Icons (<i class="fa-solid fa-pen-to-square"></i> & <i class="fa-solid fa-arrows-rotate"></i>) vector mask + animations */
+@keyframes fa-update-tilt {
+  0% {
+    transform: scale(0.65) rotate(-28deg);
+    opacity: 0.2;
+  }
+  55% {
+    transform: scale(1.22) rotate(14deg);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(0.95) rotate(-6deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes fa-update-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  45% {
+    transform: rotate(180deg) scale(1.18);
+  }
+  75% {
+    transform: rotate(360deg) scale(1.08);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+i.fa-solid.fa-pen-to-square,
+i.fa-solid.fa-pen {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  vertical-align: -0.125em;
+  font-style: normal;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M471.6 21.7c-21.9-21.9-57.3-21.9-79.2 0L362.3 51.7l97.9 97.9 30.1-30.1c21.9-21.9 21.9-57.3 0-79.2L471.6 21.7zm-299.2 220c-6.1 6.1-10.8 13.6-13.5 21.9l-29.6 88.8c-2.9 8.6-.6 18.1 5.8 24.6s15.9 8.7 24.6 5.8l88.8-29.6c8.2-2.7 15.7-7.4 21.9-13.5L437.7 172.3 339.7 74.3 172.4 241.7zM96 64C43 64 0 107 0 160V416c0 53 43 96 96 96H352c53 0 96-43 96-96V320c0-17.7-14.3-32-32-32s-32 14.3-32 32v96c0 17.7-14.3 32-32 32H96c-17.7 0-32-14.3-32-32V160c0-17.7 14.3-32 32-32h96c17.7 0 32-14.3 32-32s-14.3-32-32-32H96z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M471.6 21.7c-21.9-21.9-57.3-21.9-79.2 0L362.3 51.7l97.9 97.9 30.1-30.1c21.9-21.9 21.9-57.3 0-79.2L471.6 21.7zm-299.2 220c-6.1 6.1-10.8 13.6-13.5 21.9l-29.6 88.8c-2.9 8.6-.6 18.1 5.8 24.6s15.9 8.7 24.6 5.8l88.8-29.6c8.2-2.7 15.7-7.4 21.9-13.5L437.7 172.3 339.7 74.3 172.4 241.7zM96 64C43 64 0 107 0 160V416c0 53 43 96 96 96H352c53 0 96-43 96-96V320c0-17.7-14.3-32-32-32s-32 14.3-32 32v96c0 17.7-14.3 32-32 32H96c-17.7 0-32-14.3-32-32V160c0-17.7 14.3-32 32-32h96c17.7 0 32-14.3 32-32s-14.3-32-32-32H96z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex-shrink: 0;
+  transform-origin: center center;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
+  will-change: transform;
+}
+
+i.fa-solid.fa-arrows-rotate,
+i.fa-solid.fa-rotate {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  vertical-align: -0.125em;
+  font-style: normal;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H336c-17.7 0-32 14.3-32 32s14.3 32 32 32H464c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 35.5c-80.1-78.2-208.6-76.3-286.3 5.4C120.9 129.4 104.9 157 95.8 186.7c-5.2 16.9 4.3 34.8 21.2 40s34.8-4.3 40-21.2zm301.8 106.8c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0L125.7 352H176c17.7 0 32-14.3 32-32s-14.3-32-32-32H48c-17.7 0-32 14.3-32 32V448c0 17.7 14.3 32 32 32s32-14.3 32-32l0-35.5c80.1 78.2 208.6 76.3 286.3-5.4c24.6-24.9 40.7-52.5 49.8-82.2c5.2-16.9-4.3-34.8-21.2-40s-34.8 4.3-40 21.2z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H336c-17.7 0-32 14.3-32 32s14.3 32 32 32H464c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 35.5c-80.1-78.2-208.6-76.3-286.3 5.4C120.9 129.4 104.9 157 95.8 186.7c-5.2 16.9 4.3 34.8 21.2 40s34.8-4.3 40-21.2zm301.8 106.8c-7.7 21.8-20.2 42.3-37.8 59.8c-62.5 62.5-163.8 62.5-226.3 0L125.7 352H176c17.7 0 32-14.3 32-32s-14.3-32-32-32H48c-17.7 0-32 14.3-32 32V448c0 17.7 14.3 32 32 32s32-14.3 32-32l0-35.5c80.1 78.2 208.6 76.3 286.3-5.4c24.6-24.9 40.7-52.5 49.8-82.2c5.2-16.9-4.3-34.8-21.2-40s-34.8 4.3-40 21.2z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex-shrink: 0;
+  transform-origin: center center;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease;
+  will-change: transform;
+}
+
+button:hover:not(:disabled) i.fa-solid.fa-pen-to-square,
+button:hover:not(:disabled) i.fa-solid.fa-pen,
+button:focus-visible:not(:disabled) i.fa-solid.fa-pen-to-square,
+i.fa-solid.fa-pen-to-square:hover {
+  animation: fa-update-tilt 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+button:hover:not(:disabled) i.fa-solid.fa-arrows-rotate,
+button:hover:not(:disabled) i.fa-solid.fa-rotate,
+button:focus-visible:not(:disabled) i.fa-solid.fa-arrows-rotate,
+i.fa-solid.fa-arrows-rotate:hover {
+  animation: fa-update-spin 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+button:active:not(:disabled) i.fa-solid.fa-pen-to-square,
+button:active:not(:disabled) i.fa-solid.fa-pen,
+button:active:not(:disabled) i.fa-solid.fa-arrows-rotate,
+button:active:not(:disabled) i.fa-solid.fa-rotate {
+  animation: none;
+  transform: scale(0.85);
+}
+
+/* Bottom-Right Toast Popup Message Animation + Animated <i class="fa-solid fa-trash"></i> Badge */
+@keyframes bf-toast-pop-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(0, -4px, 0) scale(1.02);
+  }
+  82% {
+    transform: translate3d(0, 2px, 0) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes bf-toast-progress {
+  0% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+.bf-toast-popup {
+  animation: bf-toast-pop-in 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+
+.bf-toast-trash-badge i.fa-solid.fa-trash {
+  width: 0.9rem;
+  height: 0.9rem;
+  animation: fa-trash-shake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) 0.08s both;
+}
+
+.bf-toast-add-badge i.fa-solid.fa-plus,
+.bf-toast-add-badge i.fa-solid.fa-circle-plus {
+  width: 0.95rem;
+  height: 0.95rem;
+  animation: fa-plus-pop 0.58s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+.bf-toast-update-badge i.fa-solid.fa-pen-to-square,
+.bf-toast-update-badge i.fa-solid.fa-pen,
+.bf-toast-update-badge i.fa-solid.fa-arrows-rotate,
+.bf-toast-update-badge i.fa-solid.fa-rotate {
+  width: 0.92rem;
+  height: 0.92rem;
+  animation: fa-update-tilt 0.58s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+.bf-toast-progress-bar {
+  transform-origin: left center;
+  animation: bf-toast-progress 3.5s linear forwards;
+}
+
+/* Modern Sleek Pill Scrollbar Design (Light & Dark Mode) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.32) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.38);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.62);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb,
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.28);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 139, 250, 0.65);
+}
+
+.bf-scroll-area {
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+.bf-scroll-area::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:hover:not(:disabled) i.fa-solid.fa-trash,
+  button:focus-visible:not(:disabled) i.fa-solid.fa-trash,
+  i.fa-solid.fa-trash:hover,
+  button:hover:not(:disabled) i.fa-solid.fa-plus,
+  button:focus-visible:not(:disabled) i.fa-solid.fa-plus,
+  i.fa-solid.fa-plus:hover,
+  button:hover:not(:disabled) i.fa-solid.fa-circle-plus,
+  button:focus-visible:not(:disabled) i.fa-solid.fa-circle-plus,
+  i.fa-solid.fa-circle-plus:hover,
+  button:hover:not(:disabled) i.fa-solid.fa-pen-to-square,
+  button:hover:not(:disabled) i.fa-solid.fa-pen,
+  button:focus-visible:not(:disabled) i.fa-solid.fa-pen-to-square,
+  i.fa-solid.fa-pen-to-square:hover,
+  button:hover:not(:disabled) i.fa-solid.fa-arrows-rotate,
+  button:hover:not(:disabled) i.fa-solid.fa-rotate,
+  button:focus-visible:not(:disabled) i.fa-solid.fa-arrows-rotate,
+  i.fa-solid.fa-arrows-rotate:hover,
+  .bf-toast-popup,
+  .bf-toast-trash-badge i.fa-solid.fa-trash,
+  .bf-toast-add-badge i.fa-solid.fa-plus,
+  .bf-toast-add-badge i.fa-solid.fa-circle-plus,
+  .bf-toast-update-badge i.fa-solid.fa-pen-to-square,
+  .bf-toast-update-badge i.fa-solid.fa-pen,
+  .bf-toast-update-badge i.fa-solid.fa-arrows-rotate,
+  .bf-toast-update-badge i.fa-solid.fa-rotate,
+  .bf-toast-progress-bar {
+    animation: none;
+    transform: none;
+  }
 }

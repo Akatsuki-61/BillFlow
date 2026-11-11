@@ -6,12 +6,21 @@ import {
   useIsPresent,
   useReducedMotion,
   type HTMLMotionProps,
+  type Variants,
 } from "motion/react";
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import {
+  SPRING_MENU_POPOVER,
+  EXIT_MENU_POPOVER,
+  SPRING_MODAL_SHEET,
+  EXIT_MODAL_SHEET,
+  SPRING_TOAST_PILL,
+  EXIT_TOAST_PILL,
+} from "@/lib/motion";
 
 const dialogStack: HTMLDivElement[] = [];
 
-const ease = [0.22, 1, 0.36, 1] as const;
+const backdropEase = [0.22, 1, 0.36, 1] as const;
 
 export function MotionPresence({ children }: { children: ReactNode }) {
   return <AnimatePresence initial={false}>{children}</AnimatePresence>;
@@ -40,15 +49,6 @@ export function MotionSurface({
   }, [onDismiss]);
 
   const isPresent = useIsPresent();
-  const offset = reducedMotion
-    ? 0
-    : kind === "toast"
-      ? 8
-      : kind === "menu"
-        ? -4
-        : 12;
-  const scale = reducedMotion || kind === "toast" ? 1 : 0.98;
-  const stationary = kind === "dialog" || kind === "group";
 
   useEffect(() => {
     const panel = surfaceRef.current;
@@ -110,6 +110,75 @@ export function MotionSurface({
     };
   }, [isDialog, isPresent, headingId, ariaLabel, ariaLabelledBy]);
 
+  const variants: Variants = reducedMotion
+    ? {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { duration: 0 } },
+        exit: { opacity: 0, transition: { duration: 0 } },
+      }
+    : kind === "dialog" || kind === "group"
+      ? {
+          hidden: { opacity: 0 },
+          visible: {
+            opacity: 1,
+            transition: { duration: 0.2, ease: backdropEase },
+          },
+          exit: {
+            opacity: 0,
+            transition: { duration: 0.16, ease: backdropEase },
+          },
+        }
+      : kind === "menu"
+        ? {
+            hidden: { opacity: 0, scaleX: 0.95, scaleY: 0.88, y: -5 },
+            visible: {
+              opacity: 1,
+              scaleX: 1,
+              scaleY: 1,
+              y: 0,
+              transition: SPRING_MENU_POPOVER,
+            },
+            exit: {
+              opacity: 0,
+              scaleX: 0.96,
+              scaleY: 0.92,
+              y: -3,
+              transition: EXIT_MENU_POPOVER,
+            },
+          }
+        : kind === "toast"
+          ? {
+              hidden: { opacity: 0, y: 16, scale: 0.9 },
+              visible: {
+                opacity: 1,
+                y: 0,
+                scale: 1,
+                transition: SPRING_TOAST_PILL,
+              },
+              exit: {
+                opacity: 0,
+                y: 8,
+                scale: 0.92,
+                transition: EXIT_TOAST_PILL,
+              },
+            }
+          : {
+              // kind === "panel" (Modal Dialog / Sheet)
+              hidden: { opacity: 0, scale: 0.94, y: 16 },
+              visible: {
+                opacity: 1,
+                scale: 1,
+                y: 0,
+                transition: SPRING_MODAL_SHEET,
+              },
+              exit: {
+                opacity: 0,
+                scale: 0.96,
+                y: 10,
+                transition: EXIT_MODAL_SHEET,
+              },
+            };
+
   return (
     <motion.div
       {...props}
@@ -125,15 +194,7 @@ export function MotionSurface({
       initial="hidden"
       animate="visible"
       exit="exit"
-      variants={{
-        hidden: { opacity: 0, ...(stationary ? {} : { y: offset, scale }) },
-        visible: { opacity: 1, ...(stationary ? {} : { y: 0, scale: 1 }) },
-        exit: { opacity: 0, ...(stationary ? {} : { y: offset / 2, scale }) },
-      }}
-      transition={{
-        duration: reducedMotion ? 0 : kind === "dialog" ? 0.2 : 0.26,
-        ease,
-      }}
+      variants={variants}
       style={{
         ...props.style,
         ...(!isPresent ? { pointerEvents: "none" as const } : {}),

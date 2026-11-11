@@ -66,8 +66,10 @@ Delegate tasks directly from Kanban cards. BillFlow prefills a work order with t
 - **Offline Vector PDF Vouchers**: Export formal work order vouchers directly to your configured directory via `pdf-lib` and Electron IPC.
 - **Direct WhatsApp Task Dispatch**: Send clean, structured task delegation briefs to subcontractors directly via WhatsApp web/desktop intent links (`wa.me`) with automatic phone number normalization.
 
-### 9. Final Payment Settlement
+### 9. Final Payment Settlement & Accounts Receivable Aging
 Log the remaining milestone payment and attach final receipts. An invoice is marked fully paid only when total collections cover the complete balance.
+- **Overdue Summary & Aging Analysis**: Access actionable past-due breakdowns categorized into aging tiers (`1-15`, `16-30`, `31-60`, `60+` days) with delinquency statistics, affected client accounts, and 1-click WhatsApp or Email payment reminder dispatches.
+- **RFC 4180 CSV Data Export**: Export active register views, selected invoice sets, or dedicated accounts receivable delinquency reports to RFC 4180-compliant CSV format with automated balance totals.
 
 ### 10. Financial Truth & Net Profit
 Review accurate financial summaries with no artificial zero-clamping or synthetic data. Compare accrual billing against realized cashflow, isolate numbers by currency (`USD`, `LKR`, `EUR`), and subtract subcontractor costs and recorded business expenses to view true net margins.
@@ -84,7 +86,7 @@ Review accurate financial summaries with no artificial zero-clamping or syntheti
 | **Database & ORM** | SQLite 3 via `better-sqlite3`, Drizzle ORM | WAL mode, foreign key cascades, versioned schema migrations. |
 | **Analytics & Charts** | Apache ECharts 6 | Freelance turnaround velocity, retainer yields, capacity benchmarks. |
 | **Document Engine** | `pdf-lib` | Offline vector PDF invoice and work order voucher generation with embedded layouts. |
-| **Test Suite** | Vitest | 20 test suites, 126 unit and integration test assertions. |
+| **Test Suite** | Vitest | 25 test suites, 158 unit and integration test assertions. |
 
 ### Architecture Overview
 
@@ -241,10 +243,10 @@ Run the verification suite before committing:
 ```bash
 npx tsc --noEmit    # Type checking
 npm run lint        # Code style & linting
-npm test            # 96 unit and integration tests (14 suites)
+npm test            # 168 unit and integration tests (26 suites)
 ```
 
-For the complete contribution guide, local environment configuration, and PR workflow, read **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+For the complete module ownership breakdown, detailed sprint timeline, and development history, see **[CONTRIBUTIONS.md](CONTRIBUTIONS.md)**.
 
 ---
 
@@ -254,14 +256,12 @@ BillFlow is designed and built by the **Akatsuki** engineering team:
 
 | Contributor | GitHub | Primary Modules |
 | :--- | :--- | :--- |
-| **Nipun Yatawara** | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron runtime, SQLite/Drizzle layer, itemized invoices, vector PDF generator, Kanban workflow, domain analytics, dark/light theme engine, bug resolution. |
-| **GVSL-Lahiru** | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Lead Quality Assurance & bug hunting audit, application layout & navigation, Clients profiles & delivery defaults, Expenses SQLite ledger, receipt attachments, delivery link resolution. |
-| **Binuka Reshan** | [@Binukareshane](https://github.com/Binukareshane) | Outsourcing work orders, subcontractor payout management, financial integrity, multi-currency synchronization. |
-| **Sandika** | [@Sandika-2003](https://github.com/Sandika-2003) | Service Catalog management, CSV/Excel bulk import, migration naming reconciliation, invoice styling. |
+| **Nipun Yatawara** | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron runtime, SQLite/Drizzle layer, Multi-profile workspaces & password locks, Task-to-Invoice workflow, synchronized card highlighting, spring motion. |
+| **GVSL-Lahiru** | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Lead QA & bug hunting, Deliverable handoff workflow (Submit Work modal), Overdue invoices summary engine (AR aging), CSV data export. |
+| **Binuka Reshan** | [@Binukareshane](https://github.com/Binukareshane) | Task outsourcing engine & payable vouchers (`VND-INV-xxxx`), WhatsApp contractor dispatch, automated ledger expense posting, Excel workbook export. |
+| **Sandika** | [@Sandika-2003](https://github.com/Sandika-2003) | Service Catalog management, bulk CSV/Excel import, UI Rework integration, invoice preview sheet (`InvoiceDocumentSheet.tsx`), macOS Calendar two-way `.ics` sync. |
 
 For the complete module ownership breakdown, detailed sprint timeline, and git history, see **[CONTRIBUTIONS.md](CONTRIBUTIONS.md)**.
-
-For development conventions, branching policies, and pull request guidelines, see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ---
 

@@ -84,6 +84,9 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
       invoice: invoices,
       clientName: clients.name,
       clientEmail: clients.email,
+      clientPhone: clients.phone,
+      clientContactPerson: clients.contactPerson,
+      clientCategory: clients.category,
     })
     .from(invoices)
     .leftJoin(clients, eq(invoices.clientId, clients.id))
@@ -113,12 +116,30 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
         currency: p.currency as Currency,
       }));
 
+    let snapshot: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      contactPerson?: string;
+      category?: string;
+    } | null = null;
+    if (r.invoice.clientSnapshot) {
+      try {
+        snapshot = JSON.parse(r.invoice.clientSnapshot);
+      } catch {
+        snapshot = null;
+      }
+    }
+
     return {
       ...r.invoice,
       currency: r.invoice.currency as Currency,
       status: r.invoice.status as InvoiceStatus,
-      clientName: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).name : r.clientName || "Unknown Client",
-      clientEmail: r.invoice.clientSnapshot ? JSON.parse(r.invoice.clientSnapshot).email : r.clientEmail || undefined,
+      clientName: snapshot?.name || r.clientName || "Unknown Client",
+      clientEmail: snapshot?.email || r.clientEmail || undefined,
+      clientPhone: snapshot?.phone || r.clientPhone || null,
+      clientContactPerson: snapshot?.contactPerson || r.clientContactPerson || null,
+      clientCategory: snapshot?.category || r.clientCategory || null,
       items,
       payments,
     };
@@ -348,15 +369,20 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
       paidCents: value.status === "PAID" ? value.amountCents : 0,
     }).run();
 
-    // Persist line items
+    // Persist line items and link any imported tasks atomically
+    const resolvedClientName = client?.name || value.newClient?.name || null;
+    const nowIso = new Date().toISOString();
+    const linkedViaItemTaskIds = new Set<string>();
+
     if (value.items && value.items.length > 0) {
       for (let i = 0; i < value.items.length; i++) {
         const item = value.items[i];
+        const itemId = item.id || crypto.randomUUID();
         const validService = item.catalogId
           ? tx.select().from(catalogServices).where(eq(catalogServices.id, item.catalogId)).get()
           : undefined;
         tx.insert(invoiceItems).values({
-          id: item.id || crypto.randomUUID(),
+          id: itemId,
           invoiceId: id,
           catalogId: validService ? item.catalogId : null,
           description: item.description,
@@ -364,6 +390,23 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
           unitPriceCents: item.unitPriceCents,
           position: i,
         }).run();
+
+        if (item.sourceTaskId) {
+          const existingTask = tx.select().from(tasks).where(eq(tasks.id, item.sourceTaskId)).get();
+          if (existingTask && !existingTask.deletedAt) {
+            tx.update(tasks)
+              .set({
+                invoiceId: id,
+                invoiceItemId: itemId,
+                clientId: existingTask.clientId || clientId || null,
+                clientName: existingTask.clientName || resolvedClientName,
+                updatedAt: nowIso,
+              })
+              .where(eq(tasks.id, item.sourceTaskId))
+              .run();
+            linkedViaItemTaskIds.add(item.sourceTaskId);
+          }
+        }
       }
     } else if (value.title) {
       // Default line item if title was supplied without items array
@@ -379,6 +422,24 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
         unitPriceCents: value.amountCents,
         position: 0,
       }).run();
+    }
+
+    if (value.linkedTaskIds && value.linkedTaskIds.length > 0) {
+      for (const linkedTaskId of value.linkedTaskIds) {
+        if (linkedViaItemTaskIds.has(linkedTaskId)) continue;
+        const existingTask = tx.select().from(tasks).where(eq(tasks.id, linkedTaskId)).get();
+        if (existingTask && !existingTask.deletedAt) {
+          tx.update(tasks)
+            .set({
+              invoiceId: id,
+              clientId: existingTask.clientId || clientId || null,
+              clientName: existingTask.clientName || resolvedClientName,
+              updatedAt: nowIso,
+            })
+            .where(eq(tasks.id, linkedTaskId))
+            .run();
+        }
+      }
     }
   });
 

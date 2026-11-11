@@ -218,4 +218,13 @@ describe("Calendar Events SQLite Persistence & Integration", () => {
     expect(event.taskId).toBe("tsk-202");
     expect(event.taskTitle).toBe("Website Development");
   });
+
+  it("handles push-only calendar sync and background schedule safely", async () => {
+    const { scheduleBackgroundNativeCalendarSync, syncNativeLocalCalendar } = await import("../ipc/calendar");
+    const syncResult = await syncNativeLocalCalendar(undefined, undefined, false, true);
+    expect(syncResult).toHaveProperty("syncedFromMac");
+    expect(syncResult).toHaveProperty("pushedToMac");
+    expect(syncResult).toHaveProperty("deletedFromMac");
+    expect(() => scheduleBackgroundNativeCalendarSync()).not.toThrow();
+  });
 });

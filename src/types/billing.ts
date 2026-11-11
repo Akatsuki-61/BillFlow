@@ -78,6 +78,7 @@ export interface InvoiceItem {
 export interface NewInvoiceItemInput {
   id?: string;
   catalogId?: string | null;
+  sourceTaskId?: string | null;
   description: string;
   quantity: number;
   unitPriceCents: number;
@@ -133,6 +134,9 @@ export interface Invoice {
 export interface InvoiceWithClient extends Invoice {
   clientName: string;
   clientEmail?: string;
+  clientPhone?: string | null;
+  clientContactPerson?: string | null;
+  clientCategory?: string | null;
   items?: InvoiceItem[];
   payments?: InvoicePayment[];
 }
@@ -146,6 +150,7 @@ export interface NewInvoiceInput {
   catalogItemId?: string | null;
   title?: string;
   items?: NewInvoiceItemInput[];
+  linkedTaskIds?: string[];
   discountCents?: number;
   taxCents?: number;
   advanceCents?: number;

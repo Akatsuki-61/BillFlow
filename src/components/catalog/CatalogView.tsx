@@ -1,7 +1,9 @@
 "use client";
 
-import { MotionPresence } from "@/components/ui/MotionSurface";
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { Dialog } from "@/components/ui/Dialog";
+import { AnimatePresence, motion } from "framer-motion";
+import { SPRING_NAV_GLIDE, SPRING_LIQUID_BUTTON } from "@/lib/motion";
 
 import { formatCents } from "@/lib/format";
 import { DataBreakdown } from "@/components/ui/DataGraphic";
@@ -516,22 +518,26 @@ export default function CatalogView() {
   return (
     <div className="workspace-page motion-page">
       {/* Toast Notification */}
-      {notification && (
-        <div
-          className={`fixed top-14 right-6 z-[9999] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
-            notification.type === "error"
-              ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
-              : "bg-surface-neutral-900 border-line-neutral-700 text-white"
-          }`}
-        >
-          {notification.type === "error" ? (
-            <span className="w-2 h-2 rounded-full bg-rose-400" />
-          ) : (
-            <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
-          )}
-          <span>{notification.message}</span>
-        </div>
-      )}
+      <MotionPresence>
+        {notification && (
+          <MotionSurface
+            key={notification.message}
+            kind="toast"
+            className={`fixed top-14 right-6 z-[9999] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+              notification.type === "error"
+                ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
+                : "bg-surface-neutral-900 border-line-neutral-700 text-white"
+            }`}
+          >
+            {notification.type === "error" ? (
+              <span className="w-2 h-2 rounded-full bg-rose-400" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
+            )}
+            <span>{notification.message}</span>
+          </MotionSurface>
+        )}
+      </MotionPresence>
 
       {/* Top Header */}
       <PageHeader
@@ -663,17 +669,28 @@ export default function CatalogView() {
             className="ui-field ui-search-input w-full pl-10 pr-9 !rounded-full border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-xs"
             style={{ paddingLeft: "40px" }}
           />
-          {searchQuery && (
-            <Button
-              aria-label="Clear search"
-              variant="ghost"
-              size="icon"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-content-neutral-400 hover:text-content-neutral-600"
-            >
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          )}
+          <AnimatePresence>
+            {searchQuery && (
+              <motion.div
+                key="clear-catalog-search"
+                initial={{ opacity: 0, scale: 0.6 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={SPRING_LIQUID_BUTTON}
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+              >
+                <Button
+                  aria-label="Clear search"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSearchQuery("")}
+                  className="h-7 w-7 text-content-neutral-400 hover:text-content-neutral-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Category Filter Pills */}
@@ -686,15 +703,24 @@ export default function CatalogView() {
                 type="button"
                 onClick={() => setSelectedCategory(category)}
                 aria-pressed={isActive}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`relative px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer active:scale-[0.955] ${
                   isActive
-                    ? "bg-[#1c1c1f] text-white dark:bg-white dark:text-[#111115] shadow-xs"
+                    ? "text-white dark:text-[#111115]"
                     : "bg-surface-neutral-50 text-content-neutral-600 hover:bg-surface-neutral-100 hover:text-content-neutral-900 border border-line-neutral-200/80"
                 }`}
               >
-                {category}{" "}
-                <span className="opacity-75 font-normal">
-                  ({categoryCounts[category]})
+                {isActive && (
+                  <motion.span
+                    layoutId="catalog-category-pill"
+                    transition={SPRING_NAV_GLIDE}
+                    className="absolute inset-0 rounded-full bg-[#1c1c1f] dark:bg-white shadow-xs"
+                  />
+                )}
+                <span className="relative z-10">
+                  {category}{" "}
+                  <span className="opacity-75 font-normal">
+                    ({categoryCounts[category]})
+                  </span>
                 </span>
               </button>
             );
@@ -1437,27 +1463,32 @@ export default function CatalogView() {
               {/* Guide Tabs */}
               <div className="mt-4">
                 <div className="import-guide-tab-bar">
-                  <button
-                    type="button"
-                    onClick={() => setActiveGuideTab("table")}
-                    className={`import-guide-tab ${activeGuideTab === "table" ? "import-guide-tab-active" : ""}`}
-                  >
-                    Column Structure & Rules
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveGuideTab("csv")}
-                    className={`import-guide-tab ${activeGuideTab === "csv" ? "import-guide-tab-active" : ""}`}
-                  >
-                    Sample CSV Format
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveGuideTab("excel")}
-                    className={`import-guide-tab ${activeGuideTab === "excel" ? "import-guide-tab-active" : ""}`}
-                  >
-                    Excel → CSV Guidelines
-                  </button>
+                  {(
+                    [
+                      { id: "table", label: "Column Structure & Rules" },
+                      { id: "csv", label: "Sample CSV Format" },
+                      { id: "excel", label: "Excel → CSV Guidelines" },
+                    ] as const
+                  ).map((tab) => {
+                    const isActive = activeGuideTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveGuideTab(tab.id)}
+                        className={`import-guide-tab relative active:scale-[0.96] ${isActive ? "import-guide-tab-active" : ""}`}
+                      >
+                        {isActive && (
+                          <motion.span
+                            layoutId="catalog-guide-tab-pill"
+                            transition={SPRING_NAV_GLIDE}
+                            className="absolute inset-0 rounded-lg bg-surface dark:bg-[#22222c] shadow-xs border border-line-neutral-200/80 dark:border-[#343444]"
+                          />
+                        )}
+                        <span className="relative z-10">{tab.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

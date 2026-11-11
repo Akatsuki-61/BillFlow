@@ -83,6 +83,14 @@ contextBridge.exposeInMainWorld("billflow", {
     update: (id: string, patch: CalendarEventPatchInput): Promise<CalendarEventItem> =>
       ipcRenderer.invoke("events:update", id, patch),
     remove: (id: string): Promise<{ success: boolean }> => ipcRenderer.invoke("events:remove", id),
+    syncNative: (
+      taskTimeSlots?: Record<string, { startTime: string | null; endTime: string | null }>
+    ): Promise<{ syncedFromMac: number; pushedToMac: number }> =>
+      ipcRenderer.invoke("events:syncNative", taskTimeSlots),
+    openNative: (
+      taskTimeSlots?: Record<string, { startTime: string | null; endTime: string | null }>
+    ): Promise<{ success: boolean; syncedFromMac: number; pushedToMac: number }> =>
+      ipcRenderer.invoke("events:openNative", taskTimeSlots),
   },
   clients: {
     list: (): Promise<ClientWithStats[]> => ipcRenderer.invoke("clients:list"),

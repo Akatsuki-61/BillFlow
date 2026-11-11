@@ -37,6 +37,7 @@ import {
 } from "@/lib/format";
 import { DashboardPeriod } from "@/types/dashboard";
 import { WidgetDisplaySize } from "@/types/widgets";
+import { useWidgetContext } from "@/context/WidgetContext";
 import "../analytics/analytics.css";
 import { LatencyPercentilesChart } from "./charts/LatencyPercentilesChart";
 import { PortfolioComparisonChart } from "./charts/PortfolioComparisonChart";
@@ -44,6 +45,17 @@ import { GrowthBenchmarkChart } from "./charts/GrowthBenchmarkChart";
 import { AudienceGrowthChart } from "./charts/AudienceGrowthChart";
 import { ServiceTrendsLineChart } from "./charts/ServiceTrendsLineChart";
 import { ItemizedVolumeBarChart } from "./charts/ItemizedVolumeBarChart";
+
+let sharedTransparentDragCanvas: HTMLCanvasElement | null = null;
+function getTransparentDragCanvas(): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
+  if (!sharedTransparentDragCanvas) {
+    sharedTransparentDragCanvas = document.createElement("canvas");
+    sharedTransparentDragCanvas.width = 1;
+    sharedTransparentDragCanvas.height = 1;
+  }
+  return sharedTransparentDragCanvas;
+}
 
 interface WidgetRendererProps {
   widgetId: string;
@@ -81,6 +93,8 @@ export function WidgetRenderer({
   const { vendors } = useVendors();
   const { activeCurrency } = useActiveCurrency();
   const { tasks, expenses, workOrders } = useData();
+  const { draggedWidgetId, startWidgetDrag, endWidgetDrag } = useWidgetContext();
+  const isBeingDragged = draggedWidgetId === widgetId;
 
   const [hoveredFunnelIdx, setHoveredFunnelIdx] = useState<number | null>(null);
 
@@ -1702,7 +1716,13 @@ export function WidgetRenderer({
             </div>
 
             <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between text-[12px] text-content-neutral-500">
-              <span>Actionable collection queue</span>
+              <Link
+                href="/invoices?view=overdue-summary"
+                className="text-rose-600 dark:text-rose-400 font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <span>Aging Breakdown</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
               <Link
                 href="/invoices"
                 className="text-content-neutral-900 font-medium hover:underline inline-flex items-center gap-1"
@@ -2230,8 +2250,23 @@ export function WidgetRenderer({
       draggable={isDraggable}
       onDragStart={(e) => {
         if (!isDraggable) return;
+        e.dataTransfer.clearData();
         e.dataTransfer.setData("text/plain", widgetId);
         e.dataTransfer.effectAllowed = "copyMove";
+        const emptyCanvas = getTransparentDragCanvas();
+        if (emptyCanvas) {
+          e.dataTransfer.setDragImage(emptyCanvas, 0, 0);
+        }
+        startWidgetDrag({
+          widgetId,
+          source,
+          element: e.currentTarget,
+          clientX: e.clientX,
+          clientY: e.clientY,
+        });
+      }}
+      onDragEnd={() => {
+        endWidgetDrag();
       }}
       onContextMenu={(e) => {
         if (onContextMenu) {
@@ -2244,11 +2279,23 @@ export function WidgetRenderer({
           ? "cursor-grab active:cursor-grabbing hover:-translate-y-0.5"
           : ""
       } ${
+        isBeingDragged
+          ? "opacity-35 scale-[0.985] ring-2 ring-dashed ring-accent/65 rounded-[24px]"
+          : ""
+      } ${
         isEditing
           ? "ring-2 ring-dashed ring-accent/50 rounded-[24px] bg-accent-faint0/[0.03] p-0.5"
           : ""
       }`}
     >
+      {isDraggable && !isEditing && (
+        <div
+          aria-hidden="true"
+          className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center px-3 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"
+        >
+          <div className="w-9 h-1 rounded-full bg-content-neutral-400/45 dark:bg-white/25" />
+        </div>
+      )}
       {source === "dashboard" && isEditing && (
         <div className="absolute top-3 right-3 z-30 flex items-center gap-1 p-1 bg-surface/95 rounded-full border border-line-neutral-200 shadow-md backdrop-blur-xs select-none">
           {isEditing && onMoveLeft && (

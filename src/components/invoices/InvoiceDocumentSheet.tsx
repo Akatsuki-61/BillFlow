@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
+import { AnimatePresence, motion } from "motion/react";
+import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
 import { formatCents, formatDateDisplay } from "@/lib/format";
 import type { InvoiceWithClient, InvoiceTemplateId } from "@/types/billing";
 import { useSettings, useClients, useInvoices } from "@/lib/data/DataProvider";
@@ -542,49 +544,75 @@ export default function InvoiceDocumentSheet({
           <Button
             variant="secondary"
             type="button"
+            aria-expanded={isShareOpen}
             onClick={() => setIsShareOpen(!isShareOpen)}
             title="Share invoice PDF via WhatsApp or Email"
           >
             <Share2 className="w-4 h-4 text-sky-500" />
             <span>Share</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+            <ChevronDown
+              className={`w-3.5 h-3.5 opacity-70 transition-transform duration-200 ${
+                isShareOpen ? "rotate-180" : ""
+              }`}
+            />
           </Button>
 
-          {isShareOpen && (
-            <div className="absolute right-0 bottom-full mb-2 w-56 rounded-xl bg-surface border border-line-neutral-200 dark:border-white/10 shadow-2xl p-1.5 z-[150] text-content-neutral-900 dark:text-white animate-in fade-in-50 zoom-in-95">
-              <button
-                type="button"
-                onClick={handleShareWhatsApp}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-neutral-50 dark:hover:bg-white/10 text-left transition-colors cursor-pointer text-xs font-semibold"
+          <AnimatePresence initial={false}>
+            {isShareOpen && (
+              <motion.div
+                key="invoice-share-dropdown"
+                initial={{ opacity: 0, scaleX: 0.95, scaleY: 0.86, y: 6 }}
+                animate={{
+                  opacity: 1,
+                  scaleX: 1,
+                  scaleY: 1,
+                  y: 0,
+                  transition: SPRING_MENU_POPOVER,
+                }}
+                exit={{
+                  opacity: 0,
+                  scaleX: 0.96,
+                  scaleY: 0.9,
+                  y: 4,
+                  transition: EXIT_MENU_POPOVER,
+                }}
+                style={{ transformOrigin: "bottom right" }}
+                className="absolute right-0 bottom-full mb-2 w-56 rounded-xl bg-surface border border-line-neutral-200 dark:border-white/10 shadow-2xl p-1.5 z-[150] text-content-neutral-900 dark:text-white"
               >
-                <div className="w-6 h-6 rounded-md bg-[#25D366]/15 text-[#25D366] flex items-center justify-center shrink-0">
-                  <MessageSquare className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="font-bold">WhatsApp</div>
-                  <div className="text-[10px] text-content-neutral-400 font-normal">
-                    Share invoice PDF & brief
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-neutral-50 dark:hover:bg-white/10 text-left transition-colors cursor-pointer text-xs font-semibold"
+                >
+                  <div className="w-6 h-6 rounded-md bg-[#25D366]/15 text-[#25D366] flex items-center justify-center shrink-0">
+                    <MessageSquare className="w-3.5 h-3.5" />
                   </div>
-                </div>
-              </button>
+                  <div>
+                    <div className="font-bold">WhatsApp</div>
+                    <div className="text-[10px] text-content-neutral-400 font-normal">
+                      Share invoice PDF &amp; brief
+                    </div>
+                  </div>
+                </button>
 
-              <button
-                type="button"
-                onClick={handleShareEmail}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-neutral-50 dark:hover:bg-white/10 text-left transition-colors cursor-pointer text-xs font-semibold mt-1"
-              >
-                <div className="w-6 h-6 rounded-md bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0">
-                  <Mail className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="font-bold">Email</div>
-                  <div className="text-[10px] text-content-neutral-400 font-normal">
-                    Draft email with PDF attached
+                <button
+                  type="button"
+                  onClick={handleShareEmail}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-neutral-50 dark:hover:bg-white/10 text-left transition-colors cursor-pointer text-xs font-semibold mt-1"
+                >
+                  <div className="w-6 h-6 rounded-md bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0">
+                    <Mail className="w-3.5 h-3.5" />
                   </div>
-                </div>
-              </button>
-            </div>
-          )}
+                  <div>
+                    <div className="font-bold">Email</div>
+                    <div className="text-[10px] text-content-neutral-400 font-normal">
+                      Draft email with PDF attached
+                    </div>
+                  </div>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {onRecordPayment && invoice.status !== "PAID" && (

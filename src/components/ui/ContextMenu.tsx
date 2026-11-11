@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { MotionPresence } from "@/components/ui/MotionSurface";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
 
 export interface ContextMenuItem {
   label: string;
@@ -26,6 +27,7 @@ export function ContextMenu({
   items,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,61 +55,96 @@ export function ContextMenu({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   // Keep menu within screen boundaries
   const menuWidth = 210;
   const menuHeight = items.length * 36 + 16;
-  const adjustedX =
-    typeof window !== "undefined" && x + menuWidth > window.innerWidth
-      ? Math.max(10, window.innerWidth - menuWidth - 12)
-      : x;
-  const adjustedY =
-    typeof window !== "undefined" && y + menuHeight > window.innerHeight
-      ? Math.max(10, window.innerHeight - menuHeight - 12)
-      : y;
+  const nearRightEdge =
+    typeof window !== "undefined" && x + menuWidth > window.innerWidth;
+  const nearBottomEdge =
+    typeof window !== "undefined" && y + menuHeight > window.innerHeight;
+  const adjustedX = nearRightEdge
+    ? Math.max(10, window.innerWidth - menuWidth - 12)
+    : x;
+  const adjustedY = nearBottomEdge
+    ? Math.max(10, window.innerHeight - menuHeight - 12)
+    : y;
+  const originX = nearRightEdge ? "right" : "left";
+  const originY = nearBottomEdge ? "bottom" : "top";
 
   return (
-    <MotionPresence>
-      <div
-        className="fixed inset-0 z-50 pointer-events-auto"
-        onContextMenu={(e) => {
-          e.preventDefault();
-          onClose();
-        }}
-      >
+    <AnimatePresence initial={false}>
+      {isOpen && (
         <div
-          ref={menuRef}
-          style={{ top: `${adjustedY}px`, left: `${adjustedX}px` }}
-          className="fixed z-50 min-w-[200px] bg-surface/95 backdrop-blur-md rounded-xl p-1.5 shadow-[0px_4px_20px_rgba(0,0,0,0.14),0px_0px_0px_1px_rgba(0,0,0,0.08)] border border-line-neutral-200/70 select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed inset-0 z-50 pointer-events-auto"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            onClose();
+          }}
         >
-          <div className="flex flex-col gap-0.5">
-            {items.map((item, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  item.onClick();
-                  onClose();
-                }}
-                className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left transition-colors cursor-pointer outline-none ${
-                  item.tone === "danger"
-                    ? "text-content-rose-600 hover:bg-surface-rose-50 hover:text-content-rose-700"
-                    : "text-content-neutral-700 hover:bg-surface-neutral-100 hover:text-content-neutral-900"
-                }`}
-              >
-                {item.icon && (
-                  <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0 text-current">
-                    {item.icon}
-                  </span>
-                )}
-                <span className="truncate">{item.label}</span>
-              </button>
-            ))}
-          </div>
+          <motion.div
+            ref={menuRef}
+            initial={
+              reducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, scaleX: 0.94, scaleY: 0.86, y: -4 }
+            }
+            animate={
+              reducedMotion
+                ? { opacity: 1, transition: { duration: 0 } }
+                : {
+                    opacity: 1,
+                    scaleX: 1,
+                    scaleY: 1,
+                    y: 0,
+                    transition: SPRING_MENU_POPOVER,
+                  }
+            }
+            exit={
+              reducedMotion
+                ? { opacity: 0, transition: { duration: 0 } }
+                : {
+                    opacity: 0,
+                    scaleX: 0.95,
+                    scaleY: 0.9,
+                    y: -2,
+                    transition: EXIT_MENU_POPOVER,
+                  }
+            }
+            style={{
+              top: `${adjustedY}px`,
+              left: `${adjustedX}px`,
+              transformOrigin: `${originY} ${originX}`,
+            }}
+            className="fixed z-50 min-w-[200px] bg-surface/95 backdrop-blur-md rounded-xl p-1.5 shadow-[0px_4px_20px_rgba(0,0,0,0.14),0px_0px_0px_1px_rgba(0,0,0,0.08)] border border-line-neutral-200/70 select-none"
+          >
+            <div className="flex flex-col gap-0.5">
+              {items.map((item, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    item.onClick();
+                    onClose();
+                  }}
+                  className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium text-left transition-colors cursor-pointer outline-none ${
+                    item.tone === "danger"
+                      ? "text-content-rose-600 hover:bg-surface-rose-50 hover:text-content-rose-700"
+                      : "text-content-neutral-700 hover:bg-surface-neutral-100 hover:text-content-neutral-900"
+                  }`}
+                >
+                  {item.icon && (
+                    <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0 text-current">
+                      {item.icon}
+                    </span>
+                  )}
+                  <span className="truncate">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </motion.div>
         </div>
-      </div>
-    </MotionPresence>
+      )}
+    </AnimatePresence>
   );
 }

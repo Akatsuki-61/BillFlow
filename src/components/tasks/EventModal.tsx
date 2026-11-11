@@ -1,10 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video } from "lucide-react";
+import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
-import { MotionSurface } from "@/components/ui/MotionSurface";
+import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { useData } from "@/lib/data/DataProvider";
+import {
+  normalizeAndAutoFixDate,
+  normalizeAndAutoFixTimeRange,
+} from "@/lib/local-calendar";
 import type {
   CalendarEventItem,
   NewCalendarEventInput,
@@ -50,7 +54,9 @@ function EventForm({
 
   const [title, setTitle] = useState(eventToEdit?.title || "");
   const [description, setDescription] = useState(eventToEdit?.description || "");
-  const [startDate, setStartDate] = useState(() => eventToEdit?.startDate || initialDate || new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(() =>
+    normalizeAndAutoFixDate(eventToEdit?.startDate || initialDate)
+  );
   const [endDate, setEndDate] = useState(eventToEdit?.endDate || "");
   const [startTime, setStartTime] = useState(eventToEdit ? eventToEdit.startTime || "" : "10:00");
   const [endTime, setEndTime] = useState(eventToEdit ? eventToEdit.endTime || "" : "11:00");
@@ -69,30 +75,35 @@ function EventForm({
       setError("Please provide an event title");
       return;
     }
-    if (!startDate) {
-      setError("Please select a date");
-      return;
-    }
 
     setSaving(true);
     setError(null);
 
     try {
-      const selectedClient = clients.find((c) => c.id === clientId);
+      // Internal silent auto-fixing of dates, time ranges, and Task <-> Client links
+      const fixedStart = normalizeAndAutoFixDate(startDate);
+      let fixedEnd = endDate ? normalizeAndAutoFixDate(endDate, fixedStart) : null;
+      if (fixedEnd && fixedEnd < fixedStart) {
+        fixedEnd = fixedStart;
+      }
+      const fixedTimes = normalizeAndAutoFixTimeRange(startTime, endTime, isAllDay);
+
       const selectedTask = tasks.find((t) => t.id === taskId);
+      const resolvedClientId = clientId || selectedTask?.clientId || "";
+      const selectedClient = clients.find((c) => c.id === resolvedClientId);
 
       const input: NewCalendarEventInput = {
         title: title.trim(),
         description: description.trim(),
-        startDate,
-        endDate: endDate || null,
-        startTime: isAllDay ? null : startTime || null,
-        endTime: isAllDay ? null : endTime || null,
-        isAllDay,
+        startDate: fixedStart,
+        endDate: fixedEnd,
+        startTime: fixedTimes.startTime,
+        endTime: fixedTimes.endTime,
+        isAllDay: fixedTimes.isAllDay,
         category,
         color,
-        clientId: clientId || null,
-        clientName: selectedClient?.name || null,
+        clientId: resolvedClientId || null,
+        clientName: selectedClient?.name || selectedTask?.clientName || null,
         taskId: taskId || null,
         taskTitle: selectedTask?.title || null,
         location: location.trim() || null,
@@ -100,10 +111,10 @@ function EventForm({
 
       if (eventToEdit) {
         await updateEvent(eventToEdit.id, input);
-        onSaved?.(`Updated event "${title}"`);
+        onSaved?.(`Updated event "${title.trim()}"`);
       } else {
         await createEvent(input);
-        onSaved?.(`Created event "${title}"`);
+        onSaved?.(`Created event "${title.trim()}"`);
       }
       onClose();
     } catch (err) {
@@ -130,7 +141,8 @@ function EventForm({
   };
 
   return (
-    <div
+    <MotionSurface
+      kind="dialog"
       role="dialog"
       aria-modal="true"
       aria-labelledby="event-modal-title"
@@ -143,8 +155,12 @@ function EventForm({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-line-neutral-200/70 bg-surface-neutral-50/60">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-accent-soft text-accent">
-              <Calendar className="w-5 h-5" />
+            <div className="p-2 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+              {eventToEdit ? (
+                <i className="fa-solid fa-pen-to-square text-base" aria-hidden="true" />
+              ) : (
+                <Calendar className="w-5 h-5" />
+              )}
             </div>
             <div>
               <h2 id="event-modal-title" className="text-base font-semibold text-content-neutral-900">
@@ -228,7 +244,7 @@ function EventForm({
           <div className="p-3.5 rounded-xl border border-line-neutral-200/80 bg-surface-neutral-50/40 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-content-neutral-800 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-accent" /> Date & Schedule
+                <Clock className="w-3.5 h-3.5 text-accent" /> Date &amp; Schedule
               </span>
               <label className="flex items-center gap-2 text-xs text-content-neutral-700 cursor-pointer select-none">
                 <input
@@ -371,7 +387,7 @@ function EventForm({
           {/* Description & Notes */}
           <div>
             <label htmlFor="event-desc" className="block text-xs font-semibold uppercase tracking-wider text-content-neutral-600 mb-1.5">
-              Description & Agenda Notes
+              Description &amp; Agenda Notes
             </label>
             <textarea
               id="event-desc"
@@ -404,17 +420,40 @@ function EventForm({
                 Cancel
               </Button>
               <Button type="submit" variant="primary" disabled={saving}>
-                {saving ? "Saving..." : eventToEdit ? "Update Event" : "Create Event"}
+                {saving ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Syncing...</span>
+                  </>
+                ) : eventToEdit ? (
+                  <span className="flex items-center gap-1.5">
+                    <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                    <span>Update Event</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                    <span>Create Event</span>
+                  </span>
+                )}
               </Button>
             </div>
           </div>
         </form>
       </MotionSurface>
-    </div>
+    </MotionSurface>
   );
 }
 
 export default function EventModal(props: EventModalProps) {
-  if (!props.isOpen) return null;
-  return <EventForm key={props.eventToEdit?.id || `${props.initialDate}-${props.initialTaskId}`} {...props} />;
+  return (
+    <MotionPresence>
+      {props.isOpen && (
+        <EventForm
+          key={props.eventToEdit?.id || `${props.initialDate}-${props.initialTaskId}`}
+          {...props}
+        />
+      )}
+    </MotionPresence>
+  );
 }

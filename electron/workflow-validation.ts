@@ -20,6 +20,12 @@ const fields = {
   outsourceBudgetCents: minorAmount.optional(),
 };
 export const createTaskSchema = z.object({ ...fields, id: recordId, clientId: recordId.nullable().optional(), clientName: z.string().max(120).optional() }).strict();
-export const patchTaskSchema = z.object(fields).partial().strict();
+export const patchTaskSchema = z.object({
+  ...fields,
+  invoiceId: recordId.nullable().optional(),
+  invoiceItemId: recordId.nullable().optional(),
+  clientId: recordId.nullable().optional(),
+  clientName: z.string().max(120).optional(),
+}).partial().strict();
 export const attachmentOwnerSchema = z.object({ type: z.enum(["payment", "expense", "payout"]), id: recordId }).strict();
 export const trackingChoiceSchema = z.enum(["yes", "no"]);

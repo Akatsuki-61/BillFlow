@@ -30,6 +30,8 @@ import {
   Trash2,
   RotateCcw,
   CheckCircle2,
+  Receipt,
+  ListChecks,
 } from "lucide-react";
 import {
   TaskItem,
@@ -37,8 +39,14 @@ import {
   TaskPriority,
   TaskCategory,
 } from "@/types/tasks";
-import type { CalendarEventItem } from "@/types/calendar";
-import { useData } from "@/lib/data/DataProvider";
+import type {
+  CalendarEventItem,
+  EventCategory,
+  EventColor,
+} from "@/types/calendar";
+import { useData, isTaskEligibleForInvoicing } from "@/lib/data/DataProvider";
+import type { InvoiceWithClient } from "@/types/billing";
+import InvoiceDocumentSheet from "@/components/invoices/InvoiceDocumentSheet";
 import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/tasks/TaskTiming";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
@@ -47,6 +55,12 @@ import SubmitWorkModal from "@/components/tasks/SubmitWorkModal";
 import Link from "next/link";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
+import {
+  saveTaskTimeSlot,
+  getTaskTimeSlot,
+  normalizeAndAutoFixDate,
+  normalizeAndAutoFixTimeRange,
+} from "@/lib/local-calendar";
 
 const PRIORITY_OPTIONS: SelectOption[] = [
   { value: "all", label: "Priority: All" },
@@ -64,6 +78,68 @@ const CATEGORY_OPTIONS: SelectOption[] = [
   { value: "Legal", label: "Legal" },
   { value: "Documentation", label: "Documentation" },
 ];
+
+export interface InvoiceLinkPalette {
+  name: "emerald" | "indigo" | "amber" | "teal" | "violet";
+  barColor: string;
+  ringClass: string;
+  glowShadow: string;
+  activeChipClass: string;
+}
+
+const INVOICE_LINK_PALETTES: InvoiceLinkPalette[] = [
+  {
+    name: "emerald",
+    barColor: "#10b981",
+    ringClass: "ring-2 ring-emerald-500/70 !border-emerald-500/60",
+    glowShadow: "0 0 12px rgba(16, 185, 129, 0.25)",
+    activeChipClass:
+      "text-emerald-700 dark:text-emerald-300 bg-emerald-500/12 border-emerald-500/35",
+  },
+  {
+    name: "indigo",
+    barColor: "#6366f1",
+    ringClass: "ring-2 ring-indigo-500/70 !border-indigo-500/60",
+    glowShadow: "0 0 12px rgba(99, 102, 241, 0.25)",
+    activeChipClass:
+      "text-indigo-700 dark:text-indigo-300 bg-indigo-500/12 border-indigo-500/35",
+  },
+  {
+    name: "amber",
+    barColor: "#f59e0b",
+    ringClass: "ring-2 ring-amber-500/70 !border-amber-500/60",
+    glowShadow: "0 0 12px rgba(245, 158, 11, 0.25)",
+    activeChipClass:
+      "text-amber-700 dark:text-amber-300 bg-amber-500/12 border-amber-500/35",
+  },
+  {
+    name: "teal",
+    barColor: "#14b8a6",
+    ringClass: "ring-2 ring-teal-500/70 !border-teal-500/60",
+    glowShadow: "0 0 12px rgba(20, 184, 166, 0.25)",
+    activeChipClass:
+      "text-teal-700 dark:text-teal-300 bg-teal-500/12 border-teal-500/35",
+  },
+  {
+    name: "violet",
+    barColor: "#8b5cf6",
+    ringClass: "ring-2 ring-violet-500/70 !border-violet-500/60",
+    glowShadow: "0 0 12px rgba(139, 92, 246, 0.25)",
+    activeChipClass:
+      "text-violet-700 dark:text-violet-300 bg-violet-500/12 border-violet-500/35",
+  },
+];
+
+export function getInvoiceLinkPalette(
+  invoiceKey?: string | null,
+): InvoiceLinkPalette {
+  const key = (invoiceKey || "default").trim();
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return INVOICE_LINK_PALETTES[hash % INVOICE_LINK_PALETTES.length];
+}
 
 function HighlightText({ text, query }: { text: string; query: string }) {
   const trimmed = query.trim();
@@ -140,6 +216,8 @@ export default function TasksView({
   const {
     tasks,
     events,
+    createEvent,
+    deleteEvent,
     invoices,
     workflow,
     clients,
@@ -174,6 +252,15 @@ export default function TasksView({
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
+  // Synchronized Invoice Hover & Batch Invoicing state
+  const [hoveredInvoiceId, setHoveredInvoiceId] = useState<string | null>(null);
+  const [isBatchInvoicingMode, setIsBatchInvoicingMode] = useState(false);
+  const [selectedBatchTaskIds, setSelectedBatchTaskIds] = useState<string[]>(
+    [],
+  );
+  const [previewInvoice, setPreviewInvoice] =
+    useState<InvoiceWithClient | null>(null);
+
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -193,18 +280,27 @@ export default function TasksView({
   const leadFreelancerName =
     settings?.businessName?.trim() || "Lead Freelancer";
 
-  // Form State for New Task
+  // Form State for Unified New Task / Event Creation Modal
+  const [newRecordType, setNewRecordType] = useState<"task" | "event">("task");
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newStatus, setNewStatus] = useState<TaskStatus>("todo");
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium");
   const [newCategory, setNewCategory] = useState<TaskCategory>("Development");
   const [newDueDate, setNewDueDate] = useState("");
+  const [newStartTime, setNewStartTime] = useState("10:00");
+  const [newEndTime, setNewEndTime] = useState("11:00");
+  const [newIsAllDay, setNewIsAllDay] = useState(false);
+  const [newEventCategory, setNewEventCategory] = useState<EventCategory>("meeting");
+  const [newEventColor, setNewEventColor] = useState<EventColor>("blue");
+  const [newEventLocation, setNewEventLocation] = useState("");
   const [newClientName, setNewClientName] = useState("");
   const [newIsOutsourced, setNewIsOutsourced] = useState(false);
   const [newOutsourcedVendor, setNewOutsourcedVendor] = useState("");
   const [newOutsourceBudget, setNewOutsourceBudget] = useState("");
   const [hasTaskDraft, setHasTaskDraft] = useState(false);
+  const [timeSlotVersion, setTimeSlotVersion] = useState(0);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isTaskFormDirty = () => {
     return Boolean(
@@ -286,12 +382,16 @@ export default function TasksView({
     setIsAddModalOpen(true);
   };
 
-  const showToast = (message: string) => {
+  const showToast = React.useCallback((message: string) => {
     setToastMessage(message);
-    setTimeout(() => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
       setToastMessage(null);
     }, 3500);
-  };
+  }, []);
 
   const saveTask = async (id: string, patch: TaskPatchInput) => {
     if (saving) return false;
@@ -332,14 +432,17 @@ export default function TasksView({
 
   // Base filtered tasks matching priority & category filters
   const baseTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      const matchesPriority =
-        selectedPriority === "all" || t.priority === selectedPriority;
-      const matchesCategory =
-        selectedCategory === "all" || t.category === selectedCategory;
-      return matchesPriority && matchesCategory;
-    });
-  }, [tasks, selectedPriority, selectedCategory]);
+    void timeSlotVersion;
+    return tasks
+      .filter((t) => {
+        const matchesPriority =
+          selectedPriority === "all" || t.priority === selectedPriority;
+        const matchesCategory =
+          selectedCategory === "all" || t.category === selectedCategory;
+        return matchesPriority && matchesCategory;
+      })
+      .map((t) => ({ ...t }));
+  }, [tasks, selectedPriority, selectedCategory, timeSlotVersion]);
 
   const isTaskMatch = (title: string) => {
     return isSearching && title.toLowerCase().includes(trimmedSearchQuery);
@@ -421,6 +524,7 @@ export default function TasksView({
     }
 
     void saveTask(taskId, { status: targetStatus });
+    showToast(`Updated task status to ${targetStatus.replace("-", " ")}`);
     setDraggedTaskId(null);
   };
 
@@ -445,11 +549,116 @@ export default function TasksView({
     router.push(`/outsourcing?${params}`);
   };
 
-  // Create Task Submission
+  // Task-to-Invoice handlers
+  const handleBillSingleTask = (task: TaskItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const params = new URLSearchParams({
+      action: "new",
+      importTaskIds: task.id,
+    });
+    if (task.clientId) {
+      params.set("client", task.clientId);
+    }
+    router.push(`/invoices?${params.toString()}`);
+  };
+
+  const handleToggleBatchInvoiceMode = (unbilledTasks: TaskItem[]) => {
+    if (isBatchInvoicingMode) {
+      setIsBatchInvoicingMode(false);
+      setSelectedBatchTaskIds([]);
+    } else {
+      setIsBatchInvoicingMode(true);
+      setSelectedBatchTaskIds(unbilledTasks.map((t) => t.id));
+    }
+  };
+
+  const handleToggleBatchTaskSelection = (
+    taskId: string,
+    e?: React.MouseEvent,
+  ) => {
+    e?.stopPropagation();
+    setSelectedBatchTaskIds((prev) =>
+      prev.includes(taskId)
+        ? prev.filter((id) => id !== taskId)
+        : [...prev, taskId],
+    );
+  };
+
+  const handleSubmitBatchInvoice = () => {
+    if (selectedBatchTaskIds.length === 0) {
+      showToast("Select at least one completed task to invoice");
+      return;
+    }
+    const params = new URLSearchParams({
+      action: "new",
+      importTaskIds: selectedBatchTaskIds.join(","),
+    });
+    setIsBatchInvoicingMode(false);
+    router.push(`/invoices?${params.toString()}`);
+  };
+
+  const handleOpenLinkedInvoicePreview = (
+    task: TaskItem,
+    e?: React.MouseEvent,
+  ) => {
+    e?.stopPropagation();
+    if (!task.invoiceId) return;
+    const linkedInv = invoices.find((inv) => inv.id === task.invoiceId);
+    if (linkedInv) {
+      setPreviewInvoice(linkedInv);
+    } else {
+      router.push(
+        `/invoices?invoice=${encodeURIComponent(task.invoiceId)}&preview=1`,
+      );
+    }
+  };
+
+  // Create Task or Event Submission (Unified Creation Modal)
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || saving) return;
     setSaving(true);
+
+    const normalizedDate = newDueDate
+      ? normalizeAndAutoFixDate(newDueDate)
+      : "";
+    const normalizedTime = normalizeAndAutoFixTimeRange(
+      newStartTime,
+      newEndTime,
+      newIsAllDay
+    );
+
+    if (newRecordType === "event") {
+      try {
+        await createEvent({
+          title: newTitle.trim(),
+          description: newDescription.trim(),
+          startDate:
+            normalizedDate || new Date().toISOString().split("T")[0],
+          endDate: normalizedDate || new Date().toISOString().split("T")[0],
+          startTime: normalizedTime.isAllDay ? null : normalizedTime.startTime,
+          endTime: normalizedTime.isAllDay ? null : normalizedTime.endTime,
+          isAllDay: normalizedTime.isAllDay,
+          category: newEventCategory,
+          color: newEventColor,
+          clientId: newClientName || null,
+          location: newEventLocation.trim() || null,
+        });
+        clearTaskDraft();
+        closeAddTaskModal(false);
+        setNewTitle("");
+        setNewDescription("");
+        setNewEventLocation("");
+        showToast(`Event "${newTitle.trim()}" scheduled in calendar`);
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : "Could not create event."
+        );
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
 
     const assignee = {
       name: leadFreelancerName,
@@ -458,15 +667,17 @@ export default function TasksView({
       textColor: "text-content-purple-700",
     };
 
+    const taskId = draftId.current || (draftId.current = crypto.randomUUID());
+
     const newTask = {
-      id: draftId.current || (draftId.current = crypto.randomUUID()),
+      id: taskId,
       title: newTitle.trim(),
       description: newDescription.trim() || "No detailed description provided.",
       status: newStatus,
       priority: newPriority,
       category: newCategory,
       assignee,
-      dueDate: newDueDate,
+      dueDate: normalizedDate,
       clientId: newClientName || null,
       currency:
         clients.find((client) => client.id === newClientName)?.currency ||
@@ -482,7 +693,12 @@ export default function TasksView({
     };
 
     try {
+      saveTaskTimeSlot(taskId, {
+        startTime: normalizedTime.isAllDay ? null : normalizedTime.startTime,
+        endTime: normalizedTime.isAllDay ? null : normalizedTime.endTime,
+      });
       await workflow.tasks.create(newTask);
+      setTimeSlotVersion((v) => v + 1);
       draftId.current = null;
     } catch (error) {
       showToast(
@@ -496,29 +712,34 @@ export default function TasksView({
     closeAddTaskModal(false);
 
     // Reset Form
+    const createdTitle = newTitle.trim();
     setNewTitle("");
     setNewDescription("");
     setNewIsOutsourced(false);
-    showToast(`Task created in ${newStatus.replace("-", " ")}`);
+    showToast(`Task "${createdTitle}" created in ${newStatus.replace("-", " ")}`);
   };
 
   // Toggle Subtask Completion in Detail Modal
   const handleToggleSubtask = (taskId: string, subtaskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
-    if (task)
+    if (task) {
       void saveTask(taskId, {
         subtasks: task.subtasks.map((st) =>
           st.id === subtaskId ? { ...st, completed: !st.completed } : st,
         ),
       });
+      showToast("Updated task subtasks");
+    }
   };
   const handleDeleteTask = async (taskId: string) => {
     if (saving) return;
+    const target = tasks.find((t) => t.id === taskId);
+    const targetTitle = target?.title;
     setSaving(true);
     try {
       await workflow.tasks.remove(taskId);
       setSelectedTaskForDetail(null);
-      showToast("Task removed");
+      showToast(targetTitle ? `Task "${targetTitle}" deleted` : "Task deleted");
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : "Could not delete task.",
@@ -544,10 +765,25 @@ export default function TasksView({
       <MotionPresence>
         {toastMessage && (
           <MotionSurface
+            key={toastMessage}
             kind="toast"
-            className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 bg-surface-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_12px_24px_-6px_rgba(0,0,0,0.25)] border border-line-neutral-800 transition-all"
+            className="bf-toast-popup fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 bg-surface-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_14px_30px_-6px_rgba(0,0,0,0.38)] border border-line-neutral-800 transition-all"
           >
-            <div className="w-2 h-2 rounded-full bg-accent-solid animate-ping" />
+            {/\b(deleted|removed)\b/i.test(toastMessage) ? (
+              <span className="bf-toast-trash-badge w-6 h-6 rounded-lg bg-rose-500/20 border border-rose-500/35 text-rose-400 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-trash" aria-hidden="true" />
+              </span>
+            ) : /\b(created|added|scheduled)\b/i.test(toastMessage) ? (
+              <span className="bf-toast-add-badge w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/35 text-emerald-400 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-circle-plus" aria-hidden="true" />
+              </span>
+            ) : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(toastMessage) ? (
+              <span className="bf-toast-update-badge w-6 h-6 rounded-lg bg-blue-500/20 border border-blue-500/35 text-blue-400 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-pen-to-square" aria-hidden="true" />
+              </span>
+            ) : (
+              <div className="w-2.5 h-2.5 rounded-full bg-accent-solid animate-ping shrink-0" />
+            )}
             <span>{toastMessage}</span>
             <Button
               aria-label="Close"
@@ -558,6 +794,18 @@ export default function TasksView({
             >
               <X className="w-4 h-4" />
             </Button>
+            <span
+              aria-hidden="true"
+              className={`bf-toast-progress-bar absolute bottom-0 left-0 right-0 h-[2.5px] ${
+                /\b(deleted|removed)\b/i.test(toastMessage)
+                  ? "bg-rose-500/80"
+                  : /\b(created|added|scheduled)\b/i.test(toastMessage)
+                    ? "bg-emerald-500/85"
+                    : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(toastMessage)
+                      ? "bg-blue-500/85"
+                      : "bg-accent"
+              }`}
+            />
           </MotionSurface>
         )}
       </MotionPresence>
@@ -628,8 +876,8 @@ export default function TasksView({
           </Button>
 
           {/* Create Task Button */}
-          <Button variant="primary" onClick={() => openAddTaskModal("todo")}>
-            <Plus className="w-4 h-4 transition-transform duration-200 group-hover:scale-105 group-hover:rotate-6" />
+          <Button variant="primary" onClick={() => openAddTaskModal("todo")} className="flex items-center gap-1.5">
+            <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
             <span>New Task</span>
           </Button>
         </div>
@@ -857,18 +1105,88 @@ export default function TasksView({
                       </span>
                     </div>
 
-                    {/* Column Quick Add */}
-                    <button
-                      type="button"
-                      onClick={() => openAddTaskModal(col.id)}
-                      disabled={!isElectron || isLoading || saving}
-                      title={`Add task to ${col.title}`}
-                      aria-label={`Add task to ${col.title}`}
-                      className="zentra-circle-btn zentra-circle-btn--sm"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {col.id === "done" &&
+                        columnTasks.some(isTaskEligibleForInvoicing) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleToggleBatchInvoiceMode(
+                                columnTasks.filter(isTaskEligibleForInvoicing),
+                              )
+                            }
+                            title="Batch Invoice Completed Tasks"
+                            aria-label="Batch Invoice Completed"
+                            className={`px-2 py-1 rounded-full text-[10.5px] font-semibold border transition-all duration-150 flex items-center gap-1 cursor-pointer ${
+                              isBatchInvoicingMode
+                                ? "bg-accent text-white border-accent shadow-2xs"
+                                : "bg-surface border-line-neutral-200 text-content-neutral-700 hover:border-accent/50 hover:text-accent"
+                            }`}
+                          >
+                            <ListChecks className="w-3 h-3" />
+                            <span>
+                              {isBatchInvoicingMode
+                                ? "Cancel Batch"
+                                : "Batch Invoice"}
+                            </span>
+                          </button>
+                        )}
+
+                      {/* Column Quick Add */}
+                      <button
+                        type="button"
+                        onClick={() => openAddTaskModal(col.id)}
+                        disabled={!isElectron || isLoading || saving}
+                        title={`Add task to ${col.title}`}
+                        aria-label={`Add task to ${col.title}`}
+                        className="zentra-circle-btn zentra-circle-btn--sm flex items-center justify-center text-content-neutral-600 hover:text-accent"
+                      >
+                        <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Batch Invoice Selection Toolbar in Done Column */}
+                  {col.id === "done" && isBatchInvoicingMode && (
+                    <div className="mb-2.5 p-2 rounded-xl bg-accent/8 border border-accent/25 flex items-center justify-between gap-2 text-[11px]">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedBatchTaskIds(
+                              columnTasks
+                                .filter(isTaskEligibleForInvoicing)
+                                .map((t) => t.id),
+                            )
+                          }
+                          className="font-semibold text-accent hover:underline cursor-pointer"
+                        >
+                          All
+                        </button>
+                        <span className="text-content-neutral-300">·</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBatchTaskIds([])}
+                          className="text-content-neutral-500 hover:text-content-neutral-800 cursor-pointer"
+                        >
+                          None
+                        </button>
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="small"
+                        type="button"
+                        disabled={selectedBatchTaskIds.length === 0}
+                        onClick={handleSubmitBatchInvoice}
+                        className="!h-6 !px-2.5 !text-[10.5px] gap-1"
+                      >
+                        <Receipt className="w-3 h-3" />
+                        <span>
+                          Create Invoice ({selectedBatchTaskIds.length})
+                        </span>
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Mini Diagonal-Striped Column Strip */}
                   <div className="w-full h-[8px] rounded-full bg-surface-neutral-100 p-[1.5px] flex items-center">
@@ -894,9 +1212,10 @@ export default function TasksView({
                         size="small"
                         disabled={!isElectron || isLoading || saving}
                         onClick={() => openAddTaskModal(col.id)}
+                        className="flex items-center gap-1.5"
                       >
-                        <Plus />
-                        Add a task
+                        <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                        <span>Add a task</span>
                       </Button>
                     </EmptyState>
                   ) : (
@@ -908,26 +1227,114 @@ export default function TasksView({
                       const matched = isTaskMatch(task.title);
                       const dimmed = isSearching && !matched;
                       const taskProgressPct = taskProgress(task);
+                      const hasLinkedInvoice = Boolean(
+                        task.invoiceId && task.invoiceId.trim() !== "",
+                      );
+                      const isUnbilledDone = isTaskEligibleForInvoicing(task);
+                      const isBatchSelected = selectedBatchTaskIds.includes(
+                        task.id,
+                      );
+                      const invoicePalette = hasLinkedInvoice
+                        ? getInvoiceLinkPalette(
+                            task.invoiceCode || task.invoiceId,
+                          )
+                        : null;
+                      const isInvoiceHoverLinked = Boolean(
+                        hasLinkedInvoice &&
+                          hoveredInvoiceId &&
+                          hoveredInvoiceId === task.invoiceId,
+                      );
+                      const resolvedInvoiceCode =
+                        task.invoiceCode ||
+                        invoices.find((inv) => inv.id === task.invoiceId)
+                          ?.code ||
+                        "INV";
 
                       return (
                         <div
                           key={task.id}
-                          draggable={!saving}
+                          draggable={!saving && !isBatchInvoicingMode}
                           onDragStart={(e) => handleDragStart(e, task.id)}
-                          onClick={() => setSelectedTaskForDetail(task)}
-                          className={`motion-card group relative bg-surface-neutral-50/75 dark:bg-surface-secondary rounded-[18px] p-4 border transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                          onMouseEnter={() => {
+                            if (hasLinkedInvoice && task.invoiceId) {
+                              setHoveredInvoiceId(task.invoiceId);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            if (hasLinkedInvoice && task.invoiceId) {
+                              setHoveredInvoiceId((prev) =>
+                                prev === task.invoiceId ? null : prev,
+                              );
+                            }
+                          }}
+                          onClick={(e) => {
+                            if (
+                              col.id === "done" &&
+                              isBatchInvoicingMode &&
+                              isUnbilledDone
+                            ) {
+                              handleToggleBatchTaskSelection(task.id, e);
+                              return;
+                            }
+                            setSelectedTaskForDetail(task);
+                          }}
+                          style={
+                            isInvoiceHoverLinked && invoicePalette
+                              ? { boxShadow: invoicePalette.glowShadow }
+                              : undefined
+                          }
+                          data-invoice-id={task.invoiceId || undefined}
+                          data-invoice-highlighted={
+                            isInvoiceHoverLinked ? "true" : undefined
+                          }
+                          className={`motion-card group relative bg-surface-neutral-50/75 dark:bg-surface-secondary rounded-[18px] p-4 border transition-all duration-150 ease-out cursor-grab active:cursor-grabbing ${
                             isDragging
                               ? "opacity-40 scale-98"
-                              : matched
-                                ? "ring-2 ring-accent border-accent opacity-100 z-10"
-                                : dimmed
-                                  ? "opacity-35 dark:opacity-25 grayscale-[70%] border-line-neutral-200/50 shadow-none hover:opacity-75"
-                                  : "border-line-neutral-200/80 hover:border-line-neutral-300 hover:bg-surface shadow-2xs"
+                              : isInvoiceHoverLinked && invoicePalette
+                                ? `${invoicePalette.ringClass} -translate-y-[1.5px] bg-surface z-10`
+                                : col.id === "done" &&
+                                    isBatchInvoicingMode &&
+                                    isBatchSelected
+                                  ? "ring-2 ring-accent border-accent bg-accent/5"
+                                  : matched
+                                    ? "ring-2 ring-accent border-accent opacity-100 z-10"
+                                    : dimmed
+                                      ? "opacity-35 dark:opacity-25 grayscale-[70%] border-line-neutral-200/50 shadow-none hover:opacity-75"
+                                      : "border-line-neutral-200/80 hover:border-line-neutral-300 hover:bg-surface shadow-2xs"
                           }`}
                         >
+                          {/* Subtle 2px Left Accent Bar for Invoice-Linked Cards */}
+                          {hasLinkedInvoice && invoicePalette && (
+                            <span
+                              aria-hidden="true"
+                              style={{
+                                backgroundColor: invoicePalette.barColor,
+                              }}
+                              className={`absolute left-0 top-3.5 bottom-3.5 w-[2.5px] rounded-r-full transition-opacity duration-150 ${
+                                isInvoiceHoverLinked
+                                  ? "opacity-100"
+                                  : "opacity-65 group-hover:opacity-95"
+                              }`}
+                            />
+                          )}
+
                           {/* Top Tag Strip */}
                           <div className="flex items-center justify-between gap-1.5 mb-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              {col.id === "done" &&
+                                isBatchInvoicingMode &&
+                                isUnbilledDone && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isBatchSelected}
+                                    onChange={() => {}}
+                                    onClick={(e) =>
+                                      handleToggleBatchTaskSelection(task.id, e)
+                                    }
+                                    aria-label={`Select ${task.title} for batch invoice`}
+                                    className="w-3.5 h-3.5 rounded text-accent focus:ring-accent cursor-pointer"
+                                  />
+                                )}
                               <span className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-surface border border-line-neutral-200 text-content-neutral-600">
                                 {task.category}
                               </span>
@@ -1000,18 +1407,50 @@ export default function TasksView({
                             </div>
                           </div>
 
-                          {/* Bottom Row: Due Date and Direct Outsource / Delivery Actions */}
-                          <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between gap-2">
-                            <span className="text-[11px] text-content-neutral-500 flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-content-neutral-400" />
-                              <span>
-                                {task.dueDate
-                                  ? task.dueDate.replace(", 2026", "")
-                                  : "No due date"}
+                          {/* Bottom Row: Due Date, Subtle Invoice Indicator, and Direct Outsource / Delivery Actions */}
+                          <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[11px] text-content-neutral-500 flex items-center gap-1 truncate">
+                                <Calendar className="w-3 h-3 text-content-neutral-400 shrink-0" />
+                                <span className="truncate">
+                                  {task.dueDate
+                                    ? task.dueDate.replace(", 2026", "")
+                                    : "No due date"}
+                                </span>
                               </span>
-                            </span>
 
-                            <div className="flex items-center gap-1.5">
+                              {hasLinkedInvoice && invoicePalette && (
+                                <button
+                                  type="button"
+                                  onClick={(e) =>
+                                    handleOpenLinkedInvoicePreview(task, e)
+                                  }
+                                  title={`Linked to Invoice ${resolvedInvoiceCode}`}
+                                  aria-label={`Linked to Invoice ${resolvedInvoiceCode}`}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono tracking-tight border transition-all duration-150 cursor-pointer shrink-0 ${
+                                    isInvoiceHoverLinked
+                                      ? invoicePalette.activeChipClass
+                                      : "text-content-neutral-500 bg-transparent border-transparent hover:border-line-neutral-200 hover:bg-surface-neutral-100 hover:text-content-neutral-800 dark:hover:text-content-neutral-200"
+                                  }`}
+                                >
+                                  #{resolvedInvoiceCode}
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {isUnbilledDone && (
+                                <Button
+                                  variant="ghost"
+                                  size="small"
+                                  onClick={(e) => handleBillSingleTask(task, e)}
+                                  title="Bill Task — Create an invoice from this completed deliverable"
+                                  className="text-[11px] text-accent hover:bg-accent/10 flex items-center gap-1 font-semibold"
+                                >
+                                  <Receipt className="w-3 h-3" />
+                                  <span>Bill Task</span>
+                                </Button>
+                              )}
                               {task.status !== "done" ? (
                                 <Button
                                   variant="ghost"
@@ -1088,6 +1527,19 @@ export default function TasksView({
                                     : "Outsource"}
                                 </span>
                               </Button>
+                              <button
+                                type="button"
+                                disabled={!isElectron || isLoading || saving}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleDeleteTask(task.id);
+                                }}
+                                title={`Delete task "${task.title}"`}
+                                aria-label={`Delete task ${task.title}`}
+                                className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors cursor-pointer"
+                              >
+                                <i className="fa-solid fa-trash" aria-hidden="true" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1136,25 +1588,73 @@ export default function TasksView({
                 {displayListTasks.map((task) => {
                   const matched = isTaskMatch(task.title);
                   const dimmed = isSearching && !matched;
+                  const hasLinkedInvoice = Boolean(
+                    task.invoiceId && task.invoiceId.trim() !== "",
+                  );
+                  const isUnbilledDone = isTaskEligibleForInvoicing(task);
+                  const invoicePalette = hasLinkedInvoice
+                    ? getInvoiceLinkPalette(task.invoiceCode || task.invoiceId)
+                    : null;
+                  const isInvoiceHoverLinked = Boolean(
+                    hasLinkedInvoice &&
+                      hoveredInvoiceId &&
+                      hoveredInvoiceId === task.invoiceId,
+                  );
+                  const resolvedInvoiceCode =
+                    task.invoiceCode ||
+                    invoices.find((inv) => inv.id === task.invoiceId)?.code ||
+                    "INV";
 
                   return (
                     <tr
                       key={task.id}
+                      onMouseEnter={() => {
+                        if (hasLinkedInvoice && task.invoiceId) {
+                          setHoveredInvoiceId(task.invoiceId);
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        if (hasLinkedInvoice && task.invoiceId) {
+                          setHoveredInvoiceId((prev) =>
+                            prev === task.invoiceId ? null : prev,
+                          );
+                        }
+                      }}
                       onClick={() => setSelectedTaskForDetail(task)}
-                      className={`transition-colors cursor-pointer group ${
-                        matched
-                          ? "bg-accent/10 border-l-4 border-l-accent opacity-100"
-                          : dimmed
-                            ? "opacity-35 dark:opacity-25 grayscale-[70%] hover:opacity-75"
-                            : "hover:bg-surface-neutral-50/80"
+                      className={`transition-all duration-150 ease-out cursor-pointer group ${
+                        isInvoiceHoverLinked && invoicePalette
+                          ? `${invoicePalette.ringClass} bg-surface`
+                          : matched
+                            ? "bg-accent/10 border-l-4 border-l-accent opacity-100"
+                            : dimmed
+                              ? "opacity-35 dark:opacity-25 grayscale-[70%] hover:opacity-75"
+                              : "hover:bg-surface-neutral-50/80"
                       }`}
                     >
                       <td className="py-3.5 px-4 font-medium text-content-neutral-900 max-w-xs">
-                        <div className="font-semibold text-content-neutral-900 group-hover:text-accent transition-colors truncate">
-                          <HighlightText
-                            text={task.title}
-                            query={searchQuery}
-                          />
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold text-content-neutral-900 group-hover:text-accent transition-colors truncate">
+                            <HighlightText
+                              text={task.title}
+                              query={searchQuery}
+                            />
+                          </div>
+                          {hasLinkedInvoice && invoicePalette && (
+                            <button
+                              type="button"
+                              onClick={(e) =>
+                                handleOpenLinkedInvoicePreview(task, e)
+                              }
+                              title={`Linked to Invoice ${resolvedInvoiceCode}`}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono tracking-tight border transition-colors cursor-pointer shrink-0 ${
+                                isInvoiceHoverLinked
+                                  ? invoicePalette.activeChipClass
+                                  : "text-content-neutral-500 border-transparent hover:border-line-neutral-200 hover:bg-surface-neutral-100"
+                              }`}
+                            >
+                              #{resolvedInvoiceCode}
+                            </button>
+                          )}
                         </div>
                         <div className="text-xs text-content-neutral-400 truncate">
                           {task.clientName
@@ -1202,6 +1702,18 @@ export default function TasksView({
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {isUnbilledDone && (
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              onClick={(e) => handleBillSingleTask(task, e)}
+                              className="text-xs text-accent hover:bg-accent/10 flex items-center gap-1 font-semibold"
+                              title="Bill Task — Create an invoice from this completed deliverable"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                              <span>Bill Task</span>
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="small"
@@ -1234,6 +1746,20 @@ export default function TasksView({
                               {task.isOutsourced ? "Outsourced" : "Outsource"}
                             </span>
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            disabled={!isElectron || isLoading || saving}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleDeleteTask(task.id);
+                            }}
+                            title={`Delete task "${task.title}"`}
+                            aria-label={`Delete task ${task.title}`}
+                            className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
+                          >
+                            <i className="fa-solid fa-trash" aria-hidden="true" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -1252,13 +1778,21 @@ export default function TasksView({
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-accent" />
-              <h2 className="text-xl font-newspaper font-semibold text-content-neutral-900 dark:text-content-neutral-100">
-                Calendar &amp; Schedule
-              </h2>
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-accent-soft/60 dark:bg-accent-soft/20 text-accent border border-accent/30 flex items-center justify-center shrink-0 shadow-2xs">
+                <Calendar className="w-4 h-4 text-accent" />
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-newspaper font-semibold text-content-neutral-900 dark:text-content-neutral-100">
+                  Calendar &amp; Schedule
+                </h2>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-accent/10 text-accent border border-accent/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  Live Sync
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-content-neutral-500 mt-1">
+            <p className="text-xs text-content-neutral-500 dark:text-content-neutral-400 mt-1 pl-10.5">
               Deliverable deadlines, client milestones, and scheduled work events linked with your tasks.
             </p>
           </div>
@@ -1303,25 +1837,80 @@ export default function TasksView({
             if (ok) showToast(`Rescheduled task to ${newDate}`);
             return ok;
           }}
+          onUpdateTask={async (taskId, patch) => {
+            return saveTask(taskId, patch);
+          }}
+          onDeleteTask={async (taskId) => {
+            await handleDeleteTask(taskId);
+          }}
+          onDeleteEvent={async (eventId) => {
+            try {
+              await deleteEvent(eventId);
+              showToast("Calendar event removed");
+            } catch (err) {
+              showToast(
+                err instanceof Error ? err.message : "Could not delete event."
+              );
+            }
+          }}
+          onQuickCreateTask={async (input) => {
+            const assignee = {
+              name: leadFreelancerName,
+              avatarLetter: (leadFreelancerName[0] || "L").toUpperCase(),
+              bgColor: "bg-surface-purple-100",
+              textColor: "text-content-purple-700",
+            };
+            const taskId = crypto.randomUUID();
+            saveTaskTimeSlot(taskId, {
+              startTime: input.startTime || null,
+              endTime: input.endTime || null,
+            });
+            await workflow.tasks.create({
+              id: taskId,
+              title: input.title,
+              description:
+                input.description || "Scheduled from Calendar & Local Schedule.",
+              status: input.status || "todo",
+              priority: input.priority,
+              category: input.category,
+              assignee,
+              dueDate: input.dueDate,
+              clientId: null,
+              currency: settings?.defaultCurrency || activeCurrency || "LKR",
+              subtasks: [],
+            });
+            setTimeSlotVersion((v) => v + 1);
+            showToast(
+              `Added task "${input.title}" for ${input.dueDate}${input.startTime ? ` at ${input.startTime}` : ""}`
+            );
+          }}
+          onQuickCreateEvent={async (input) => {
+            await createEvent(input);
+            showToast(`Scheduled event "${input.title}" for ${input.startDate}`);
+          }}
+          onNotify={(msg) => showToast(msg)}
         />
       </section>
 
-      {/* CREATE NEW TASK MODAL */}
+      {/* UNIFIED CREATE NEW TASK OR EVENT MODAL */}
       <MotionPresence>
         {isAddModalOpen && (
           <Dialog onClose={() => closeAddTaskModal()} width={700}>
             <div className="app-dialog-header">
               <div>
                 <h2 className="text-xl font-newspaper font-semibold text-content-neutral-900">
-                  Create New Deliverable
+                  {newRecordType === "task"
+                    ? "Create New Deliverable"
+                    : "Schedule Calendar Event"}
                 </h2>
                 <p className="text-xs text-content-neutral-500 mt-0.5">
-                  Add a task to the board with team assignments and optional
-                  subcontractor outsourcing.
+                  {newRecordType === "task"
+                    ? "Add a task with scheduled date, time, and optional subcontractor outsourcing."
+                    : "Schedule a local calendar event with date, start/end time, and client link."}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {hasTaskDraft && (
+                {hasTaskDraft && newRecordType === "task" && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -1338,10 +1927,43 @@ export default function TasksView({
             </div>
             <form onSubmit={handleCreateTask} className="app-dialog-form">
               <div className="app-dialog-body">
-                {/* Task Title */}
+                {/* Record Type Selector (Select Task or Event inside the creation modal) */}
                 <div>
                   <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                    Task Title{" "}
+                    Select Type (Task or Event)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5 p-1 rounded-xl bg-surface-neutral-100 border border-line-neutral-200/80">
+                    <button
+                      type="button"
+                      onClick={() => setNewRecordType("task")}
+                      className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        newRecordType === "task"
+                          ? "bg-accent text-white shadow-xs"
+                          : "text-content-neutral-700 hover:text-content-neutral-900"
+                      }`}
+                    >
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      <span>Task Deliverable</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewRecordType("event")}
+                      className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        newRecordType === "event"
+                          ? "bg-accent text-white shadow-xs"
+                          : "text-content-neutral-700 hover:text-content-neutral-900"
+                      }`}
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Calendar Event</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                    {newRecordType === "task" ? "Task Title" : "Event Title"}{" "}
                     <span className="text-content-rose-500 font-bold">*</span>
                   </label>
                   <input
@@ -1349,7 +1971,11 @@ export default function TasksView({
                     required
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="e.g. Production Database Migration"
+                    placeholder={
+                      newRecordType === "task"
+                        ? "e.g. Production Database Migration"
+                        : "e.g. Client Sprint Review & AI Architecture Demo"
+                    }
                     className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
                   />
                 </div>
@@ -1368,161 +1994,289 @@ export default function TasksView({
                   />
                 </div>
 
-                {/* Status & Priority Row */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Initial Column / Status
+                {/* Date & Time Row (Available for BOTH Task and Event) */}
+                <div className="p-3.5 rounded-xl bg-surface-neutral-50/80 border border-line-neutral-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-content-neutral-700 uppercase tracking-wider">
+                      Scheduled Date &amp; Time
+                    </span>
+                    <label className="inline-flex items-center gap-2 text-xs font-medium text-content-neutral-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newIsAllDay}
+                        onChange={(e) => setNewIsAllDay(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-accent focus:ring-accent"
+                      />
+                      <span>All-day (no specific time)</span>
                     </label>
-                    <select
-                      value={newStatus}
-                      onChange={(e) =>
-                        setNewStatus(e.target.value as TaskStatus)
-                      }
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      <option value="todo">To Do</option>
-                      <option value="in-progress">In Progress</option>
-                      <option value="review">Under Review</option>
-                      <option value="done">Done</option>
-                    </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Priority
-                    </label>
-                    <select
-                      value={newPriority}
-                      onChange={(e) =>
-                        setNewPriority(e.target.value as TaskPriority)
-                      }
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Category & Client Row */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Category
-                    </label>
-                    <select
-                      value={newCategory}
-                      onChange={(e) =>
-                        setNewCategory(e.target.value as TaskCategory)
-                      }
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      <option value="Development">Development</option>
-                      <option value="Design">Design</option>
-                      <option value="Infrastructure">Infrastructure</option>
-                      <option value="Legal">Legal</option>
-                      <option value="Documentation">Documentation</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                      Client Association
-                    </label>
-                    <select
-                      value={newClientName}
-                      onChange={(e) => setNewClientName(e.target.value)}
-                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
-                    >
-                      <option value="">No client / Internal</option>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Due Date */}
-                <div>
-                  <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                    placeholder="e.g. Oct 12, 2026"
-                    className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
-                  />
-                </div>
-
-                {/* Subcontractor Outsourcing Section */}
-                <div className="pt-3 border-t border-line-neutral-100">
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newIsOutsourced}
-                      onChange={(e) => setNewIsOutsourced(e.target.checked)}
-                      className="w-4 h-4 rounded text-accent focus:ring-accent border-line-neutral-300"
-                    />
-                    <div className="flex items-center gap-1.5 text-sm font-semibold text-content-neutral-900">
-                      <GitFork className="w-3.5 h-3.5 text-accent" />
-                      <span>Outsource this task to an external vendor</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-content-neutral-600 mb-1">
+                        {newRecordType === "task" ? "Due Date" : "Event Date"}
+                      </label>
+                      <input
+                        type="date"
+                        value={newDueDate}
+                        onChange={(e) => setNewDueDate(e.target.value)}
+                        className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
+                      />
                     </div>
-                  </label>
 
-                  {newIsOutsourced && (
-                    <div className="motion-page mt-3.5 p-3.5 bg-surface-tinted rounded-xl border border-line-purple-200/60 grid grid-cols-2 gap-3.5">
+                    {!newIsAllDay && (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-content-neutral-600 mb-1">
+                            Start Time
+                          </label>
+                          <input
+                            type="time"
+                            aria-label="Start time"
+                            value={newStartTime}
+                            onChange={(e) => setNewStartTime(e.target.value)}
+                            className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-content-neutral-600 mb-1">
+                            End Time
+                          </label>
+                          <input
+                            type="time"
+                            aria-label="End time"
+                            value={newEndTime}
+                            onChange={(e) => setNewEndTime(e.target.value)}
+                            className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {newRecordType === "task" ? (
+                  <>
+                    {/* Status & Priority Row */}
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-content-neutral-700 mb-1">
-                          Subcontractor Vendor
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Initial Column / Status
                         </label>
                         <select
-                          value={newOutsourcedVendor}
+                          value={newStatus}
                           onChange={(e) =>
-                            setNewOutsourcedVendor(e.target.value)
+                            setNewStatus(e.target.value as TaskStatus)
                           }
-                          className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
                         >
-                          <option value="">Select a vendor</option>
-                          {vendors.map((vendor) => (
-                            <option key={vendor.id} value={vendor.name}>
-                              {vendor.name}
-                            </option>
-                          ))}
+                          <option value="todo">To Do</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="review">Under Review</option>
+                          <option value="done">Done</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-content-neutral-700 mb-1">
-                          Estimated Budget (
-                          {clients.find((client) => client.id === newClientName)
-                            ?.currency ||
-                            settings?.defaultCurrency ||
-                            activeCurrency ||
-                            "LKR"}
-                          )
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Priority
+                        </label>
+                        <select
+                          value={newPriority}
+                          onChange={(e) =>
+                            setNewPriority(e.target.value as TaskPriority)
+                          }
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                          <option value="urgent">Urgent</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Category & Client Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Category
+                        </label>
+                        <select
+                          value={newCategory}
+                          onChange={(e) =>
+                            setNewCategory(e.target.value as TaskCategory)
+                          }
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="Development">Development</option>
+                          <option value="Design">Design</option>
+                          <option value="Infrastructure">Infrastructure</option>
+                          <option value="Legal">Legal</option>
+                          <option value="Documentation">Documentation</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Client Association
+                        </label>
+                        <select
+                          value={newClientName}
+                          onChange={(e) => setNewClientName(e.target.value)}
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="">No client / Internal</option>
+                          {clients.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {client.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Subcontractor Outsourcing Section */}
+                    <div className="pt-3 border-t border-line-neutral-100">
+                      <label className="flex items-center gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newIsOutsourced}
+                          onChange={(e) => setNewIsOutsourced(e.target.checked)}
+                          className="w-4 h-4 rounded text-accent focus:ring-accent border-line-neutral-300"
+                        />
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-content-neutral-900">
+                          <GitFork className="w-3.5 h-3.5 text-accent" />
+                          <span>Outsource this task to an external vendor</span>
+                        </div>
+                      </label>
+
+                      {newIsOutsourced && (
+                        <div className="motion-page mt-3.5 p-3.5 bg-surface-tinted rounded-xl border border-line-purple-200/60 grid grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="block text-xs font-medium text-content-neutral-700 mb-1">
+                              Subcontractor Vendor
+                            </label>
+                            <select
+                              value={newOutsourcedVendor}
+                              onChange={(e) =>
+                                setNewOutsourcedVendor(e.target.value)
+                              }
+                              className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
+                            >
+                              <option value="">Select a vendor</option>
+                              {vendors.map((vendor) => (
+                                <option key={vendor.id} value={vendor.name}>
+                                  {vendor.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-content-neutral-700 mb-1">
+                              Estimated Budget (
+                              {clients.find((client) => client.id === newClientName)
+                                ?.currency ||
+                                settings?.defaultCurrency ||
+                                activeCurrency ||
+                                "LKR"}
+                              )
+                            </label>
+                            <input
+                              type="number"
+                              value={newOutsourceBudget}
+                              onChange={(e) =>
+                                setNewOutsourceBudget(e.target.value)
+                              }
+                              placeholder="0"
+                              className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* Event-specific fields inside the Unified Creation Modal */
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Event Type
+                        </label>
+                        <select
+                          value={newEventCategory}
+                          onChange={(e) =>
+                            setNewEventCategory(e.target.value as EventCategory)
+                          }
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="meeting">👥 Client Meeting</option>
+                          <option value="milestone">🚩 Project Milestone</option>
+                          <option value="review">🔍 Deliverable Review</option>
+                          <option value="deadline">⏰ Hard Deadline</option>
+                          <option value="reminder">🔔 Follow-up Reminder</option>
+                          <option value="general">📅 General Schedule</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Client Association
+                        </label>
+                        <select
+                          value={newClientName}
+                          onChange={(e) => setNewClientName(e.target.value)}
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="">No client / Internal</option>
+                          {clients.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {client.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Badge Color
+                        </label>
+                        <select
+                          value={newEventColor}
+                          onChange={(e) =>
+                            setNewEventColor(e.target.value as EventColor)
+                          }
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
+                        >
+                          <option value="blue">Ocean Blue</option>
+                          <option value="emerald">Emerald</option>
+                          <option value="amber">Amber Gold</option>
+                          <option value="purple">Royal Purple</option>
+                          <option value="rose">Crimson Rose</option>
+                          <option value="cyan">Sky Cyan</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-content-neutral-700 uppercase tracking-wider mb-1.5">
+                          Location / Meeting Link
                         </label>
                         <input
-                          type="number"
-                          value={newOutsourceBudget}
-                          onChange={(e) =>
-                            setNewOutsourceBudget(e.target.value)
-                          }
-                          placeholder="0"
-                          className="ui-field w-full px-3 border border-line-neutral-200 font-medium focus:outline-none focus:border-accent"
+                          type="text"
+                          value={newEventLocation}
+                          onChange={(e) => setNewEventLocation(e.target.value)}
+                          placeholder="e.g. Google Meet, Zoom, or Office"
+                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent"
                         />
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* Action Buttons */}
+                  </>
+                )}
               </div>
               <div className="app-dialog-footer">
                 <Button
@@ -1532,8 +2286,13 @@ export default function TasksView({
                 >
                   Cancel
                 </Button>
-                <Button variant="primary" type="submit" disabled={saving}>
-                  Create Deliverable
+                <Button variant="primary" type="submit" disabled={saving} className="flex items-center gap-1.5">
+                  <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                  <span>
+                    {newRecordType === "task"
+                      ? "Create Deliverable"
+                      : "Schedule Event"}
+                  </span>
                 </Button>
               </div>
             </form>
@@ -1716,6 +2475,7 @@ export default function TasksView({
                         <Button
                           size="icon"
                           disabled={saving}
+                          data-trash-popup="Delete Subtask"
                           aria-label={`Delete subtask ${st.title}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1726,7 +2486,7 @@ export default function TasksView({
                             });
                           }}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <i className="fa-solid fa-trash" aria-hidden="true" />
                         </Button>
                       </div>
                     ))}
@@ -1800,13 +2560,14 @@ export default function TasksView({
                   </Button>
                 </div>
 
-                {/* Status and Details Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-line-neutral-100 text-xs">
+                {/* Status, Priority, Category, Due Date & Time Editable Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-line-neutral-100 text-xs">
                   <div>
                     <span className="text-content-neutral-400 block mb-1">
                       Status
                     </span>
                     <select
+                      aria-label="Task status"
                       value={selectedTaskForDetail.status}
                       disabled={saving}
                       onChange={(e) => {
@@ -1820,6 +2581,7 @@ export default function TasksView({
                           void saveTask(selectedTaskForDetail.id, {
                             status: newStatus,
                           });
+                          showToast(`Updated task status to ${newStatus.replace("-", " ")}`);
                         }
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
@@ -1833,20 +2595,128 @@ export default function TasksView({
 
                   <div>
                     <span className="text-content-neutral-400 block mb-1">
-                      Due Date
+                      Priority
                     </span>
-                    <span className="font-semibold text-content-neutral-800">
-                      {selectedTaskForDetail.dueDate || "No due date"}
-                    </span>
+                    <select
+                      aria-label="Task priority"
+                      value={selectedTaskForDetail.priority}
+                      disabled={saving}
+                      onChange={(e) => {
+                        void saveTask(selectedTaskForDetail.id, {
+                          priority: e.target.value as TaskPriority,
+                        });
+                        showToast(`Updated priority to ${e.target.value}`);
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
                   </div>
 
                   <div>
                     <span className="text-content-neutral-400 block mb-1">
-                      Created
+                      Category
                     </span>
-                    <span className="font-semibold text-content-neutral-800">
-                      {selectedTaskForDetail.createdAt}
+                    <select
+                      aria-label="Task category"
+                      value={selectedTaskForDetail.category}
+                      disabled={saving}
+                      onChange={(e) => {
+                        void saveTask(selectedTaskForDetail.id, {
+                          category: e.target.value as TaskCategory,
+                        });
+                        showToast(`Updated category to ${e.target.value}`);
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    >
+                      <option value="Development">Development</option>
+                      <option value="Design">Design</option>
+                      <option value="Infrastructure">Infrastructure</option>
+                      <option value="Legal">Legal</option>
+                      <option value="Documentation">Documentation</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="text-content-neutral-400 block mb-1">
+                      Due Date
                     </span>
+                    <input
+                      type="date"
+                      aria-label="Task due date"
+                      value={
+                        selectedTaskForDetail.dueDate
+                          ? selectedTaskForDetail.dueDate.split("T")[0]
+                          : ""
+                      }
+                      disabled={saving}
+                      onChange={(e) => {
+                        void saveTask(selectedTaskForDetail.id, {
+                          dueDate: e.target.value,
+                        });
+                        showToast(`Updated due date to ${e.target.value}`);
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    />
+                  </div>
+
+                  <div>
+                    <span className="text-content-neutral-400 block mb-1">
+                      Start Time
+                    </span>
+                    <input
+                      type="time"
+                      aria-label="Task start time"
+                      value={
+                        selectedTaskForDetail.startTime ??
+                        getTaskTimeSlot(selectedTaskForDetail.id)?.startTime ??
+                        ""
+                      }
+                      disabled={saving}
+                      onChange={(e) => {
+                        const currentSlot = getTaskTimeSlot(selectedTaskForDetail.id);
+                        saveTaskTimeSlot(selectedTaskForDetail.id, {
+                          startTime: e.target.value || null,
+                          endTime:
+                            selectedTaskForDetail.endTime ??
+                            currentSlot?.endTime ??
+                            null,
+                        });
+                        setTimeSlotVersion((v) => v + 1);
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    />
+                  </div>
+
+                  <div>
+                    <span className="text-content-neutral-400 block mb-1">
+                      End Time
+                    </span>
+                    <input
+                      type="time"
+                      aria-label="Task end time"
+                      value={
+                        selectedTaskForDetail.endTime ??
+                        getTaskTimeSlot(selectedTaskForDetail.id)?.endTime ??
+                        ""
+                      }
+                      disabled={saving}
+                      onChange={(e) => {
+                        const currentSlot = getTaskTimeSlot(selectedTaskForDetail.id);
+                        saveTaskTimeSlot(selectedTaskForDetail.id, {
+                          startTime:
+                            selectedTaskForDetail.startTime ??
+                            currentSlot?.startTime ??
+                            "09:00",
+                          endTime: e.target.value || null,
+                        });
+                        setTimeSlotVersion((v) => v + 1);
+                      }}
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                    />
                   </div>
                 </div>
               </div>
@@ -1859,7 +2729,7 @@ export default function TasksView({
                 disabled={saving}
                 onClick={() => handleDeleteTask(selectedTaskForDetail.id)}
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <i className="fa-solid fa-trash" aria-hidden="true" />
                 <span>Delete Task</span>
               </Button>
 
@@ -1911,6 +2781,29 @@ export default function TasksView({
             onClose={handleCloseSubmitWork}
             onSubmit={handleSubmitWork}
             saving={saving}
+          />
+        )}
+      </MotionPresence>
+
+      {/* LINKED INVOICE PREVIEW SHEET */}
+      <MotionPresence>
+        {previewInvoice && (
+          <InvoiceDocumentSheet
+            invoice={previewInvoice}
+            onClose={() => setPreviewInvoice(null)}
+            onOpenPdf={() => {
+              const inv = previewInvoice;
+              if (workflow?.files?.openInvoicePdf) {
+                void workflow.files.openInvoicePdf(inv.id);
+              } else {
+                window.print();
+              }
+            }}
+            onRecordPayment={() => {
+              const inv = previewInvoice;
+              setPreviewInvoice(null);
+              router.push(`/invoices?invoice=${encodeURIComponent(inv.id)}`);
+            }}
           />
         )}
       </MotionPresence>

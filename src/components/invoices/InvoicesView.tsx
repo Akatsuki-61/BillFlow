@@ -3,7 +3,7 @@
 import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
-import { recentMonths, isPastDue } from "@/lib/visual-metrics";
+import { recentMonths, isPastDue, localDateKey } from "@/lib/visual-metrics";
 
 import {
   Button,
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { AnimatePresence, motion } from "motion/react";
+import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -35,7 +37,22 @@ import {
   RotateCcw,
   Upload,
   Eye,
+  AlertTriangle,
+  Download,
+  FileSpreadsheet,
+  CheckSquare,
+  ListChecks,
 } from "lucide-react";
+import { OverdueSummaryDialog } from "./OverdueSummaryDialog";
+import {
+  generateInvoicesCsv,
+  generateInvoicesExcelWorkbook,
+  generateOverdueSummaryCsv,
+  generateOverdueExcelWorkbook,
+  downloadCsvFile,
+  downloadExcelFile,
+  type ExportFileFormat,
+} from "@/lib/csv-export";
 import {
   useInvoices,
   useClients,
@@ -55,6 +72,7 @@ import type {
   Currency,
 } from "@/types/billing";
 import type { AttachmentItem } from "@/types/workflow";
+import type { TaskItem } from "@/types/tasks";
 
 import "./invoices.css";
 import InvoiceDocumentSheet from "./InvoiceDocumentSheet";
@@ -69,6 +87,7 @@ type FilterTab =
 interface LineItemDraft {
   id: string;
   catalogId?: string;
+  sourceTaskId?: string;
   description: string;
   quantity: number;
   unitPrice: string;
@@ -107,7 +126,13 @@ export default function InvoicesView() {
   const { clients } = useClients();
   const { catalogItems } = useCatalog();
   const { settings } = useSettings();
-  const { workflow, activeCurrency } = useData();
+  const {
+    tasks,
+    workflow,
+    activeCurrency,
+    getUnbilledCompletedTasks,
+    linkTasksToInvoice,
+  } = useData();
 
   const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
   const [clientName, setClientName] = useState("");
@@ -204,6 +229,21 @@ export default function InvoicesView() {
   const [newNotes, setNewNotes] = useState("");
   const [isSubmittingNew, setIsSubmittingNew] = useState(false);
   const [hasInvoiceDraft, setHasInvoiceDraft] = useState(false);
+  const [linkedTaskIds, setLinkedTaskIds] = useState<string[]>([]);
+
+  // Import Completed Tasks Dialog state
+  const [showImportTasksModal, setShowImportTasksModal] = useState(false);
+  const [importTasksShowAllClients, setImportTasksShowAllClients] =
+    useState(false);
+  const [selectedImportTaskIds, setSelectedImportTaskIds] = useState<string[]>(
+    [],
+  );
+  const [importTaskFees, setImportTaskFees] = useState<Record<string, string>>(
+    {},
+  );
+  const [importTaskQuantities, setImportTaskQuantities] = useState<
+    Record<string, number>
+  >({});
 
   // Edit Invoice Modal state
   const [editingInvoice, setEditingInvoice] =
@@ -267,6 +307,9 @@ export default function InvoicesView() {
   // URL search parameters
   const clientFilterParam = searchParams.get("client");
   const isNewParam = searchParams.get("new");
+  const actionParam = searchParams.get("action");
+  const importTaskIdsParam = searchParams.get("importTaskIds");
+  const previewParam = searchParams.get("preview");
   const invoiceHighlightParam = searchParams.get("invoice");
 
   const [previousHighlightParam, setPreviousHighlightParam] = useState(
@@ -289,15 +332,127 @@ export default function InvoicesView() {
     return () => clearTimeout(timer);
   }, [invoiceHighlightParam]);
 
+  // Overdue Summary Modal state & Export Format preference
+  const [showOverdueSummary, setShowOverdueSummary] = useState(false);
+  const [exportFormat, setExportFormat] = useState<ExportFileFormat>("csv");
+
+  // Check URL search parameters for overdue summary view
+  const viewParam = searchParams.get("view");
+  const summaryParam = searchParams.get("summary");
+  useEffect(() => {
+    if (viewParam === "overdue-summary" || summaryParam === "overdue") {
+      setShowOverdueSummary(true);
+    }
+  }, [viewParam, summaryParam]);
+
+  // Export Invoices CSV / Excel handler using Convert Engine
+  const handleExportInvoicesCsv = (
+    type: "current" | "selected" | "overdue" | "all",
+    formatOverride?: ExportFileFormat,
+  ) => {
+    const activeFmt = formatOverride ?? exportFormat;
+    const isExcel = activeFmt === "excel";
+    try {
+      const todayStr = localDateKey();
+      if (type === "selected") {
+        const selected = allInvoices.filter((inv) =>
+          selectedIds.includes(inv.id),
+        );
+        if (selected.length === 0) {
+          showToast("No invoices selected for export", "error");
+          return;
+        }
+        if (isExcel) {
+          const xls = generateInvoicesExcelWorkbook(selected, {
+            includeSummaryRow: true,
+            sheetName: "Selected Invoices",
+          });
+          downloadExcelFile(`invoices-selected-${todayStr}.xls`, xls);
+          showToast(
+            `Converted & exported ${selected.length} selected invoices to Excel (.xls).`,
+          );
+        } else {
+          const csv = generateInvoicesCsv(selected, {
+            includeSummaryRow: true,
+          });
+          downloadCsvFile(`invoices-selected-${todayStr}.csv`, csv);
+          showToast(
+            `Exported ${selected.length} selected invoices to CSV (.csv).`,
+          );
+        }
+      } else if (type === "overdue") {
+        if (isExcel) {
+          const xls = generateOverdueExcelWorkbook(allInvoices, {
+            includeClientRollup: true,
+          });
+          downloadExcelFile(`overdue-invoices-summary-${todayStr}.xls`, xls);
+          showToast(
+            "Converted & exported Overdue Aging Workbook to Excel (.xls).",
+          );
+        } else {
+          const csv = generateOverdueSummaryCsv(allInvoices);
+          downloadCsvFile(`overdue-invoices-summary-${todayStr}.csv`, csv);
+          showToast("Exported overdue invoices summary to CSV (.csv).");
+        }
+      } else if (type === "all") {
+        if (isExcel) {
+          const xls = generateInvoicesExcelWorkbook(allInvoices, {
+            includeSummaryRow: true,
+            sheetName: "All Invoices",
+          });
+          downloadExcelFile(`invoices-all-${todayStr}.xls`, xls);
+          showToast(
+            `Converted & exported all ${allInvoices.length} invoices to Excel (.xls).`,
+          );
+        } else {
+          const csv = generateInvoicesCsv(allInvoices, {
+            includeSummaryRow: true,
+          });
+          downloadCsvFile(`invoices-all-${todayStr}.csv`, csv);
+          showToast(`Exported all ${allInvoices.length} invoices to CSV (.csv).`);
+        }
+      } else {
+        if (isExcel) {
+          const xls = generateInvoicesExcelWorkbook(filteredInvoices, {
+            includeSummaryRow: true,
+            sheetName: "Filtered Invoices",
+          });
+          downloadExcelFile(`invoices-filtered-${todayStr}.xls`, xls);
+          showToast(
+            `Converted & exported ${filteredInvoices.length} invoices to Excel (.xls).`,
+          );
+        } else {
+          const csv = generateInvoicesCsv(filteredInvoices, {
+            includeSummaryRow: true,
+          });
+          downloadCsvFile(`invoices-filtered-${todayStr}.csv`, csv);
+          showToast(
+            `Exported ${filteredInvoices.length} invoices to CSV (.csv).`,
+          );
+        }
+      }
+    } catch {
+      showToast(
+        `Failed to generate ${isExcel ? "Excel" : "CSV"} export file`,
+        "error",
+      );
+    }
+  };
+
   const linkedClient = clients.find(
     (client) => client.id === clientFilterParam,
   );
-  const isNewActive = isNewParam === "1" || isNewParam === "true";
+  const isNewActive =
+    isNewParam === "1" ||
+    isNewParam === "true" ||
+    actionParam === "new" ||
+    Boolean(importTaskIdsParam);
   const modalQueryKey = JSON.stringify([
     isNewActive,
     searchParams.get("t"),
     clientFilterParam,
     linkedClient?.currency,
+    importTaskIdsParam,
   ]);
   const [previousModalQueryKey, setPreviousModalQueryKey] = useState<
     string | null
@@ -313,6 +468,132 @@ export default function InvoicesView() {
       }
     }
   }
+
+  // Handle ?invoice=ID&preview=1 to automatically open the InvoiceDocumentSheet preview
+  useEffect(() => {
+    if (!invoiceHighlightParam || previewParam !== "1") return;
+    const targetInv = allInvoices.find((inv) => inv.id === invoiceHighlightParam);
+    if (targetInv) {
+      setPreviewInvoice(targetInv);
+    }
+  }, [invoiceHighlightParam, previewParam, allInvoices]);
+
+  // Helper to resolve default fee for an imported task
+  const getTaskDefaultFee = React.useCallback(
+    (task: TaskItem): string => {
+      if (task.outsourceBudget && task.outsourceBudget > 0) {
+        return String(task.outsourceBudget);
+      }
+      if (task.outsourceBudgetCents && task.outsourceBudgetCents > 0) {
+        return (task.outsourceBudgetCents / 100).toFixed(2);
+      }
+      const matchingCatalog = catalogItems.find(
+        (ci) =>
+          ci.title.toLowerCase() === task.title.toLowerCase() ||
+          ci.category?.toLowerCase() === task.category.toLowerCase(),
+      );
+      if (matchingCatalog && matchingCatalog.price) {
+        return String(matchingCatalog.price);
+      }
+      return "0.00";
+    },
+    [catalogItems],
+  );
+
+  // Auto-populate New Invoice modal when redirected with ?action=new&importTaskIds=id1,id2...
+  const importedFromQueryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!importTaskIdsParam || tasks.length === 0) return;
+    if (importedFromQueryRef.current === importTaskIdsParam) return;
+
+    const requestedIds = importTaskIdsParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (requestedIds.length === 0) return;
+
+    const matchedTasks = tasks.filter(
+      (t) =>
+        requestedIds.includes(t.id) &&
+        t.status === "done" &&
+        (!t.invoiceId || t.invoiceId.trim() === ""),
+    );
+    if (matchedTasks.length === 0) return;
+
+    importedFromQueryRef.current = importTaskIdsParam;
+
+    const due = new Date();
+    due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
+    setNewDueDate((prev) => prev || due.toISOString().slice(0, 10));
+
+    void getNextInvoiceCode()
+      .then((code) => setNewCode((prev) => prev || code))
+      .catch(() =>
+        setNewCode(
+          (prev) => prev || `INV-${new Date().getFullYear()}-001`,
+        ),
+      );
+
+    // Pre-populate client from first task with a clientId or clientName
+    const taskWithClient = matchedTasks.find(
+      (t) => t.clientId || t.clientName,
+    );
+    if (taskWithClient) {
+      const matchedClient = clients.find(
+        (c) =>
+          (taskWithClient.clientId && c.id === taskWithClient.clientId) ||
+          (taskWithClient.clientName &&
+            c.name.toLowerCase() === taskWithClient.clientName.toLowerCase()),
+      );
+      if (matchedClient) {
+        setClientMode("existing");
+        setNewClientId(matchedClient.id);
+        setNewCurrency(matchedClient.currency);
+        if (matchedClient.driveUrl) {
+          setNewDeliveryUrl(matchedClient.driveUrl);
+        }
+      } else if (taskWithClient.clientName) {
+        setClientMode("new");
+        setClientName(taskWithClient.clientName);
+      }
+    }
+
+    // Pre-populate delivery URL from task if available
+    const taskWithDelivery = matchedTasks.find((t) => t.deliveryUrl);
+    if (taskWithDelivery?.deliveryUrl) {
+      setNewDeliveryUrl((prev) => prev || taskWithDelivery.deliveryUrl || "");
+    }
+
+    // Build line items from matched tasks
+    const generatedItems: LineItemDraft[] = matchedTasks.map((t) => {
+      const completedSubtaskTitles = t.subtasks
+        .filter((st) => st.completed)
+        .map((st) => st.title.trim())
+        .filter(Boolean);
+      const detailsSuffix =
+        completedSubtaskTitles.length > 0
+          ? ` (${completedSubtaskTitles.join(", ")})`
+          : "";
+      return {
+        id: `task-item-${t.id}`,
+        sourceTaskId: t.id,
+        description: `${t.title}${detailsSuffix}`.slice(0, 300),
+        quantity: 1,
+        unitPrice: getTaskDefaultFee(t),
+      };
+    });
+
+    setNewLineItems(generatedItems);
+    setLinkedTaskIds(matchedTasks.map((t) => t.id));
+    setShowAddInvoiceModal(true);
+  }, [
+    importTaskIdsParam,
+    tasks,
+    clients,
+    settings?.defaultDueDays,
+    getNextInvoiceCode,
+    getTaskDefaultFee,
+  ]);
 
   const isInvoiceFormDirty = () => {
     const hasItems = newLineItems.some(
@@ -399,12 +680,17 @@ export default function InvoicesView() {
       saveInvoiceDraft();
     }
     setShowAddInvoiceModal(false);
+    setShowImportTasksModal(false);
     if (
       typeof window !== "undefined" &&
-      window.location.search.includes("new=")
+      (window.location.search.includes("new=") ||
+        window.location.search.includes("action=new") ||
+        window.location.search.includes("importTaskIds="))
     ) {
       const url = new URL(window.location.href);
       url.searchParams.delete("new");
+      url.searchParams.delete("action");
+      url.searchParams.delete("importTaskIds");
       url.searchParams.delete("t");
       window.history.replaceState(
         null,
@@ -453,6 +739,7 @@ export default function InvoicesView() {
     due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
     setNewDueDate(due.toISOString().slice(0, 10));
     setNewLineItems([{ id: "1", description: "", quantity: 1, unitPrice: "" }]);
+    setLinkedTaskIds([]);
     setNewDiscount("");
     setNewTaxRate("");
     setRequireAdvance(true);
@@ -910,6 +1197,12 @@ export default function InvoicesView() {
   };
 
   const handleRemoveLineItem = (id: string) => {
+    const target = newLineItems.find((it) => it.id === id);
+    if (target?.sourceTaskId) {
+      setLinkedTaskIds((prev) =>
+        prev.filter((taskId) => taskId !== target.sourceTaskId),
+      );
+    }
     setNewLineItems((prev) =>
       prev.length > 1 ? prev.filter((it) => it.id !== id) : prev,
     );
@@ -955,6 +1248,190 @@ export default function InvoicesView() {
     }
   };
 
+  // Unbilled completed tasks eligible for import (excluding any already added in the current draft)
+  const alreadyDraftedTaskIds = React.useMemo(() => {
+    const ids = new Set<string>(linkedTaskIds);
+    for (const item of newLineItems) {
+      if (item.sourceTaskId) ids.add(item.sourceTaskId);
+    }
+    return ids;
+  }, [linkedTaskIds, newLineItems]);
+
+  const activeDraftClientObj = React.useMemo(() => {
+    if (clientMode === "existing" && newClientId) {
+      return clients.find((c) => c.id === newClientId) || null;
+    }
+    return null;
+  }, [clientMode, newClientId, clients]);
+
+  const allUnbilledTasks = React.useMemo(() => {
+    return getUnbilledCompletedTasks({ includeAllClients: true }).filter(
+      (t) => !alreadyDraftedTaskIds.has(t.id),
+    );
+  }, [getUnbilledCompletedTasks, alreadyDraftedTaskIds]);
+
+  const clientFilteredUnbilledTasks = React.useMemo(() => {
+    const targetClientId =
+      clientMode === "existing" ? newClientId || null : null;
+    const targetClientName =
+      clientMode === "existing"
+        ? activeDraftClientObj?.name || null
+        : clientName.trim() || null;
+    return getUnbilledCompletedTasks({
+      clientId: targetClientId,
+      clientName: targetClientName,
+      includeAllClients: false,
+    }).filter((t) => !alreadyDraftedTaskIds.has(t.id));
+  }, [
+    getUnbilledCompletedTasks,
+    clientMode,
+    newClientId,
+    activeDraftClientObj,
+    clientName,
+    alreadyDraftedTaskIds,
+  ]);
+
+  const displayedImportTasks = importTasksShowAllClients
+    ? allUnbilledTasks
+    : clientFilteredUnbilledTasks;
+
+  const handleOpenImportTasksModal = () => {
+    // Initialize fee and quantity map for all eligible unbilled tasks
+    const nextFees: Record<string, string> = { ...importTaskFees };
+    const nextQtys: Record<string, number> = { ...importTaskQuantities };
+    for (const t of allUnbilledTasks) {
+      if (nextFees[t.id] === undefined) {
+        nextFees[t.id] = getTaskDefaultFee(t);
+      }
+      if (nextQtys[t.id] === undefined) {
+        nextQtys[t.id] = 1;
+      }
+    }
+    setImportTaskFees(nextFees);
+    setImportTaskQuantities(nextQtys);
+
+    // If the currently selected client has no tasks, default to showing all clients so the dialog isn't empty
+    const hasClientTasks = clientFilteredUnbilledTasks.length > 0;
+    setImportTasksShowAllClients(!hasClientTasks);
+    setSelectedImportTaskIds([]);
+    setShowImportTasksModal(true);
+  };
+
+  const handleToggleImportTask = (task: TaskItem) => {
+    setSelectedImportTaskIds((prev) => {
+      const isRemoving = prev.includes(task.id);
+      const next = isRemoving
+        ? prev.filter((id) => id !== task.id)
+        : [...prev, task.id];
+
+      // If no client is selected yet (or when selecting a task belonging to a client), pre-fill the client in the invoice form
+      if (!isRemoving && (task.clientId || task.clientName)) {
+        const matchedClient = clients.find(
+          (c) =>
+            (task.clientId && c.id === task.clientId) ||
+            (task.clientName &&
+              c.name.toLowerCase() === task.clientName.toLowerCase()),
+        );
+        if (matchedClient && (!newClientId || importTasksShowAllClients)) {
+          setClientMode("existing");
+          setNewClientId(matchedClient.id);
+          setNewCurrency(matchedClient.currency);
+          if (matchedClient.driveUrl && !newDeliveryUrl) {
+            setNewDeliveryUrl(matchedClient.driveUrl);
+          }
+        } else if (
+          !matchedClient &&
+          task.clientName &&
+          clientMode === "new" &&
+          !clientName.trim()
+        ) {
+          setClientName(task.clientName);
+        }
+      }
+
+      return next;
+    });
+  };
+
+  const handleSelectAllImportTasks = () => {
+    const ids = displayedImportTasks.map((t) => t.id);
+    setSelectedImportTaskIds(ids);
+    const firstWithClient = displayedImportTasks.find(
+      (t) => t.clientId || t.clientName,
+    );
+    if (firstWithClient) {
+      const matchedClient = clients.find(
+        (c) =>
+          (firstWithClient.clientId && c.id === firstWithClient.clientId) ||
+          (firstWithClient.clientName &&
+            c.name.toLowerCase() === firstWithClient.clientName.toLowerCase()),
+      );
+      if (matchedClient && !newClientId) {
+        setClientMode("existing");
+        setNewClientId(matchedClient.id);
+        setNewCurrency(matchedClient.currency);
+      }
+    }
+  };
+
+  const handleDeselectAllImportTasks = () => {
+    setSelectedImportTaskIds([]);
+  };
+
+  const handleImportSelectedTasks = () => {
+    const selectedTasks = allUnbilledTasks.filter((t) =>
+      selectedImportTaskIds.includes(t.id),
+    );
+    if (selectedTasks.length === 0) {
+      showToast("Select at least one completed task to import", "error");
+      return;
+    }
+
+    const importedLines: LineItemDraft[] = selectedTasks.map((t) => {
+      const completedSubtaskTitles = t.subtasks
+        .filter((st) => st.completed)
+        .map((st) => st.title.trim())
+        .filter(Boolean);
+      const noteSuffix =
+        completedSubtaskTitles.length > 0
+          ? ` (${completedSubtaskTitles.join(", ")})`
+          : "";
+      return {
+        id: `task-item-${t.id}`,
+        sourceTaskId: t.id,
+        description: `${t.title}${noteSuffix}`.slice(0, 300),
+        quantity: Math.max(1, importTaskQuantities[t.id] || 1),
+        unitPrice: importTaskFees[t.id] ?? getTaskDefaultFee(t),
+      };
+    });
+
+    setNewLineItems((prev) => {
+      if (
+        prev.length === 1 &&
+        !prev[0].description.trim() &&
+        !prev[0].unitPrice.trim()
+      ) {
+        return importedLines;
+      }
+      return [...prev, ...importedLines];
+    });
+
+    setLinkedTaskIds((prev) =>
+      Array.from(new Set([...prev, ...selectedTasks.map((t) => t.id)])),
+    );
+
+    const taskWithDelivery = selectedTasks.find((t) => t.deliveryUrl);
+    if (taskWithDelivery?.deliveryUrl && !newDeliveryUrl) {
+      setNewDeliveryUrl(taskWithDelivery.deliveryUrl);
+    }
+
+    setShowImportTasksModal(false);
+    setSelectedImportTaskIds([]);
+    showToast(
+      `Imported ${selectedTasks.length} completed ${selectedTasks.length === 1 ? "task" : "tasks"} into invoice draft.`,
+    );
+  };
+
   // Math for Add Invoice Modal
   const itemsSubtotal = newLineItems.reduce((sum, it) => {
     const q = it.quantity > 0 ? it.quantity : 1;
@@ -989,10 +1466,19 @@ export default function InvoicesView() {
       const today = new Date().toISOString().split("T")[0];
       const itemsPayload = validItems.map((it) => ({
         catalogId: it.catalogId || undefined,
+        sourceTaskId: it.sourceTaskId || undefined,
         description: it.description.trim(),
         quantity: it.quantity > 0 ? it.quantity : 1,
         unitPriceCents: parseAmountToCents(it.unitPrice || "0"),
       }));
+      const allLinkedTaskIds = Array.from(
+        new Set([
+          ...linkedTaskIds,
+          ...(validItems
+            .map((it) => it.sourceTaskId)
+            .filter(Boolean) as string[]),
+        ]),
+      );
 
       const finalAmountCents = parseAmountToCents(calculatedTotal.toFixed(2));
       const discountCents = parseAmountToCents(discountVal.toFixed(2));
@@ -1020,6 +1506,8 @@ export default function InvoicesView() {
         code: newCode.trim() || undefined,
         title: validItems[0]?.description || undefined,
         items: itemsPayload,
+        linkedTaskIds:
+          allLinkedTaskIds.length > 0 ? allLinkedTaskIds : undefined,
         amountCents: finalAmountCents,
         discountCents,
         taxCents,
@@ -1032,12 +1520,17 @@ export default function InvoicesView() {
         status: newStatus,
       });
 
+      if (allLinkedTaskIds.length > 0) {
+        await linkTasksToInvoice(created.id, created.code, allLinkedTaskIds);
+      }
+
       clearInvoiceDraft();
       closeAddInvoiceModal(false);
       requestId.current = null;
       setNewLineItems([
         { id: "1", description: "", quantity: 1, unitPrice: "" },
       ]);
+      setLinkedTaskIds([]);
       setNewDiscount("");
       setNewTaxRate("");
       setNewDeliveryUrl("");
@@ -1282,7 +1775,16 @@ export default function InvoicesView() {
         title="Invoices"
         description="Create invoices, record deposits and keep every payment in view."
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowOverdueSummary(true)}
+            className="zentra-control-pill"
+            title="Open Overdue Invoices Summary & Professional CSV Template Table"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Overdue Summary & CSV Template</span>
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -1410,24 +1912,50 @@ export default function InvoicesView() {
             <section className="lg:col-span-3 ui-card p-6 space-y-5">
               <div className="flex items-center justify-between gap-3">
                 <h2>Overdue</h2>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setActiveTab(
-                      activeTab === "Overdue" ? "All Invoices" : "Overdue",
-                    )
-                  }
-                  className="zentra-circle-btn zentra-circle-btn--sm"
-                  aria-label="Filter overdue invoices"
-                >
-                  <AlertCircle className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleExportInvoicesCsv("overdue", "csv")}
+                    className="zentra-circle-btn zentra-circle-btn--sm text-content-neutral-600 hover:text-content-neutral-900"
+                    aria-label="Export overdue invoices to CSV"
+                    title="Export Overdue Invoices to CSV (.csv)"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportInvoicesCsv("overdue", "excel")}
+                    className="zentra-circle-btn zentra-circle-btn--sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                    aria-label="Export overdue invoices to Excel"
+                    title="Convert & Export Overdue Invoices to Excel (.xls)"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowOverdueSummary(true)}
+                    className="zentra-circle-btn zentra-circle-btn--sm text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                    aria-label="View Overdue Summary and Aging"
+                    title="View Overdue Summary and Aging Breakdown"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <div>
                 <div className="summary-value">{money(pastDue)}</div>
-                <p className="summary-caption">
-                  {overdue.length} invoices with a past-due balance
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="summary-caption">
+                    {overdue.length} invoices with a past-due balance
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowOverdueSummary(true)}
+                    className="text-[11.5px] text-accent hover:underline font-medium cursor-pointer"
+                  >
+                    Breakdown →
+                  </button>
+                </div>
               </div>
               <MonthlyBars
                 label="Unpaid balance by due month"
@@ -1476,28 +2004,107 @@ export default function InvoicesView() {
               ] as FilterTab[]
             ).map((value) => ({ value, label: value }))}
           />
+
+          {activeTab === "Overdue" && (
+            <Button
+              variant="secondary"
+              size="small"
+              type="button"
+              onClick={() => setShowOverdueSummary(true)}
+              className="text-rose-700 bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900"
+              title="Open Overdue Summary & Aging Analysis"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Overdue Summary</span>
+            </Button>
+          )}
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search invoices, clients, deliverables..."
-            className="ui-field ui-search-input w-full pl-9 pr-8 text-xs !rounded-full"
-            style={{ paddingLeft: "38px" }}
-          />
-          {searchQuery && (
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search invoices, clients..."
+              className="ui-field ui-search-input w-full pl-9 pr-8 text-xs !rounded-full"
+              style={{ paddingLeft: "38px" }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="inline-flex items-center rounded-full border border-border-subtle bg-surface-neutral-100/80 dark:bg-surface-neutral-900 p-0.5 shrink-0">
             <button
               type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-content-neutral-400 hover:text-content-neutral-700 p-0.5"
-              aria-label="Clear search"
+              onClick={() => setExportFormat("csv")}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                exportFormat === "csv"
+                  ? "bg-surface-card text-content-neutral-950 shadow-xs"
+                  : "text-content-neutral-500 hover:text-content-neutral-800"
+              }`}
+              title="Set export format to RFC 4180 CSV (.csv)"
             >
-              <X className="w-3.5 h-3.5" />
+              CSV
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => setExportFormat("excel")}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                exportFormat === "excel"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-content-neutral-500 hover:text-content-neutral-800"
+              }`}
+              title="Set export format to Microsoft Excel Workbook (.xls) via Convert Engine"
+            >
+              Excel
+            </button>
+          </div>
+
+          <Button
+            variant="secondary"
+            size="small"
+            type="button"
+            onClick={() =>
+              handleExportInvoicesCsv(
+                activeTab === "Overdue" ? "overdue" : "current",
+              )
+            }
+            title={
+              activeTab === "Overdue"
+                ? `Export overdue summary report to ${exportFormat === "excel" ? "Excel (.xls)" : "CSV (.csv)"}`
+                : `Export currently filtered invoices to ${exportFormat === "excel" ? "Excel (.xls)" : "CSV (.csv)"}`
+            }
+            className={`shrink-0 ${
+              exportFormat === "excel"
+                ? "!border-emerald-300 dark:!border-emerald-800 !text-emerald-700 dark:!text-emerald-300"
+                : ""
+            }`}
+          >
+            {exportFormat === "excel" ? (
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            <span>
+              {activeTab === "Overdue"
+                ? exportFormat === "excel"
+                  ? "Export Overdue Excel"
+                  : "Export Overdue CSV"
+                : exportFormat === "excel"
+                  ? "Export Excel (.xls)"
+                  : "Export CSV (.csv)"}
+            </span>
+          </Button>
         </div>
       </div>
 
@@ -1514,9 +2121,33 @@ export default function InvoicesView() {
             </span>
           </div>
           {selectedIds.length > 0 && (
-            <span className="text-[12px] font-medium text-accent">
-              {selectedIds.length} selected
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-medium text-accent">
+                {selectedIds.length} selected
+              </span>
+              <Button
+                variant="secondary"
+                size="small"
+                type="button"
+                onClick={() => handleExportInvoicesCsv("selected", "csv")}
+                className="!text-xs !py-1 text-accent"
+                title="Export selected invoices to CSV (.csv)"
+              >
+                <Download className="w-3 h-3" />
+                <span>Export CSV</span>
+              </Button>
+              <Button
+                variant="secondary"
+                size="small"
+                type="button"
+                onClick={() => handleExportInvoicesCsv("selected", "excel")}
+                className="!text-xs !py-1 text-emerald-700 dark:text-emerald-300 !border-emerald-300 dark:!border-emerald-800"
+                title="Convert & export selected invoices to Excel (.xls)"
+              >
+                <FileSpreadsheet className="w-3 h-3" />
+                <span>Export Excel</span>
+              </Button>
+            </div>
           )}
         </div>
 
@@ -2051,29 +2682,48 @@ export default function InvoicesView() {
                       </p>
                     </div>
 
-                    {catalogItems.length > 0 && (
-                      <div className="w-56">
-                        <select
-                          className="ui-field w-full px-3.5 text-xs"
-                          defaultValue=""
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleCatalogSelect(e.target.value);
-                              e.target.value = "";
-                            }
-                          }}
-                        >
-                          <option value="" disabled>
-                            + Add from Catalog...
-                          </option>
-                          {catalogItems.map((ci) => (
-                            <option key={ci.id} value={ci.id}>
-                              {ci.title} ({ci.currency} {ci.price})
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        type="button"
+                        onClick={handleOpenImportTasksModal}
+                        className="text-xs gap-1.5 border-accent/30 text-accent hover:bg-accent/10"
+                        title="Import completed unbilled tasks from your Kanban board"
+                      >
+                        <ListChecks className="w-3.5 h-3.5" />
+                        <span>Import Completed Tasks</span>
+                        {allUnbilledTasks.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold tabular-nums">
+                            {allUnbilledTasks.length}
+                          </span>
+                        )}
+                      </Button>
+
+                      {catalogItems.length > 0 && (
+                        <div className="w-52">
+                          <select
+                            className="ui-field w-full px-3.5 text-xs"
+                            defaultValue=""
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleCatalogSelect(e.target.value);
+                                e.target.value = "";
+                              }
+                            }}
+                          >
+                            <option value="" disabled>
+                              + Add from Catalog...
                             </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                            {catalogItems.map((ci) => (
+                              <option key={ci.id} value={ci.id}>
+                                {ci.title} ({ci.currency} {ci.price})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -2393,6 +3043,228 @@ export default function InvoicesView() {
                 </Button>
               </div>
             </form>
+          </Dialog>
+        )}
+      </MotionPresence>
+
+      {/* Import Completed Tasks Modal */}
+      <MotionPresence>
+        {showImportTasksModal && (
+          <Dialog
+            onClose={() => setShowImportTasksModal(false)}
+            width={680}
+          >
+            <div className="app-dialog-header">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
+                  <ListChecks className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-content-neutral-900">
+                    Import Completed Tasks
+                  </h3>
+                  <p className="text-xs text-content-neutral-400">
+                    Select unbilled completed deliverables to add as line items
+                    and link to this invoice.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="app-dialog-body">
+              <div className="app-dialog-section p-5 space-y-4">
+                {/* Filter & Bulk Selection Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line-neutral-100">
+                  <div className="flex items-center gap-2">
+                    {(activeDraftClientObj ||
+                      (clientMode === "new" && clientName.trim())) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setImportTasksShowAllClients((prev) => !prev)
+                        }
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
+                          !importTasksShowAllClients
+                            ? "bg-accent/10 border-accent/30 text-accent"
+                            : "bg-surface-neutral-100 border-line-neutral-200 text-content-neutral-600 hover:text-content-neutral-900"
+                        }`}
+                      >
+                        {importTasksShowAllClients
+                          ? `Showing all clients (${allUnbilledTasks.length}) · Filter by ${activeDraftClientObj?.name || clientName.trim()}`
+                          : `Filtered: ${activeDraftClientObj?.name || clientName.trim()} (${clientFilteredUnbilledTasks.length}) · Show all clients`}
+                      </button>
+                    )}
+                  </div>
+
+                  {displayedImportTasks.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="small"
+                        type="button"
+                        onClick={handleSelectAllImportTasks}
+                        className="text-xs h-7 px-2.5"
+                      >
+                        Select All ({displayedImportTasks.length})
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="small"
+                        type="button"
+                        onClick={handleDeselectAllImportTasks}
+                        disabled={selectedImportTaskIds.length === 0}
+                        className="text-xs h-7 px-2.5"
+                      >
+                        Deselect All
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Task Rows */}
+                {displayedImportTasks.length === 0 ? (
+                  <div className="py-10 text-center space-y-2">
+                    <CheckSquare className="w-8 h-8 text-content-neutral-300 mx-auto" />
+                    <p className="text-sm font-semibold text-content-neutral-700">
+                      No unbilled completed tasks found
+                    </p>
+                    <p className="text-xs text-content-neutral-400 max-w-md mx-auto">
+                      {!importTasksShowAllClients && allUnbilledTasks.length > 0
+                        ? `No completed unbilled tasks match "${activeDraftClientObj?.name || clientName.trim()}", but ${allUnbilledTasks.length} completed task(s) exist across other clients.`
+                        : "Move tasks to the Done column on the Kanban board to import them into an invoice."}
+                    </p>
+                    {!importTasksShowAllClients &&
+                      allUnbilledTasks.length > 0 && (
+                        <div className="pt-2">
+                          <Button
+                            variant="secondary"
+                            size="small"
+                            type="button"
+                            onClick={() => setImportTasksShowAllClients(true)}
+                          >
+                            Show All Clients ({allUnbilledTasks.length})
+                          </Button>
+                        </div>
+                      )}
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
+                    {displayedImportTasks.map((task) => {
+                      const isChecked = selectedImportTaskIds.includes(task.id);
+                      const feeVal =
+                        importTaskFees[task.id] ?? getTaskDefaultFee(task);
+                      const loggedHours =
+                        task.activeMilliseconds && task.activeMilliseconds > 0
+                          ? (task.activeMilliseconds / 3600000).toFixed(1)
+                          : null;
+
+                      return (
+                        <div
+                          key={task.id}
+                          onClick={() => handleToggleImportTask(task)}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isChecked
+                              ? "border-accent bg-accent/5 ring-1 ring-accent/25"
+                              : "border-line-neutral-200 bg-surface-neutral-50/60 hover:border-line-neutral-300"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}}
+                              className="mt-0.5 w-4 h-4 rounded text-accent focus:ring-accent cursor-pointer shrink-0"
+                              aria-label={`Select task ${task.title}`}
+                            />
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-content-neutral-900 truncate">
+                                  {task.title}
+                                </span>
+                                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface border border-line-neutral-200 text-content-neutral-600">
+                                  {task.category}
+                                </span>
+                                {task.clientName && (
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent">
+                                    {task.clientName}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-content-neutral-400">
+                                <span>
+                                  Completed:{" "}
+                                  {task.completedAt
+                                    ? formatDateDisplay(task.completedAt)
+                                    : task.dueDate || "Done"}
+                                </span>
+                                {loggedHours && (
+                                  <span>Logged: {loggedHours}h</span>
+                                )}
+                                {task.outsourceBudget ? (
+                                  <span>
+                                    Est. Budget:{" "}
+                                    {formatCents(
+                                      Math.round(task.outsourceBudget * 100),
+                                      task.currency || newCurrency,
+                                    )}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Editable Fee Input */}
+                          <div
+                            className="flex items-center gap-2 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <label className="text-[10px] uppercase font-bold text-content-neutral-400">
+                              Fee ({newCurrency})
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              aria-label={`Fee for ${task.title}`}
+                              value={feeVal}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setImportTaskFees((prev) => ({
+                                  ...prev,
+                                  [task.id]: val,
+                                }));
+                                if (!isChecked) {
+                                  handleToggleImportTask(task);
+                                }
+                              }}
+                              className="ui-field w-28 px-2.5 py-1 text-xs text-right font-mono"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setShowImportTasksModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                disabled={selectedImportTaskIds.length === 0}
+                onClick={handleImportSelectedTasks}
+              >
+                Import Selected Tasks ({selectedImportTaskIds.length})
+              </Button>
+            </div>
           </Dialog>
         )}
       </MotionPresence>
@@ -3301,6 +4173,19 @@ export default function InvoicesView() {
         )}
       </MotionPresence>
 
+      {/* Overdue Invoices Summary & Collections Modal */}
+      <OverdueSummaryDialog
+        isOpen={showOverdueSummary}
+        onClose={() => setShowOverdueSummary(false)}
+        invoices={allInvoices}
+        primaryCurrency={primaryCurrency}
+        freelancerName={settings?.businessName || "Chethaka"}
+        paymentInstructions={settings?.paymentDetails}
+        onFilterToOverdue={() => setActiveTab("Overdue")}
+        onInspectInvoice={(inv) => setInspectingInvoice(inv)}
+        showToast={showToast}
+      />
+
       {/* Floating Backdrop for outside clicks */}
       {(actionMenu || statusMenu) && (
         <div
@@ -3314,252 +4199,302 @@ export default function InvoicesView() {
       )}
 
       {/* Floating Status Menu */}
-      {statusMenu && (
-        <div
-          style={{
-            position: "fixed",
-            top:
-              statusMenu.top !== undefined ? `${statusMenu.top}px` : undefined,
-            bottom:
-              statusMenu.bottom !== undefined
-                ? `${statusMenu.bottom}px`
-                : undefined,
-            left: `${statusMenu.left}px`,
-          }}
-          className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-60 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)] animate-in fade-in-0 zoom-in-95 duration-100"
-          role="menu"
-        >
-          <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider border-b border-line-neutral-100 mb-1">
-            Change Status · {statusMenu.invoice.code}
-          </div>
-          {[
-            {
-              value: "UNPAID",
-              label: "Unpaid",
-              desc: "No payments recorded yet",
-              dot: "bg-accent-faint0",
-            },
-            {
-              value: "ADVANCE_PAID",
-              label: "Advance Paid",
-              desc: "Deposit received, ready to track",
-              dot: "bg-amber-500",
-            },
-            {
-              value: "PAID",
-              label: "Paid",
-              desc: "Fully settled invoice",
-              dot: "bg-emerald-500",
-            },
-            {
-              value: "OVERDUE",
-              label: "Overdue",
-              desc: "Past agreed payment date",
-              dot: "bg-rose-500",
-            },
-            {
-              value: "DRAFT",
-              label: "Draft",
-              desc: "Estimate or unfinalized invoice",
-              dot: "bg-neutral-400",
-            },
-          ].map((opt) => {
-            const isCurrent = statusMenu.invoice.status === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="menuitem"
-                onClick={() =>
-                  void handleChangeStatus(
-                    statusMenu.invoice.id,
-                    opt.value as InvoiceStatus,
-                  )
-                }
-                className={`w-full px-3 py-2 hover:bg-surface-neutral-50 flex items-center justify-between text-left cursor-pointer transition-colors ${
-                  isCurrent
-                    ? "bg-surface-neutral-50/80 font-semibold text-accent"
-                    : ""
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full shrink-0 ${opt.dot}`}
-                  />
-                  <div>
-                    <div className="text-xs leading-none">{opt.label}</div>
-                    <div className="text-[10px] text-content-neutral-400 mt-0.5 leading-tight">
-                      {opt.desc}
+      <AnimatePresence initial={false}>
+        {statusMenu && (
+          <motion.div
+            key={`status-menu-${statusMenu.invoice.id}`}
+            initial={{
+              opacity: 0,
+              scaleX: 0.95,
+              scaleY: 0.86,
+              y: statusMenu.bottom !== undefined ? 6 : -6,
+            }}
+            animate={{
+              opacity: 1,
+              scaleX: 1,
+              scaleY: 1,
+              y: 0,
+              transition: SPRING_MENU_POPOVER,
+            }}
+            exit={{
+              opacity: 0,
+              scaleX: 0.96,
+              scaleY: 0.9,
+              y: statusMenu.bottom !== undefined ? 4 : -4,
+              transition: EXIT_MENU_POPOVER,
+            }}
+            style={{
+              position: "fixed",
+              top:
+                statusMenu.top !== undefined ? `${statusMenu.top}px` : undefined,
+              bottom:
+                statusMenu.bottom !== undefined
+                  ? `${statusMenu.bottom}px`
+                  : undefined,
+              left: `${statusMenu.left}px`,
+              transformOrigin:
+                statusMenu.bottom !== undefined ? "bottom left" : "top left",
+            }}
+            className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-60 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)]"
+            role="menu"
+          >
+            <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider border-b border-line-neutral-100 mb-1">
+              Change Status · {statusMenu.invoice.code}
+            </div>
+            {[
+              {
+                value: "UNPAID",
+                label: "Unpaid",
+                desc: "No payments recorded yet",
+                dot: "bg-accent-faint0",
+              },
+              {
+                value: "ADVANCE_PAID",
+                label: "Advance Paid",
+                desc: "Deposit received, ready to track",
+                dot: "bg-amber-500",
+              },
+              {
+                value: "PAID",
+                label: "Paid",
+                desc: "Fully settled invoice",
+                dot: "bg-emerald-500",
+              },
+              {
+                value: "OVERDUE",
+                label: "Overdue",
+                desc: "Past agreed payment date",
+                dot: "bg-rose-500",
+              },
+              {
+                value: "DRAFT",
+                label: "Draft",
+                desc: "Estimate or unfinalized invoice",
+                dot: "bg-neutral-400",
+              },
+            ].map((opt) => {
+              const isCurrent = statusMenu.invoice.status === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="menuitem"
+                  onClick={() =>
+                    void handleChangeStatus(
+                      statusMenu.invoice.id,
+                      opt.value as InvoiceStatus,
+                    )
+                  }
+                  className={`w-full px-3 py-2 hover:bg-surface-neutral-50 flex items-center justify-between text-left cursor-pointer transition-colors ${
+                    isCurrent
+                      ? "bg-surface-neutral-50/80 font-semibold text-accent"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full shrink-0 ${opt.dot}`}
+                    />
+                    <div>
+                      <div className="text-xs leading-none">{opt.label}</div>
+                      <div className="text-[10px] text-content-neutral-400 mt-0.5 leading-tight">
+                        {opt.desc}
+                      </div>
                     </div>
                   </div>
-                </div>
-                {isCurrent && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 ml-2" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+                  {isCurrent && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 ml-2" />
+                  )}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating Actions Menu */}
-      {actionMenu && (
-        <div
-          style={{
-            position: "fixed",
-            top:
-              actionMenu.top !== undefined ? `${actionMenu.top}px` : undefined,
-            bottom:
-              actionMenu.bottom !== undefined
-                ? `${actionMenu.bottom}px`
-                : undefined,
-            right: `${actionMenu.right}px`,
-          }}
-          className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-52 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)] animate-in fade-in-0 zoom-in-95 duration-100 max-h-[85vh] overflow-y-auto"
-          role="menu"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              setPreviewInvoice(inv);
+      <AnimatePresence initial={false}>
+        {actionMenu && (
+          <motion.div
+            key={`action-menu-${actionMenu.invoice.id}`}
+            initial={{
+              opacity: 0,
+              scaleX: 0.95,
+              scaleY: 0.86,
+              y: actionMenu.bottom !== undefined ? 6 : -6,
             }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors text-content-neutral-900 font-semibold"
-          >
-            <Eye className="w-3.5 h-3.5 text-[#00A887]" />
-            <span>View Invoice Design</span>
-          </button>
-
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              void handleOpenPdf(inv);
+            animate={{
+              opacity: 1,
+              scaleX: 1,
+              scaleY: 1,
+              y: 0,
+              transition: SPRING_MENU_POPOVER,
             }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5 text-content-neutral-500" />
-            <span>Open PDF</span>
-          </button>
-
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              void handleRevealPdf(inv);
+            exit={{
+              opacity: 0,
+              scaleX: 0.96,
+              scaleY: 0.9,
+              y: actionMenu.bottom !== undefined ? 4 : -4,
+              transition: EXIT_MENU_POPOVER,
             }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            style={{
+              position: "fixed",
+              top:
+                actionMenu.top !== undefined ? `${actionMenu.top}px` : undefined,
+              bottom:
+                actionMenu.bottom !== undefined
+                  ? `${actionMenu.bottom}px`
+                  : undefined,
+              right: `${actionMenu.right}px`,
+              transformOrigin:
+                actionMenu.bottom !== undefined ? "bottom right" : "top right",
+            }}
+            className="z-50 bg-surface rounded-xl border border-line-neutral-200 py-1.5 w-52 text-xs font-medium text-content-neutral-700 text-left shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_1px_1px_-0.5px_rgba(0,0,0,0.06),0px_3px_3px_-1.5px_rgba(0,0,0,0.06),_0px_6px_6px_-3px_rgba(0,0,0,0.06),0px_12px_12px_-6px_rgba(0,0,0,0.06),0px_24px_24px_-12px_rgba(0,0,0,0.06)] max-h-[85vh] overflow-y-auto"
+            role="menu"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-content-neutral-500" />
-            <span>Reveal PDF in folder</span>
-          </button>
-
-          {actionMenu.invoice.payments &&
-            actionMenu.invoice.payments.length > 0 && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  const inv = actionMenu.invoice;
-                  setActionMenu(null);
-                  handleOpenInspector(inv);
-                }}
-                className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
-              >
-                <Paperclip className="w-3.5 h-3.5 text-content-neutral-500" />
-                <span>
-                  Payments & Receipts ({actionMenu.invoice.payments.length})
-                </span>
-              </button>
-            )}
-
-          <div className="my-1 border-t border-line-neutral-100" />
-
-          {!actionMenu.invoice.clientId && (
             <button
               type="button"
               role="menuitem"
               onClick={() => {
                 const inv = actionMenu.invoice;
                 setActionMenu(null);
-                void handlePromoteClient(inv);
+                setPreviewInvoice(inv);
               }}
-              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer text-accent font-semibold transition-colors"
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors text-content-neutral-900 font-semibold"
             >
-              <UserPlus className="w-3.5 h-3.5 text-accent" />
-              <span>Save as Permanent Client</span>
+              <Eye className="w-3.5 h-3.5 text-[#00A887]" />
+              <span>View Invoice Design</span>
             </button>
-          )}
 
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              handleOpenEdit(inv);
-            }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
-          >
-            <Pencil className="w-3.5 h-3.5 text-content-neutral-400" />
-            <span>Edit Details</span>
-          </button>
-
-          <div className="my-1 border-t border-line-neutral-100" />
-          <div className="px-3 py-1 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider">
-            Change Status
-          </div>
-          {(
-            [
-              { value: "UNPAID", label: "UNPAID" },
-              { value: "ADVANCE_PAID", label: "ADVANCE PAID" },
-              { value: "PAID", label: "PAID" },
-              { value: "OVERDUE", label: "OVERDUE" },
-              { value: "DRAFT", label: "DRAFT" },
-            ] as { value: InvoiceStatus; label: string }[]
-          ).map((s) => (
             <button
-              key={s.value}
               type="button"
               role="menuitem"
-              onClick={() =>
-                void handleChangeStatus(actionMenu.invoice.id, s.value)
-              }
-              className={`w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center justify-between cursor-pointer transition-colors ${
-                actionMenu.invoice.status === s.value
-                  ? "font-bold text-accent"
-                  : ""
-              }`}
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                void handleOpenPdf(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <span>{s.label}</span>
-              {actionMenu.invoice.status === s.value && (
-                <CheckCircle2 className="w-3 h-3 text-accent" />
-              )}
+              <FileText className="w-3.5 h-3.5 text-content-neutral-500" />
+              <span>Open PDF</span>
             </button>
-          ))}
 
-          <div className="my-1 border-t border-line-neutral-100" />
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              const inv = actionMenu.invoice;
-              setActionMenu(null);
-              setDeletingInvoice(inv);
-            }}
-            className="w-full px-3.5 py-1.5 hover:bg-surface-rose-50 text-content-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
-            <span>Delete Invoice</span>
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                void handleRevealPdf(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-content-neutral-500" />
+              <span>Reveal PDF in folder</span>
+            </button>
+
+            {actionMenu.invoice.payments &&
+              actionMenu.invoice.payments.length > 0 && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    const inv = actionMenu.invoice;
+                    setActionMenu(null);
+                    handleOpenInspector(inv);
+                  }}
+                  className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Paperclip className="w-3.5 h-3.5 text-content-neutral-500" />
+                  <span>
+                    Payments & Receipts ({actionMenu.invoice.payments.length})
+                  </span>
+                </button>
+              )}
+
+            <div className="my-1 border-t border-line-neutral-100" />
+
+            {!actionMenu.invoice.clientId && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const inv = actionMenu.invoice;
+                  setActionMenu(null);
+                  void handlePromoteClient(inv);
+                }}
+                className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer text-accent font-semibold transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-accent" />
+                <span>Save as Permanent Client</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                handleOpenEdit(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5 text-content-neutral-400" />
+              <span>Edit Details</span>
+            </button>
+
+            <div className="my-1 border-t border-line-neutral-100" />
+            <div className="px-3 py-1 text-[10px] uppercase font-bold text-content-neutral-400 tracking-wider">
+              Change Status
+            </div>
+            {(
+              [
+                { value: "UNPAID", label: "UNPAID" },
+                { value: "ADVANCE_PAID", label: "ADVANCE PAID" },
+                { value: "PAID", label: "PAID" },
+                { value: "OVERDUE", label: "OVERDUE" },
+                { value: "DRAFT", label: "DRAFT" },
+              ] as { value: InvoiceStatus; label: string }[]
+            ).map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                role="menuitem"
+                onClick={() =>
+                  void handleChangeStatus(actionMenu.invoice.id, s.value)
+                }
+                className={`w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center justify-between cursor-pointer transition-colors ${
+                  actionMenu.invoice.status === s.value
+                    ? "font-bold text-accent"
+                    : ""
+                }`}
+              >
+                <span>{s.label}</span>
+                {actionMenu.invoice.status === s.value && (
+                  <CheckCircle2 className="w-3 h-3 text-accent" />
+                )}
+              </button>
+            ))}
+
+            <div className="my-1 border-t border-line-neutral-100" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                setDeletingInvoice(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-rose-50 text-content-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
+              <span>Delete Invoice</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Visual Invoice Document Sheet Modal (from EPS template) */}
       <MotionPresence>

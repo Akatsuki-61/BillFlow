@@ -1,6 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  SPRING_NAV_GLIDE,
+  SPRING_MENU_POPOVER,
+  EXIT_MENU_POPOVER,
+} from "@/lib/motion";
 import Link from "next/link";
 import {
   HelpCircle,
@@ -631,13 +637,20 @@ export default function SupportPage() {
                   key={cat.id}
                   type="button"
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer active:scale-[0.955] ${
                     active
-                      ? "bg-accent text-white"
+                      ? "text-white"
                       : "bg-surface-tinted text-content-neutral-600 hover:text-content-neutral-900 hover:bg-surface-tinted/80"
                   }`}
                 >
-                  {cat.label}
+                  {active && (
+                    <motion.span
+                      layoutId="support-category-pill"
+                      transition={SPRING_NAV_GLIDE}
+                      className="absolute inset-0 rounded-lg bg-accent shadow-xs"
+                    />
+                  )}
+                  <span className="relative z-10">{cat.label}</span>
                 </button>
               );
             })}
@@ -696,22 +709,40 @@ export default function SupportPage() {
                     />
                   </button>
 
-                  {isOpen && (
-                    <div className="px-4.5 pb-4.5 pt-1 border-t border-line-neutral-100/70 text-xs text-content-neutral-600 leading-relaxed space-y-3">
-                      <p>{faq.answer}</p>
-                      {faq.actionHref && (
-                        <div className="pt-2">
-                          <Link
-                            href={faq.actionHref}
-                            className="inline-flex items-center gap-1.5 font-semibold text-accent hover:underline"
-                          >
-                            <span>{faq.actionText || "Learn more"}</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </Link>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        key={`faq-body-${faq.id}`}
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{
+                          height: "auto",
+                          opacity: 1,
+                          transition: SPRING_MENU_POPOVER,
+                        }}
+                        exit={{
+                          height: 0,
+                          opacity: 0,
+                          transition: EXIT_MENU_POPOVER,
+                        }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-4.5 pb-4.5 pt-1 border-t border-line-neutral-100/70 text-xs text-content-neutral-600 leading-relaxed space-y-3">
+                          <p>{faq.answer}</p>
+                          {faq.actionHref && (
+                            <div className="pt-2">
+                              <Link
+                                href={faq.actionHref}
+                                className="inline-flex items-center gap-1.5 font-semibold text-accent hover:underline"
+                              >
+                                <span>{faq.actionText || "Learn more"}</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </Link>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })
