@@ -17,10 +17,8 @@ import {
   Grid3X3,
   CalendarDays,
   Pencil,
-  Trash2,
   RefreshCw,
   CheckSquare,
-  Download,
   Upload,
   ExternalLink,
   ArrowLeftRight,
@@ -195,9 +193,10 @@ export default function TaskCalendarView({
   // Brief UI loading state while internal calendar sync/auto-linking runs
   const [isSyncingCalendar, setIsSyncingCalendar] = useState<boolean>(false);
   const onNotifyRef = useRef(onNotify);
-  onNotifyRef.current = onNotify;
+  useEffect(() => {
+    onNotifyRef.current = onNotify;
+  }, [onNotify]);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasMountedSyncRef = useRef<boolean>(false);
 
   const triggerBriefCalendarSync = useCallback((toastText?: string) => {
     setIsSyncingCalendar(true);

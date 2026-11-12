@@ -8,7 +8,6 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
       ? data.items.reduce((sum, it) => sum + it.quantity * it.unitPriceCents, 0)
       : data.amountCents;
   const paidCents = data.paidCents || 0;
-  const balanceDueCents = Math.max(0, data.amountCents - paidCents);
 
   const itemsRows = (data.items && data.items.length > 0
     ? data.items

@@ -56,7 +56,7 @@ export default function AnalyticsView() {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     if (!draggedWidgetId || draggedWidgetId === targetId) return;
-    const now = performance.now();
+    const now = e.timeStamp;
     const pairKey = [draggedWidgetId, targetId].sort().join("::");
     if (
       lastSwapRef.current.pair === pairKey &&

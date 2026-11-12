@@ -6,6 +6,11 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
+  {
     files: ["src/components/evilcharts/**"],
     rules: {
       "react-hooks/refs": "off",

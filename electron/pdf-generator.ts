@@ -1,6 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import * as electron from "electron";
 import fs from "fs";
-import path from "path";
 import {
   buildInvoiceHtmlGeometricTeal,
   buildInvoiceHtmlExecutiveWave,
@@ -10,8 +10,6 @@ import {
   InvoicePdfPayload,
   InvoicePdfItem,
   formatMoney,
-  escapeHtml,
-  getBase64Logo,
   resolveBrandIcon,
 } from "./pdf-templates";
 
@@ -82,7 +80,6 @@ export function buildInvoiceHtml(data: InvoicePdfPayload): string {
  */
 export async function generateInvoiceHtmlPdfBuffer(data: InvoicePdfPayload): Promise<Buffer> {
   try {
-    const electron = require("electron");
     if (electron && electron.BrowserWindow) {
       const win = new electron.BrowserWindow({
         show: false,
@@ -96,7 +93,7 @@ export async function generateInvoiceHtmlPdfBuffer(data: InvoicePdfPayload): Pro
       const pdfBytes = await win.webContents.printToPDF({
         printBackground: true,
         pageSize: "A4",
-        margins: { marginType: "none" },
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
       });
       win.destroy();
       return Buffer.from(pdfBytes);

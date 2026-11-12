@@ -317,6 +317,14 @@ describe("Database & Interconnection Tests", () => {
       expect(restoredClients.length).toBe(1);
       expect(restoredInvoices.length).toBe(1);
       expect(restoredInvoices[0].code).toBe("BK-2026-001");
+
+      // Also accept legacy backups exported before default_invoice_template existed
+      const legacyBackup = structuredClone(backup);
+      if (legacyBackup.records?.settings?.[0]) {
+        delete legacyBackup.records.settings[0].default_invoice_template;
+      }
+      const legacyResult = importWorkspace(legacyBackup);
+      expect(legacyResult.success).toBe(true);
     });
   });
 

@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { Button } from "./Workspace";
 import { MotionSurface } from "./MotionSurface";
 
 let openDialogs = 0;
@@ -64,7 +63,7 @@ export function Dialog({
           }}
           aria-label="Close dialog"
           className="ui-button ui-button--ghost ui-button--icon app-dialog-close app-no-drag"
-          style={{ ["WebkitAppRegion" as any]: "no-drag" }}
+          style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
         >
           <X className="w-4 h-4 pointer-events-none" />
         </button>

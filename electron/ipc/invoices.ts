@@ -146,9 +146,9 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
   });
 }
 
-export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string, templateOverride?: string): Promise<{ invoice: any; pdfBuffer: Buffer }> {
+export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string, templateOverride?: string): Promise<{ invoice: { code?: string }; pdfBuffer: Buffer }> {
   const profile = getOrCreateSettings();
-  const template = templateOverride || (profile as any).defaultInvoiceTemplate || "geometric-teal";
+  const template = templateOverride || profile.defaultInvoiceTemplate || "geometric-teal";
 
   if (invoiceId === "sample-preview" || invoiceId === "draft-preview") {
     const payload = {

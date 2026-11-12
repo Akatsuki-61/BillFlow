@@ -192,7 +192,12 @@ export function migrateDatabase(sqlite: Database.Database, customMigrations?: st
 
 export function initDatabase(customPath?: string, customMigrations?: string) {
   startupError = null;
-  if (dbInstance && sqliteInstance) return { db: dbInstance, sqlite: sqliteInstance };
+  if (dbInstance && sqliteInstance) {
+    if (!customPath || customPath === activePath) {
+      return { db: dbInstance, sqlite: sqliteInstance };
+    }
+    closeDatabaseForTesting();
+  }
   const dbPath = customPath || getRootDatabasePath();
   const sqlite = new Database(dbPath);
   try {

@@ -682,7 +682,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       return window.billflow.settings.export();
     } else {
       return {
-        version: "0.1.0",
+        version: "0.2.0",
         exportedAt: new Date().toISOString(),
         settings: memorySettings,
         clients: memoryClients,

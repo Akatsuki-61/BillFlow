@@ -339,11 +339,14 @@ export default function InvoicesView() {
   // Check URL search parameters for overdue summary view
   const viewParam = searchParams.get("view");
   const summaryParam = searchParams.get("summary");
-  useEffect(() => {
+  const overdueQueryKey = `${viewParam ?? ""}:${summaryParam ?? ""}`;
+  const [prevOverdueQueryKey, setPrevOverdueQueryKey] = useState<string | null>(null);
+  if (prevOverdueQueryKey !== overdueQueryKey) {
+    setPrevOverdueQueryKey(overdueQueryKey);
     if (viewParam === "overdue-summary" || summaryParam === "overdue") {
       setShowOverdueSummary(true);
     }
-  }, [viewParam, summaryParam]);
+  }
 
   // Export Invoices CSV / Excel handler using Convert Engine
   const handleExportInvoicesCsv = (
@@ -470,13 +473,16 @@ export default function InvoicesView() {
   }
 
   // Handle ?invoice=ID&preview=1 to automatically open the InvoiceDocumentSheet preview
-  useEffect(() => {
-    if (!invoiceHighlightParam || previewParam !== "1") return;
-    const targetInv = allInvoices.find((inv) => inv.id === invoiceHighlightParam);
-    if (targetInv) {
-      setPreviewInvoice(targetInv);
-    }
-  }, [invoiceHighlightParam, previewParam, allInvoices]);
+  const previewTargetInv =
+    invoiceHighlightParam && previewParam === "1"
+      ? allInvoices.find((inv) => inv.id === invoiceHighlightParam)
+      : undefined;
+  const previewQueryKey = previewTargetInv ? `${invoiceHighlightParam}:${previewParam}` : null;
+  const [prevPreviewQueryKey, setPrevPreviewQueryKey] = useState<string | null>(null);
+  if (previewQueryKey && prevPreviewQueryKey !== previewQueryKey && previewTargetInv) {
+    setPrevPreviewQueryKey(previewQueryKey);
+    setPreviewInvoice(previewTargetInv);
+  }
 
   // Helper to resolve default fee for an imported task
   const getTaskDefaultFee = React.useCallback(
@@ -524,45 +530,23 @@ export default function InvoicesView() {
 
     const due = new Date();
     due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
-    setNewDueDate((prev) => prev || due.toISOString().slice(0, 10));
-
-    void getNextInvoiceCode()
-      .then((code) => setNewCode((prev) => prev || code))
-      .catch(() =>
-        setNewCode(
-          (prev) => prev || `INV-${new Date().getFullYear()}-001`,
-        ),
-      );
+    const defaultDueStr = due.toISOString().slice(0, 10);
 
     // Pre-populate client from first task with a clientId or clientName
     const taskWithClient = matchedTasks.find(
       (t) => t.clientId || t.clientName,
     );
-    if (taskWithClient) {
-      const matchedClient = clients.find(
-        (c) =>
-          (taskWithClient.clientId && c.id === taskWithClient.clientId) ||
-          (taskWithClient.clientName &&
-            c.name.toLowerCase() === taskWithClient.clientName.toLowerCase()),
-      );
-      if (matchedClient) {
-        setClientMode("existing");
-        setNewClientId(matchedClient.id);
-        setNewCurrency(matchedClient.currency);
-        if (matchedClient.driveUrl) {
-          setNewDeliveryUrl(matchedClient.driveUrl);
-        }
-      } else if (taskWithClient.clientName) {
-        setClientMode("new");
-        setClientName(taskWithClient.clientName);
-      }
-    }
+    const matchedClient = taskWithClient
+      ? clients.find(
+          (c) =>
+            (taskWithClient.clientId && c.id === taskWithClient.clientId) ||
+            (taskWithClient.clientName &&
+              c.name.toLowerCase() === taskWithClient.clientName.toLowerCase()),
+        )
+      : undefined;
 
     // Pre-populate delivery URL from task if available
     const taskWithDelivery = matchedTasks.find((t) => t.deliveryUrl);
-    if (taskWithDelivery?.deliveryUrl) {
-      setNewDeliveryUrl((prev) => prev || taskWithDelivery.deliveryUrl || "");
-    }
 
     // Build line items from matched tasks
     const generatedItems: LineItemDraft[] = matchedTasks.map((t) => {
@@ -583,9 +567,34 @@ export default function InvoicesView() {
       };
     });
 
-    setNewLineItems(generatedItems);
-    setLinkedTaskIds(matchedTasks.map((t) => t.id));
-    setShowAddInvoiceModal(true);
+    queueMicrotask(() => {
+      setNewDueDate((prev) => prev || defaultDueStr);
+      if (matchedClient) {
+        setClientMode("existing");
+        setNewClientId(matchedClient.id);
+        setNewCurrency(matchedClient.currency);
+        if (matchedClient.driveUrl) {
+          setNewDeliveryUrl(matchedClient.driveUrl);
+        }
+      } else if (taskWithClient?.clientName) {
+        setClientMode("new");
+        setClientName(taskWithClient.clientName);
+      }
+      if (taskWithDelivery?.deliveryUrl) {
+        setNewDeliveryUrl((prev) => prev || taskWithDelivery.deliveryUrl || "");
+      }
+      setNewLineItems(generatedItems);
+      setLinkedTaskIds(matchedTasks.map((t) => t.id));
+      setShowAddInvoiceModal(true);
+    });
+
+    void getNextInvoiceCode()
+      .then((code) => setNewCode((prev) => prev || code))
+      .catch(() =>
+        setNewCode(
+          (prev) => prev || `INV-${new Date().getFullYear()}-001`,
+        ),
+      );
   }, [
     importTaskIdsParam,
     tasks,

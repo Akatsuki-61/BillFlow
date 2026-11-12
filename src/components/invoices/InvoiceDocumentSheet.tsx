@@ -128,14 +128,6 @@ export default function InvoiceDocumentSheet({
   const professionalTitle =
     settings?.professionalTitle || "SOFTWARE FREELANCING & CONSULTING";
 
-  const subtotalCents =
-    invoice.items && invoice.items.length > 0
-      ? invoice.items.reduce(
-          (sum, it) => sum + it.quantity * it.unitPriceCents,
-          0,
-        )
-      : invoice.amountCents;
-
   const paidCents =
     invoice.payments && invoice.payments.length > 0
       ? invoice.payments.reduce((sum, p) => sum + p.amountCents, 0)
@@ -145,17 +137,6 @@ export default function InvoiceDocumentSheet({
 
   const delivery = resolveDeliveryUrl(invoice, { clients });
   const client = clients.find((c) => c.id === invoice.clientId);
-
-  const displayItems =
-    invoice.items && invoice.items.length > 0
-      ? invoice.items
-      : [
-          {
-            description: "Professional Services & Development Sprint",
-            quantity: 1,
-            unitPriceCents: invoice.amountCents,
-          },
-        ];
 
   // Close dropdowns when clicking outside
   useEffect(() => {

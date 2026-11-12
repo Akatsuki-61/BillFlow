@@ -4,7 +4,6 @@ import {
   buildContractorWhatsAppMessage,
   generateWhatsAppLink,
   createWhatsAppPayloadFromWorkOrder,
-  buildInvoiceWhatsAppMessage,
   generateInvoiceWhatsAppLink,
   generateInvoiceEmailLink,
   buildOverduePaymentReminderMessage,

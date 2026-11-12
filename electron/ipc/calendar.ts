@@ -23,6 +23,11 @@ import type {
   EventCategory,
   EventColor,
 } from "../../src/types/calendar";
+import type {
+  TaskStatus,
+  TaskPriority,
+  TaskCategory,
+} from "../../src/types/tasks";
 
 /**
  * Internal silent auto-healer for calendar event inputs & links.
@@ -1071,8 +1076,8 @@ export async function syncNativeLocalCalendar(
             startTime: e.startTime || null,
             endTime: e.endTime || null,
             isAllDay: Boolean(e.isAllDay),
-            category: e.category as any,
-            color: e.color as any,
+            category: e.category as EventCategory,
+            color: e.color as EventColor,
             clientId: e.clientId || null,
             clientName: e.clientName || null,
             taskId: e.taskId || null,
@@ -1087,9 +1092,9 @@ export async function syncNativeLocalCalendar(
               id: t.id,
               title: t.title,
               description: t.description,
-              status: t.status as any,
-              priority: t.priority as any,
-              category: t.category as any,
+              status: t.status as TaskStatus,
+              priority: t.priority as TaskPriority,
+              category: t.category as TaskCategory,
               assignee: t.assignee,
               dueDate: t.dueDate,
               startTime: slot?.startTime || null,
@@ -1181,9 +1186,9 @@ export async function openNativeLocalCalendar(
             id: t.id,
             title: t.title,
             description: t.description,
-            status: t.status as any,
-            priority: t.priority as any,
-            category: t.category as any,
+            status: t.status as TaskStatus,
+            priority: t.priority as TaskPriority,
+            category: t.category as TaskCategory,
             assignee: t.assignee,
             dueDate: t.dueDate,
             startTime: slot?.startTime || null,

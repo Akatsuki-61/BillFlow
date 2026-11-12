@@ -107,6 +107,13 @@ export function importWorkspace(input: ExportDataPayload) {
   const payload = backupSchema.parse(input);
   // Backups from before the calendar feature have no events.
   payload.records.calendar_events ??= [];
+  if (Array.isArray(payload.records.settings)) {
+    for (const sRow of payload.records.settings) {
+      if (sRow && typeof sRow === "object" && !("default_invoice_template" in sRow)) {
+        sRow.default_invoice_template = "geometric-teal";
+      }
+    }
+  }
   if (Object.keys(payload.records).length !== backupTables.length || backupTables.some(t => !Array.isArray(payload.records[t]))) throw new Error("Backup is missing required workflow tables.");
   if (payload.records.invoice_pdf_exports.length) throw new Error("Backup must not restore machine-local PDF paths.");
   const sandbox = new Database(":memory:");

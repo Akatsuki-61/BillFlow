@@ -28,8 +28,6 @@ export function ApexOrangeTemplate({
       ? invoice.payments.reduce((sum, p) => sum + p.amountCents, 0)
       : invoice.paidCents || 0;
 
-  const balanceDueCents = Math.max(0, invoice.amountCents - paidCents);
-
   const displayItems =
     invoice.items && invoice.items.length > 0
       ? invoice.items

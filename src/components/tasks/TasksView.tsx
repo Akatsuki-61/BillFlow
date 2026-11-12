@@ -14,7 +14,7 @@ import {
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 
-import React, { useState, useMemo, useRef, Suspense } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -27,7 +27,6 @@ import {
   ExternalLink,
   Link2,
   CheckSquare,
-  Trash2,
   RotateCcw,
   CheckCircle2,
   Receipt,
