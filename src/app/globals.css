@@ -1465,11 +1465,12 @@ input[type="checkbox"] {
   flex-shrink: 0;
 }
 .settings-content {
-  max-width: 960px;
+  width: 100%;
+  max-width: none;
   min-width: 0;
 }
 .settings-section-heading {
-  margin-bottom: 26px;
+  margin-bottom: 24px;
   animation: page-arrive 260ms var(--motion-ease);
 }
 .settings-section-heading .settings-nav-label {
@@ -1489,12 +1490,12 @@ input[type="checkbox"] {
   margin-top: 7px;
 }
 .settings-content .ui-card {
-  padding: 28px;
+  padding: 24px;
   border-radius: 22px;
 }
 .settings-content .ui-card h2 {
   font-size: 16px;
-  margin-bottom: 7px;
+  margin-bottom: 4px;
 }
 .settings-content .ui-card p {
   font-size: 12px;
@@ -1508,17 +1509,16 @@ input[type="checkbox"] {
   min-height: 44px;
   border-radius: 12px;
 }
-.settings-content .ui-card [class*="gap-4"] {
-  gap: 22px;
-}
 .settings-content .settings-section {
   animation: page-arrive 240ms var(--motion-ease);
 }
-.settings-content [role="radiogroup"] {
+.settings-content [role="radiogroup"][aria-labelledby="accent-heading"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
-.settings-content [role="radio"] {
+.settings-content
+  [role="radiogroup"][aria-labelledby="accent-heading"]
+  [role="radio"] {
   min-height: 110px;
   border-radius: 16px;
 }

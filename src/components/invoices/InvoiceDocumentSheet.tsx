@@ -42,50 +42,51 @@ interface InvoiceDocumentSheetProps {
   onClose: () => void;
   onOpenPdf?: () => void;
   onRecordPayment?: () => void;
+  initialTemplate?: InvoiceTemplateId;
+  onSelectTemplate?: (templateId: InvoiceTemplateId) => void;
 }
 
 const TEMPLATES: Array<{
   id: InvoiceTemplateId;
   name: string;
-  badge: string;
+  surface: string;
   color: string;
   description: string;
 }> = [
   {
     id: "geometric-teal",
     name: "Geometric Teal",
-    badge: "Template 1",
+    surface: "Light",
     color: "#00A887",
-    description: "Modern teal ribbons & dark slate header",
+    description: "Teal and slate angled header on white",
   },
   {
     id: "executive-wave",
     name: "Executive Wave",
-    badge: "Template 2",
+    surface: "Light",
     color: "#EAA828",
-    description: "Charcoal wave header & golden amber accents",
+    description: "Charcoal wave header and amber table",
   },
   {
     id: "scarlet-modern",
     name: "Scarlet Modern",
-    badge: "Template 3",
+    surface: "Light",
     color: "#E5252A",
-    description: "Crimson red & dark slate geometric header with dotted rows",
+    description: "Split red header and dotted item rows",
   },
   {
     id: "apex-orange",
     name: "Apex Orange",
-    badge: "Template 4",
+    surface: "Light",
     color: "#F25C05",
-    description:
-      "Tangerine diagonal header, full orange table with grid borders & numbered terms",
+    description: "Orange diagonal header and bordered grid",
   },
   {
     id: "noir-crimson",
     name: "Noir Crimson",
-    badge: "Template 5",
+    surface: "Dark",
     color: "#D9383A",
-    description: "Dark obsidian canvas with crimson capsules & chevron accents",
+    description: "Dark page with red pill rows",
   },
 ];
 
@@ -94,6 +95,8 @@ export default function InvoiceDocumentSheet({
   onClose,
   onOpenPdf,
   onRecordPayment,
+  initialTemplate,
+  onSelectTemplate,
 }: InvoiceDocumentSheetProps) {
   const { settings: currentSettings } = useSettings();
   const settings = (() => {
@@ -113,6 +116,9 @@ export default function InvoiceDocumentSheet({
 
   const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplateId>(
     () => {
+      if (initialTemplate) {
+        return initialTemplate;
+      }
       if (typeof window !== "undefined") {
         const stored = localStorage.getItem(
           profileStorageKey("billflow_invoice_template"),
@@ -140,6 +146,7 @@ export default function InvoiceDocumentSheet({
 
   const handleSelectTemplate = (templateId: InvoiceTemplateId) => {
     setSelectedTemplate(templateId);
+    onSelectTemplate?.(templateId);
     if (typeof window !== "undefined") {
       localStorage.setItem(
         profileStorageKey("billflow_invoice_template"),
@@ -463,7 +470,7 @@ export default function InvoiceDocumentSheet({
                         <div className="text-xs font-bold truncate flex items-center gap-1.5">
                           <span>{tmpl.name}</span>
                           <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-content-neutral-500 dark:text-neutral-400">
-                            {tmpl.badge}
+                            {tmpl.surface}
                           </span>
                         </div>
                         <div className="text-[10px] text-content-neutral-400 font-normal truncate mt-0.5">
