@@ -1,4 +1,5 @@
 "use client";
+import { formatClientBalance } from "@/lib/client-balances";
 
 import { Dialog } from "@/components/ui/Dialog";
 
@@ -7,7 +8,7 @@ import { DataBreakdown } from "@/components/ui/DataGraphic";
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
 import React, { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -125,10 +126,10 @@ function ClientsContent() {
   const isClientFormDirty = () => {
     return Boolean(
       formData.name.trim() ||
-        formData.email.trim() ||
-        formData.phone.trim() ||
-        formData.contactPerson.trim() ||
-        formData.driveUrl.trim(),
+      formData.email.trim() ||
+      formData.phone.trim() ||
+      formData.contactPerson.trim() ||
+      formData.driveUrl.trim(),
     );
   };
 
@@ -819,7 +820,7 @@ function ClientsContent() {
                         Billed
                       </span>
                       <span className="text-[13.5px] font-semibold tabular-nums text-content-neutral-950 mt-1 block leading-tight truncate">
-                        {formatCents(client.totalBilledCents, client.currency)}
+                        {formatClientBalance(client, "billed")}
                       </span>
                     </div>
 
@@ -828,7 +829,7 @@ function ClientsContent() {
                         Paid
                       </span>
                       <span className="text-[13.5px] font-semibold tabular-nums text-emerald-700 dark:text-emerald-400 mt-1 block leading-tight truncate">
-                        {formatCents(client.totalPaidCents, client.currency)}
+                        {formatClientBalance(client, "paid")}
                       </span>
                     </div>
 
@@ -838,15 +839,15 @@ function ClientsContent() {
                       </span>
                       <span
                         className={`text-[13.5px] font-semibold tabular-nums mt-1 block leading-tight truncate ${
-                          client.outstandingBalanceCents > 0
+                          client.outstandingBalanceCents > 0 ||
+                          Object.values(client.totalsByCurrency || {}).some(
+                            (total) => Boolean(total?.outstanding),
+                          )
                             ? "text-rose-600 dark:text-rose-400"
                             : "text-content-neutral-400"
                         }`}
                       >
-                        {formatCents(
-                          client.outstandingBalanceCents,
-                          client.currency,
-                        )}
+                        {formatClientBalance(client, "outstanding")}
                       </span>
                     </div>
                   </div>
@@ -1385,10 +1386,7 @@ function ClientsContent() {
                       TOTAL BILLED
                     </span>
                     <span className="text-base font-bold text-content-neutral-900 mt-1 block">
-                      {formatCents(
-                        selectedClientForHistory.totalBilledCents,
-                        selectedClientForHistory.currency,
-                      )}
+                      {formatClientBalance(selectedClientForHistory, "billed")}
                     </span>
                   </div>
                   <div className="p-3 bg-surface-emerald-50/50 rounded-xl border border-line-emerald-100">
@@ -1396,10 +1394,7 @@ function ClientsContent() {
                       TOTAL PAID
                     </span>
                     <span className="text-base font-bold text-content-emerald-700 mt-1 block">
-                      {formatCents(
-                        selectedClientForHistory.totalPaidCents,
-                        selectedClientForHistory.currency,
-                      )}
+                      {formatClientBalance(selectedClientForHistory, "paid")}
                     </span>
                   </div>
                   <div className="p-3 bg-surface-rose-50/50 rounded-xl border border-line-rose-100">
@@ -1407,9 +1402,9 @@ function ClientsContent() {
                       OUTSTANDING
                     </span>
                     <span className="text-base font-bold text-content-rose-700 mt-1 block font-mono">
-                      {formatCents(
-                        selectedClientForHistory.outstandingBalanceCents,
-                        selectedClientForHistory.currency,
+                      {formatClientBalance(
+                        selectedClientForHistory,
+                        "outstanding",
                       )}
                     </span>
                   </div>

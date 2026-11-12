@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 
 import React, { useState, useMemo } from "react";
@@ -91,7 +91,11 @@ function OpenAIBrandIcon({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
-function VercelBrandIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+function VercelBrandIcon({
+  className = "w-3.5 h-3.5",
+}: {
+  className?: string;
+}) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -153,8 +157,8 @@ export default function ExpensesPage() {
   const isExpenseFormDirty = () => {
     return Boolean(
       formData.merchant.trim() ||
-        formData.description.trim() ||
-        formData.amount.trim(),
+      formData.description.trim() ||
+      formData.amount.trim(),
     );
   };
 
@@ -339,8 +343,7 @@ export default function ExpensesPage() {
       return <Utensils className="w-4.5 h-4.5" />;
     if (cat.includes("OFFICE") || cat.includes("HARDWARE"))
       return <Package className="w-4.5 h-4.5" />;
-    if (cat.includes("AI"))
-      return <Cpu className="w-4.5 h-4.5 text-accent" />;
+    if (cat.includes("AI")) return <Cpu className="w-4.5 h-4.5 text-accent" />;
     if (cat.includes("HOSTING") || cat.includes("SERVER"))
       return <Server className="w-4.5 h-4.5" />;
     if (cat.includes("SOFTWARE") || cat.includes("DEV"))

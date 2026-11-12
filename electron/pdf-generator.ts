@@ -78,46 +78,61 @@ export function buildInvoiceHtml(data: InvoicePdfPayload): string {
  * Generates an exact HTML-to-PDF buffer using Electron's native printToPDF.
  * If running outside an Electron app context (e.g. unit tests), falls back to pdf-lib.
  */
-export async function generateInvoiceHtmlPdfBuffer(data: InvoicePdfPayload): Promise<Buffer> {
+export async function generateInvoiceHtmlPdfBuffer(
+  data: InvoicePdfPayload,
+): Promise<Buffer> {
+  if (!electron?.BrowserWindow) return generateInvoicePdfBuffer(data);
+  const win = new electron.BrowserWindow({
+    show: false,
+    width: 794,
+    height: 1123,
+    webPreferences: {
+      offscreen: true,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      javascript: true,
+    },
+  });
   try {
-    if (electron && electron.BrowserWindow) {
-      const win = new electron.BrowserWindow({
-        show: false,
-        width: 794,
-        height: 1123,
-        webPreferences: { offscreen: true },
-      });
-      const html = buildInvoiceHtml(data);
-      await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-      await new Promise((r) => setTimeout(r, 650));
-      const pdfBytes = await win.webContents.printToPDF({
-        printBackground: true,
-        pageSize: "A4",
-        margins: { top: 0, bottom: 0, left: 0, right: 0 },
-      });
-      win.destroy();
-      return Buffer.from(pdfBytes);
-    }
-  } catch {
-    // Fallback below
+    win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    win.webContents.on("will-navigate", (event) => event.preventDefault());
+    const html = buildInvoiceHtml(data).replace(
+      "<head>",
+      `<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:; script-src 'none'">`,
+    );
+    await win.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+    );
+    await win.webContents.executeJavaScript(
+      `Promise.all([document.fonts.ready, ...Array.from(document.images, image => image.complete ? Promise.resolve() : new Promise((resolve,reject) => { image.onload=resolve; image.onerror=reject; }))]).then(() => true)`,
+    );
+    const pdfBytes = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    });
+    return Buffer.from(pdfBytes);
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
   }
-
-  return generateInvoicePdfBuffer(data);
 }
 
 // Color Palette adapted creatively from the geometric EPS design template:
-const cTeal = rgb(0.0, 0.66, 0.53);       // Vibrant Bright Teal (#00A887)
-const cDarkTeal = rgb(0.0, 0.40, 0.34);   // Deep Teal (#006758)
-const cSlate = rgb(0.35, 0.39, 0.46);      // Mid Slate (#5A6577)
-const cDarkSlate = rgb(0.22, 0.25, 0.30);  // Dark Slate Stripe (#38414D)
-const cSlateShadow = rgb(0.72, 0.76, 0.80);// Subtle Slate Shadow (#B8C2CC)
-const cCharcoal = rgb(0.13, 0.16, 0.19);   // Charcoal Banner (#222831)
-const cTextPrimary = rgb(0.12, 0.15, 0.18);// Body dark (#1F262E)
-const cTextMuted = rgb(0.44, 0.50, 0.58);  // Muted gray (#718096)
-const cLine = rgb(0.88, 0.91, 0.94);       // Divider (#E2E8F0)
-const cLightBg = rgb(0.96, 0.98, 0.98);    // Ultra light tinted background
+const cTeal = rgb(0.0, 0.66, 0.53); // Vibrant Bright Teal (#00A887)
+const cDarkTeal = rgb(0.0, 0.4, 0.34); // Deep Teal (#006758)
+const cSlate = rgb(0.35, 0.39, 0.46); // Mid Slate (#5A6577)
+const cDarkSlate = rgb(0.22, 0.25, 0.3); // Dark Slate Stripe (#38414D)
+const cSlateShadow = rgb(0.72, 0.76, 0.8); // Subtle Slate Shadow (#B8C2CC)
+const cCharcoal = rgb(0.13, 0.16, 0.19); // Charcoal Banner (#222831)
+const cTextPrimary = rgb(0.12, 0.15, 0.18); // Body dark (#1F262E)
+const cTextMuted = rgb(0.44, 0.5, 0.58); // Muted gray (#718096)
+const cLine = rgb(0.88, 0.91, 0.94); // Divider (#E2E8F0)
+const cLightBg = rgb(0.96, 0.98, 0.98); // Ultra light tinted background
 
-export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise<Buffer> {
+export async function generateInvoicePdfBuffer(
+  data: InvoicePdfPayload,
+): Promise<Buffer> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595.28, 841.89]); // Standard A4
   const W = 595.28;
@@ -128,12 +143,32 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
 
   // 1. TOP-LEFT GEOMETRIC ARTWORK (Continuous diagonal ribbons with horizontal charcoal banner)
-  page.drawSvgPath("M 140 0 L 215 0 L 146 118 L 71 118 Z", { x: 0, y: H, color: cSlateShadow });
+  page.drawSvgPath("M 140 0 L 215 0 L 146 118 L 71 118 Z", {
+    x: 0,
+    y: H,
+    color: cSlateShadow,
+  });
   page.drawSvgPath("M 0 0 L 42 0 L 0 71 Z", { x: 0, y: H, color: cDarkSlate });
-  page.drawSvgPath("M 42 0 L 90 0 L 0 153 L 0 71 Z", { x: 0, y: H, color: cDarkTeal });
-  page.drawSvgPath("M 90 0 L 142 0 L 0 241 L 0 153 Z", { x: 0, y: H, color: cTeal });
-  page.drawSvgPath("M 0 52 L 280 52 L 242 118 L 0 118 Z", { x: 0, y: H, color: cSlate });
-  page.drawSvgPath("M 0 52 L 258 52 L 220 118 L 0 118 Z", { x: 0, y: H, color: cCharcoal });
+  page.drawSvgPath("M 42 0 L 90 0 L 0 153 L 0 71 Z", {
+    x: 0,
+    y: H,
+    color: cDarkTeal,
+  });
+  page.drawSvgPath("M 90 0 L 142 0 L 0 241 L 0 153 Z", {
+    x: 0,
+    y: H,
+    color: cTeal,
+  });
+  page.drawSvgPath("M 0 52 L 280 52 L 242 118 L 0 118 Z", {
+    x: 0,
+    y: H,
+    color: cSlate,
+  });
+  page.drawSvgPath("M 0 52 L 258 52 L 220 118 L 0 118 Z", {
+    x: 0,
+    y: H,
+    color: cCharcoal,
+  });
 
   // BillFlow App Logo inside Banner
   const brandIcon = resolveBrandIcon();
@@ -153,7 +188,9 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
   }
 
   // Business Name inside Banner
-  const businessName = (data.business.businessName || "CHETHAKA LAKSHITHA").toUpperCase();
+  const businessName = (
+    data.business.businessName || "CHETHAKA LAKSHITHA"
+  ).toUpperCase();
   page.drawText(businessName.slice(0, 26), {
     x: 64,
     y: H - 78,
@@ -162,7 +199,9 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
     color: rgb(1, 1, 1),
   });
 
-  const subtitle = (data.business.professionalTitle || "SOFTWARE FREELANCING & CONSULTING").toUpperCase();
+  const subtitle = (
+    data.business.professionalTitle || "SOFTWARE FREELANCING & CONSULTING"
+  ).toUpperCase();
   page.drawText(subtitle.slice(0, 38), {
     x: 64,
     y: H - 92,
@@ -172,7 +211,9 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
   });
 
   // Contact info under banner
-  const contactPieces = [data.business.email, data.business.phone].filter(Boolean).join("  |  ");
+  const contactPieces = [data.business.email, data.business.phone]
+    .filter(Boolean)
+    .join("  |  ");
   if (contactPieces) {
     page.drawText(contactPieces.slice(0, 48), {
       x: 36,
@@ -195,9 +236,21 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
 
   let metaY = H - 100;
   const drawMetaRow = (label: string, val: string) => {
-    page.drawText(label, { x: rightX - 138, y: metaY, size: 8.5, font: fontBold, color: cTextPrimary });
+    page.drawText(label, {
+      x: rightX - 138,
+      y: metaY,
+      size: 8.5,
+      font: fontBold,
+      color: cTextPrimary,
+    });
     const tw = fontRegular.widthOfTextAtSize(val, 8.5);
-    page.drawText(val, { x: rightX - tw, y: metaY, size: 8.5, font: fontRegular, color: cTextPrimary });
+    page.drawText(val, {
+      x: rightX - tw,
+      y: metaY,
+      size: 8.5,
+      font: fontRegular,
+      color: cTextPrimary,
+    });
     metaY -= 13;
   };
 
@@ -236,12 +289,42 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
   };
 
   // Header Row - Clean WHITE background with TEAL text
-  page.drawText("No.", { x: colX.num, y, size: 9, font: fontBold, color: cTeal });
-  page.drawText("Item Description", { x: colX.desc, y, size: 9, font: fontBold, color: cTeal });
-  page.drawText("Price", { x: colX.price, y, size: 9, font: fontBold, color: cTeal });
-  page.drawText("Qty.", { x: colX.qty, y, size: 9, font: fontBold, color: cTeal });
+  page.drawText("No.", {
+    x: colX.num,
+    y,
+    size: 9,
+    font: fontBold,
+    color: cTeal,
+  });
+  page.drawText("Item Description", {
+    x: colX.desc,
+    y,
+    size: 9,
+    font: fontBold,
+    color: cTeal,
+  });
+  page.drawText("Price", {
+    x: colX.price,
+    y,
+    size: 9,
+    font: fontBold,
+    color: cTeal,
+  });
+  page.drawText("Qty.", {
+    x: colX.qty,
+    y,
+    size: 9,
+    font: fontBold,
+    color: cTeal,
+  });
   const totalHdrW = fontBold.widthOfTextAtSize("Total", 9);
-  page.drawText("Total", { x: colX.total - totalHdrW, y, size: 9, font: fontBold, color: cTeal });
+  page.drawText("Total", {
+    x: colX.total - totalHdrW,
+    y,
+    size: 9,
+    font: fontBold,
+    color: cTeal,
+  });
 
   y -= 8;
   page.drawLine({
@@ -256,7 +339,13 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
   const items =
     data.items.length > 0
       ? data.items
-      : [{ description: "Professional Software & Consulting Services", quantity: 1, unitPriceCents: data.amountCents }];
+      : [
+          {
+            description: "Professional Software & Consulting Services",
+            quantity: 1,
+            unitPriceCents: data.amountCents,
+          },
+        ];
 
   let subtotalCents = 0;
 
@@ -265,13 +354,43 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
     subtotalCents += lineTotal;
 
     const rowNum = String(index + 1);
-    page.drawText(rowNum, { x: colX.num, y, size: 8.5, font: fontRegular, color: cTextMuted });
-    page.drawText(item.description.slice(0, 52), { x: colX.desc, y, size: 8.5, font: fontRegular, color: cTextPrimary });
-    page.drawText(formatMoney(item.unitPriceCents, data.currency), { x: colX.price, y, size: 8.5, font: fontRegular, color: cTextMuted });
-    page.drawText(String(item.quantity), { x: colX.qty + 5, y, size: 8.5, font: fontRegular, color: cTextMuted });
+    page.drawText(rowNum, {
+      x: colX.num,
+      y,
+      size: 8.5,
+      font: fontRegular,
+      color: cTextMuted,
+    });
+    page.drawText(item.description.slice(0, 52), {
+      x: colX.desc,
+      y,
+      size: 8.5,
+      font: fontRegular,
+      color: cTextPrimary,
+    });
+    page.drawText(formatMoney(item.unitPriceCents, data.currency), {
+      x: colX.price,
+      y,
+      size: 8.5,
+      font: fontRegular,
+      color: cTextMuted,
+    });
+    page.drawText(String(item.quantity), {
+      x: colX.qty + 5,
+      y,
+      size: 8.5,
+      font: fontRegular,
+      color: cTextMuted,
+    });
     const lineTotText = formatMoney(lineTotal, data.currency);
     const totW = fontBold.widthOfTextAtSize(lineTotText, 8.5);
-    page.drawText(lineTotText, { x: colX.total - totW, y, size: 8.5, font: fontBold, color: cTextPrimary });
+    page.drawText(lineTotText, {
+      x: colX.total - totW,
+      y,
+      size: 8.5,
+      font: fontBold,
+      color: cTextPrimary,
+    });
 
     y -= 8;
     page.drawLine({
@@ -292,53 +411,137 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
   const sectionTopY = y;
 
   // Column 1: "Invoice to:"
-  page.drawText("Invoice to:", { x: col1X, y: sectionTopY, size: 10, font: fontBold, color: cTeal });
+  page.drawText("Invoice to:", {
+    x: col1X,
+    y: sectionTopY,
+    size: 10,
+    font: fontBold,
+    color: cTeal,
+  });
   let c1Y = sectionTopY - 16;
-  page.drawText(data.client.name.slice(0, 32), { x: col1X, y: c1Y, size: 9.5, font: fontBold, color: cTextPrimary });
+  page.drawText(data.client.name.slice(0, 32), {
+    x: col1X,
+    y: c1Y,
+    size: 9.5,
+    font: fontBold,
+    color: cTextPrimary,
+  });
   c1Y -= 12;
   if (data.client.email) {
-    page.drawText(data.client.email.slice(0, 35), { x: col1X, y: c1Y, size: 8, font: fontRegular, color: cTextMuted });
+    page.drawText(data.client.email.slice(0, 35), {
+      x: col1X,
+      y: c1Y,
+      size: 8,
+      font: fontRegular,
+      color: cTextMuted,
+    });
     c1Y -= 11;
   }
   if (data.client.phone) {
-    page.drawText(data.client.phone.slice(0, 35), { x: col1X, y: c1Y, size: 8, font: fontRegular, color: cTextMuted });
+    page.drawText(data.client.phone.slice(0, 35), {
+      x: col1X,
+      y: c1Y,
+      size: 8,
+      font: fontRegular,
+      color: cTextMuted,
+    });
     c1Y -= 11;
   }
   const delivery = data.deliveryUrl || data.client.driveUrl;
   if (delivery) {
-    page.drawText("Delivery Endpoint:", { x: col1X, y: c1Y, size: 7.5, font: fontBold, color: cTextMuted });
+    page.drawText("Delivery Endpoint:", {
+      x: col1X,
+      y: c1Y,
+      size: 7.5,
+      font: fontBold,
+      color: cTextMuted,
+    });
     c1Y -= 10;
-    page.drawText(delivery.slice(0, 36), { x: col1X, y: c1Y, size: 7.5, font: fontBold, color: cTeal });
+    page.drawText(delivery.slice(0, 36), {
+      x: col1X,
+      y: c1Y,
+      size: 7.5,
+      font: fontBold,
+      color: cTeal,
+    });
   }
 
   // Column 2: "Payment Info:"
-  page.drawText("Payment Info:", { x: col2X, y: sectionTopY, size: 10, font: fontBold, color: cTeal });
+  page.drawText("Payment Info:", {
+    x: col2X,
+    y: sectionTopY,
+    size: 10,
+    font: fontBold,
+    color: cTeal,
+  });
   let c2Y = sectionTopY - 16;
   if (data.business.paymentDetails) {
     const pLines = data.business.paymentDetails.split("\n").slice(0, 4);
     pLines.forEach((line) => {
-      page.drawText(line.slice(0, 36), { x: col2X, y: c2Y, size: 8, font: fontRegular, color: cTextPrimary });
+      page.drawText(line.slice(0, 36), {
+        x: col2X,
+        y: c2Y,
+        size: 8,
+        font: fontRegular,
+        color: cTextPrimary,
+      });
       c2Y -= 11;
     });
   } else {
-    page.drawText("Standard Wire / Bank Transfer", { x: col2X, y: c2Y, size: 8, font: fontRegular, color: cTextPrimary });
+    page.drawText("Standard Wire / Bank Transfer", {
+      x: col2X,
+      y: c2Y,
+      size: 8,
+      font: fontRegular,
+      color: cTextPrimary,
+    });
     c2Y -= 11;
-    page.drawText("Contact issuer for direct details", { x: col2X, y: c2Y, size: 8, font: fontRegular, color: cTextMuted });
+    page.drawText("Contact issuer for direct details", {
+      x: col2X,
+      y: c2Y,
+      size: 8,
+      font: fontRegular,
+      color: cTextMuted,
+    });
     c2Y -= 11;
   }
   if (data.business.taxId) {
-    page.drawText(`Tax Reg: ${data.business.taxId}`, { x: col2X, y: c2Y, size: 7.5, font: fontRegular, color: cTextMuted });
+    page.drawText(`Tax Reg: ${data.business.taxId}`, {
+      x: col2X,
+      y: c2Y,
+      size: 7.5,
+      font: fontRegular,
+      color: cTextMuted,
+    });
   }
 
   // Column 3: Totals
   let c3Y = sectionTopY;
-  const drawTotal = (label: string, cents: number, isBold = false, isHighlight = false, isNegative = false) => {
+  const drawTotal = (
+    label: string,
+    cents: number,
+    isBold = false,
+    isHighlight = false,
+    isNegative = false,
+  ) => {
     const f = isBold ? fontBold : fontRegular;
     const col = isHighlight ? cTeal : isBold ? cTextPrimary : cTextMuted;
-    page.drawText(label, { x: col3X, y: c3Y, size: isHighlight ? 10.5 : 8.5, font: f, color: col });
+    page.drawText(label, {
+      x: col3X,
+      y: c3Y,
+      size: isHighlight ? 10.5 : 8.5,
+      font: f,
+      color: col,
+    });
     const formatted = `${isNegative ? "-" : ""}${formatMoney(cents, data.currency)}`;
     const tw = f.widthOfTextAtSize(formatted, isHighlight ? 10.5 : 8.5);
-    page.drawText(formatted, { x: W - margin - tw, y: c3Y, size: isHighlight ? 10.5 : 8.5, font: f, color: col });
+    page.drawText(formatted, {
+      x: W - margin - tw,
+      y: c3Y,
+      size: isHighlight ? 10.5 : 8.5,
+      font: f,
+      color: col,
+    });
     c3Y -= 13;
   };
 
@@ -411,15 +614,29 @@ export async function generateInvoicePdfBuffer(data: InvoicePdfPayload): Promise
   });
 
   // 6. BOTTOM-RIGHT CORNER ARTWORK (NO SIGNATURE LINE OR LABEL!)
-  page.drawSvgPath("M 48 155 L 138 0 L 154 0 L 64 155 Z", { x: W - 170, y: 155, color: cSlate });
-  page.drawSvgPath("M 64 155 L 154 0 L 170 0 L 170 32 L 90 155 Z", { x: W - 170, y: 155, color: cDarkTeal });
-  page.drawSvgPath("M 90 155 L 170 32 L 170 155 Z", { x: W - 170, y: 155, color: cTeal });
+  page.drawSvgPath("M 48 155 L 138 0 L 154 0 L 64 155 Z", {
+    x: W - 170,
+    y: 155,
+    color: cSlate,
+  });
+  page.drawSvgPath("M 64 155 L 154 0 L 170 0 L 170 32 L 90 155 Z", {
+    x: W - 170,
+    y: 155,
+    color: cDarkTeal,
+  });
+  page.drawSvgPath("M 90 155 L 170 32 L 170 155 Z", {
+    x: W - 170,
+    y: 155,
+    color: cTeal,
+  });
 
   const pdfBytes = await doc.save();
   return Buffer.from(pdfBytes);
 }
 
-export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Promise<Buffer> {
+export async function generateWorkOrderPdfBuffer(
+  data: WorkOrderPdfPayload,
+): Promise<Buffer> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595.28, 841.89]); // A4
   const W = 595.28;
@@ -430,12 +647,32 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
 
   // 1. TOP-LEFT GEOMETRIC ACCENT BANNER (Continuous diagonal ribbons with horizontal charcoal banner)
-  page.drawSvgPath("M 140 0 L 215 0 L 146 118 L 71 118 Z", { x: 0, y: H, color: cSlateShadow });
+  page.drawSvgPath("M 140 0 L 215 0 L 146 118 L 71 118 Z", {
+    x: 0,
+    y: H,
+    color: cSlateShadow,
+  });
   page.drawSvgPath("M 0 0 L 42 0 L 0 71 Z", { x: 0, y: H, color: cDarkSlate });
-  page.drawSvgPath("M 42 0 L 90 0 L 0 153 L 0 71 Z", { x: 0, y: H, color: cDarkTeal });
-  page.drawSvgPath("M 90 0 L 142 0 L 0 241 L 0 153 Z", { x: 0, y: H, color: cTeal });
-  page.drawSvgPath("M 0 52 L 280 52 L 242 118 L 0 118 Z", { x: 0, y: H, color: cSlate });
-  page.drawSvgPath("M 0 52 L 258 52 L 220 118 L 0 118 Z", { x: 0, y: H, color: cCharcoal });
+  page.drawSvgPath("M 42 0 L 90 0 L 0 153 L 0 71 Z", {
+    x: 0,
+    y: H,
+    color: cDarkTeal,
+  });
+  page.drawSvgPath("M 90 0 L 142 0 L 0 241 L 0 153 Z", {
+    x: 0,
+    y: H,
+    color: cTeal,
+  });
+  page.drawSvgPath("M 0 52 L 280 52 L 242 118 L 0 118 Z", {
+    x: 0,
+    y: H,
+    color: cSlate,
+  });
+  page.drawSvgPath("M 0 52 L 258 52 L 220 118 L 0 118 Z", {
+    x: 0,
+    y: H,
+    color: cCharcoal,
+  });
 
   // BillFlow App Logo inside Banner
   const brandIcon = resolveBrandIcon();
@@ -455,7 +692,9 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
   }
 
   // Business Name inside Banner
-  const businessName = (data.business.businessName || "CHETHAKA LAKSHITHA").toUpperCase();
+  const businessName = (
+    data.business.businessName || "CHETHAKA LAKSHITHA"
+  ).toUpperCase();
   page.drawText(businessName.slice(0, 26), {
     x: 64,
     y: H - 78,
@@ -464,7 +703,9 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
     color: rgb(1, 1, 1),
   });
 
-  const subtitle = (data.business.professionalTitle || "OUTSOURCING & SUBCONTRACTOR VOUCHER").toUpperCase();
+  const subtitle = (
+    data.business.professionalTitle || "OUTSOURCING & SUBCONTRACTOR VOUCHER"
+  ).toUpperCase();
   page.drawText(subtitle.slice(0, 38), {
     x: 64,
     y: H - 92,
@@ -485,9 +726,21 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
 
   let metaY = H - 100;
   const drawMetaRow = (label: string, val: string) => {
-    page.drawText(label, { x: rightX - 145, y: metaY, size: 8.5, font: fontBold, color: cTextPrimary });
+    page.drawText(label, {
+      x: rightX - 145,
+      y: metaY,
+      size: 8.5,
+      font: fontBold,
+      color: cTextPrimary,
+    });
     const tw = fontRegular.widthOfTextAtSize(val, 8.5);
-    page.drawText(val, { x: rightX - tw, y: metaY, size: 8.5, font: fontRegular, color: cTextPrimary });
+    page.drawText(val, {
+      x: rightX - tw,
+      y: metaY,
+      size: 8.5,
+      font: fontRegular,
+      color: cTextPrimary,
+    });
     metaY -= 13;
   };
 
@@ -515,10 +768,28 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
   let y = H - 195;
 
   // Scope & Task Table
-  page.drawText("No.", { x: margin + 4, y, size: 9, font: fontBold, color: cTeal });
-  page.drawText("Subcontractor Scope / Deliverable", { x: margin + 35, y, size: 9, font: fontBold, color: cTeal });
+  page.drawText("No.", {
+    x: margin + 4,
+    y,
+    size: 9,
+    font: fontBold,
+    color: cTeal,
+  });
+  page.drawText("Subcontractor Scope / Deliverable", {
+    x: margin + 35,
+    y,
+    size: 9,
+    font: fontBold,
+    color: cTeal,
+  });
   const feeHdrW = fontBold.widthOfTextAtSize("Fee Amount", 9);
-  page.drawText("Fee Amount", { x: W - margin - feeHdrW, y, size: 9, font: fontBold, color: cTeal });
+  page.drawText("Fee Amount", {
+    x: W - margin - feeHdrW,
+    y,
+    size: 9,
+    font: fontBold,
+    color: cTeal,
+  });
 
   y -= 8;
   page.drawLine({
@@ -529,11 +800,29 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
   });
 
   y -= 18;
-  page.drawText("1", { x: margin + 4, y, size: 8.5, font: fontRegular, color: cTextMuted });
-  page.drawText(data.scope.slice(0, 65), { x: margin + 35, y, size: 8.5, font: fontRegular, color: cTextPrimary });
+  page.drawText("1", {
+    x: margin + 4,
+    y,
+    size: 8.5,
+    font: fontRegular,
+    color: cTextMuted,
+  });
+  page.drawText(data.scope.slice(0, 65), {
+    x: margin + 35,
+    y,
+    size: 8.5,
+    font: fontRegular,
+    color: cTextPrimary,
+  });
   const feeText = formatMoney(data.feeCents, data.currency);
   const feeValW = fontBold.widthOfTextAtSize(feeText, 8.5);
-  page.drawText(feeText, { x: W - margin - feeValW, y, size: 8.5, font: fontBold, color: cTextPrimary });
+  page.drawText(feeText, {
+    x: W - margin - feeValW,
+    y,
+    size: 8.5,
+    font: fontBold,
+    color: cTextPrimary,
+  });
 
   y -= 8;
   page.drawLine({
@@ -552,44 +841,116 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
   const sectionTopY = y;
 
   // Column 1: Subcontractor
-  page.drawText("Subcontractor:", { x: col1X, y: sectionTopY, size: 10, font: fontBold, color: cTeal });
+  page.drawText("Subcontractor:", {
+    x: col1X,
+    y: sectionTopY,
+    size: 10,
+    font: fontBold,
+    color: cTeal,
+  });
   let c1Y = sectionTopY - 16;
-  page.drawText(data.vendor.name.slice(0, 32), { x: col1X, y: c1Y, size: 9.5, font: fontBold, color: cTextPrimary });
+  page.drawText(data.vendor.name.slice(0, 32), {
+    x: col1X,
+    y: c1Y,
+    size: 9.5,
+    font: fontBold,
+    color: cTextPrimary,
+  });
   c1Y -= 12;
   if (data.vendor.service) {
-    page.drawText(data.vendor.service.slice(0, 35), { x: col1X, y: c1Y, size: 8, font: fontRegular, color: cTextMuted });
+    page.drawText(data.vendor.service.slice(0, 35), {
+      x: col1X,
+      y: c1Y,
+      size: 8,
+      font: fontRegular,
+      color: cTextMuted,
+    });
     c1Y -= 11;
   }
   if (data.vendor.email) {
-    page.drawText(data.vendor.email.slice(0, 35), { x: col1X, y: c1Y, size: 8, font: fontRegular, color: cTextMuted });
+    page.drawText(data.vendor.email.slice(0, 35), {
+      x: col1X,
+      y: c1Y,
+      size: 8,
+      font: fontRegular,
+      color: cTextMuted,
+    });
   }
 
   // Column 2: Linked Project
-  page.drawText("Project Details:", { x: col2X, y: sectionTopY, size: 10, font: fontBold, color: cTeal });
+  page.drawText("Project Details:", {
+    x: col2X,
+    y: sectionTopY,
+    size: 10,
+    font: fontBold,
+    color: cTeal,
+  });
   let c2Y = sectionTopY - 16;
   if (data.parentInvoice?.clientName) {
-    page.drawText(`Client: ${data.parentInvoice.clientName.slice(0, 28)}`, { x: col2X, y: c2Y, size: 8, font: fontRegular, color: cTextPrimary });
+    page.drawText(`Client: ${data.parentInvoice.clientName.slice(0, 28)}`, {
+      x: col2X,
+      y: c2Y,
+      size: 8,
+      font: fontRegular,
+      color: cTextPrimary,
+    });
     c2Y -= 11;
   }
   if (data.parentInvoice?.code) {
-    page.drawText(`Invoice Ref: ${data.parentInvoice.code}`, { x: col2X, y: c2Y, size: 8, font: fontRegular, color: cTextMuted });
+    page.drawText(`Invoice Ref: ${data.parentInvoice.code}`, {
+      x: col2X,
+      y: c2Y,
+      size: 8,
+      font: fontRegular,
+      color: cTextMuted,
+    });
     c2Y -= 11;
   }
   if (data.deliveryUrl) {
-    page.drawText(`Delivery: ${data.deliveryUrl.slice(0, 30)}`, { x: col2X, y: c2Y, size: 8, font: fontBold, color: cTeal });
+    page.drawText(`Delivery: ${data.deliveryUrl.slice(0, 30)}`, {
+      x: col2X,
+      y: c2Y,
+      size: 8,
+      font: fontBold,
+      color: cTeal,
+    });
   }
 
   // Column 3: Totals
   let c3Y = sectionTopY;
-  page.drawText("Total Fee:", { x: col3X, y: c3Y, size: 10.5, font: fontBold, color: cTeal });
+  page.drawText("Total Fee:", {
+    x: col3X,
+    y: c3Y,
+    size: 10.5,
+    font: fontBold,
+    color: cTeal,
+  });
   const ftw = fontBold.widthOfTextAtSize(feeText, 10.5);
-  page.drawText(feeText, { x: W - margin - ftw, y: c3Y, size: 10.5, font: fontBold, color: cTeal });
+  page.drawText(feeText, {
+    x: W - margin - ftw,
+    y: c3Y,
+    size: 10.5,
+    font: fontBold,
+    color: cTeal,
+  });
   c3Y -= 14;
 
-  page.drawText("Payout Status:", { x: col3X, y: c3Y, size: 8.5, font: fontRegular, color: cTextMuted });
+  page.drawText("Payout Status:", {
+    x: col3X,
+    y: c3Y,
+    size: 8.5,
+    font: fontRegular,
+    color: cTextMuted,
+  });
   const pText = data.payoutStatus || "PENDING";
   const ptw = fontRegular.widthOfTextAtSize(pText, 8.5);
-  page.drawText(pText, { x: W - margin - ptw, y: c3Y, size: 8.5, font: fontRegular, color: cTextPrimary });
+  page.drawText(pText, {
+    x: W - margin - ptw,
+    y: c3Y,
+    size: 8.5,
+    font: fontRegular,
+    color: cTextPrimary,
+  });
 
   // Footer
   const footerY = 95;
@@ -600,13 +961,16 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
     font: fontBold,
     color: cTeal,
   });
-  page.drawText("Voucher confirms agreed subcontractor scope. Payout released upon approved delivery.", {
-    x: margin,
-    y: footerY + 8,
-    size: 7.5,
-    font: fontRegular,
-    color: cTextMuted,
-  });
+  page.drawText(
+    "Voucher confirms agreed subcontractor scope. Payout released upon approved delivery.",
+    {
+      x: margin,
+      y: footerY + 8,
+      size: 7.5,
+      font: fontRegular,
+      color: cTextMuted,
+    },
+  );
   page.drawLine({
     start: { x: margin, y: footerY - 2 },
     end: { x: margin + 260, y: footerY - 2 },
@@ -622,9 +986,21 @@ export async function generateWorkOrderPdfBuffer(data: WorkOrderPdfPayload): Pro
   });
 
   // Bottom-Right Corner Artwork
-  page.drawSvgPath("M 48 155 L 138 0 L 154 0 L 64 155 Z", { x: W - 170, y: 155, color: cSlate });
-  page.drawSvgPath("M 64 155 L 154 0 L 170 0 L 170 32 L 90 155 Z", { x: W - 170, y: 155, color: cDarkTeal });
-  page.drawSvgPath("M 90 155 L 170 32 L 170 155 Z", { x: W - 170, y: 155, color: cTeal });
+  page.drawSvgPath("M 48 155 L 138 0 L 154 0 L 64 155 Z", {
+    x: W - 170,
+    y: 155,
+    color: cSlate,
+  });
+  page.drawSvgPath("M 64 155 L 154 0 L 170 0 L 170 32 L 90 155 Z", {
+    x: W - 170,
+    y: 155,
+    color: cDarkTeal,
+  });
+  page.drawSvgPath("M 90 155 L 170 32 L 170 155 Z", {
+    x: W - 170,
+    y: 155,
+    color: cTeal,
+  });
 
   const pdfBytes = await doc.save();
   return Buffer.from(pdfBytes);

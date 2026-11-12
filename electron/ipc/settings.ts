@@ -1,10 +1,15 @@
-import { ipcMain, shell } from "electron";
+import { shell } from "electron";
+import { ipcMain } from "../security";
 import { eq, sql } from "drizzle-orm";
 import { getDb, getDatabasePath, getRootDb, getActiveProfileId } from "../db";
 import { settings, userProfiles } from "../db/schema";
 import { updateSettingsSchema } from "../validation";
 import { formatError } from "./errors";
-import type { AppSettings, UpdateSettingsInput, ExportDataPayload } from "../../src/types/settings";
+import type {
+  AppSettings,
+  UpdateSettingsInput,
+  ExportDataPayload,
+} from "../../src/types/settings";
 
 import { exportWorkspace, importWorkspace, resetWorkspace } from "../backup";
 export { exportWorkspace, importWorkspace, resetWorkspace } from "../backup";
@@ -30,7 +35,8 @@ export function getOrCreateSettings(): AppSettings {
         nextInvoiceSeq: 1,
         defaultDueDays: 14,
         defaultTaxRate: 0,
-        defaultNotes: "Payment due within specified due date. Thank you for your business.",
+        defaultNotes:
+          "Payment due within specified due date. Thank you for your business.",
         dateFormat: "YYYY-MM-DD",
         currencyDisplay: "symbol",
       })
@@ -57,14 +63,20 @@ export function updateSettings(patch: UpdateSettingsInput): AppSettings {
     .where(eq(settings.id, "default"))
     .run();
 
-  const updated = db.select().from(settings).where(eq(settings.id, "default")).get();
+  const updated = db
+    .select()
+    .from(settings)
+    .where(eq(settings.id, "default"))
+    .get();
 
   try {
     const activeId = getActiveProfileId();
     const rootDb = getRootDb();
     const profilePatch: Record<string, unknown> = {};
-    if (validated.defaultCurrency) profilePatch.defaultCurrency = validated.defaultCurrency;
-    if (validated.invoicePrefix) profilePatch.invoicePrefix = validated.invoicePrefix;
+    if (validated.defaultCurrency)
+      profilePatch.defaultCurrency = validated.defaultCurrency;
+    if (validated.invoicePrefix)
+      profilePatch.invoicePrefix = validated.invoicePrefix;
     if (validated.professionalTitle && validated.professionalTitle.trim()) {
       profilePatch.subtitle = validated.professionalTitle.trim();
     }
@@ -91,15 +103,18 @@ export function registerSettingsHandlers(broadcastDataChanged: () => void) {
     }
   });
 
-  ipcMain.handle("settings:update", async (_event, patch: UpdateSettingsInput) => {
-    try {
-      const res = updateSettings(patch);
-      broadcastDataChanged();
-      return res;
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+  ipcMain.handle(
+    "settings:update",
+    async (_event, patch: UpdateSettingsInput) => {
+      try {
+        const res = updateSettings(patch);
+        broadcastDataChanged();
+        return res;
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 
   ipcMain.handle("settings:getDbPath", async () => {
     try {
@@ -127,15 +142,18 @@ export function registerSettingsHandlers(broadcastDataChanged: () => void) {
     }
   });
 
-  ipcMain.handle("settings:import", async (_event, payload: ExportDataPayload) => {
-    try {
-      const res = importWorkspace(payload);
-      broadcastDataChanged();
-      return res;
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+  ipcMain.handle(
+    "settings:import",
+    async (_event, payload: ExportDataPayload) => {
+      try {
+        const res = importWorkspace(payload);
+        broadcastDataChanged();
+        return res;
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 
   ipcMain.handle("settings:reset", async () => {
     try {

@@ -1,5 +1,10 @@
 import { InvoicePdfPayload } from "./types";
-import { escapeHtml, formatMoney, getBase64Logo } from "./helpers";
+import {
+  escapeHtml,
+  formatMoney,
+  getBase64Logo,
+  invoiceFontCss,
+} from "./helpers";
 
 export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
   const logoBase64 = getBase64Logo();
@@ -10,9 +15,16 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
   const paidCents = data.paidCents || 0;
   const balanceDueCents = Math.max(0, data.amountCents - paidCents);
 
-  const itemsRows = (data.items && data.items.length > 0
-    ? data.items
-    : [{ description: "Professional Services & Development Sprint", quantity: 1, unitPriceCents: data.amountCents }]
+  const itemsRows = (
+    data.items && data.items.length > 0
+      ? data.items
+      : [
+          {
+            description: "Professional Services & Development Sprint",
+            quantity: 1,
+            unitPriceCents: data.amountCents,
+          },
+        ]
   )
     .map(
       (it, idx) => `
@@ -26,7 +38,7 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
         <td class="td-qty">${it.quantity}</td>
         <td class="td-total">${formatMoney(it.quantity * it.unitPriceCents, data.currency)}</td>
       </tr>
-    `
+    `,
     )
     .join("");
 
@@ -34,10 +46,8 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
 <html>
 <head>
   <meta charset="utf-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    ${invoiceFontCss()}
     @page { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; }
     body {
@@ -451,11 +461,15 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
           <span class="meta-label">Date:</span>
           <span class="meta-val">${escapeHtml(data.issueDate)}</span>
         </div>
-        ${data.dueDate ? `
+        ${
+          data.dueDate
+            ? `
         <div class="meta-row">
           <span class="meta-label">Due Date:</span>
           <span class="meta-val">${escapeHtml(data.dueDate)}</span>
-        </div>` : ""}
+        </div>`
+            : ""
+        }
       </div>
     </div>
   </div>
@@ -503,18 +517,26 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
           <span>Subtotal:</span>
           <span>${formatMoney(subtotalCents, data.currency)}</span>
         </div>
-        ${data.discountCents ? `
+        ${
+          data.discountCents
+            ? `
           <div class="breakdown-line" style="color: #E11D48;">
             <span>Discount:</span>
             <span>-${formatMoney(data.discountCents, data.currency)}</span>
           </div>
-        ` : ""}
-        ${data.taxCents ? `
+        `
+            : ""
+        }
+        ${
+          data.taxCents
+            ? `
           <div class="breakdown-line">
             <span>Tax:</span>
             <span>${formatMoney(data.taxCents, data.currency)}</span>
           </div>
-        ` : ""}
+        `
+            : ""
+        }
       </div>
     </div>
 

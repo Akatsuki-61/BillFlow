@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { ExternalLink, Phone, Mail, Globe, MapPin } from "lucide-react";
 import type { InvoiceTemplateProps } from "./types";
 
@@ -122,8 +121,14 @@ export function NoirCrimsonTemplate({
           </div>
           <div className="text-[11px] text-zinc-400 mt-1 space-y-0.5 leading-tight">
             {client?.phone && <div>{client.phone}</div>}
-            <div>{client?.email || invoice.clientEmail || "client@domain.com"}</div>
-            <div>{client?.category ? `${client.category} Client` : "Client Account"}</div>
+            <div>
+              {client?.email || invoice.clientEmail || "client@domain.com"}
+            </div>
+            <div>
+              {client?.category
+                ? `${client.category} Client`
+                : "Client Account"}
+            </div>
           </div>
         </div>
 
@@ -134,12 +139,16 @@ export function NoirCrimsonTemplate({
         <div className="min-w-0 flex-1 px-4 text-left">
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-[#D9383A] w-24">Invoice No.:</span>
+              <span className="font-bold text-[#D9383A] w-24">
+                Invoice No.:
+              </span>
               <span className="font-black text-white">{invoice.code}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-[#D9383A] w-24">Date:</span>
-              <span className="font-medium text-white">{formatDate(invoice.issueDate)}</span>
+              <span className="font-medium text-white">
+                {formatDate(invoice.issueDate)}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-[#D9383A] w-24">Due Date:</span>
@@ -220,7 +229,9 @@ export function NoirCrimsonTemplate({
                     {String(idx + 1).padStart(2, "0")}
                   </div>
                   <div className="w-[46%] text-left pr-2">
-                    <div className="font-black leading-tight text-white">{item.description}</div>
+                    <div className="font-black leading-tight text-white">
+                      {item.description}
+                    </div>
                     <div className="text-[10px] text-white/80 leading-tight font-medium mt-0.5">
                       Deliverable milestone &amp; software sprint scope
                     </div>
@@ -247,7 +258,9 @@ export function NoirCrimsonTemplate({
                   {String(idx + 1).padStart(2, "0")}
                 </div>
                 <div className="w-[46%] text-left pr-2">
-                  <div className="font-bold text-white leading-tight">{item.description}</div>
+                  <div className="font-bold text-white leading-tight">
+                    {item.description}
+                  </div>
                   <div className="text-[10px] text-zinc-400 leading-tight font-normal mt-0.5">
                     Deliverable milestone &amp; software sprint scope
                   </div>
@@ -377,7 +390,9 @@ export function NoirCrimsonTemplate({
         </div>
         <div className="flex items-center gap-1.5 truncate max-w-[200px]">
           <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
-          <span className="truncate">{settings?.address || "Colombo, Sri Lanka"}</span>
+          <span className="truncate">
+            {settings?.address || "Colombo, Sri Lanka"}
+          </span>
         </div>
       </div>
     </div>

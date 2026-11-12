@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { ipcMain } from "../security";
 import crypto from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db";
@@ -19,7 +19,10 @@ export function listVendors(): VendorItem[] {
     .orderBy(desc(vendors.createdAt))
     .all();
 
-  const allClients = db.select({ id: clients.id, name: clients.name }).from(clients).all();
+  const allClients = db
+    .select({ id: clients.id, name: clients.name })
+    .from(clients)
+    .all();
   const clientMap = new Map<string, string>();
   for (const c of allClients) {
     clientMap.set(c.id, c.name);
@@ -47,11 +50,7 @@ export function listVendors(): VendorItem[] {
 
 export function removeVendor(id: string): { success: boolean } {
   const db = getDb();
-  const existing = db
-    .select()
-    .from(vendors)
-    .where(eq(vendors.id, id))
-    .get();
+  const existing = db.select().from(vendors).where(eq(vendors.id, id)).get();
   if (!existing) throw new AppError("NOT_FOUND", "Vendor not found");
 
   const woCountRes = db
@@ -63,13 +62,11 @@ export function removeVendor(id: string): { success: boolean } {
   if (woCount > 0) {
     throw new AppError(
       "VENDOR_HAS_WORK_ORDERS",
-      `Cannot delete vendor. This vendor is assigned to ${woCount} work order${woCount > 1 ? "s" : ""}.`
+      `Cannot delete vendor. This vendor is assigned to ${woCount} work order${woCount > 1 ? "s" : ""}.`,
     );
   }
 
-  db.delete(vendors)
-    .where(eq(vendors.id, id))
-    .run();
+  db.delete(vendors).where(eq(vendors.id, id)).run();
 
   return { success: true };
 }
@@ -170,10 +167,7 @@ export function registerVendorHandlers(broadcastDataChanged: () => void) {
         if (validated.notes !== undefined) updateData.notes = validated.notes;
         updateData.updatedAt = new Date().toISOString();
 
-        db.update(vendors)
-          .set(updateData)
-          .where(eq(vendors.id, id))
-          .run();
+        db.update(vendors).set(updateData).where(eq(vendors.id, id)).run();
 
         broadcastDataChanged();
         const updated = listVendors().find((v) => v.id === id);

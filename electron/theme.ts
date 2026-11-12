@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from "electron";
+import { app, BrowserWindow, nativeTheme } from "electron";
+import { ipcMain } from "./security";
 import fs from "fs";
 import path from "path";
 import { isThemePreference, type ThemePreference } from "../src/lib/theme";
@@ -24,16 +25,22 @@ export function registerThemeHandlers() {
   try {
     const saved: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
     if (isThemePreference(saved)) preference = saved;
-  } catch { /* First launch or an unreadable preference follows the OS. */ }
+  } catch {
+    /* First launch or an unreadable preference follows the OS. */
+  }
   nativeTheme.themeSource = preference;
   nativeTheme.on("updated", applyWindowTheme);
 
   // Only the app's top-level renderer can access these narrow IPC methods.
   ipcMain.on("theme:initial", (event) => {
-    event.returnValue = event.senderFrame === event.sender.mainFrame ? preference : "system";
+    event.returnValue =
+      event.senderFrame === event.sender.mainFrame ? preference : "system";
   });
   ipcMain.handle("theme:set", (event, value: unknown) => {
-    if (event.senderFrame !== event.sender.mainFrame || !isThemePreference(value)) {
+    if (
+      event.senderFrame !== event.sender.mainFrame ||
+      !isThemePreference(value)
+    ) {
       throw new Error("Invalid theme preference");
     }
     if (value !== preference) {

@@ -1,4 +1,23 @@
-import { app, BrowserWindow, protocol, net, shell, Menu, Tray, nativeImage, nativeTheme, dialog } from "electron";
+import { registerWorkspaceHandlers } from "./ipc/workspace";
+import { affectedDatasets } from "../src/types/workspace";
+import { getActiveProfileId, getWorkspaceGeneration } from "./db";
+import { currentIpcChannel } from "./security";
+import { configureIpcSecurity, isTrustedDocument } from "./security";
+import { isWorkspaceUnlocked, lockProfileSession } from "./workspace-session";
+import { resolveStaticFile, documentCsp } from "./static-protocol";
+import {
+  app,
+  BrowserWindow,
+  protocol,
+  net,
+  shell,
+  Menu,
+  Tray,
+  nativeImage,
+  nativeTheme,
+  dialog,
+  session,
+} from "electron";
 import path from "path";
 import fs from "fs";
 import { pathToFileURL } from "url";
@@ -23,9 +42,10 @@ import { setupAboutPanel, createApplicationMenu } from "./menu";
 
 const testProfile = process.env.BILLFLOW_USER_DATA;
 if (testProfile) {
-  if (!path.isAbsolute(testProfile)) throw new Error("BILLFLOW_USER_DATA must be absolute.");
-  fs.mkdirSync(testProfile, {recursive:true});
-  app.setPath("userData",testProfile);
+  if (!path.isAbsolute(testProfile))
+    throw new Error("BILLFLOW_USER_DATA must be absolute.");
+  fs.mkdirSync(testProfile, { recursive: true });
+  app.setPath("userData", testProfile);
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -43,7 +63,8 @@ protocol.registerSchemesAsPrivileged([
 
 app.setName("BillFlow");
 if (process.env.BILLFLOW_USER_DATA) {
-  if (!path.isAbsolute(process.env.BILLFLOW_USER_DATA)) throw new Error("BILLFLOW_USER_DATA must be absolute.");
+  if (!path.isAbsolute(process.env.BILLFLOW_USER_DATA))
+    throw new Error("BILLFLOW_USER_DATA must be absolute.");
   app.setPath("userData", process.env.BILLFLOW_USER_DATA);
 }
 
@@ -79,21 +100,29 @@ function createTray() {
     : path.join(__dirname, "../build/tray");
   const trayImage = () => {
     if (process.platform === "darwin") {
-      const image = nativeImage.createFromPath(path.join(directory, "trayTemplate.png"));
+      const image = nativeImage.createFromPath(
+        path.join(directory, "trayTemplate.png"),
+      );
       image.setTemplateImage(true);
       return image;
     }
     // Follow the Windows taskbar theme, independently of the app's appearance.
-    return path.join(directory, nativeTheme.shouldUseDarkColorsForSystemIntegratedUI
-      ? "tray-white.ico" : "tray-color.ico");
+    return path.join(
+      directory,
+      nativeTheme.shouldUseDarkColorsForSystemIntegratedUI
+        ? "tray-white.ico"
+        : "tray-color.ico",
+    );
   };
   tray = new Tray(trayImage());
   tray.setToolTip("BillFlow");
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "Open BillFlow", click: showMainWindow },
-    { type: "separator" },
-    { label: "Quit BillFlow", click: () => app.quit() },
-  ]));
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Open BillFlow", click: showMainWindow },
+      { type: "separator" },
+      { label: "Quit BillFlow", click: () => app.quit() },
+    ]),
+  );
   if (process.platform === "win32") {
     tray.on("click", showMainWindow);
     nativeTheme.on("updated", () => tray?.setImage(trayImage()));
@@ -102,7 +131,11 @@ function createTray() {
 
 function broadcastDataChanged() {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("data:changed");
+    mainWindow.webContents.send("data:changed", {
+      profileId: getActiveProfileId(),
+      generation: getWorkspaceGeneration(),
+      datasets: affectedDatasets(currentIpcChannel()),
+    });
   }
 }
 
@@ -137,29 +170,52 @@ function createWindow() {
   });
 
   mainWindow.once("ready-to-show", () => {
-    if (!(testProfile && process.env.BILLFLOW_VERIFY_HIDDEN === "1")) mainWindow?.show();
+    if (!(testProfile && process.env.BILLFLOW_VERIFY_HIDDEN === "1"))
+      mainWindow?.show();
   });
 
-  // Handle external links safely via default system browser
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http:") || url.startsWith("https:") || url.startsWith("mailto:")) {
-      shell.openExternal(url);
+  const isDev = !app.isPackaged && process.env.TEST_PROD_BUILD !== "1";
+  const devUrl = "http://127.0.0.1:3000";
+  configureIpcSecurity(
+    mainWindow.webContents,
+    isDev ? devUrl : null,
+    isWorkspaceUnlocked,
+  );
+  const openExternal = (value: string) => {
+    try {
+      const url = new URL(value);
+      if (
+        !url.username &&
+        !url.password &&
+        ["https:", "http:", "mailto:"].includes(url.protocol)
+      )
+        void shell.openExternal(url.href);
+    } catch {
+      /* Invalid links never reach the OS. */
     }
+  };
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    openExternal(url);
     return { action: "deny" };
   });
-
-  mainWindow.webContents.on("will-navigate", (event, url) => {
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      // Don't intercept localhost during dev
-      if (!url.includes("localhost:3000")) {
-        event.preventDefault();
-        shell.openExternal(url);
-      }
+  const guardNavigation = (event: Electron.Event, url: string) => {
+    if (!isTrustedDocument(url, isDev ? devUrl : null)) {
+      event.preventDefault();
+      openExternal(url);
     }
+  };
+  mainWindow.webContents.on("will-navigate", guardNavigation);
+  mainWindow.webContents.on("will-redirect", guardNavigation);
+  mainWindow.webContents.on("will-frame-navigate", (event) => {
+    if (
+      !event.isMainFrame ||
+      !isTrustedDocument(event.url, isDev ? devUrl : null)
+    )
+      event.preventDefault();
   });
-
-  const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
-  const devUrl = process.env.DEV_URL || "http://localhost:3000";
+  mainWindow.webContents.on("render-process-gone", () => {
+    lockProfileSession();
+  });
 
   if (isDev && !process.env.TEST_PROD_BUILD) {
     mainWindow.loadURL(devUrl).catch(() => {
@@ -171,88 +227,94 @@ function createWindow() {
   }
 
   mainWindow.on("closed", () => {
+    lockProfileSession();
+    configureIpcSecurity(null, null, () => false);
     mainWindow = null;
   });
 }
 
-app.whenReady().then(() => {
-  if (process.platform === "darwin") app.dock?.setIcon(appIconPath());
-  // Initialize database and migrations
-  try {
-    initDatabase();
-    listProfilesState();
-  } catch (error) {
-    dialog.showErrorBox("BillFlow database upgrade failed", error instanceof Error ? error.message : String(error));
-    app.quit(); return;
-  }
+app
+  .whenReady()
+  .then(() => {
+    if (process.platform === "darwin") app.dock?.setIcon(appIconPath());
+    // Initialize database and migrations
+    try {
+      initDatabase();
+      listProfilesState();
+    } catch (error) {
+      dialog.showErrorBox(
+        "BillFlow database upgrade failed",
+        error instanceof Error ? error.message : String(error),
+      );
+      app.quit();
+      return;
+    }
 
-  // Register IPC handlers
-  registerProfileHandlers(broadcastDataChanged);
-  registerClientHandlers(broadcastDataChanged);
-  registerInvoiceHandlers(broadcastDataChanged);
-  registerDashboardHandlers();
-  registerThemeHandlers();
-  registerSettingsHandlers(broadcastDataChanged);
-  registerVendorHandlers(broadcastDataChanged);
-  registerWorkOrderHandlers(broadcastDataChanged);
-  registerAnalyticsHandlers();
-  registerCatalogHandlers(broadcastDataChanged);
-  registerTaskHandlers(broadcastDataChanged);
-  registerFileHandlers(broadcastDataChanged);
-  registerExpenseHandlers(broadcastDataChanged);
-  registerCalendarHandlers(broadcastDataChanged);
+    // Register IPC handlers
+    registerWorkspaceHandlers();
+    registerProfileHandlers(broadcastDataChanged);
+    registerClientHandlers(broadcastDataChanged);
+    registerInvoiceHandlers(broadcastDataChanged);
+    registerDashboardHandlers();
+    registerThemeHandlers();
+    registerSettingsHandlers(broadcastDataChanged);
+    registerVendorHandlers(broadcastDataChanged);
+    registerWorkOrderHandlers(broadcastDataChanged);
+    registerAnalyticsHandlers();
+    registerCatalogHandlers(broadcastDataChanged);
+    registerTaskHandlers(broadcastDataChanged);
+    registerFileHandlers(broadcastDataChanged);
+    registerExpenseHandlers(broadcastDataChanged);
+    registerCalendarHandlers(broadcastDataChanged);
 
-  // Register production static file protocol
-  const outDir = app.isPackaged
-    ? path.join(app.getAppPath(), "out")
-    : path.join(__dirname, "../out");
+    // Register production static file protocol
+    const outDir = app.isPackaged
+      ? path.join(app.getAppPath(), "out")
+      : path.join(__dirname, "../out");
 
-  protocol.handle("app", async (req) => {
-    const url = new URL(req.url);
-    let filePath = path.join(outDir, decodeURIComponent(url.pathname));
+    protocol.handle("app", async (req) => {
+      const filePath = resolveStaticFile(outDir, req.url);
+      if (!filePath) return new Response("Not found", { status: 404 });
+      const response = await net.fetch(pathToFileURL(filePath).toString());
+      const headers = new Headers(response.headers);
+      headers.set("X-Content-Type-Options", "nosniff");
+      if (filePath.endsWith(".html"))
+        headers.set(
+          "Content-Security-Policy",
+          documentCsp(fs.readFileSync(filePath, "utf8")),
+        );
+      return new Response(response.body, { status: response.status, headers });
+    });
+    session.defaultSession.setPermissionRequestHandler(
+      (_contents, _permission, callback) => callback(false),
+    );
+    session.defaultSession.setPermissionCheckHandler(() => false);
+    if (app.isPackaged || process.env.TEST_PROD_BUILD === "1") {
+      session.defaultSession.webRequest.onBeforeRequest(
+        { urls: ["http://*/*", "https://*/*", "ws://*/*", "wss://*/*"] },
+        (_details, callback) => callback({ cancel: true }),
+      );
+    }
 
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-      filePath = path.join(filePath, "index.html");
-    } else if (!fs.existsSync(filePath)) {
-      if (fs.existsSync(filePath + ".html")) {
-        filePath = filePath + ".html";
-      } else if (fs.existsSync(path.join(filePath, "index.html"))) {
-        filePath = path.join(filePath, "index.html");
-      } else if (filePath.endsWith(".txt")) {
-        const altTxt = path.join(filePath.replace(/\.txt$/, ""), "index.txt");
-        if (fs.existsSync(altTxt)) {
-          filePath = altTxt;
-        }
+    createWindow();
+    createTray();
+    setupAboutPanel();
+    createApplicationMenu(() => mainWindow, showMainWindow);
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
       }
-    }
-
-    if (!filePath.startsWith(outDir) || !fs.existsSync(filePath)) {
-      const isHtmlNav = !path.extname(url.pathname) || url.pathname.endsWith(".html");
-      const fallbackIndex = path.join(outDir, "index.html");
-      if (isHtmlNav && fs.existsSync(fallbackIndex)) {
-        return net.fetch(pathToFileURL(fallbackIndex).toString());
-      }
-      return new Response("Not found", { status: 404 });
-    }
-
-    return net.fetch(pathToFileURL(filePath).toString());
+    });
+  })
+  .catch((error) => {
+    console.error("BillFlow startup failed", error);
+    dialog.showErrorBox(
+      "BillFlow could not open your data",
+      `${error instanceof Error ? error.message : String(error)}\nNo business writes were enabled. Keep your data directory and repair or reinstall the app.`,
+    );
+    app.quit();
   });
-
-  createWindow();
-  createTray();
-  setupAboutPanel();
-  createApplicationMenu(() => mainWindow, showMainWindow);
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-}).catch(error => {
-  console.error("BillFlow startup failed", error);
-  dialog.showErrorBox("BillFlow could not open your data", `${error instanceof Error ? error.message : String(error)}\nNo business writes were enabled. Keep your data directory and repair or reinstall the app.`);
-  app.quit();
-});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

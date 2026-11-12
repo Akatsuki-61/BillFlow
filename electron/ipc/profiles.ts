@@ -1,4 +1,10 @@
-import { ipcMain } from "electron";
+import {
+  initializeProfileSession,
+  unlockProfileSession,
+  lockProfileSession,
+  isWorkspaceUnlocked,
+} from "../workspace-session";
+import { ipcMain } from "../security";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -54,7 +60,14 @@ const avatarEnum = z.enum([
   "shield",
 ]);
 
-const accentEnum = z.enum(["blue", "purple", "emerald", "amber", "rose", "indigo"]);
+const accentEnum = z.enum([
+  "blue",
+  "purple",
+  "emerald",
+  "amber",
+  "rose",
+  "indigo",
+]);
 const themeEnum = z.enum(["system", "light", "dark"]);
 const currencyEnum = z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]);
 
@@ -67,13 +80,23 @@ const createProfileSchema = z.object({
   themePreference: themeEnum.optional(),
   defaultCurrency: currencyEnum.optional(),
   invoicePrefix: z.string().trim().min(1).max(12).optional(),
-  password: z.string().min(4, "Password must be at least 4 characters.").max(128).optional().or(z.literal("")),
+  password: z
+    .string()
+    .min(4, "Password must be at least 4 characters.")
+    .max(128)
+    .optional()
+    .or(z.literal("")),
   passwordHint: z.string().trim().max(80).optional(),
   seedRoleCatalog: z.boolean().optional(),
 });
 
 const updateProfileSchema = z.object({
-  name: z.string().trim().min(1, "Profile name is required.").max(60).optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Profile name is required.")
+    .max(60)
+    .optional(),
   role: roleEnum.optional(),
   subtitle: z.string().trim().max(80).optional(),
   avatar: avatarEnum.optional(),
@@ -88,7 +111,7 @@ const updateProfileSchema = z.object({
       z.null(),
     ])
     .optional(),
-  currentPassword: z.string().optional(),
+  currentPassword: z.string().max(128).optional(),
   passwordHint: z.string().trim().max(80).nullable().optional(),
   isOnboarded: z.boolean().optional(),
 });
@@ -101,19 +124,31 @@ const onboardingSlotSchema = z.object({
   accent: accentEnum,
   defaultCurrency: currencyEnum,
   invoicePrefix: z.string().trim().min(1).max(12),
-  password: z.string().min(4, "Password must be at least 4 characters.").max(128).optional().or(z.literal("")),
+  password: z
+    .string()
+    .min(4, "Password must be at least 4 characters.")
+    .max(128)
+    .optional()
+    .or(z.literal("")),
   passwordHint: z.string().trim().max(80).optional(),
   seedRoleCatalog: z.boolean().default(true),
 });
 
 const completeOnboardingSchema = z.object({
-  studioName: z.string().trim().min(1, "Your name or studio name is required.").max(80),
+  studioName: z
+    .string()
+    .trim()
+    .min(1, "Your name or studio name is required.")
+    .max(80),
   email: z.string().trim().max(120).optional().default(""),
   defaultCurrency: currencyEnum.default("USD"),
   profiles: z.array(onboardingSlotSchema).min(1).max(MAX_PROFILES),
 });
 
-export function hashProfilePassword(password: string): { hash: string; salt: string } {
+export function hashProfilePassword(password: string): {
+  hash: string;
+  salt: string;
+} {
   const isPin = /^\d{4}$/.test(password);
   const rawSalt = crypto.randomBytes(16).toString("hex");
   const salt = `${isPin ? "pin" : "pwd"}:${rawSalt}`;
@@ -121,18 +156,34 @@ export function hashProfilePassword(password: string): { hash: string; salt: str
   return { hash, salt };
 }
 
+const failedUnlocks = new Map<string, { count: number; retryAt: number }>();
 export function verifyProfilePasswordHash(
   password: string,
   storedHash: string | null | undefined,
   storedSalt: string | null | undefined,
 ): boolean {
   if (!storedHash || !storedSalt) return true;
-  if (!password) return false;
+  const attempt = failedUnlocks.get(storedSalt);
+  if (attempt && Date.now() < attempt.retryAt)
+    throw new AppError(
+      "TRY_LATER",
+      "Too many attempts. Try again in a minute.",
+    );
+  if (!password || password.length > 128) return false;
   try {
     const derived = crypto.scryptSync(password, storedSalt, 64);
     const expected = Buffer.from(storedHash, "hex");
     if (derived.length !== expected.length) return false;
-    return crypto.timingSafeEqual(derived, expected);
+    const valid = crypto.timingSafeEqual(derived, expected);
+    if (valid) failedUnlocks.delete(storedSalt);
+    else {
+      const count = (attempt?.count || 0) + 1;
+      failedUnlocks.set(storedSalt, {
+        count,
+        retryAt: count >= 5 ? Date.now() + 60000 : 0,
+      });
+    }
+    return valid;
   } catch {
     return false;
   }
@@ -174,7 +225,10 @@ function mapProfileRow(row: UserProfileRow): UserProfile {
   };
 }
 
-function syncProfilesJsonMirror(profiles: UserProfile[], activeProfileId: string) {
+function syncProfilesJsonMirror(
+  profiles: UserProfile[],
+  activeProfileId: string,
+) {
   try {
     const rootDir = path.dirname(getRootDatabasePath());
     const mirrorPath = path.join(rootDir, "profiles.json");
@@ -305,13 +359,24 @@ export function ensureDefaultProfile(): void {
     .from(settings)
     .where(eq(settings.id, "default"))
     .get();
-  const existingClients = rootDb.select({ id: clients.id }).from(clients).limit(1).all();
-  const existingInvoices = rootDb.select({ id: invoices.id }).from(invoices).limit(1).all();
+  const existingClients = rootDb
+    .select({ id: clients.id })
+    .from(clients)
+    .limit(1)
+    .all();
+  const existingInvoices = rootDb
+    .select({ id: invoices.id })
+    .from(invoices)
+    .limit(1)
+    .all();
 
   const hasExistingWorkspaceData =
     existingClients.length > 0 ||
     existingInvoices.length > 0 ||
-    Boolean(existingSetting?.businessName && existingSetting.businessName.trim().length > 0);
+    Boolean(
+      existingSetting?.businessName &&
+      existingSetting.businessName.trim().length > 0,
+    );
 
   const now = new Date().toISOString();
   const preset = PROFILE_ROLE_PRESETS["software-engineering"];
@@ -320,13 +385,9 @@ export function ensureDefaultProfile(): void {
     .insert(userProfiles)
     .values({
       id: "default",
-      name:
-        existingSetting?.businessName?.trim() ||
-        preset.defaultName,
+      name: existingSetting?.businessName?.trim() || preset.defaultName,
       role: "software-engineering",
-      subtitle:
-        existingSetting?.professionalTitle?.trim() ||
-        preset.subtitle,
+      subtitle: existingSetting?.professionalTitle?.trim() || preset.subtitle,
       avatar: preset.avatar,
       accent: preset.accent,
       themePreference: "system",
@@ -359,6 +420,7 @@ export function listProfilesState(): ProfileListResponse {
     switchWorkspaceDatabase(activeRow.id);
   }
 
+  initializeProfileSession(activeRow.id, Boolean(activeRow.passwordHash));
   const profiles = rows.map(mapProfileRow);
   syncProfilesJsonMirror(profiles, activeRow.id);
 
@@ -369,6 +431,7 @@ export function listProfilesState(): ProfileListResponse {
     activeProfileId: activeRow.id,
     maxProfiles: MAX_PROFILES,
     needsOnboarding,
+    isLocked: !isWorkspaceUnlocked(),
   };
 }
 
@@ -389,7 +452,8 @@ export function createProfile(input: CreateProfileInput): ProfileListResponse {
     );
   }
 
-  const preset = PROFILE_ROLE_PRESETS[value.role] ?? PROFILE_ROLE_PRESETS["general"];
+  const preset =
+    PROFILE_ROLE_PRESETS[value.role] ?? PROFILE_ROLE_PRESETS["general"];
   const id = `prof-${crypto.randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
 
@@ -461,7 +525,10 @@ export function createProfile(input: CreateProfileInput): ProfileListResponse {
   return listProfilesState();
 }
 
-export function updateProfile(id: string, patch: UpdateProfileInput): ProfileListResponse {
+export function updateProfile(
+  id: string,
+  patch: UpdateProfileInput,
+): ProfileListResponse {
   z.string().min(1).parse(id);
   ensureDefaultProfile();
   const value = updateProfileSchema.parse(patch);
@@ -477,10 +544,25 @@ export function updateProfile(id: string, patch: UpdateProfileInput): ProfileLis
     throw new AppError("NOT_FOUND", "Profile not found.");
   }
 
+  if (
+    id !== getActiveProfileId() &&
+    existing.passwordHash &&
+    !verifyProfilePasswordHash(
+      value.currentPassword || "",
+      existing.passwordHash,
+      existing.passwordSalt,
+    )
+  )
+    throw new AppError(
+      "INVALID_PASSWORD",
+      "Current password is incorrect. Unlock this profile before changing its settings.",
+    );
   let passwordHash = existing.passwordHash;
   let passwordSalt = existing.passwordSalt;
   let passwordHint =
-    value.passwordHint !== undefined ? value.passwordHint : existing.passwordHint;
+    value.passwordHint !== undefined
+      ? value.passwordHint
+      : existing.passwordHint;
 
   if (value.password !== undefined) {
     if (existing.passwordHash && existing.passwordSalt) {
@@ -491,7 +573,10 @@ export function updateProfile(id: string, patch: UpdateProfileInput): ProfileLis
           existing.passwordSalt,
         )
       ) {
-        throw new AppError("INVALID_PASSWORD", "Current password is incorrect.");
+        throw new AppError(
+          "INVALID_PASSWORD",
+          "Current password is incorrect.",
+        );
       }
     }
 
@@ -508,7 +593,8 @@ export function updateProfile(id: string, patch: UpdateProfileInput): ProfileLis
 
   const nextRole = (value.role ?? existing.role) as ProfileRole;
   const nextSubtitle = value.subtitle ?? existing.subtitle;
-  const nextCurrency = (value.defaultCurrency ?? existing.defaultCurrency) as Currency;
+  const nextCurrency = (value.defaultCurrency ??
+    existing.defaultCurrency) as Currency;
   const nextPrefix = value.invoicePrefix ?? existing.invoicePrefix;
   const now = new Date().toISOString();
 
@@ -526,7 +612,7 @@ export function updateProfile(id: string, patch: UpdateProfileInput): ProfileLis
       passwordHash,
       passwordSalt,
       passwordHint,
-      isOnboarded: value.isOnboarded ?? existing.isOnboarded,
+      isOnboarded: existing.isOnboarded,
       updatedAt: now,
     })
     .where(eq(userProfiles.id, id))
@@ -569,7 +655,10 @@ export function verifyProfilePassword(
   return { valid };
 }
 
-export function switchProfile(id: string, password?: string): ProfileListResponse {
+export function switchProfile(
+  id: string,
+  password?: string,
+): ProfileListResponse {
   z.string().min(1).parse(id);
   ensureDefaultProfile();
   const rootDb = getRootDb();
@@ -598,6 +687,7 @@ export function switchProfile(id: string, password?: string): ProfileListRespons
   }
 
   switchWorkspaceDatabase(target.id);
+  unlockProfileSession(target.id);
 
   // Ensure settings row exists in the switched workspace database
   const activeDb = getDb();
@@ -643,7 +733,10 @@ export function switchProfile(id: string, password?: string): ProfileListRespons
   return listProfilesState();
 }
 
-export function deleteProfile(id: string, password?: string): ProfileListResponse {
+export function deleteProfile(
+  id: string,
+  password?: string,
+): ProfileListResponse {
   z.string().min(1).parse(id);
   ensureDefaultProfile();
   const rootDb = getRootDb();
@@ -709,8 +802,28 @@ export function deleteProfile(id: string, password?: string): ProfileListRespons
 export function completeProfileOnboarding(
   input: CompleteOnboardingInput,
 ): ProfileListResponse {
+  const created: string[] = [];
+  try {
+    return getRootDb().transaction(() =>
+      completeOnboardingTransaction(input, created),
+    );
+  } catch (error) {
+    switchWorkspaceDatabase("default");
+    for (const id of created) deleteWorkspaceDatabaseFiles(id);
+    throw error;
+  }
+}
+function completeOnboardingTransaction(
+  input: CompleteOnboardingInput,
+  created: string[],
+): ProfileListResponse {
   ensureDefaultProfile();
   const value = completeOnboardingSchema.parse(input);
+  if (!listProfilesState().needsOnboarding)
+    throw new AppError(
+      "ALREADY_ONBOARDED",
+      "Onboarding has already been completed. Use profile settings to make changes.",
+    );
   const rootDb = getRootDb();
   const now = new Date().toISOString();
 
@@ -769,7 +882,9 @@ export function completeProfileOnboarding(
   for (let i = 1; i < value.profiles.length; i++) {
     const slot = value.profiles[i];
     const rawPass = slot.password?.trim() || "";
-    const creds = rawPass ? hashProfilePassword(rawPass) : { hash: null, salt: null };
+    const creds = rawPass
+      ? hashProfilePassword(rawPass)
+      : { hash: null, salt: null };
     const matchedExisting = secondaryExisting[i - 1];
 
     if (matchedExisting) {
@@ -809,6 +924,7 @@ export function completeProfileOnboarding(
       });
     } else if (currentTotal < MAX_PROFILES) {
       const newId = `prof-${crypto.randomUUID().slice(0, 8)}`;
+      created.push(newId);
       currentTotal += 1;
 
       rootDb
@@ -849,10 +965,16 @@ export function completeProfileOnboarding(
   }
 
   switchWorkspaceDatabase("default");
+  unlockProfileSession("default");
   return listProfilesState();
 }
 
 export function registerProfileHandlers(broadcast: () => void) {
+  ipcMain.handle("profiles:lock", () => {
+    lockProfileSession();
+    broadcast();
+    return { success: true };
+  });
   ipcMain.handle("profiles:list", () => {
     try {
       return listProfilesState();
@@ -884,18 +1006,15 @@ export function registerProfileHandlers(broadcast: () => void) {
     },
   );
 
-  ipcMain.handle(
-    "profiles:switch",
-    (_event, id: string, password?: string) => {
-      try {
-        const result = switchProfile(id, password);
-        broadcast();
-        return result;
-      } catch (error) {
-        throw formatError(error);
-      }
-    },
-  );
+  ipcMain.handle("profiles:switch", (_event, id: string, password?: string) => {
+    try {
+      const result = switchProfile(id, password);
+      broadcast();
+      return result;
+    } catch (error) {
+      throw formatError(error);
+    }
+  });
 
   ipcMain.handle(
     "profiles:verifyPassword",
@@ -908,18 +1027,15 @@ export function registerProfileHandlers(broadcast: () => void) {
     },
   );
 
-  ipcMain.handle(
-    "profiles:remove",
-    (_event, id: string, password?: string) => {
-      try {
-        const result = deleteProfile(id, password);
-        broadcast();
-        return result;
-      } catch (error) {
-        throw formatError(error);
-      }
-    },
-  );
+  ipcMain.handle("profiles:remove", (_event, id: string, password?: string) => {
+    try {
+      const result = deleteProfile(id, password);
+      broadcast();
+      return result;
+    } catch (error) {
+      throw formatError(error);
+    }
+  });
 
   ipcMain.handle(
     "profiles:completeOnboarding",

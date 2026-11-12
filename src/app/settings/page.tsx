@@ -1,4 +1,5 @@
 "use client";
+import { MAX_BACKUP_BYTES } from "@/lib/backup-limits";
 
 import { Dialog } from "@/components/ui/Dialog";
 
@@ -12,7 +13,7 @@ import React, {
   Suspense,
 } from "react";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   User,
@@ -171,7 +172,8 @@ function SettingsContent() {
         defaultDueDays: settings.defaultDueDays ?? 14,
         defaultTaxRate: settings.defaultTaxRate ?? 0,
         defaultNotes: settings.defaultNotes || "",
-        defaultInvoiceTemplate: settings.defaultInvoiceTemplate || "geometric-teal",
+        defaultInvoiceTemplate:
+          settings.defaultInvoiceTemplate || "geometric-teal",
         dateFormat: settings.dateFormat || "YYYY-MM-DD",
         currencyDisplay: settings.currencyDisplay || "symbol",
         pdfExportDirectory: settings.pdfExportDirectory || null,
@@ -205,7 +207,8 @@ function SettingsContent() {
       formState.defaultDueDays !== settings.defaultDueDays ||
       formState.defaultTaxRate !== settings.defaultTaxRate ||
       (formState.defaultNotes ?? "") !== (settings.defaultNotes ?? "") ||
-      (formState.defaultInvoiceTemplate || "geometric-teal") !== (settings.defaultInvoiceTemplate || "geometric-teal") ||
+      (formState.defaultInvoiceTemplate || "geometric-teal") !==
+        (settings.defaultInvoiceTemplate || "geometric-teal") ||
       formState.dateFormat !== settings.dateFormat ||
       formState.currencyDisplay !== settings.currencyDisplay ||
       (formState.pdfExportDirectory || null) !==
@@ -300,7 +303,7 @@ function SettingsContent() {
     if (!file) return;
 
     setParsedImport(null);
-    if (file.size > 150 * 1024 * 1024) {
+    if (file.size > MAX_BACKUP_BYTES) {
       setImportError("Backup must be smaller than 150 MB.");
       return;
     }
@@ -783,7 +786,8 @@ function SettingsContent() {
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-1">
                                   <span className="text-[10px] font-mono text-content-neutral-600 bg-surface-neutral-100 px-1.5 py-0.5 rounded">
-                                    {prof.invoicePrefix} · {prof.defaultCurrency}
+                                    {prof.invoicePrefix} ·{" "}
+                                    {prof.defaultCurrency}
                                   </span>
                                   <span className="text-[10px] text-content-neutral-500">
                                     {prof.hasPassword
@@ -1109,7 +1113,8 @@ function SettingsContent() {
                         Default Invoice Design Template
                       </h2>
                       <p className="text-xs text-content-neutral-500 mt-0.5">
-                        Choose the layout and style used for generating invoice previews and exported PDF documents.
+                        Choose the layout and style used for generating invoice
+                        previews and exported PDF documents.
                       </p>
                     </div>
 
@@ -1124,7 +1129,8 @@ function SettingsContent() {
                           }))
                         }
                         className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
-                          (formState.defaultInvoiceTemplate || "geometric-teal") === "geometric-teal"
+                          (formState.defaultInvoiceTemplate ||
+                            "geometric-teal") === "geometric-teal"
                             ? "border-accent bg-accent/5 ring-2 ring-accent/20"
                             : "border-line-neutral-200 dark:border-white/10 hover:border-line-neutral-300 dark:hover:border-white/20 bg-surface"
                         }`}
@@ -1139,16 +1145,20 @@ function SettingsContent() {
                           </span>
                         </div>
                         <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
-                          Modern geometric ribbons with deep slate contrast header, sharp angles, and vibrant teal highlights.
+                          Modern geometric ribbons with deep slate contrast
+                          header, sharp angles, and vibrant teal highlights.
                         </p>
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
-                          {(formState.defaultInvoiceTemplate || "geometric-teal") === "geometric-teal" ? (
+                          {(formState.defaultInvoiceTemplate ||
+                            "geometric-teal") === "geometric-teal" ? (
                             <>
                               <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
                               <span>Active Default</span>
                             </>
                           ) : (
-                            <span className="text-content-neutral-400">Click to set as default</span>
+                            <span className="text-content-neutral-400">
+                              Click to set as default
+                            </span>
                           )}
                         </div>
                       </button>
@@ -1178,16 +1188,20 @@ function SettingsContent() {
                           </span>
                         </div>
                         <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
-                          Premium dark charcoal wave header, warm golden amber accents, alternating rows, and grand total bar.
+                          Premium dark charcoal wave header, warm golden amber
+                          accents, alternating rows, and grand total bar.
                         </p>
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
-                          {formState.defaultInvoiceTemplate === "executive-wave" ? (
+                          {formState.defaultInvoiceTemplate ===
+                          "executive-wave" ? (
                             <>
                               <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
                               <span>Active Default</span>
                             </>
                           ) : (
-                            <span className="text-content-neutral-400">Click to set as default</span>
+                            <span className="text-content-neutral-400">
+                              Click to set as default
+                            </span>
                           )}
                         </div>
                       </button>
@@ -1217,16 +1231,20 @@ function SettingsContent() {
                           </span>
                         </div>
                         <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
-                          Vibrant crimson &amp; dark slate angled header, dotted rows, large total due, and geometric footer.
+                          Vibrant crimson &amp; dark slate angled header, dotted
+                          rows, large total due, and geometric footer.
                         </p>
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
-                          {formState.defaultInvoiceTemplate === "scarlet-modern" ? (
+                          {formState.defaultInvoiceTemplate ===
+                          "scarlet-modern" ? (
                             <>
                               <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
                               <span>Active Default</span>
                             </>
                           ) : (
-                            <span className="text-content-neutral-400">Click to set as default</span>
+                            <span className="text-content-neutral-400">
+                              Click to set as default
+                            </span>
                           )}
                         </div>
                       </button>
@@ -1256,16 +1274,20 @@ function SettingsContent() {
                           </span>
                         </div>
                         <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
-                          Vibrant diagonal tangerine header, solid orange table header with grid borders, and numbered terms.
+                          Vibrant diagonal tangerine header, solid orange table
+                          header with grid borders, and numbered terms.
                         </p>
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
-                          {formState.defaultInvoiceTemplate === "apex-orange" ? (
+                          {formState.defaultInvoiceTemplate ===
+                          "apex-orange" ? (
                             <>
                               <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
                               <span>Active Default</span>
                             </>
                           ) : (
-                            <span className="text-content-neutral-400">Click to set as default</span>
+                            <span className="text-content-neutral-400">
+                              Click to set as default
+                            </span>
                           )}
                         </div>
                       </button>
@@ -1295,16 +1317,20 @@ function SettingsContent() {
                           </span>
                         </div>
                         <p className="text-xs text-content-neutral-500 leading-relaxed mb-3">
-                          Dark obsidian canvas with crimson capsules, chevron accents, stadium terms, and solid crimson footer.
+                          Dark obsidian canvas with crimson capsules, chevron
+                          accents, stadium terms, and solid crimson footer.
                         </p>
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
-                          {formState.defaultInvoiceTemplate === "noir-crimson" ? (
+                          {formState.defaultInvoiceTemplate ===
+                          "noir-crimson" ? (
                             <>
                               <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
                               <span>Active Default</span>
                             </>
                           ) : (
-                            <span className="text-content-neutral-400">Click to set as default</span>
+                            <span className="text-content-neutral-400">
+                              Click to set as default
+                            </span>
                           )}
                         </div>
                       </button>

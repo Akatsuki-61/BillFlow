@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense } from "react";
+import { Suspense } from "react";
 import TasksView from "@/components/tasks/TasksView";
 
 export default function TasksPage() {

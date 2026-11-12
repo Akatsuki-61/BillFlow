@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { ExternalLink } from "lucide-react";
 import type { InvoiceTemplateProps } from "./types";
 
@@ -164,7 +163,10 @@ export function GeometricTealTemplate({
             </thead>
             <tbody className="divide-y divide-[#E2E8F0] text-xs">
               {displayItems.map((item, index) => (
-                <tr key={index} className="hover:bg-slate-50/60 transition-colors">
+                <tr
+                  key={index}
+                  className="hover:bg-slate-50/60 transition-colors"
+                >
                   <td className="py-4 pl-2 font-bold text-[#718096] tabular-nums align-top">
                     {index + 1}
                   </td>
@@ -180,7 +182,10 @@ export function GeometricTealTemplate({
                     {item.quantity}
                   </td>
                   <td className="py-4 text-right pr-2 font-black text-[#1f262e] tabular-nums align-top">
-                    {formatMoney(item.quantity * item.unitPriceCents, invoice.currency)}
+                    {formatMoney(
+                      item.quantity * item.unitPriceCents,
+                      invoice.currency,
+                    )}
                   </td>
                 </tr>
               ))}
@@ -202,8 +207,12 @@ export function GeometricTealTemplate({
                 {client?.contactPerson && (
                   <p className="text-[#718096]">Attn: {client.contactPerson}</p>
                 )}
-                {client?.phone && <p className="text-[#718096]">{client.phone}</p>}
-                {invoice.clientEmail && <p className="text-[#718096]">{invoice.clientEmail}</p>}
+                {client?.phone && (
+                  <p className="text-[#718096]">{client.phone}</p>
+                )}
+                {invoice.clientEmail && (
+                  <p className="text-[#718096]">{invoice.clientEmail}</p>
+                )}
               </div>
 
               {delivery.hasLink && (

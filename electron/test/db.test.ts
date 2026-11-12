@@ -1,3 +1,4 @@
+import { seedPayout, seedCollection } from "./financial-fixtures";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import path from "path";
 import fs from "fs";
@@ -10,7 +11,11 @@ import { getNextInvoiceCode } from "../ipc/invoices";
 import { getDashboardSummary } from "../ipc/dashboard";
 import { listVendors } from "../ipc/vendors";
 import { getAnalyticsSummary } from "../ipc/analytics";
-import { newClientSchema, newInvoiceSchema, newVendorSchema } from "../validation";
+import {
+  newClientSchema,
+  newInvoiceSchema,
+  newVendorSchema,
+} from "../validation";
 import { eq } from "drizzle-orm";
 
 describe("Database & Interconnection Tests", () => {
@@ -54,7 +59,9 @@ describe("Database & Interconnection Tests", () => {
       });
       expect(invalid.success).toBe(false);
       if (!invalid.success) {
-        expect(invalid.error.issues.some((i) => i.message.includes("@"))).toBe(true);
+        expect(invalid.error.issues.some((i) => i.message.includes("@"))).toBe(
+          true,
+        );
       }
     });
 
@@ -116,25 +123,29 @@ describe("Database & Interconnection Tests", () => {
       const clientAId = "cli-test-a";
       const clientBId = "cli-test-b";
 
-      db.insert(clients).values({
-        id: clientAId,
-        name: "Sterling Financial Technologies",
-        category: "Enterprise",
-        contactPerson: "Anthony Miller",
-        email: "anthony@sterlingfintech.com",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientAId,
+          name: "Sterling Financial Technologies",
+          category: "Enterprise",
+          contactPerson: "Anthony Miller",
+          email: "anthony@sterlingfintech.com",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
-      db.insert(clients).values({
-        id: clientBId,
-        name: "Vanguard Global Advisory",
-        category: "Enterprise",
-        contactPerson: "Benjamin Walker",
-        email: "benjamin@vanguardadvisory.com",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientBId,
+          name: "Vanguard Global Advisory",
+          category: "Enterprise",
+          contactPerson: "Benjamin Walker",
+          email: "benjamin@vanguardadvisory.com",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
       // Initial stats: both have 0 billed and 0 invoices
       let clientStats = listClientsWithStats();
@@ -152,18 +163,20 @@ describe("Database & Interconnection Tests", () => {
 
       // 3. Create an invoice for Sterling Financial Technologies ($1,500.00 / 150000 cents, UNPAID)
       const invId1 = "inv-test-1";
-      db.insert(invoices).values({
-        id: invId1,
-        code: nextCode1,
-        clientId: clientAId,
-        title: "Cloud Infrastructure Consulting",
-        amountCents: 150000,
-        currency: "USD",
-        issueDate: "2026-10-01",
-        dueDate: "2026-10-15",
-        status: "UNPAID",
-        paidCents: 0,
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: invId1,
+          code: nextCode1,
+          clientId: clientAId,
+          title: "Cloud Infrastructure Consulting",
+          amountCents: 150000,
+          currency: "USD",
+          issueDate: "2026-10-01",
+          dueDate: "2026-10-15",
+          status: "UNPAID",
+          paidCents: 0,
+        })
+        .run();
 
       // Next invoice code sequence should now advance to 002
       const nextCode2 = getNextInvoiceCode();
@@ -192,7 +205,9 @@ describe("Database & Interconnection Tests", () => {
       expect(dashboard.totalBilledByCurrency["USD"]).toBe(150000);
       expect(dashboard.outstandingByCurrency["USD"]).toBe(150000);
       expect(dashboard.recentInvoices.length).toBe(1);
-      expect(dashboard.recentInvoices[0].clientName).toBe("Sterling Financial Technologies");
+      expect(dashboard.recentInvoices[0].clientName).toBe(
+        "Sterling Financial Technologies",
+      );
 
       // 6. Settle invoice (mark as PAID)
       db.update(invoices)
@@ -211,7 +226,11 @@ describe("Database & Interconnection Tests", () => {
       expect(dashboardAfterPaid.outstandingByCurrency["USD"] || 0).toBe(0);
 
       // 7. Verify Client deletion is blocked when invoices exist
-      const clientAInvoicesCount = db.select().from(invoices).where(eq(invoices.clientId, clientAId)).all().length;
+      const clientAInvoicesCount = db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.clientId, clientAId))
+        .all().length;
       expect(clientAInvoicesCount).toBe(1);
 
       // 8. Delete Vanguard Global Advisory (has no invoices - must succeed)
@@ -242,7 +261,8 @@ describe("Database & Interconnection Tests", () => {
     });
 
     it("seeds default settings and persists updates", async () => {
-      const { getOrCreateSettings, updateSettings } = await import("../ipc/settings");
+      const { getOrCreateSettings, updateSettings } =
+        await import("../ipc/settings");
 
       // Initial query creates default settings row
       const initial = getOrCreateSettings();
@@ -272,28 +292,40 @@ describe("Database & Interconnection Tests", () => {
 
     it("exports and imports full workspace backup", async () => {
       const db = getDb();
-      const { updateSettings, exportWorkspace, importWorkspace, resetWorkspace } = await import("../ipc/settings");
+      const {
+        updateSettings,
+        exportWorkspace,
+        importWorkspace,
+        resetWorkspace,
+      } = await import("../ipc/settings");
 
       // Setup data
-      updateSettings({ businessName: "Backup Test Studio", invoicePrefix: "BK-" });
-      db.insert(clients).values({
-        id: "cli-backup-1",
-        name: "Test Client",
-        contactPerson: "Alice",
-        email: "alice@test.com",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      updateSettings({
+        businessName: "Backup Test Studio",
+        invoicePrefix: "BK-",
+      });
+      db.insert(clients)
+        .values({
+          id: "cli-backup-1",
+          name: "Test Client",
+          contactPerson: "Alice",
+          email: "alice@test.com",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
-      db.insert(invoices).values({
-        id: "inv-backup-1",
-        code: "BK-2026-001",
-        clientId: "cli-backup-1",
-        amountCents: 50000,
-        currency: "USD",
-        issueDate: "2026-10-04",
-        status: "UNPAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-backup-1",
+          code: "BK-2026-001",
+          clientId: "cli-backup-1",
+          amountCents: 50000,
+          currency: "USD",
+          issueDate: "2026-10-04",
+          status: "UNPAID",
+        })
+        .run();
 
       // Export
       const backup = exportWorkspace();
@@ -363,28 +395,32 @@ describe("Database & Interconnection Tests", () => {
 
       // Create a client
       const clientId = "cli-vnd-test-1";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Fintech Labs Inc.",
-        contactPerson: "Jane",
-        email: "jane@fintech.io",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Fintech Labs Inc.",
+          contactPerson: "Jane",
+          email: "jane@fintech.io",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
       // Insert vendor
       const vendorId = "vnd-test-1";
-      db.insert(vendors).values({
-        id: vendorId,
-        name: "DevOps Nexus",
-        service: "Kubernetes Migration",
-        balanceCents: 350000,
-        status: "PENDING",
-        iconType: "devops",
-        email: "devops@nexus.com",
-        linkedClientId: clientId,
-        payoutDueDate: "2026-10-25",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: vendorId,
+          name: "DevOps Nexus",
+          service: "Kubernetes Migration",
+          balanceCents: 350000,
+          status: "PENDING",
+          iconType: "devops",
+          email: "devops@nexus.com",
+          linkedClientId: clientId,
+          payoutDueDate: "2026-10-25",
+        })
+        .run();
 
       const list = listVendors();
       const found = list.find((v) => v.id === vendorId);
@@ -412,49 +448,59 @@ describe("Database & Interconnection Tests", () => {
       db.delete(vendors).run();
 
       // Client
-      db.insert(clients).values({
-        id: "cli-an-1",
-        name: "Apex Global",
-        contactPerson: "Mark",
-        email: "mark@apex.com",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: "cli-an-1",
+          name: "Apex Global",
+          contactPerson: "Mark",
+          email: "mark@apex.com",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
       // Invoices: 1 paid $5,000 (500000 cents), 1 unpaid $3,000 (300000 cents)
-      db.insert(invoices).values({
-        id: "inv-an-1",
-        code: "INV-2026-001",
-        clientId: "cli-an-1",
-        amountCents: 500000,
-        paidCents: 500000,
-        currency: "USD",
-        issueDate: "2026-10-01",
-        status: "PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-an-1",
+          code: "INV-2026-001",
+          clientId: "cli-an-1",
+          amountCents: 500000,
+          paidCents: 500000,
+          currency: "USD",
+          issueDate: "2026-10-01",
+          status: "PAID",
+        })
+        .run();
 
-      db.insert(invoices).values({
-        id: "inv-an-2",
-        code: "INV-2026-002",
-        clientId: "cli-an-1",
-        amountCents: 300000,
-        paidCents: 0,
-        currency: "USD",
-        issueDate: "2026-10-02",
-        dueDate: "2026-09-01", // overdue
-        status: "OVERDUE",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-an-2",
+          code: "INV-2026-002",
+          clientId: "cli-an-1",
+          amountCents: 300000,
+          paidCents: 0,
+          currency: "USD",
+          issueDate: "2026-10-02",
+          dueDate: "2026-09-01", // overdue
+          status: "OVERDUE",
+        })
+        .run();
 
       // Vendors: $2,000 (200000 cents) outsourced
-      db.insert(vendors).values({
-        id: "vnd-an-1",
-        name: "Cloud Ops",
-        service: "Infra",
-        balanceCents: 200000,
-        status: "PENDING",
-        iconType: "devops",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: "vnd-an-1",
+          name: "Cloud Ops",
+          service: "Infra",
+          balanceCents: 200000,
+          status: "PENDING",
+          iconType: "devops",
+        })
+        .run();
 
+      seedPayout("inv-an-1", "vnd-an-1", 200000);
+      seedCollection("inv-an-1");
       const summary = getAnalyticsSummary();
 
       expect(summary.totalRevenueCents).toBe(800000); // $8,000
@@ -470,7 +516,7 @@ describe("Database & Interconnection Tests", () => {
       expect(summary.monthlyTrends.length).toBe(6);
     });
 
-    it("reconciles databases migrated on the intermediate Nipun branch without errors", () => {
+    it("preserves and rejects incomplete intermediate schemas instead of skipping required workflow tables", () => {
       closeDatabaseForTesting();
       const branchDbPath = path.join(tempDir, "branch.db");
       const sqlite = new Database(branchDbPath);
@@ -483,12 +529,17 @@ describe("Database & Interconnection Tests", () => {
         CREATE TABLE settings (id text PRIMARY KEY, business_name text NOT NULL);
       `);
       sqlite.close();
-      const { sqlite: connected } = initDatabase(branchDbPath);
-      expect(connected.pragma("foreign_key_check")).toEqual([]);
-      expect(connected.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='catalog_items'").get()).toBeTruthy();
-      const columns = (connected.prepare("PRAGMA table_info(invoices)").all() as { name: string }[]).map(c => c.name);
-      expect(columns).toContain("catalog_item_id");
-      expect(columns).toContain("request_hash");
+      expect(() => initDatabase(branchDbPath)).toThrow(
+        /incomplete legacy workspace/,
+      );
+      const preserved = new Database(branchDbPath);
+      expect(
+        preserved.prepare("SELECT count(*) n FROM __drizzle_migrations").get(),
+      ).toEqual({ n: 6 });
+      preserved.close();
+      expect(
+        fs.readdirSync(tempDir).some((name) => name.includes("before-upgrade")),
+      ).toBe(true);
     });
   });
 });

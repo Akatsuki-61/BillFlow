@@ -43,6 +43,8 @@ yarn-error.log*
 next-env.d.ts
 
 # electron & local database
+/.billflow-dev/
+/build/THIRD_PARTY_NOTICES.txt
 /dist-electron/
 /release/
 *.db

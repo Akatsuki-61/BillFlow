@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -216,9 +216,12 @@ export function OverdueSummaryDialog({
                 businessName: freelancerName,
                 primaryCurrency,
               })
-            : convertCsvToExcelWorkbook(generateOverdueSummaryCsv(overdueList), {
-                sheetName: "Overdue Register",
-              });
+            : convertCsvToExcelWorkbook(
+                generateOverdueSummaryCsv(overdueList),
+                {
+                  sheetName: "Overdue Register",
+                },
+              );
         const filename = `overdue-invoices-${suffix}-${todayStr}.xls`;
         downloadExcelFile(filename, workbookXml);
         showToast(
@@ -830,9 +833,7 @@ export function OverdueSummaryDialog({
                   <th className="py-3 px-3">Oldest Due / Delay</th>
                   <th className="py-3 px-3 text-right">Total Billed</th>
                   <th className="py-3 px-3 text-right">Total Paid</th>
-                  <th className="py-3 px-4 text-right">
-                    Consolidated Overdue
-                  </th>
+                  <th className="py-3 px-4 text-right">Consolidated Overdue</th>
                   <th className="py-3 px-3 text-center">Remind Client</th>
                 </tr>
               </thead>
@@ -1076,8 +1077,8 @@ export function OverdueSummaryDialog({
                       <strong className="text-accent">
                         RFC 4180 CSV Engine Active:
                       </strong>{" "}
-                      Generates UTF-8 comma-separated values (
-                      <code>.csv</code>) with escaped quotes and summary totals.
+                      Generates UTF-8 comma-separated values (<code>.csv</code>)
+                      with escaped quotes and summary totals.
                     </>
                   )}
                 </span>

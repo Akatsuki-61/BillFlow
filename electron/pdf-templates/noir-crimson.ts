@@ -1,5 +1,5 @@
 import { InvoicePdfPayload } from "./types";
-import { escapeHtml, formatMoney } from "./helpers";
+import { escapeHtml, formatMoney, invoiceFontCss } from "./helpers";
 
 export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
   const subtotalCents =
@@ -9,8 +9,12 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
   const paidCents = data.paidCents || 0;
   const balanceDueCents = Math.max(0, data.amountCents - paidCents);
 
-  const businessName = escapeHtml(data.business?.businessName || "CHETHAKA LAKSHITHA");
-  const professionalTitle = escapeHtml(data.business?.professionalTitle || "FULL-STACK & SYSTEMS CONSULTING");
+  const businessName = escapeHtml(
+    data.business?.businessName || "CHETHAKA LAKSHITHA",
+  );
+  const professionalTitle = escapeHtml(
+    data.business?.professionalTitle || "FULL-STACK & SYSTEMS CONSULTING",
+  );
   const clientName = escapeHtml(data.client?.name || "Client Name");
   const clientEmail = escapeHtml(data.client?.email || "client@example.com");
   const clientPhone = data.client?.phone ? escapeHtml(data.client.phone) : "";
@@ -50,10 +54,8 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
 <html>
 <head>
   <meta charset="utf-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    ${invoiceFontCss()}
     @page { size: A4 portrait; margin: 0; }
     * {
       box-sizing: border-box;

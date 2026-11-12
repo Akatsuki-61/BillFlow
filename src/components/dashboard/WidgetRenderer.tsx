@@ -1,4 +1,5 @@
 "use client";
+import { calculateFinancials } from "@/lib/financials";
 
 import React, { useState, useMemo, useId } from "react";
 import Link from "next/link";
@@ -9,7 +10,6 @@ import {
   sharePercent,
   taskProgress,
   recentMonths,
-  localDateKey,
   SHORT_MONTHS,
 } from "@/lib/visual-metrics";
 import { useRouter } from "next/navigation";
@@ -93,7 +93,8 @@ export function WidgetRenderer({
   const { vendors } = useVendors();
   const { activeCurrency } = useActiveCurrency();
   const { tasks, expenses, workOrders } = useData();
-  const { draggedWidgetId, startWidgetDrag, endWidgetDrag } = useWidgetContext();
+  const { draggedWidgetId, startWidgetDrag, endWidgetDrag } =
+    useWidgetContext();
   const isBeingDragged = draggedWidgetId === widgetId;
 
   const [hoveredFunnelIdx, setHoveredFunnelIdx] = useState<number | null>(null);
@@ -107,18 +108,18 @@ export function WidgetRenderer({
     [invoices, activeCurrency, period],
   );
 
-  // Costs use job work orders in the same invoice cohort and currency.
-  const totalOutsourcedCents = useMemo(
+  const financials = useMemo(
     () =>
-      workOrders
-        .filter(
-          (order) =>
-            order.currency === activeCurrency &&
-            filteredInvoices.some((inv) => inv.id === order.invoiceId),
-        )
-        .reduce((sum, order) => sum + order.feeCents, 0),
-    [workOrders, activeCurrency, filteredInvoices],
+      calculateFinancials({
+        invoices,
+        workOrders,
+        expenses,
+        period,
+        currency: activeCurrency,
+      }),
+    [invoices, workOrders, expenses, period, activeCurrency],
   );
+  const totalOutsourcedCents = financials.paidCostCents;
 
   const outsourcedCostsStr = useMemo(() => {
     return formatCents(totalOutsourcedCents, activeCurrency);
@@ -209,51 +210,7 @@ export function WidgetRenderer({
     return formatCents(pendingCents, activeCurrency);
   }, [pendingCents, activeCurrency]);
 
-  // Filter general operational expenses
-  const filteredExpenses = useMemo(() => {
-    if (!expenses) return [];
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    return expenses.filter((e) => {
-      if (
-        activeCurrency &&
-        e.currency &&
-        e.currency.toUpperCase() !== activeCurrency.toUpperCase()
-      ) {
-        return false;
-      }
-      if (!period || period === "all") return true;
-      if (!e.incurredAt) return true;
-      const eDate = new Date(e.incurredAt);
-      if (isNaN(eDate.getTime())) return true;
-
-      if (period === "year") {
-        return eDate.getFullYear() === currentYear;
-      }
-      if (period === "month") {
-        return (
-          eDate.getFullYear() === currentYear &&
-          eDate.getMonth() === currentMonth
-        );
-      }
-      if (period === "quarter") {
-        const eQuarter = Math.floor(eDate.getMonth() / 3);
-        const currQuarter = Math.floor(currentMonth / 3);
-        return eDate.getFullYear() === currentYear && eQuarter === currQuarter;
-      }
-      return true;
-    });
-  }, [expenses, period, activeCurrency]);
-
-  const generalExpensesCents = useMemo(() => {
-    return filteredExpenses.reduce((sum, e) => sum + (e.amountCents || 0), 0);
-  }, [filteredExpenses]);
-
-  const opexCents = useMemo(() => {
-    return totalOutsourcedCents + generalExpensesCents;
-  }, [totalOutsourcedCents, generalExpensesCents]);
+  const opexCents = financials.totalOperatingCostsCents;
 
   const opexStr = useMemo(() => {
     return formatCents(opexCents, activeCurrency);
@@ -265,8 +222,8 @@ export function WidgetRenderer({
   }, [opexCents, totalRevenueCents]);
 
   const netProfitCents = useMemo(() => {
-    return totalRevenueCents - opexCents;
-  }, [totalRevenueCents, opexCents]);
+    return financials.netProfitCents;
+  }, [financials.netProfitCents]);
 
   const isLoss = netProfitCents < 0;
 
@@ -574,7 +531,9 @@ export function WidgetRenderer({
               </div>
             </div>
           )}
-          {barPct === undefined && <p className="summary-caption">{subtitle}</p>}
+          {barPct === undefined && (
+            <p className="summary-caption">{subtitle}</p>
+          )}
         </div>
 
         <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
@@ -605,33 +564,7 @@ export function WidgetRenderer({
       collectedCents += collected;
     });
 
-    const contractorCents = workOrders
-      .filter(
-        (order) =>
-          order.currency === activeCurrency &&
-          filteredInvoices.some((inv) => inv.id === order.invoiceId),
-      )
-      .reduce((sum, order) => sum + order.feeCents, 0);
-
-    const generalExpCents = (expenses || [])
-      .filter(
-        (expense) =>
-          expense.currency === activeCurrency &&
-          (period === "all" ||
-            (period === "year"
-              ? expense.incurredAt.slice(0, 4) ===
-                String(new Date().getFullYear())
-              : period === "month"
-                ? expense.incurredAt.slice(0, 7) === localDateKey().slice(0, 7)
-                : new Date(expense.incurredAt).getFullYear() ===
-                    new Date().getFullYear() &&
-                  Math.floor(new Date(expense.incurredAt).getMonth() / 3) ===
-                    Math.floor(new Date().getMonth() / 3))),
-      )
-      .reduce((sum, e) => sum + (e.amountCents || 0), 0);
-
-    const billedProfitCents =
-      totalBilledCents - contractorCents - generalExpCents;
+    const billedProfitCents = financials.netProfitCents;
 
     const collectionRatePct =
       totalBilledCents > 0
@@ -671,22 +604,19 @@ export function WidgetRenderer({
       },
       {
         metric: formatCents(billedProfitCents, activeCurrency),
-        title:
-          "Billed profit after agreed contractor fees and operating expenses",
+        title: "Billed profit after recorded payouts and operating expenses",
         description:
-          "Issued invoice totals less agreed work order fees and recorded expenses. This includes unpaid invoices and contractor fees awaiting payout.",
+          "Issued invoice totals less actual contractor payouts and recorded operating expenses, in the selected currency and period.",
         actionLabel: "Open Expenses",
         actionHref: "/expenses",
       },
     ];
   }, [
     filteredInvoices,
-    workOrders,
-    expenses,
+    financials.netProfitCents,
     tasks,
     clients,
     activeCurrency,
-    period,
   ]);
 
   // Render individual widget based on ID

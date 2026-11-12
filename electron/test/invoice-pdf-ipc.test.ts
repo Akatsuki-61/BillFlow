@@ -1,3 +1,4 @@
+import { trustedEvent } from "./trusted-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import fs from "fs";
 import os from "os";
@@ -9,7 +10,11 @@ import { createInvoice, registerInvoiceHandlers } from "../ipc/invoices";
 import { updateSettings } from "../ipc/settings";
 import { buildInvoiceHtml } from "../pdf-generator";
 
-vi.mock("electron", () => ({ app: undefined, ipcMain: { handle: vi.fn() } }));
+vi.mock("electron", () => ({
+  app: undefined,
+  BrowserWindow: undefined,
+  ipcMain: { handle: vi.fn() },
+}));
 
 let directory: string;
 beforeEach(() => {
@@ -26,15 +31,29 @@ afterEach(() => {
 
 it("returns the PDF result promised by the preload API", async () => {
   const invoice = createInvoice({
-    requestId: randomUUID(), code: "PDF-001", currency: "LKR", amountCents: 100000,
-    newClient: { name: "Website client", contactPerson: "Client", email: "client@example.com", currency: "LKR" },
-    items: [{ description: "AI consulting", quantity: 1, unitPriceCents: 100000 }],
+    requestId: randomUUID(),
+    code: "PDF-001",
+    currency: "LKR",
+    amountCents: 100000,
+    newClient: {
+      name: "Website client",
+      contactPerson: "Client",
+      email: "client@example.com",
+      currency: "LKR",
+    },
+    items: [
+      { description: "AI consulting", quantity: 1, unitPriceCents: 100000 },
+    ],
   });
   registerInvoiceHandlers(() => {});
-  const handler = vi.mocked(ipcMain.handle).mock.calls.find(([channel]) => channel === "invoices:exportPdf")![1];
-  const result = await handler({} as Electron.IpcMainInvokeEvent, invoice.id);
+  const handler = vi
+    .mocked(ipcMain.handle)
+    .mock.calls.find(([channel]) => channel === "invoices:exportPdf")![1];
+  const result = await handler(trustedEvent(), invoice.id);
   expect(result).toMatchObject({ success: true, filePath: expect.any(String) });
-  expect(fs.readFileSync(result.filePath).subarray(0, 5).toString()).toBe("%PDF-");
+  expect(fs.readFileSync(result.filePath).subarray(0, 5).toString()).toBe(
+    "%PDF-",
+  );
 });
 
 it("renders Geometric Teal, Executive Wave, Scarlet Modern, and Apex Orange templates correctly", () => {
@@ -45,9 +64,18 @@ it("renders Geometric Teal, Executive Wave, Scarlet Modern, and Apex Orange temp
     currency: "USD",
     status: "UNPAID",
     amountCents: 150000,
-    items: [{ description: "Full-Stack Development", quantity: 1, unitPriceCents: 150000 }],
+    items: [
+      {
+        description: "Full-Stack Development",
+        quantity: 1,
+        unitPriceCents: 150000,
+      },
+    ],
     client: { name: "Acme Corp", email: "acme@example.com" },
-    business: { businessName: "Chethaka Lakshitha", professionalTitle: "Software Consultant" },
+    business: {
+      businessName: "Chethaka Lakshitha",
+      professionalTitle: "Software Consultant",
+    },
   };
 
   const tealHtml = buildInvoiceHtml({ ...payload, template: "geometric-teal" });
@@ -59,7 +87,10 @@ it("renders Geometric Teal, Executive Wave, Scarlet Modern, and Apex Orange temp
   expect(waveHtml).toContain("grand-total-banner");
   expect(waveHtml).toContain("th-gold");
 
-  const scarletHtml = buildInvoiceHtml({ ...payload, template: "scarlet-modern" });
+  const scarletHtml = buildInvoiceHtml({
+    ...payload,
+    template: "scarlet-modern",
+  });
   expect(scarletHtml).toContain("header-svg");
   expect(scarletHtml).toContain("th-red");
   expect(scarletHtml).toContain("due-amount");

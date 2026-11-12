@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { ExternalLink, Phone, Mail, MapPin } from "lucide-react";
 import type { InvoiceTemplateProps } from "./types";
 
@@ -135,10 +134,14 @@ export function ApexOrangeTemplate({
               </p>
             )}
             {client?.phone && (
-              <p className="text-xs text-slate-600 mt-0.5">Phone: {client.phone}</p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Phone: {client.phone}
+              </p>
             )}
             {invoice.clientEmail && (
-              <p className="text-xs text-slate-600 mt-0.5">{invoice.clientEmail}</p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {invoice.clientEmail}
+              </p>
             )}
             {delivery.hasLink && (
               <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-700 font-medium">
@@ -202,7 +205,10 @@ export function ApexOrangeTemplate({
                     {item.quantity}
                   </td>
                   <td className="py-3 px-4 border border-slate-200 text-right text-xs font-bold text-slate-900 tabular-nums align-top">
-                    {formatMoney(item.quantity * item.unitPriceCents, invoice.currency)}
+                    {formatMoney(
+                      item.quantity * item.unitPriceCents,
+                      invoice.currency,
+                    )}
                   </td>
                 </tr>
               ))}
@@ -219,16 +225,14 @@ export function ApexOrangeTemplate({
             </div>
             <div className="text-[10.5px] text-slate-600 leading-relaxed font-medium space-y-1">
               <p>
-                01. Payment is due within agreed terms. Development proceeds upon confirmation of payment.
+                01. Payment is due within agreed terms. Development proceeds
+                upon confirmation of payment.
               </p>
               <p>
-                02. All deliverable milestones, intellectual property, and documentation transfer upon settlement.
+                02. All deliverable milestones, intellectual property, and
+                documentation transfer upon settlement.
               </p>
-              {invoice.notes && (
-                <p>
-                  03. {invoice.notes}
-                </p>
-              )}
+              {invoice.notes && <p>03. {invoice.notes}</p>}
             </div>
 
             {/* Closing Notice */}

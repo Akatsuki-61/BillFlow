@@ -1,4 +1,5 @@
-import { app, ipcMain, shell } from "electron";
+import { shell } from "electron";
+import { ipcMain } from "../security";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
 import { execFile, execSync } from "child_process";
@@ -6,9 +7,15 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import Database from "better-sqlite3";
-import { getDb } from "../db";
-import { calendarEvents, clients, tasks } from "../db/schema";
-import { newCalendarEventSchema, calendarEventPatchSchema } from "../validation";
+import { getDb, getDatabasePath, getActiveProfileId } from "../db";
+import { captureWorkspace, isWorkspaceUnlocked } from "../workspace-session";
+import { atomicWrite } from "../managed-files";
+import { z } from "zod";
+import { calendarEvents, clients, tasks, taskTimeSlots } from "../db/schema";
+import {
+  newCalendarEventSchema,
+  calendarEventPatchSchema,
+} from "../validation";
 import { recordId } from "../workflow-validation";
 import { AppError } from "./errors";
 import {
@@ -33,7 +40,9 @@ import type {
  * Internal silent auto-healer for calendar event inputs & links.
  * Repairs date/time formats and resolves Task <-> Client foreign keys before DB write.
  */
-function autoHealCalendarInput(raw: NewCalendarEventInput): NewCalendarEventInput {
+function autoHealCalendarInput(
+  raw: NewCalendarEventInput,
+): NewCalendarEventInput {
   const db = getDb();
   const fixedStart = normalizeAndAutoFixDate(raw.startDate);
   let fixedEnd = raw.endDate
@@ -46,7 +55,7 @@ function autoHealCalendarInput(raw: NewCalendarEventInput): NewCalendarEventInpu
   const fixedTimes = normalizeAndAutoFixTimeRange(
     raw.startTime,
     raw.endTime,
-    raw.isAllDay
+    raw.isAllDay,
   );
 
   let validTaskId: string | null = raw.taskId || null;
@@ -116,7 +125,11 @@ export function listCalendarEvents(filter?: {
 
   return allEvents
     .filter((evt) => {
-      if (filter?.category && filter.category !== "all" && evt.category !== filter.category) {
+      if (
+        filter?.category &&
+        filter.category !== "all" &&
+        evt.category !== filter.category
+      ) {
         return false;
       }
       if (filter?.taskId && evt.taskId !== filter.taskId) {
@@ -135,7 +148,9 @@ export function listCalendarEvents(filter?: {
       title: evt.title,
       description: evt.description,
       startDate: normalizeAndAutoFixDate(evt.startDate),
-      endDate: evt.endDate ? normalizeAndAutoFixDate(evt.endDate, evt.startDate) : null,
+      endDate: evt.endDate
+        ? normalizeAndAutoFixDate(evt.endDate, evt.startDate)
+        : null,
       startTime: evt.startTime || null,
       endTime: evt.endTime || null,
       isAllDay: Boolean(evt.isAllDay),
@@ -154,7 +169,11 @@ export function listCalendarEvents(filter?: {
 export function getCalendarEvent(idInput: string): CalendarEventItem {
   const id = recordId.parse(idInput);
   const db = getDb();
-  const evt = db.select().from(calendarEvents).where(eq(calendarEvents.id, id)).get();
+  const evt = db
+    .select()
+    .from(calendarEvents)
+    .where(eq(calendarEvents.id, id))
+    .get();
   if (!evt) {
     throw new AppError("NOT_FOUND", "Calendar event not found.");
   }
@@ -164,7 +183,9 @@ export function getCalendarEvent(idInput: string): CalendarEventItem {
     title: evt.title,
     description: evt.description,
     startDate: normalizeAndAutoFixDate(evt.startDate),
-    endDate: evt.endDate ? normalizeAndAutoFixDate(evt.endDate, evt.startDate) : null,
+    endDate: evt.endDate
+      ? normalizeAndAutoFixDate(evt.endDate, evt.startDate)
+      : null,
     startTime: evt.startTime || null,
     endTime: evt.endTime || null,
     isAllDay: Boolean(evt.isAllDay),
@@ -182,7 +203,7 @@ export function getCalendarEvent(idInput: string): CalendarEventItem {
 
 export function createCalendarEvent(
   input: NewCalendarEventInput,
-  broadcast?: () => void
+  broadcast?: () => void,
 ): CalendarEventItem {
   const healed = autoHealCalendarInput(input);
   const parsed = newCalendarEventSchema.parse(healed);
@@ -219,11 +240,15 @@ export function createCalendarEvent(
 export function updateCalendarEvent(
   idInput: string,
   input: CalendarEventPatchInput,
-  broadcast?: () => void
+  broadcast?: () => void,
 ): CalendarEventItem {
   const id = recordId.parse(idInput);
   const db = getDb();
-  const existing = db.select().from(calendarEvents).where(eq(calendarEvents.id, id)).get();
+  const existing = db
+    .select()
+    .from(calendarEvents)
+    .where(eq(calendarEvents.id, id))
+    .get();
   if (!existing) {
     throw new AppError("NOT_FOUND", "Calendar event not found.");
   }
@@ -246,11 +271,13 @@ export function updateCalendarEvent(
   }
 
   const mergedIsAllDay =
-    parsed.isAllDay !== undefined ? Boolean(parsed.isAllDay) : Boolean(existing.isAllDay);
+    parsed.isAllDay !== undefined
+      ? Boolean(parsed.isAllDay)
+      : Boolean(existing.isAllDay);
   const fixedTimes = normalizeAndAutoFixTimeRange(
     parsed.startTime !== undefined ? parsed.startTime : existing.startTime,
     parsed.endTime !== undefined ? parsed.endTime : existing.endTime,
-    mergedIsAllDay
+    mergedIsAllDay,
   );
 
   let validClientId =
@@ -258,7 +285,11 @@ export function updateCalendarEvent(
   let resolvedClientName =
     parsed.clientName !== undefined ? parsed.clientName : existing.clientName;
   if (validClientId) {
-    const client = db.select().from(clients).where(eq(clients.id, validClientId)).get();
+    const client = db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, validClientId))
+      .get();
     if (client) {
       resolvedClientName = client.name;
     } else {
@@ -286,7 +317,9 @@ export function updateCalendarEvent(
   db.update(calendarEvents)
     .set({
       ...(parsed.title !== undefined ? { title: parsed.title } : {}),
-      ...(parsed.description !== undefined ? { description: parsed.description } : {}),
+      ...(parsed.description !== undefined
+        ? { description: parsed.description }
+        : {}),
       startDate: mergedStartDate,
       endDate: mergedEndDate,
       startTime: fixedTimes.startTime,
@@ -308,10 +341,17 @@ export function updateCalendarEvent(
   return getCalendarEvent(id);
 }
 
-export function deleteCalendarEvent(idInput: string, broadcast?: () => void): { success: boolean } {
+export function deleteCalendarEvent(
+  idInput: string,
+  broadcast?: () => void,
+): { success: boolean } {
   const id = recordId.parse(idInput);
   const db = getDb();
-  const existing = db.select().from(calendarEvents).where(eq(calendarEvents.id, id)).get();
+  const existing = db
+    .select()
+    .from(calendarEvents)
+    .where(eq(calendarEvents.id, id))
+    .get();
   if (!existing) {
     throw new AppError("NOT_FOUND", "Calendar event not found.");
   }
@@ -328,9 +368,11 @@ const APPLE_COREDATA_EPOCH_OFFSET_SEC = 978307200; // Seconds between 1970-01-01
 
 function coreDataSecondsToLocalDateAndTime(
   coreDataSec: number,
-  isAllDay: boolean
+  isAllDay: boolean,
 ): { dateStr: string; timeStr: string | null } {
-  const jsDate = new Date((coreDataSec + APPLE_COREDATA_EPOCH_OFFSET_SEC) * 1000);
+  const jsDate = new Date(
+    (coreDataSec + APPLE_COREDATA_EPOCH_OFFSET_SEC) * 1000,
+  );
   const y = jsDate.getFullYear();
   const m = String(jsDate.getMonth() + 1).padStart(2, "0");
   const d = String(jsDate.getDate()).padStart(2, "0");
@@ -346,24 +388,57 @@ function coreDataSecondsToLocalDateAndTime(
 function inferMacCalendarColor(calendarTitle: string): EventColor {
   const lower = (calendarTitle || "").toLowerCase();
   if (lower.includes("holiday") || lower.includes("family")) return "emerald";
-  if (lower.includes("work") || lower.includes("university") || lower.includes("ousl")) return "purple";
-  if (lower.includes("deadline") || lower.includes("exam") || lower.includes("cat")) return "rose";
+  if (
+    lower.includes("work") ||
+    lower.includes("university") ||
+    lower.includes("ousl")
+  )
+    return "purple";
+  if (
+    lower.includes("deadline") ||
+    lower.includes("exam") ||
+    lower.includes("cat")
+  )
+    return "rose";
   if (lower.includes("home")) return "blue";
   return "cyan";
 }
 
-function inferMacEventCategory(summary: string, calendarTitle: string): EventCategory {
+function inferMacEventCategory(
+  summary: string,
+  calendarTitle: string,
+): EventCategory {
   const combined = `${summary} ${calendarTitle}`.toLowerCase();
-  if (combined.includes("cat ") || combined.includes("exam") || combined.includes("deadline") || combined.includes("due")) {
+  if (
+    combined.includes("cat ") ||
+    combined.includes("exam") ||
+    combined.includes("deadline") ||
+    combined.includes("due")
+  ) {
     return "deadline";
   }
-  if (combined.includes("holiday") || combined.includes("poya") || combined.includes("deepavali") || combined.includes("milestone")) {
+  if (
+    combined.includes("holiday") ||
+    combined.includes("poya") ||
+    combined.includes("deepavali") ||
+    combined.includes("milestone")
+  ) {
     return "milestone";
   }
-  if (combined.includes("review") || combined.includes("ps") || combined.includes("ils") || combined.includes("audit")) {
+  if (
+    combined.includes("review") ||
+    combined.includes("ps") ||
+    combined.includes("ils") ||
+    combined.includes("audit")
+  ) {
     return "review";
   }
-  if (combined.includes("meet") || combined.includes("call") || combined.includes("zoom") || combined.includes("session")) {
+  if (
+    combined.includes("meet") ||
+    combined.includes("call") ||
+    combined.includes("zoom") ||
+    combined.includes("session")
+  ) {
     return "meeting";
   }
   return "general";
@@ -402,8 +477,14 @@ function upsertNativeMacEventToBillFlowDb(raw: {
   const now = new Date().toISOString();
 
   const fixedStart = normalizeAndAutoFixDate(raw.startDate);
-  const fixedEnd = raw.endDate ? normalizeAndAutoFixDate(raw.endDate, fixedStart) : fixedStart;
-  const fixedTimes = normalizeAndAutoFixTimeRange(raw.startTime, raw.endTime, raw.isAllDay);
+  const fixedEnd = raw.endDate
+    ? normalizeAndAutoFixDate(raw.endDate, fixedStart)
+    : fixedStart;
+  const fixedTimes = normalizeAndAutoFixTimeRange(
+    raw.startTime,
+    raw.endTime,
+    raw.isAllDay,
+  );
   const category = inferMacEventCategory(cleanTitle, raw.calendarName);
   const color = inferMacCalendarColor(raw.calendarName);
   const descWithSource = raw.calendarName
@@ -474,50 +555,68 @@ type TaskTimeSlotMap = Record<
   { startTime: string | null; endTime: string | null }
 >;
 
-let cachedTaskTimeSlots: TaskTimeSlotMap = {};
-
-function getTaskTimeSlotsPath(): string | null {
-  try {
-    return path.join(app.getPath("userData"), "billflow-task-times.json");
-  } catch {
-    return null;
-  }
+const timeSlotSchema = z
+  .record(
+    z.string().min(1).max(160),
+    z
+      .object({
+        startTime: z
+          .string()
+          .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+          .nullable(),
+        endTime: z
+          .string()
+          .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+          .nullable(),
+      })
+      .strict(),
+  )
+  .refine(
+    (value) => Object.keys(value).length <= 10000,
+    "Too many task schedules",
+  );
+export function loadPersistedTaskTimeSlots(): TaskTimeSlotMap {
+  return Object.fromEntries(
+    getDb()
+      .select()
+      .from(taskTimeSlots)
+      .all()
+      .map((row) => [
+        row.taskId,
+        { startTime: row.startTime, endTime: row.endTime },
+      ]),
+  );
 }
-
-function loadPersistedTaskTimeSlots(): TaskTimeSlotMap {
-  if (Object.keys(cachedTaskTimeSlots).length > 0) {
-    return cachedTaskTimeSlots;
-  }
-  const filePath = getTaskTimeSlotsPath();
-  if (!filePath) return cachedTaskTimeSlots;
-  try {
-    if (fs.existsSync(filePath)) {
-      const raw = fs.readFileSync(filePath, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        cachedTaskTimeSlots = parsed;
+export function savePersistedTaskTimeSlots(
+  incoming?: TaskTimeSlotMap,
+): TaskTimeSlotMap {
+  if (incoming) {
+    const slots = timeSlotSchema.parse(incoming);
+    const db = getDb();
+    db.transaction((tx) => {
+      for (const [id, slot] of Object.entries(slots)) {
+        if (
+          !tx
+            .select()
+            .from(tasks)
+            .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+            .get()
+        )
+          continue;
+        tx.insert(taskTimeSlots)
+          .values({ taskId: id, ...slot, updatedAt: new Date().toISOString() })
+          .onConflictDoUpdate({
+            target: taskTimeSlots.taskId,
+            set: { ...slot, updatedAt: new Date().toISOString() },
+          })
+          .run();
       }
-    }
-  } catch {}
-  return cachedTaskTimeSlots;
+    });
+  }
+  return loadPersistedTaskTimeSlots();
 }
 
-function savePersistedTaskTimeSlots(incoming?: TaskTimeSlotMap): TaskTimeSlotMap {
-  const current = loadPersistedTaskTimeSlots();
-  if (!incoming || typeof incoming !== "object") {
-    return current;
-  }
-  cachedTaskTimeSlots = { ...current, ...incoming };
-  const filePath = getTaskTimeSlotsPath();
-  if (filePath) {
-    try {
-      fs.writeFileSync(filePath, JSON.stringify(cachedTaskTimeSlots), "utf-8");
-    } catch {}
-  }
-  return cachedTaskTimeSlots;
-}
-
-let lastSqlitePullAt = 0;
+const lastSqlitePullByProfile = new Map<string, number>();
 
 /**
  * Reads events directly from macOS Calendar.sqlitedb (OccurrenceCache + CalendarItem) if accessible.
@@ -531,13 +630,19 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
     return { accessible: false, changedCount: 0 };
   }
   const nowMs = Date.now();
-  if (!forcePull && nowMs - lastSqlitePullAt < 15000) {
+  if (
+    !forcePull &&
+    nowMs - (lastSqlitePullByProfile.get(getActiveProfileId()) || 0) < 15000
+  ) {
     return { accessible: true, changedCount: 0 };
   }
 
   const home = os.homedir();
   const candidatePaths = [
-    path.join(home, "Library/Group Containers/group.com.apple.calendar/Calendar.sqlitedb"),
+    path.join(
+      home,
+      "Library/Group Containers/group.com.apple.calendar/Calendar.sqlitedb",
+    ),
     path.join(home, "Library/Calendars/Calendar.sqlitedb"),
   ];
 
@@ -556,11 +661,16 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
   let importedCount = 0;
   let accessible = false;
   try {
-    macDb = new Database(dbPath, { readonly: true, fileMustExist: true, timeout: 1000 });
+    macDb = new Database(dbPath, {
+      readonly: true,
+      fileMustExist: true,
+      timeout: 1000,
+    });
     accessible = true;
-    lastSqlitePullAt = nowMs;
+    lastSqlitePullByProfile.set(getActiveProfileId(), nowMs);
 
-    const nowCoreDataSec = Math.floor(nowMs / 1000) - APPLE_COREDATA_EPOCH_OFFSET_SEC;
+    const nowCoreDataSec =
+      Math.floor(nowMs / 1000) - APPLE_COREDATA_EPOCH_OFFSET_SEC;
     const minSec = nowCoreDataSec - 90 * 86400; // 90 days ago
     const maxSec = nowCoreDataSec + 365 * 86400; // 365 days ahead
 
@@ -601,7 +711,7 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
             AND ci.summary IS NOT NULL
           ORDER BY oc.occurrence_start_date ASC
           LIMIT 600
-        `
+        `,
         )
         .all(minSec, maxSec) as RawCalendarRow[];
     } catch {
@@ -631,7 +741,7 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
               AND ci.summary IS NOT NULL
             ORDER BY ci.start_date ASC
             LIMIT 500
-          `
+          `,
           )
           .all(minSec, maxSec) as RawCalendarRow[];
       } catch {}
@@ -676,7 +786,10 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
 function isMacCalendarAppRunning(): boolean {
   if (process.platform !== "darwin") return false;
   try {
-    const stdout = execSync("pgrep -x Calendar", { encoding: "utf-8", timeout: 300 });
+    const stdout = execSync("pgrep -x Calendar", {
+      encoding: "utf-8",
+      timeout: 300,
+    });
     return Boolean(stdout.trim());
   } catch {
     return false;
@@ -700,7 +813,7 @@ function syncWithMacOsCalendarAppViaJxa(
     isAllDay: boolean;
     location: string | null;
   }>,
-  shouldPullEvents = false
+  shouldPullEvents = false,
 ): Promise<{
   pulledEvents: Array<{
     uidKey: string;
@@ -718,7 +831,11 @@ function syncWithMacOsCalendarAppViaJxa(
   deletedCount: number;
 }> {
   if (process.platform !== "darwin") {
-    return Promise.resolve({ pulledEvents: [], pushedCount: 0, deletedCount: 0 });
+    return Promise.resolve({
+      pulledEvents: [],
+      pushedCount: 0,
+      deletedCount: 0,
+    });
   }
 
   const jxaScript = `
@@ -738,6 +855,7 @@ function syncWithMacOsCalendarAppViaJxa(
     function run(argv) {
       var itemsToPush = JSON.parse(argv[0] || "[]");
       var pullMode = argv[1] === "1";
+      var ownerPrefix = argv[2];
       var Cal = Application("Calendar");
       var wasRunning = false;
       try {
@@ -760,7 +878,7 @@ function syncWithMacOsCalendarAppViaJxa(
         var existingSummaries = bfCal.events.summary();
         for (var j = 0; j < existingEvents.length; j++) {
           var desc = (existingDescs && existingDescs[j]) ? String(existingDescs[j]) : "";
-          var bfIdx = desc.indexOf("[BF-SYNC:");
+          var bfIdx = desc.lastIndexOf("[BF-SYNC:");
           if (bfIdx !== -1) {
             var endIdx = desc.indexOf("]", bfIdx + 9);
             if (endIdx !== -1) {
@@ -784,7 +902,7 @@ function syncWithMacOsCalendarAppViaJxa(
       // 2. AUTO-DELETE: Remove any events in BillFlow calendar that were deleted or unscheduled in BillFlow
       var deletedCount = 0;
       for (var exKey in existingByKey) {
-        if (!activeKeyMap[exKey]) {
+        if (exKey.indexOf(ownerPrefix) === 0 && !activeKeyMap[exKey]) {
           try {
             Cal.delete(existingByKey[exKey].ref);
             deletedCount++;
@@ -893,7 +1011,7 @@ function syncWithMacOsCalendarAppViaJxa(
     }
   `;
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     execFile(
       "osascript",
       [
@@ -903,31 +1021,41 @@ function syncWithMacOsCalendarAppViaJxa(
         jxaScript,
         JSON.stringify(payloadToPush),
         shouldPullEvents ? "1" : "0",
+        `profile-${getActiveProfileId()}:`,
       ],
       { timeout: 7000 },
       (err, stdout) => {
         if (err || !stdout) {
-          resolve({ pulledEvents: [], pushedCount: 0, deletedCount: 0 });
+          reject(
+            new Error(
+              `Calendar sync failed: ${err?.message || "No response from Calendar"}`,
+            ),
+          );
           return;
         }
         try {
           const parsed = JSON.parse(stdout.trim());
           resolve({
-            pulledEvents: Array.isArray(parsed.pulledEvents) ? parsed.pulledEvents : [],
+            pulledEvents: Array.isArray(parsed.pulledEvents)
+              ? parsed.pulledEvents
+              : [],
             pushedCount: Number(parsed.pushedCount) || 0,
             deletedCount: Number(parsed.deletedCount) || 0,
           });
         } catch {
-          resolve({ pulledEvents: [], pushedCount: 0, deletedCount: 0 });
+          reject(
+            new Error("Calendar returned an invalid synchronization response."),
+          );
         }
-      }
+      },
     );
   });
 }
 
-let lastJxaPullAt = 0;
+const lastJxaPullByProfile = new Map<string, number>();
 let isSyncInFlight = false;
 let queuedSyncPayload: {
+  workspace: ReturnType<typeof captureWorkspace>;
   broadcast?: () => void;
   incomingTaskTimeSlots?: TaskTimeSlotMap;
   forcePull?: boolean;
@@ -944,9 +1072,10 @@ export function scheduleBackgroundNativeCalendarSync(
   options?: {
     pushOnly?: boolean;
     incomingTaskTimeSlots?: TaskTimeSlotMap;
-  }
+  },
 ): void {
   if (
+    process.env.BILLFLOW_DISABLE_NATIVE_CALENDAR === "1" ||
     process.platform !== "darwin" ||
     process.env.VITEST ||
     process.env.NODE_ENV === "test"
@@ -956,14 +1085,21 @@ export function scheduleBackgroundNativeCalendarSync(
   if (pendingBackgroundSyncTimer) {
     clearTimeout(pendingBackgroundSyncTimer);
   }
+  const workspace = captureWorkspace();
   pendingBackgroundSyncTimer = setTimeout(() => {
+    try {
+      workspace.assertCurrent();
+      if (!isWorkspaceUnlocked()) return;
+    } catch {
+      return;
+    }
     pendingBackgroundSyncTimer = null;
     void syncNativeLocalCalendar(
       broadcast,
       options?.incomingTaskTimeSlots,
       false,
-      options?.pushOnly ?? true
-    );
+      options?.pushOnly ?? true,
+    ).catch((error) => console.warn("Calendar sync deferred:", error.message));
   }, 100);
 }
 
@@ -971,24 +1107,35 @@ export async function syncNativeLocalCalendar(
   broadcast?: () => void,
   incomingTaskTimeSlots?: TaskTimeSlotMap,
   forcePull = false,
-  pushOnly = false
-): Promise<{ syncedFromMac: number; pushedToMac: number; deletedFromMac: number }> {
+  pushOnly = false,
+): Promise<{
+  syncedFromMac: number;
+  pushedToMac: number;
+  deletedFromMac: number;
+}> {
+  const timeSlots = savePersistedTaskTimeSlots(incomingTaskTimeSlots);
   if (
+    process.env.BILLFLOW_DISABLE_NATIVE_CALENDAR === "1" ||
     process.platform !== "darwin" ||
     process.env.VITEST ||
     process.env.NODE_ENV === "test"
   ) {
     return { syncedFromMac: 0, pushedToMac: 0, deletedFromMac: 0 };
   }
-  const timeSlots = savePersistedTaskTimeSlots(incomingTaskTimeSlots);
+  const workspace = captureWorkspace();
+  if (!isWorkspaceUnlocked())
+    throw new Error("Unlock your profile before syncing Calendar.");
 
   if (isSyncInFlight) {
     // Queue the latest request so we never drop any task edit or deletion
     queuedSyncPayload = {
+      workspace,
       broadcast,
       incomingTaskTimeSlots,
       forcePull: Boolean(queuedSyncPayload?.forcePull || forcePull),
-      pushOnly: Boolean((queuedSyncPayload ? queuedSyncPayload.pushOnly : true) && pushOnly),
+      pushOnly: Boolean(
+        (queuedSyncPayload ? queuedSyncPayload.pushOnly : true) && pushOnly,
+      ),
     };
     return { syncedFromMac: 0, pushedToMac: 0, deletedFromMac: 0 };
   }
@@ -1008,9 +1155,14 @@ export async function syncNativeLocalCalendar(
 
       // If SQLite was not accessible (FDA required), fallback to JXA pull at most once every 5 minutes unless forced
       const nowMs = Date.now();
-      if (!sqliteResult.accessible && (forcePull || nowMs - lastJxaPullAt > 5 * 60 * 1000)) {
+      if (
+        !sqliteResult.accessible &&
+        (forcePull ||
+          nowMs - (lastJxaPullByProfile.get(workspace.profileId) || 0) >
+            5 * 60 * 1000)
+      ) {
         shouldPullViaJxa = true;
-        lastJxaPullAt = nowMs;
+        lastJxaPullByProfile.set(workspace.profileId, nowMs);
       }
     }
 
@@ -1036,7 +1188,7 @@ export async function syncNativeLocalCalendar(
           ? normalizeAndAutoFixTimeRange(slot.startTime, slot.endTime, false)
           : { startTime: null, endTime: null, isAllDay: true };
         return {
-          bfKey: `task-${t.id}`,
+          bfKey: `profile-${workspace.profileId}:task-${t.id}`,
           title: `${t.status === "done" ? "[DONE] " : "[TASK] "}${t.title}`,
           description: `${t.description || ""}\nStatus: ${t.status.toUpperCase()} | Priority: ${t.priority.toUpperCase()}${t.clientName ? `\nClient: ${t.clientName}` : ""}`,
           startDate: normalizeAndAutoFixDate(t.dueDate),
@@ -1048,11 +1200,13 @@ export async function syncNativeLocalCalendar(
         };
       }),
       ...appEvents.map((e) => ({
-        bfKey: `evt-${e.id}`,
+        bfKey: `profile-${workspace.profileId}:evt-${e.id}`,
         title: e.title,
         description: e.description || "",
         startDate: normalizeAndAutoFixDate(e.startDate),
-        endDate: e.endDate ? normalizeAndAutoFixDate(e.endDate, e.startDate) : normalizeAndAutoFixDate(e.startDate),
+        endDate: e.endDate
+          ? normalizeAndAutoFixDate(e.endDate, e.startDate)
+          : normalizeAndAutoFixDate(e.startDate),
         startTime: e.startTime || null,
         endTime: e.endTime || null,
         isAllDay: Boolean(e.isAllDay),
@@ -1072,7 +1226,9 @@ export async function syncNativeLocalCalendar(
             title: e.title,
             description: e.description,
             startDate: normalizeAndAutoFixDate(e.startDate),
-            endDate: e.endDate ? normalizeAndAutoFixDate(e.endDate, e.startDate) : null,
+            endDate: e.endDate
+              ? normalizeAndAutoFixDate(e.endDate, e.startDate)
+              : null,
             startTime: e.startTime || null,
             endTime: e.endTime || null,
             isAllDay: Boolean(e.isAllDay),
@@ -1105,8 +1261,17 @@ export async function syncNativeLocalCalendar(
           }),
           calendarName: "BillFlow",
         });
-        const icsPath = path.join(app.getPath("userData"), "BillFlow.ics");
-        fs.writeFileSync(icsPath, icsContent, "utf-8");
+        const icsPath = path.join(
+          path.dirname(getDatabasePath()),
+          "BillFlow.ics",
+        );
+        atomicWrite(
+          icsPath,
+          icsContent.replace(
+            /UID:billflow-default-/g,
+            `UID:billflow-${getActiveProfileId()}-`,
+          ),
+        );
       } catch {}
 
       return {
@@ -1118,9 +1283,10 @@ export async function syncNativeLocalCalendar(
 
     const jxaResult = await syncWithMacOsCalendarAppViaJxa(
       payloadToPush,
-      shouldPullViaJxa
+      shouldPullViaJxa,
     );
 
+    workspace.assertCurrent();
     if (jxaResult.pulledEvents.length > 0) {
       let jxaImported = 0;
       db.transaction(() => {
@@ -1146,23 +1312,34 @@ export async function syncNativeLocalCalendar(
     if (queuedSyncPayload) {
       const next = queuedSyncPayload;
       queuedSyncPayload = null;
-      void syncNativeLocalCalendar(
-        next.broadcast,
-        next.incomingTaskTimeSlots,
-        next.forcePull,
-        next.pushOnly
-      );
+      let current = false;
+      try {
+        next.workspace.assertCurrent();
+        current = true;
+      } catch {
+        /* A switch invalidates queued work. */
+      }
+      if (current)
+        void syncNativeLocalCalendar(
+          next.broadcast,
+          next.incomingTaskTimeSlots,
+          next.forcePull,
+          next.pushOnly,
+        ).catch((error) =>
+          console.warn("Calendar sync deferred:", error.message),
+        );
     }
   }
 }
 
 export async function openNativeLocalCalendar(
   broadcast?: () => void,
-  incomingTaskTimeSlots?: TaskTimeSlotMap
+  incomingTaskTimeSlots?: TaskTimeSlotMap,
 ): Promise<{ success: boolean; syncedFromMac: number; pushedToMac: number }> {
   const timeSlots = savePersistedTaskTimeSlots(incomingTaskTimeSlots);
 
   if (
+    process.env.BILLFLOW_DISABLE_NATIVE_CALENDAR !== "1" &&
     process.platform === "darwin" &&
     !process.env.VITEST &&
     process.env.NODE_ENV !== "test"
@@ -1175,7 +1352,7 @@ export async function openNativeLocalCalendar(
         .where(isNull(tasks.deletedAt))
         .all();
       const allEvents = listCalendarEvents().filter(
-        (e) => !e.id.startsWith("macos-cal-")
+        (e) => !e.id.startsWith("macos-cal-"),
       );
 
       const icsContent = generateIcsFromEventsAndTasks({
@@ -1200,8 +1377,17 @@ export async function openNativeLocalCalendar(
         calendarName: "BillFlow",
       });
 
-      const icsPath = path.join(app.getPath("userData"), "BillFlow.ics");
-      fs.writeFileSync(icsPath, icsContent, "utf-8");
+      const icsPath = path.join(
+        path.dirname(getDatabasePath()),
+        "BillFlow.ics",
+      );
+      atomicWrite(
+        icsPath,
+        icsContent.replace(
+          /UID:billflow-default-/g,
+          `UID:billflow-${getActiveProfileId()}-`,
+        ),
+      );
 
       // Open macOS Calendar.app immediately without waiting on JXA
       execFile("open", ["-a", "Calendar", icsPath], () => {});
@@ -1213,7 +1399,9 @@ export async function openNativeLocalCalendar(
   }
 
   // Trigger two-way sync in background without blocking the open call
-  void syncNativeLocalCalendar(broadcast, incomingTaskTimeSlots, true);
+  void syncNativeLocalCalendar(broadcast, incomingTaskTimeSlots, true).catch(
+    (error) => console.warn("Calendar sync failed:", error.message),
+  );
 
   return {
     success: true,
@@ -1223,7 +1411,9 @@ export async function openNativeLocalCalendar(
 }
 
 export function registerCalendarHandlers(broadcast: () => void): void {
-  ipcMain.handle("events:list", async (_, filter) => listCalendarEvents(filter));
+  ipcMain.handle("events:list", async (_, filter) =>
+    listCalendarEvents(filter),
+  );
   ipcMain.handle("events:get", async (_, id) => getCalendarEvent(id));
   ipcMain.handle("events:create", async (_, input) => {
     const created = createCalendarEvent(input, broadcast);
@@ -1240,12 +1430,20 @@ export function registerCalendarHandlers(broadcast: () => void): void {
     scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return removed;
   });
-  ipcMain.handle("events:syncNative", async (_, taskTimeSlots?: TaskTimeSlotMap) => {
-    savePersistedTaskTimeSlots(taskTimeSlots);
-    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true, incomingTaskTimeSlots: taskTimeSlots });
-    return { syncedFromMac: 0, pushedToMac: 0 };
-  });
-  ipcMain.handle("events:openNative", async (_, taskTimeSlots?: TaskTimeSlotMap) =>
-    openNativeLocalCalendar(broadcast, taskTimeSlots)
+  ipcMain.handle(
+    "events:syncNative",
+    async (_, taskTimeSlots?: TaskTimeSlotMap) => {
+      savePersistedTaskTimeSlots(taskTimeSlots);
+      scheduleBackgroundNativeCalendarSync(broadcast, {
+        pushOnly: true,
+        incomingTaskTimeSlots: taskTimeSlots,
+      });
+      return { syncedFromMac: 0, pushedToMac: 0 };
+    },
+  );
+  ipcMain.handle(
+    "events:openNative",
+    async (_, taskTimeSlots?: TaskTimeSlotMap) =>
+      openNativeLocalCalendar(broadcast, taskTimeSlots),
   );
 }

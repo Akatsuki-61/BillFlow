@@ -1,8 +1,20 @@
 "use client";
+import { activeProfileScope } from "@/lib/profile-scope";
+import type { WorkspaceDataset, WorkspaceSnapshot } from "@/types/workspace";
+import { calculateFinancials } from "@/lib/financials";
+import { hydrateTaskTimeSlots } from "@/lib/local-calendar";
 
 import { readBrowserPreferences } from "./browserStorage";
 
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import type {
   ClientWithStats,
   NewClientInput,
@@ -13,7 +25,9 @@ import type {
   InvoiceStatus,
   DashboardSummary,
   Currency,
-  CatalogItem, NewCatalogItemInput, CatalogItemPatchInput,
+  CatalogItem,
+  NewCatalogItemInput,
+  CatalogItemPatchInput,
   InvoicePayment,
   RecordPaymentInput,
 } from "@/types/billing";
@@ -33,14 +47,19 @@ import type {
   ReviewWorkOrderInput,
   RecordWorkOrderPayoutInput,
 } from "@/types/outsourcing";
-import type {
-  AnalyticsSummaryPayload,
-  AnalyticsMonthlyTrend,
-} from "@/types/analytics";
+import type { AnalyticsSummaryPayload } from "@/types/analytics";
 
 import type { TaskItem } from "@/types/tasks";
-import type { WorkflowAPI, TrackingOffer, AttachmentItem } from "@/types/workflow";
-import type { ExpenseItem, NewExpenseInput, ExpensePatchInput } from "@/types/expenses";
+import type {
+  WorkflowAPI,
+  TrackingOffer,
+  AttachmentItem,
+} from "@/types/workflow";
+import type {
+  ExpenseItem,
+  NewExpenseInput,
+  ExpensePatchInput,
+} from "@/types/expenses";
 import type {
   CalendarEventItem,
   NewCalendarEventInput,
@@ -62,7 +81,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   nextInvoiceSeq: 1,
   defaultDueDays: 14,
   defaultTaxRate: 0,
-  defaultNotes: "Payment due within specified due date. Thank you for your business.",
+  defaultNotes:
+    "Payment due within specified due date. Thank you for your business.",
   defaultInvoiceTemplate: "geometric-teal",
   dateFormat: "YYYY-MM-DD",
   currencyDisplay: "symbol",
@@ -79,11 +99,6 @@ interface DataContextType {
     clientName?: string | null;
     includeAllClients?: boolean;
   }) => TaskItem[];
-  linkTasksToInvoice: (
-    invoiceId: string,
-    invoiceCode: string,
-    taskIds: string[],
-  ) => Promise<void>;
 
   clients: ClientWithStats[];
   invoices: InvoiceWithClient[];
@@ -100,42 +115,82 @@ interface DataContextType {
   error: string | null;
   refresh: () => Promise<void>;
   createClient: (input: NewClientInput) => Promise<ClientWithStats>;
-  updateClient: (id: string, patch: ClientPatchInput) => Promise<ClientWithStats>;
+  updateClient: (
+    id: string,
+    patch: ClientPatchInput,
+  ) => Promise<ClientWithStats>;
   deleteClient: (id: string) => Promise<void>;
   createInvoice: (input: NewInvoiceInput) => Promise<InvoiceWithClient>;
-  updateInvoice: (id: string, patch: InvoicePatchInput) => Promise<InvoiceWithClient>;
+  updateInvoice: (
+    id: string,
+    patch: InvoicePatchInput,
+  ) => Promise<InvoiceWithClient>;
   promoteInvoiceClient: (invoiceId: string) => Promise<ClientWithStats>;
-  setInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<InvoiceWithClient>;
-  recordPayment: (input: RecordPaymentInput) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
+  setInvoiceStatus: (
+    id: string,
+    status: InvoiceStatus,
+  ) => Promise<InvoiceWithClient>;
+  recordPayment: (
+    input: RecordPaymentInput,
+  ) => Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }>;
   listPayments: (invoiceId: string) => Promise<InvoicePayment[]>;
-  exportInvoicePdf: (invoiceId: string, template?: string) => Promise<{ success: boolean; filePath: string }>;
-  saveInvoicePdfAs: (invoiceId: string, template?: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
+  exportInvoicePdf: (
+    invoiceId: string,
+    template?: string,
+  ) => Promise<{ success: boolean; filePath: string }>;
+  saveInvoicePdfAs: (
+    invoiceId: string,
+    template?: string,
+    draft?: NewInvoiceInput,
+  ) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
   openInvoicePdf: (invoiceId: string, reveal?: boolean) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
   getNextInvoiceCode: () => Promise<string>;
   createCatalogItem: (input: NewCatalogItemInput) => Promise<CatalogItem>;
-  updateCatalogItem: (id: string, patch: CatalogItemPatchInput) => Promise<CatalogItem>;
+  updateCatalogItem: (
+    id: string,
+    patch: CatalogItemPatchInput,
+  ) => Promise<CatalogItem>;
   deleteCatalogItem: (id: string) => Promise<void>;
   bulkImportCatalogItems: (items: NewCatalogItemInput[]) => Promise<number>;
   createVendor: (input: NewVendorInput) => Promise<VendorItem>;
   updateVendor: (id: string, patch: VendorPatchInput) => Promise<VendorItem>;
-  setVendorStatus: (id: string, status: "PENDING" | "PAID") => Promise<VendorItem>;
+  setVendorStatus: (
+    id: string,
+    status: "PENDING" | "PAID",
+  ) => Promise<VendorItem>;
   deleteVendor: (id: string) => Promise<void>;
   createExpense: (input: NewExpenseInput) => Promise<ExpenseItem>;
   updateExpense: (id: string, patch: ExpensePatchInput) => Promise<ExpenseItem>;
   deleteExpense: (id: string) => Promise<void>;
-  attachExpenseReceipt: (expenseId: string, requestId: string) => Promise<AttachmentItem | null>;
+  attachExpenseReceipt: (
+    expenseId: string,
+    requestId: string,
+  ) => Promise<AttachmentItem | null>;
   createEvent: (input: NewCalendarEventInput) => Promise<CalendarEventItem>;
-  updateEvent: (id: string, patch: CalendarEventPatchInput) => Promise<CalendarEventItem>;
+  updateEvent: (
+    id: string,
+    patch: CalendarEventPatchInput,
+  ) => Promise<CalendarEventItem>;
   deleteEvent: (id: string) => Promise<void>;
   createWorkOrder: (input: NewWorkOrderInput) => Promise<WorkOrderItem>;
-  updateWorkOrder: (id: string, patch: WorkOrderPatchInput) => Promise<WorkOrderItem>;
+  updateWorkOrder: (
+    id: string,
+    patch: WorkOrderPatchInput,
+  ) => Promise<WorkOrderItem>;
   reviewWorkOrder: (input: ReviewWorkOrderInput) => Promise<WorkOrderItem>;
-  recordWorkOrderPayout: (input: RecordWorkOrderPayoutInput) => Promise<WorkOrderItem>;
+  recordWorkOrderPayout: (
+    input: RecordWorkOrderPayoutInput,
+  ) => Promise<WorkOrderItem>;
   removeWorkOrderPayout: (workOrderId: string) => Promise<WorkOrderItem>;
-  setWorkOrderPayoutStatus: (id: string, status: "PENDING" | "PAID") => Promise<WorkOrderItem>;
+  setWorkOrderPayoutStatus: (
+    id: string,
+    status: "PENDING" | "PAID",
+  ) => Promise<WorkOrderItem>;
   deleteWorkOrder: (id: string) => Promise<void>;
-  exportWorkOrderPdf: (id: string) => Promise<{ success: boolean; filePath: string }>;
+  exportWorkOrderPdf: (
+    id: string,
+  ) => Promise<{ success: boolean; filePath: string }>;
   openWorkOrderPdf: (filePath: string, reveal?: boolean) => Promise<void>;
   getAnalyticsSummary: (
     period?: string,
@@ -146,7 +201,11 @@ interface DataContextType {
   getDbPath: () => Promise<string>;
   revealDbFile: () => Promise<void>;
   exportData: () => Promise<ExportDataPayload>;
-  importData: (payload: ExportDataPayload) => Promise<{ success: boolean; importedClients: number; importedInvoices: number }>;
+  importData: (payload: ExportDataPayload) => Promise<{
+    success: boolean;
+    importedClients: number;
+    importedInvoices: number;
+  }>;
   resetData: () => Promise<void>;
 }
 
@@ -167,7 +226,11 @@ let memorySettings: AppSettings = { ...DEFAULT_SETTINGS };
 // Browser storage implements the same async snapshot contract as desktop IPC.
 async function loadBrowserSnapshot() {
   if (typeof window !== "undefined") {
-    const saved = readBrowserPreferences(memorySettings, memoryVendors, localStorage);
+    const saved = readBrowserPreferences(
+      memorySettings,
+      memoryVendors,
+      localStorage,
+    );
     memorySettings = saved.settings;
     memoryVendors = saved.vendors;
   }
@@ -183,12 +246,17 @@ async function loadBrowserSnapshot() {
     settings: { ...memorySettings },
     dashboard: {
       activeClients: memoryClients.length,
-      unpaidCount: memoryInvoices.filter((invoice) => invoice.status !== "PAID" && invoice.status !== "DRAFT").length,
+      unpaidCount: memoryInvoices.filter(
+        (invoice) => invoice.status !== "PAID" && invoice.status !== "DRAFT",
+      ).length,
       totalBilledByCurrency: {
         USD: memoryInvoices.reduce((acc, inv) => acc + inv.amountCents, 0),
       },
       outstandingByCurrency: {
-        USD: memoryInvoices.reduce((acc, inv) => acc + (inv.amountCents - (inv.paidCents || 0)), 0),
+        USD: memoryInvoices.reduce(
+          (acc, inv) => acc + (inv.amountCents - (inv.paidCents || 0)),
+          0,
+        ),
       },
       recentInvoices: memoryInvoices.slice(0, 5),
     },
@@ -252,72 +320,226 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [isElectron, setIsElectron] = useState<boolean>(false);
 
   const checkIsElectron = useCallback(() => {
-    return typeof window !== "undefined" && Boolean(window.billflow?.isElectron);
+    return (
+      typeof window !== "undefined" && Boolean(window.billflow?.isElectron)
+    );
   }, []);
 
-  const loadSnapshot = useCallback(async () => {
-    if (checkIsElectron() && window.billflow) {
-      const [clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expensesList, workOrdersList, eventsList] = await Promise.all([
-        window.billflow.clients.list(),
-        window.billflow.invoices.list(),
-        window.billflow.dashboard.summary(),
-        window.billflow.settings.get(),
-        window.billflow.vendors.list(),
-        window.billflow.catalog.list(),
-        window.billflow.tasks.list(),
-        window.billflow.tracking.pending(),
-        window.billflow.expenses ? window.billflow.expenses.list() : Promise.resolve([]),
-        window.billflow.workOrders?.list().catch(() => [] as WorkOrderItem[]) ?? Promise.resolve([] as WorkOrderItem[]),
-        window.billflow.events ? window.billflow.events.list().catch(() => [] as CalendarEventItem[]) : Promise.resolve([] as CalendarEventItem[]),
-      ]);
-      return { clients, invoices, dashboard, settings, vendors, catalogItems, tasks, trackingOffers, expenses: expensesList || [], workOrders: workOrdersList || [], events: eventsList || [], isElectron: true };
-    }
-    const browser = await loadBrowserSnapshot();
-    return { ...browser, trackingOffers: [] as TrackingOffer[], isElectron: false };
-  }, [checkIsElectron]);
-
-  const refresh = useCallback(() => {
-    const request = ++snapshotRequest.current;
-    return loadSnapshot().then((snapshot) => {
-    if (request !== snapshotRequest.current) return;
-    setIsElectron(snapshot.isElectron);
-    setTasks(snapshot.tasks);
-    setTrackingOffers(snapshot.trackingOffers);
-    setClients(snapshot.clients);
-    setInvoices(snapshot.invoices);
-    setVendors(snapshot.vendors);
-    setExpenses(snapshot.expenses || []);
-    setWorkOrders(snapshot.workOrders || []);
-    setEvents(snapshot.events || []);
-    setCatalogItems(snapshot.catalogItems);
-    setSettings(snapshot.settings);
-    setDashboard(snapshot.dashboard);
-    setError(null);
-  }).catch((err: unknown) => {
-    if (request !== snapshotRequest.current) return;
-    console.error("Failed to load billflow data:", err);
-    const message = err instanceof Error ? err.message : "Failed to load data";
-    setError(message);
-  }).finally(() => { if (request === snapshotRequest.current) setIsLoading(false); });
-  }, [loadSnapshot]);
-
-  useEffect(() => {
-    refresh();
-
-    if (checkIsElectron() && window.billflow?.onDataChanged) {
-      const unsubscribe = window.billflow.onDataChanged(() => {
-        refresh();
-      });
-      return () => {
-        unsubscribe();
+  const loadSnapshot = useCallback(
+    async (
+      datasets?: WorkspaceDataset[],
+    ): Promise<Partial<WorkspaceSnapshot> & { isElectron: boolean }> => {
+      if (checkIsElectron() && window.billflow) {
+        if (window.billflow.workspace)
+          return {
+            ...(await window.billflow.workspace.snapshot(datasets)),
+            isElectron: true,
+          };
+        const [
+          clients,
+          invoices,
+          dashboard,
+          settings,
+          vendors,
+          catalogItems,
+          tasks,
+          trackingOffers,
+          expensesList,
+          workOrdersList,
+          eventsList,
+        ] = await Promise.all([
+          window.billflow.clients.list(),
+          window.billflow.invoices.list(),
+          window.billflow.dashboard.summary(),
+          window.billflow.settings.get(),
+          window.billflow.vendors.list(),
+          window.billflow.catalog.list(),
+          window.billflow.tasks.list(),
+          window.billflow.tracking.pending(),
+          window.billflow.expenses
+            ? window.billflow.expenses.list()
+            : Promise.resolve([]),
+          window.billflow.workOrders
+            ?.list()
+            .catch(() => [] as WorkOrderItem[]) ??
+            Promise.resolve([] as WorkOrderItem[]),
+          window.billflow.events
+            ? window.billflow.events
+                .list()
+                .catch(() => [] as CalendarEventItem[])
+            : Promise.resolve([] as CalendarEventItem[]),
+        ]);
+        hydrateTaskTimeSlots(
+          Object.fromEntries(
+            tasks.map((task) => [
+              task.id,
+              {
+                startTime: task.startTime ?? null,
+                endTime: task.endTime ?? null,
+              },
+            ]),
+          ),
+        );
+        return {
+          clients,
+          invoices,
+          dashboard,
+          settings,
+          vendors,
+          catalogItems,
+          tasks,
+          trackingOffers,
+          expenses: expensesList || [],
+          workOrders: workOrdersList || [],
+          events: eventsList || [],
+          isElectron: true,
+        };
+      }
+      const browser = await loadBrowserSnapshot();
+      return {
+        ...browser,
+        trackingOffers: [] as TrackingOffer[],
+        isElectron: false,
       };
-    }
-  }, [refresh, checkIsElectron]);
+    },
+    [checkIsElectron],
+  );
 
-  const createClient = async (input: NewClientInput): Promise<ClientWithStats> => {
+  const refreshQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingRefresh = useRef<{
+    promise: Promise<void>;
+    resolve: () => void;
+    datasets: Set<WorkspaceDataset> | null;
+    scope: string;
+  } | null>(null);
+  const clearSnapshot = useCallback(() => {
+    snapshotRequest.current++;
+    setTasks([]);
+    setTrackingOffers([]);
+    setClients([]);
+    setInvoices([]);
+    setVendors([]);
+    setExpenses([]);
+    setWorkOrders([]);
+    setEvents([]);
+    setCatalogItems([]);
+    setSettings(null);
+    setDashboard(null);
+  }, []);
+  const refresh = useCallback(
+    (datasets?: WorkspaceDataset[]) => {
+      const scope = activeProfileScope();
+      if (pendingRefresh.current && pendingRefresh.current.scope === scope) {
+        if (!datasets) pendingRefresh.current.datasets = null;
+        else if (pendingRefresh.current.datasets)
+          datasets.forEach((d) => pendingRefresh.current!.datasets!.add(d));
+        return pendingRefresh.current.promise;
+      }
+      let resolve!: () => void;
+      const promise = new Promise<void>((r) => {
+        resolve = r;
+      });
+      const pending = {
+        promise,
+        resolve,
+        datasets: datasets ? new Set(datasets) : null,
+        scope,
+      };
+      pendingRefresh.current = pending;
+      setTimeout(() => {
+        if (pendingRefresh.current === pending) pendingRefresh.current = null;
+        refreshQueue.current = refreshQueue.current
+          .catch(() => {})
+          .then(() => {
+            if (scope !== activeProfileScope()) {
+              resolve();
+              return;
+            }
+            const request = ++snapshotRequest.current;
+            return loadSnapshot(
+              pending.datasets ? [...pending.datasets] : undefined,
+            )
+              .then((snapshot) => {
+                if (
+                  request !== snapshotRequest.current ||
+                  scope !== activeProfileScope() ||
+                  (snapshot.profileId && snapshot.profileId !== scope)
+                )
+                  return;
+                setIsElectron(snapshot.isElectron);
+                if (snapshot.tasks) {
+                  setTasks(snapshot.tasks);
+                  hydrateTaskTimeSlots(
+                    Object.fromEntries(
+                      snapshot.tasks.map((task) => [
+                        task.id,
+                        {
+                          startTime: task.startTime ?? null,
+                          endTime: task.endTime ?? null,
+                        },
+                      ]),
+                    ),
+                  );
+                }
+                if (snapshot.trackingOffers)
+                  setTrackingOffers(snapshot.trackingOffers);
+                if (snapshot.clients) setClients(snapshot.clients);
+                if (snapshot.invoices) setInvoices(snapshot.invoices);
+                if (snapshot.vendors) setVendors(snapshot.vendors);
+                if (snapshot.expenses) setExpenses(snapshot.expenses);
+                if (snapshot.workOrders) setWorkOrders(snapshot.workOrders);
+                if (snapshot.events) setEvents(snapshot.events);
+                if (snapshot.catalogItems)
+                  setCatalogItems(snapshot.catalogItems);
+                if (snapshot.settings) setSettings(snapshot.settings);
+                if (snapshot.dashboard) setDashboard(snapshot.dashboard);
+                setError(null);
+              })
+              .catch((err: unknown) => {
+                if (
+                  request === snapshotRequest.current &&
+                  scope === activeProfileScope()
+                )
+                  setError(
+                    err instanceof Error ? err.message : "Failed to load data",
+                  );
+              })
+              .finally(() => {
+                if (request === snapshotRequest.current) setIsLoading(false);
+                resolve();
+              });
+          });
+      }, 0);
+      return promise;
+    },
+    [loadSnapshot],
+  );
+  useEffect(() => {
+    void refresh();
+    const clear = () => clearSnapshot();
+    const switched = () => {
+      clearSnapshot();
+      void refresh();
+    };
+    window.addEventListener("billflow:workspace-locked", clear);
+    window.addEventListener("billflow:profile-switched", switched);
+    const unsubscribe = window.billflow?.onDataChanged((change) => {
+      if (change && change.profileId !== activeProfileScope()) return;
+      void refresh(change?.datasets);
+    });
+    return () => {
+      unsubscribe?.();
+      window.removeEventListener("billflow:workspace-locked", clear);
+      window.removeEventListener("billflow:profile-switched", switched);
+    };
+  }, [refresh, clearSnapshot]);
+
+  const createClient = async (
+    input: NewClientInput,
+  ): Promise<ClientWithStats> => {
     if (checkIsElectron() && window.billflow) {
       const created = await window.billflow.clients.create(input);
-      await refresh();
+
       return created;
     } else {
       const id = `cli-${Date.now()}`;
@@ -346,10 +568,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateClient = async (id: string, patch: ClientPatchInput): Promise<ClientWithStats> => {
+  const updateClient = async (
+    id: string,
+    patch: ClientPatchInput,
+  ): Promise<ClientWithStats> => {
     if (checkIsElectron() && window.billflow) {
       const updated = await window.billflow.clients.update(id, patch);
-      await refresh();
+
       return updated;
     } else {
       const idx = memoryClients.findIndex((c) => c.id === id);
@@ -369,7 +594,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteClient = async (id: string): Promise<void> => {
     if (checkIsElectron() && window.billflow) {
       await window.billflow.clients.remove(id);
-      await refresh();
     } else {
       const hasInvoices = memoryInvoices.some((i) => i.clientId === id);
       if (hasInvoices) {
@@ -380,16 +604,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const createInvoice = async (input: NewInvoiceInput): Promise<InvoiceWithClient> => {
+  const createInvoice = async (
+    input: NewInvoiceInput,
+  ): Promise<InvoiceWithClient> => {
     if (checkIsElectron() && window.billflow) {
       const created = await window.billflow.invoices.create(input);
-      await refresh();
+
       return created;
     } else {
-      if (!input.clientId || input.newClient) throw new Error("Open the desktop app to create a new client with its invoice.");
+      if (!input.clientId || input.newClient)
+        throw new Error(
+          "Open the desktop app to create a new client with its invoice.",
+        );
       const client = memoryClients.find((c) => c.id === input.clientId);
       const id = `inv-${Date.now()}`;
-      const code = input.code || `INV-${new Date().getFullYear()}-${String(memoryInvoices.length + 1).padStart(3, "0")}`;
+      const code =
+        input.code ||
+        `INV-${new Date().getFullYear()}-${String(memoryInvoices.length + 1).padStart(3, "0")}`;
       const today = new Date().toISOString().split("T")[0];
       const newInv: InvoiceWithClient = {
         id,
@@ -415,15 +646,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         clientPhone: client?.phone,
         clientContactPerson: client?.contactPerson,
         clientCategory: client?.category,
-        items: input.items ? input.items.map((it, idx) => ({
-          id: it.id || `item-${Date.now()}-${idx}`,
-          invoiceId: id,
-          catalogId: it.catalogId || null,
-          description: it.description,
-          quantity: it.quantity,
-          unitPriceCents: it.unitPriceCents,
-          position: idx,
-        })) : [],
+        items: input.items
+          ? input.items.map((it, idx) => ({
+              id: it.id || `item-${Date.now()}-${idx}`,
+              invoiceId: id,
+              catalogId: it.catalogId || null,
+              description: it.description,
+              quantity: it.quantity,
+              unitPriceCents: it.unitPriceCents,
+              position: idx,
+            }))
+          : [],
         payments: [],
       };
       memoryInvoices = [newInv, ...memoryInvoices];
@@ -462,15 +695,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateInvoice = async (id: string, patch: InvoicePatchInput): Promise<InvoiceWithClient> => {
+  const updateInvoice = async (
+    id: string,
+    patch: InvoicePatchInput,
+  ): Promise<InvoiceWithClient> => {
     if (checkIsElectron() && window.billflow) {
       const updated = await window.billflow.invoices.update(id, patch);
-      await refresh();
+
       return updated;
     } else {
       const idx = memoryInvoices.findIndex((i) => i.id === id);
       if (idx === -1) throw new Error("Invoice not found");
-      const client = patch.clientId ? memoryClients.find((c) => c.id === patch.clientId) : undefined;
+      const client = patch.clientId
+        ? memoryClients.find((c) => c.id === patch.clientId)
+        : undefined;
       const target = memoryInvoices[idx];
       const newStatus = patch.status ?? target.status;
       const newAmount = patch.amountCents ?? target.amountCents;
@@ -495,7 +733,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         clientName: client ? client.name : target.clientName,
         clientEmail: client ? client.email : target.clientEmail,
         clientPhone: client ? client.phone : target.clientPhone,
-        clientContactPerson: client ? client.contactPerson : target.clientContactPerson,
+        clientContactPerson: client
+          ? client.contactPerson
+          : target.clientContactPerson,
         clientCategory: client ? client.category : target.clientCategory,
         updatedAt: new Date().toISOString(),
       };
@@ -505,10 +745,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const promoteInvoiceClient = async (invoiceId: string): Promise<ClientWithStats> => {
+  const promoteInvoiceClient = async (
+    invoiceId: string,
+  ): Promise<ClientWithStats> => {
     if (checkIsElectron() && window.billflow) {
       const client = await window.billflow.invoices.promoteClient(invoiceId);
-      await refresh();
+
       return client;
     } else {
       const inv = memoryInvoices.find((i) => i.id === invoiceId);
@@ -542,20 +784,25 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setInvoiceStatus = async (id: string, status: InvoiceStatus): Promise<InvoiceWithClient> => {
+  const setInvoiceStatus = async (
+    id: string,
+    status: InvoiceStatus,
+  ): Promise<InvoiceWithClient> => {
     if (checkIsElectron() && window.billflow) {
       const updated = await window.billflow.invoices.setStatus(id, status);
-      await refresh();
+
       return updated;
     } else {
       return updateInvoice(id, { status });
     }
   };
 
-  const recordPayment = async (input: RecordPaymentInput): Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }> => {
+  const recordPayment = async (
+    input: RecordPaymentInput,
+  ): Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }> => {
     if (checkIsElectron() && window.billflow) {
       const result = await window.billflow.invoices.recordPayment(input);
-      await refresh();
+
       return result;
     } else {
       const inv = memoryInvoices.find((i) => i.id === input.invoiceId);
@@ -585,7 +832,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         status: newStatus,
         payments: [...(inv.payments || []), payment],
       };
-      memoryInvoices = memoryInvoices.map((i) => (i.id === inv.id ? updated : i));
+      memoryInvoices = memoryInvoices.map((i) =>
+        i.id === inv.id ? updated : i,
+      );
       await refresh();
       return { invoice: updated, payment };
     }
@@ -598,22 +847,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return memoryPayments.filter((p) => p.invoiceId === invoiceId);
   };
 
-  const exportInvoicePdf = async (invoiceId: string, template?: string): Promise<{ success: boolean; filePath: string }> => {
+  const exportInvoicePdf = async (
+    invoiceId: string,
+    template?: string,
+  ): Promise<{ success: boolean; filePath: string }> => {
     if (checkIsElectron() && window.billflow) {
       return await window.billflow.invoices.exportPdf(invoiceId, template);
     }
     return { success: true, filePath: "invoice.pdf" };
   };
 
-  const saveInvoicePdfAs = async (invoiceId: string, template?: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> => {
+  const saveInvoicePdfAs = async (
+    invoiceId: string,
+    template?: string,
+    draft?: NewInvoiceInput,
+  ): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> => {
     if (checkIsElectron() && window.billflow?.invoices?.savePdfAs) {
-      return await window.billflow.invoices.savePdfAs(invoiceId, template);
+      return await window.billflow.invoices.savePdfAs(
+        invoiceId,
+        template,
+        draft,
+      );
     }
     window.print();
     return { success: true, canceled: false };
   };
 
-  const openInvoicePdf = async (invoiceId: string, reveal?: boolean): Promise<void> => {
+  const openInvoicePdf = async (
+    invoiceId: string,
+    reveal?: boolean,
+  ): Promise<void> => {
     if (checkIsElectron() && window.billflow) {
       await window.billflow.files.openInvoicePdf(invoiceId, reveal);
     }
@@ -622,7 +885,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteInvoice = async (id: string): Promise<void> => {
     if (checkIsElectron() && window.billflow) {
       await window.billflow.invoices.remove(id);
-      await refresh();
     } else {
       memoryInvoices = memoryInvoices.filter((i) => i.id !== id);
       await refresh();
@@ -638,17 +900,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const activePrefix = prefix.includes("{YYYY}")
         ? prefix.replace("{YYYY}", String(year))
         : prefix.endsWith("-")
-        ? `${prefix}${year}-`
-        : `${prefix}-${year}-`;
-      const nextSeq = Math.max(memorySettings.nextInvoiceSeq || 1, memoryInvoices.length + 1);
+          ? `${prefix}${year}-`
+          : `${prefix}-${year}-`;
+      const nextSeq = Math.max(
+        memorySettings.nextInvoiceSeq || 1,
+        memoryInvoices.length + 1,
+      );
       return `${activePrefix}${String(nextSeq).padStart(3, "0")}`;
     }
   };
 
-  const updateSettings = async (patch: UpdateSettingsInput): Promise<AppSettings> => {
+  const updateSettings = async (
+    patch: UpdateSettingsInput,
+  ): Promise<AppSettings> => {
     if (checkIsElectron() && window.billflow) {
       const updated = await window.billflow.settings.update(patch);
-      await refresh();
+
       return updated;
     } else {
       memorySettings = {
@@ -657,7 +924,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
       };
       if (typeof window !== "undefined") {
-        localStorage.setItem("billflow_memory_settings", JSON.stringify(memorySettings));
+        localStorage.setItem(
+          "billflow_memory_settings",
+          JSON.stringify(memorySettings),
+        );
       }
       await refresh();
       return memorySettings;
@@ -691,16 +961,25 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const importData = async (payload: ExportDataPayload): Promise<{ success: boolean; importedClients: number; importedInvoices: number }> => {
+  const importData = async (
+    payload: ExportDataPayload,
+  ): Promise<{
+    success: boolean;
+    importedClients: number;
+    importedInvoices: number;
+  }> => {
     if (checkIsElectron() && window.billflow) {
       const res = await window.billflow.settings.import(payload);
-      await refresh();
+
       return res;
     } else {
       if (payload.settings) {
         memorySettings = { ...memorySettings, ...payload.settings };
         if (typeof window !== "undefined") {
-          localStorage.setItem("billflow_memory_settings", JSON.stringify(memorySettings));
+          localStorage.setItem(
+            "billflow_memory_settings",
+            JSON.stringify(memorySettings),
+          );
         }
       }
       if (Array.isArray(payload.clients)) {
@@ -712,8 +991,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await refresh();
       return {
         success: true,
-        importedClients: Array.isArray(payload.clients) ? payload.clients.length : 0,
-        importedInvoices: Array.isArray(payload.invoices) ? payload.invoices.length : 0,
+        importedClients: Array.isArray(payload.clients)
+          ? payload.clients.length
+          : 0,
+        importedInvoices: Array.isArray(payload.invoices)
+          ? payload.invoices.length
+          : 0,
       };
     }
   };
@@ -721,7 +1004,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const resetData = async (): Promise<void> => {
     if (checkIsElectron() && window.billflow) {
       await window.billflow.settings.reset();
-      await refresh();
     } else {
       memoryCatalog = [];
       memoryClients = [];
@@ -743,10 +1025,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const createCatalogItem = async (input: NewCatalogItemInput): Promise<CatalogItem> => {
+  const createCatalogItem = async (
+    input: NewCatalogItemInput,
+  ): Promise<CatalogItem> => {
     if (checkIsElectron() && window.billflow) {
       const created = await window.billflow.catalog.create(input);
-      await refresh(); return created;
+      return created;
     }
     const priceCents = Math.round(parseFloat(input.price || "0") * 100);
     const item: CatalogItem = {
@@ -767,16 +1051,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     await refresh();
     return item;
   };
-  const updateCatalogItem = async (id: string, patch: CatalogItemPatchInput): Promise<CatalogItem> => {
+  const updateCatalogItem = async (
+    id: string,
+    patch: CatalogItemPatchInput,
+  ): Promise<CatalogItem> => {
     if (checkIsElectron() && window.billflow) {
       const updated = await window.billflow.catalog.update(id, patch);
-      await refresh(); return updated;
+      return updated;
     }
     const idx = memoryCatalog.findIndex((c) => c.id === id);
     if (idx === -1) throw new Error("Catalog item not found");
     const existing = memoryCatalog[idx];
     const price = patch.price !== undefined ? patch.price : existing.price;
-    const priceCents = patch.price !== undefined ? Math.round(parseFloat(patch.price || "0") * 100) : existing.priceCents;
+    const priceCents =
+      patch.price !== undefined
+        ? Math.round(parseFloat(patch.price || "0") * 100)
+        : existing.priceCents;
     const updated: CatalogItem = {
       ...existing,
       ...patch,
@@ -790,16 +1080,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
   const deleteCatalogItem = async (id: string): Promise<void> => {
     if (checkIsElectron() && window.billflow) {
-      await window.billflow.catalog.remove(id); await refresh();
+      await window.billflow.catalog.remove(id);
       return;
     }
     memoryCatalog = memoryCatalog.filter((c) => c.id !== id);
     await refresh();
   };
-  const bulkImportCatalogItems = async (items: NewCatalogItemInput[]): Promise<number> => {
+  const bulkImportCatalogItems = async (
+    items: NewCatalogItemInput[],
+  ): Promise<number> => {
     if (checkIsElectron() && window.billflow) {
       const result = await window.billflow.catalog.bulkImport(items);
-      await refresh(); return result.count;
+      return result.count;
     }
     const imported: CatalogItem[] = items.map((input, idx) => {
       const priceCents = Math.round(parseFloat(input.price || "0") * 100);
@@ -826,7 +1118,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const createVendor = async (input: NewVendorInput): Promise<VendorItem> => {
     if (checkIsElectron() && window.billflow) {
       const created = await window.billflow.vendors.create(input);
-      await refresh();
+
       return created;
     } else {
       const id = `vnd-${Date.now()}`;
@@ -855,17 +1147,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       };
       memoryVendors = [newVendor, ...memoryVendors];
       if (typeof window !== "undefined") {
-        localStorage.setItem("billflow_outsourcing_vendors", JSON.stringify(memoryVendors));
+        localStorage.setItem(
+          "billflow_outsourcing_vendors",
+          JSON.stringify(memoryVendors),
+        );
       }
       await refresh();
       return newVendor;
     }
   };
 
-  const updateVendor = async (id: string, patch: VendorPatchInput): Promise<VendorItem> => {
+  const updateVendor = async (
+    id: string,
+    patch: VendorPatchInput,
+  ): Promise<VendorItem> => {
     if (checkIsElectron() && window.billflow) {
       const updated = await window.billflow.vendors.update(id, patch);
-      await refresh();
+
       return updated;
     } else {
       const idx = memoryVendors.findIndex((v) => v.id === id);
@@ -885,17 +1183,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       };
       memoryVendors[idx] = updated;
       if (typeof window !== "undefined") {
-        localStorage.setItem("billflow_outsourcing_vendors", JSON.stringify(memoryVendors));
+        localStorage.setItem(
+          "billflow_outsourcing_vendors",
+          JSON.stringify(memoryVendors),
+        );
       }
       await refresh();
       return updated;
     }
   };
 
-  const setVendorStatus = async (id: string, status: "PENDING" | "PAID"): Promise<VendorItem> => {
+  const setVendorStatus = async (
+    id: string,
+    status: "PENDING" | "PAID",
+  ): Promise<VendorItem> => {
     if (checkIsElectron() && window.billflow) {
       const updated = await window.billflow.vendors.setStatus(id, status);
-      await refresh();
+
       return updated;
     } else {
       return updateVendor(id, { status });
@@ -905,11 +1209,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteVendor = async (id: string): Promise<void> => {
     if (checkIsElectron() && window.billflow) {
       await window.billflow.vendors.remove(id);
-      await refresh();
     } else {
       memoryVendors = memoryVendors.filter((v) => v.id !== id);
       if (typeof window !== "undefined") {
-        localStorage.setItem("billflow_outsourcing_vendors", JSON.stringify(memoryVendors));
+        localStorage.setItem(
+          "billflow_outsourcing_vendors",
+          JSON.stringify(memoryVendors),
+        );
       }
       await refresh();
     }
@@ -920,10 +1226,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
    * In Electron desktop mode, saves to SQLite `work_orders`, updates the linked task
    * with outsourcing metadata, and increments the vendor balance.
    */
-  const createWorkOrder = async (input: NewWorkOrderInput): Promise<WorkOrderItem> => {
+  const createWorkOrder = async (
+    input: NewWorkOrderInput,
+  ): Promise<WorkOrderItem> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
       const created = await window.billflow.workOrders.create(input);
-      await refresh();
+
       return created;
     } else {
       const id = input.id || `wo-${Date.now()}`;
@@ -959,10 +1267,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   /**
    * Updates an existing work order.
    */
-  const updateWorkOrder = async (id: string, patch: WorkOrderPatchInput): Promise<WorkOrderItem> => {
+  const updateWorkOrder = async (
+    id: string,
+    patch: WorkOrderPatchInput,
+  ): Promise<WorkOrderItem> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
       const updated = await window.billflow.workOrders.update(id, patch);
-      await refresh();
+
       return updated;
     } else {
       const idx = memoryWorkOrders.findIndex((w) => w.id === id);
@@ -971,7 +1282,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const updated: WorkOrderItem = {
         ...existing,
         ...patch,
-        completedAt: patch.status === "done" && !existing.completedAt ? new Date().toISOString() : existing.completedAt,
+        completedAt:
+          patch.status === "done" && !existing.completedAt
+            ? new Date().toISOString()
+            : existing.completedAt,
       };
       memoryWorkOrders[idx] = updated;
       await refresh();
@@ -982,10 +1296,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   /**
    * Reviews contractor deliverable, saves deliverable URL & notes, and updates the original task after review.
    */
-  const reviewWorkOrder = async (input: ReviewWorkOrderInput): Promise<WorkOrderItem> => {
+  const reviewWorkOrder = async (
+    input: ReviewWorkOrderInput,
+  ): Promise<WorkOrderItem> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
       const updated = await window.billflow.workOrders.review(input);
-      await refresh();
+
       return updated;
     } else {
       const updated = await updateWorkOrder(input.workOrderId, {
@@ -1003,10 +1319,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
    * Explicitly records a vendor payout entry in SQLite `vendor_payouts`.
    * Separate from contractor work progress.
    */
-  const recordWorkOrderPayout = async (input: RecordWorkOrderPayoutInput): Promise<WorkOrderItem> => {
+  const recordWorkOrderPayout = async (
+    input: RecordWorkOrderPayoutInput,
+  ): Promise<WorkOrderItem> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
       const updated = await window.billflow.workOrders.recordPayout(input);
-      await refresh();
+
       return updated;
     } else {
       const wo = memoryWorkOrders.find((w) => w.id === input.workOrderId);
@@ -1029,10 +1347,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
    * Removes a vendor payout entry, reverting payout status to PENDING
    * without affecting contractor work status.
    */
-  const removeWorkOrderPayout = async (workOrderId: string): Promise<WorkOrderItem> => {
+  const removeWorkOrderPayout = async (
+    workOrderId: string,
+  ): Promise<WorkOrderItem> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
-      const updated = await window.billflow.workOrders.removePayout(workOrderId);
-      await refresh();
+      const updated =
+        await window.billflow.workOrders.removePayout(workOrderId);
+
       return updated;
     } else {
       const wo = memoryWorkOrders.find((w) => w.id === workOrderId);
@@ -1054,7 +1375,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
    * Toggles settlement payout status between PENDING and PAID.
    * Automatically creates or removes records in `vendor_payouts`.
    */
-  const setWorkOrderPayoutStatus = async (id: string, status: "PENDING" | "PAID"): Promise<WorkOrderItem> => {
+  const setWorkOrderPayoutStatus = async (
+    id: string,
+    status: "PENDING" | "PAID",
+  ): Promise<WorkOrderItem> => {
     if (status === "PAID") {
       return recordWorkOrderPayout({ workOrderId: id });
     } else {
@@ -1068,21 +1392,25 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteWorkOrder = async (id: string): Promise<void> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
       await window.billflow.workOrders.remove(id);
-      await refresh();
     } else {
       memoryWorkOrders = memoryWorkOrders.filter((w) => w.id !== id);
       await refresh();
     }
   };
 
-  const exportWorkOrderPdf = async (id: string): Promise<{ success: boolean; filePath: string }> => {
+  const exportWorkOrderPdf = async (
+    id: string,
+  ): Promise<{ success: boolean; filePath: string }> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
       return await window.billflow.workOrders.exportPdf(id);
     }
     return { success: true, filePath: "" };
   };
 
-  const openWorkOrderPdf = async (filePath: string, reveal = false): Promise<void> => {
+  const openWorkOrderPdf = async (
+    filePath: string,
+    reveal = false,
+  ): Promise<void> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
       await window.billflow.workOrders.openPdf(filePath, reveal);
     }
@@ -1094,186 +1422,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       currency?: string,
       accountingMethod: "accrual" | "cash" = "accrual",
     ): Promise<AnalyticsSummaryPayload> => {
-      if (checkIsElectron() && window.billflow) {
-        return await window.billflow.analytics.summary(period, currency, accountingMethod);
-      } else {
-        let totalRevenueCents = 0;
-        let paidCents = 0;
-        let pendingReceivablesCents = 0;
-        let unpaidCount = 0;
-        let overdueCents = 0;
-        let overdueCount = 0;
-        const now = new Date();
-        const todayStr = now.toISOString().split("T")[0];
-
-        const targetInvoices = memoryInvoices.filter((inv) => {
-          if (currency && currency !== "all" && currency !== "ALL") {
-            if (inv.currency && inv.currency.toUpperCase() !== currency.toUpperCase()) {
-              return false;
-            }
-          }
-          return true;
-        });
-
-        for (const inv of targetInvoices) {
-          if (inv.status !== "DRAFT") {
-            totalRevenueCents += inv.amountCents;
-            const collected = inv.paidCents ?? (inv.status === "PAID" ? inv.amountCents : 0);
-            paidCents += collected;
-            if (inv.status === "PAID") {
-              // fully settled
-            } else {
-              const unpaid = Math.max(0, inv.amountCents - collected);
-              pendingReceivablesCents += unpaid;
-              unpaidCount += 1;
-              if (inv.status === "OVERDUE" || (inv.dueDate && inv.dueDate < todayStr)) {
-                overdueCents += unpaid;
-                overdueCount += 1;
-              }
-            }
-          }
-        }
-
-        let totalOutsourcedCents = 0;
-        let paidCostCents = 0;
-        for (const v of memoryVendors) {
-          const balance = (Number(v.currentBalance) || 0) * 100;
-          totalOutsourcedCents += balance;
-          if (v.status === "PAID") {
-            paidCostCents += balance;
-          }
-        }
-
-        const generalExpensesCents = memoryExpenses.reduce((sum, e) => sum + (e.amountCents || 0), 0);
-        const totalOperatingCostsCents = totalOutsourcedCents + generalExpensesCents;
-
-        // Preserve losses (no Math.max(0, ...))
-        const accrualProfitCents = totalRevenueCents - totalOperatingCostsCents;
-        const cashProfitCents = paidCents - (paidCostCents + generalExpensesCents);
-        const netProfitCents = accountingMethod === "cash" ? cashProfitCents : accrualProfitCents;
-        const isLoss = netProfitCents < 0;
-
-        const baseForMargin = accountingMethod === "cash" ? paidCents : totalRevenueCents;
-        const marginPct = baseForMargin > 0 ? Math.round((netProfitCents / baseForMargin) * 100) : 0;
-        const paidRatioPct = totalRevenueCents > 0 ? Math.round((paidCents / totalRevenueCents) * 100) : 0;
-        const avgInvoiceCents = targetInvoices.length > 0 ? Math.round(totalRevenueCents / targetInvoices.length) : 0;
-
-        let topClientName = "Diversified";
-        let topClientMaxBilled = 0;
-        const clientBilledMap = new Map<string, number>();
-        for (const inv of targetInvoices) {
-          if (inv.status !== "DRAFT") {
-            const prev = clientBilledMap.get(inv.clientName) || 0;
-            clientBilledMap.set(inv.clientName, prev + inv.amountCents);
-          }
-        }
-        for (const [name, billed] of clientBilledMap.entries()) {
-          if (billed > topClientMaxBilled) {
-            topClientMaxBilled = billed;
-            topClientName = name;
-          }
-        }
-        const topClientPct = totalRevenueCents > 0 ? Math.min(100, Math.round((topClientMaxBilled / totalRevenueCents) * 100)) : 0;
-
-        const totalActiveMs = tasks.reduce((sum, t) => sum + (t.activeMilliseconds || 0), 0);
-        const totalHours = totalActiveMs / 3600000;
-        const effectiveHourlyRate = totalHours > 0 ? Math.round((netProfitCents / 100) / totalHours) : 0;
-
-        const monthlyBurn = Math.round(totalOperatingCostsCents / 6);
-        const cashflowRunwayMonths = monthlyBurn > 0 && paidCents > 0 ? Math.min(36, Math.max(1, Math.round(paidCents / monthlyBurn))) : 0;
-
-        const monthlyTrends: AnalyticsMonthlyTrend[] = [];
-        for (let i = 5; i >= 0; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-          const label = d.toLocaleString("default", { month: "short" });
-          monthlyTrends.push({
-            key,
-            label,
-            revenueCents: 0,
-            expensesCents: 0,
-            profitCents: 0,
-            marginPct: 0,
-          });
-        }
-
-        for (const inv of targetInvoices) {
-          if (!inv.issueDate || inv.status === "DRAFT") continue;
-          const invKey = inv.issueDate.slice(0, 7);
-          const target = monthlyTrends.find((m) => m.key === invKey);
-          if (target) {
-            target.revenueCents += inv.amountCents;
-          }
-        }
-
-        for (const v of memoryVendors) {
-          const vDate = v.payoutDueDate || v.createdAt;
-          if (!vDate) continue;
-          const vKey = vDate.slice(0, 7);
-          const target = monthlyTrends.find((m) => m.key === vKey);
-          if (target) {
-            target.expensesCents += (Number(v.currentBalance) || 0) * 100;
-          }
-        }
-
-        for (const e of memoryExpenses) {
-          const eDate = e.incurredAt || e.createdAt;
-          if (!eDate) continue;
-          const eKey = eDate.slice(0, 7);
-          const target = monthlyTrends.find((m) => m.key === eKey);
-          if (target) {
-            target.expensesCents += e.amountCents || 0;
-          }
-        }
-
-        for (const m of monthlyTrends) {
-          // Preserve losses across months
-          m.profitCents = m.revenueCents - m.expensesCents;
-          m.marginPct = m.revenueCents > 0 ? Math.round((m.profitCents / m.revenueCents) * 100) : 0;
-        }
-
-        return {
-          totalRevenueCents,
-          billedAmountCents: totalRevenueCents,
-          paidCents,
-          collectedCents: paidCents,
-          pendingReceivablesCents,
-          outstandingCents: pendingReceivablesCents,
-          totalOutsourcedCents,
-          generalExpensesCents,
-          totalOperatingCostsCents,
-          committedCostCents: totalOperatingCostsCents,
-          paidCostCents,
-          accrualProfitCents,
-          cashProfitCents,
-          netProfitCents,
-          marginPct,
-          isLoss,
-          unpaidCount,
-          overdueCents,
-          overdueCount,
-          paidRatioPct,
-          avgInvoiceCents,
-          activeClientsCount: memoryClients.length,
-          vendorsCount: memoryVendors.length,
-          topClientName,
-          topClientPct,
-          effectiveHourlyRate,
-          cashflowRunwayMonths,
-          monthlyTrends,
-          currency: currency || "ALL",
-          period: period || "all",
+      if (checkIsElectron() && window.billflow)
+        return window.billflow.analytics.summary(
+          period,
+          currency,
           accountingMethod,
-        };
-      }
+        );
+      return calculateFinancials({
+        invoices: memoryInvoices,
+        workOrders: memoryWorkOrders,
+        expenses: memoryExpenses,
+        tasks,
+        period,
+        currency:
+          currency && !["ALL", "all"].includes(currency)
+            ? currency
+            : memorySettings.defaultCurrency,
+        accountingMethod,
+        clientCount: memoryClients.length,
+        vendorCount: memoryVendors.length,
+      });
     },
     [checkIsElectron, tasks],
   );
 
-  const createExpense = async (input: NewExpenseInput): Promise<ExpenseItem> => {
+  const createExpense = async (
+    input: NewExpenseInput,
+  ): Promise<ExpenseItem> => {
     if (checkIsElectron() && window.billflow?.expenses) {
       const created = await window.billflow.expenses.create(input);
-      await refresh();
+
       return created;
     } else {
       const id = input.requestId || `exp-${Date.now()}`;
@@ -1296,13 +1474,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateExpense = async (id: string, patch: ExpensePatchInput): Promise<ExpenseItem> => {
+  const updateExpense = async (
+    id: string,
+    patch: ExpensePatchInput,
+  ): Promise<ExpenseItem> => {
     if (checkIsElectron() && window.billflow?.expenses) {
       const updated = await window.billflow.expenses.update(id, patch);
-      await refresh();
+
       return updated;
     } else {
-      memoryExpenses = memoryExpenses.map((exp) => (exp.id === id ? { ...exp, ...patch } : exp));
+      memoryExpenses = memoryExpenses.map((exp) =>
+        exp.id === id ? { ...exp, ...patch } : exp,
+      );
       const found = memoryExpenses.find((exp) => exp.id === id);
       if (!found) throw new Error("Expense not found");
       await refresh();
@@ -1313,26 +1496,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteExpense = async (id: string): Promise<void> => {
     if (checkIsElectron() && window.billflow?.expenses) {
       await window.billflow.expenses.remove(id);
-      await refresh();
     } else {
       memoryExpenses = memoryExpenses.filter((exp) => exp.id !== id);
       await refresh();
     }
   };
 
-  const attachExpenseReceipt = async (expenseId: string, requestId: string): Promise<AttachmentItem | null> => {
+  const attachExpenseReceipt = async (
+    expenseId: string,
+    requestId: string,
+  ): Promise<AttachmentItem | null> => {
     if (checkIsElectron() && window.billflow?.attachments) {
-      const item = await window.billflow.attachments.select({ type: "expense", id: expenseId }, requestId);
-      await refresh();
+      const item = await window.billflow.attachments.select(
+        { type: "expense", id: expenseId },
+        requestId,
+      );
+
       return item;
     }
     return null;
   };
 
-  const createEvent = async (input: NewCalendarEventInput): Promise<CalendarEventItem> => {
+  const createEvent = async (
+    input: NewCalendarEventInput,
+  ): Promise<CalendarEventItem> => {
     if (checkIsElectron() && window.billflow?.events) {
       const created = await window.billflow.events.create(input);
-      await refresh();
+
       return created;
     } else {
       const id = input.id || `evt-${Date.now()}`;
@@ -1362,14 +1552,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateEvent = async (id: string, patch: CalendarEventPatchInput): Promise<CalendarEventItem> => {
+  const updateEvent = async (
+    id: string,
+    patch: CalendarEventPatchInput,
+  ): Promise<CalendarEventItem> => {
     if (checkIsElectron() && window.billflow?.events) {
       const updated = await window.billflow.events.update(id, patch);
-      await refresh();
+
       return updated;
     } else {
       const now = new Date().toISOString();
-      memoryEvents = memoryEvents.map((evt) => (evt.id === id ? { ...evt, ...patch, updatedAt: now } : evt));
+      memoryEvents = memoryEvents.map((evt) =>
+        evt.id === id ? { ...evt, ...patch, updatedAt: now } : evt,
+      );
       const found = memoryEvents.find((evt) => evt.id === id);
       if (!found) throw new Error("Calendar event not found");
       await refresh();
@@ -1380,7 +1575,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteEvent = async (id: string): Promise<void> => {
     if (checkIsElectron() && window.billflow?.events) {
       await window.billflow.events.remove(id);
-      await refresh();
     } else {
       memoryEvents = memoryEvents.filter((evt) => evt.id !== id);
       await refresh();
@@ -1388,16 +1582,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   const requireDesktop = () => {
-    if (!checkIsElectron() || !window.billflow) throw new Error("Open the BillFlow desktop app to save workflow records.");
+    if (!checkIsElectron() || !window.billflow)
+      throw new Error(
+        "Open the BillFlow desktop app to save workflow records.",
+      );
     return window.billflow;
   };
   const workflow: WorkflowAPI = {
     tasks: {
-      list: async () => checkIsElectron() && window.billflow ? window.billflow.tasks.list() : [...memoryTasks],
-      create: async input => {
+      list: async () =>
+        checkIsElectron() && window.billflow
+          ? window.billflow.tasks.list()
+          : [...memoryTasks],
+      create: async (input) => {
         if (checkIsElectron() && window.billflow) {
           const result = await window.billflow.tasks.create(input);
-          await refresh();
+
           return result;
         }
         const created: TaskItem = {
@@ -1415,7 +1615,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       update: async (id, patch) => {
         if (checkIsElectron() && window.billflow) {
           const result = await window.billflow.tasks.update(id, patch);
-          await refresh();
+
           return result;
         }
         const idx = memoryTasks.findIndex((t) => t.id === id);
@@ -1425,16 +1625,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           ...existing,
           ...patch,
           updatedAt: new Date().toISOString(),
-          completedAt: patch.status === "done" && !existing.completedAt ? new Date().toISOString() : existing.completedAt,
+          completedAt:
+            patch.status === "done" && !existing.completedAt
+              ? new Date().toISOString()
+              : existing.completedAt,
         };
         memoryTasks[idx] = updated;
         await refresh();
         return updated;
       },
-      remove: async id => {
+      remove: async (id) => {
         if (checkIsElectron() && window.billflow) {
           await window.billflow.tasks.remove(id);
-          await refresh();
+
           return;
         }
         memoryTasks = memoryTasks.filter((t) => t.id !== id);
@@ -1444,20 +1647,34 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     },
     tracking: {
       pending: async () => requireDesktop().tracking.pending(),
-      decide: async (id, choice) => { const result = await requireDesktop().tracking.decide(id, choice); await refresh(); return result; },
+      decide: async (id, choice) => {
+        const result = await requireDesktop().tracking.decide(id, choice);
+        await refresh();
+        return result;
+      },
     },
     attachments: {
-      list: async owner => requireDesktop().attachments.list(owner),
-      select: async (owner, requestId, filePath?) => { const result = await requireDesktop().attachments.select(owner, requestId, filePath); await refresh(); return result; },
+      list: async (owner) => requireDesktop().attachments.list(owner),
+      select: async (owner, requestId, filePath?) => {
+        const result = await requireDesktop().attachments.select(
+          owner,
+          requestId,
+          filePath,
+        );
+        await refresh();
+        return result;
+      },
       chooseFile: async () => {
         const fn = requireDesktop().attachments.chooseFile;
         return fn ? fn() : null;
       },
-      open: async id => requireDesktop().attachments.open(id),
+      open: async (id) => requireDesktop().attachments.open(id),
     },
     files: {
-      selectPdfDirectory: async () => requireDesktop().files.selectPdfDirectory(),
-      openInvoicePdf: async (id, reveal) => requireDesktop().files.openInvoicePdf(id, reveal),
+      selectPdfDirectory: async () =>
+        requireDesktop().files.selectPdfDirectory(),
+      openInvoicePdf: async (id, reveal) =>
+        requireDesktop().files.openInvoicePdf(id, reveal),
     },
   };
 
@@ -1472,47 +1689,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [tasks],
   );
 
-  const linkTasksToInvoice = useCallback(
-    async (
-      invoiceId: string,
-      invoiceCode: string,
-      taskIds: string[],
-    ): Promise<void> => {
-      const uniqueIds = Array.from(new Set(taskIds.filter(Boolean)));
-      if (uniqueIds.length === 0) return;
-
-      if (checkIsElectron() && window.billflow) {
-        await Promise.all(
-          uniqueIds.map((taskId) =>
-            window.billflow!.tasks.update(taskId, { invoiceId }).catch(() => null),
-          ),
-        );
-        await refresh();
-        return;
-      }
-
-      const nowIso = new Date().toISOString();
-      memoryTasks = memoryTasks.map((t) =>
-        uniqueIds.includes(t.id)
-          ? {
-              ...t,
-              invoiceId,
-              invoiceCode,
-              updatedAt: nowIso,
-            }
-          : t,
-      );
-      await refresh();
-    },
-    [checkIsElectron, refresh],
-  );
-
   const activeCurrency: Currency = useMemo(() => {
-    return getSystemCurrency(
-      settings?.defaultCurrency,
-      invoices,
-      "USD",
-    );
+    return getSystemCurrency(settings?.defaultCurrency, invoices, "USD");
   }, [settings?.defaultCurrency, invoices]);
 
   return (
@@ -1522,14 +1700,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         trackingOffers,
         workflow,
         getUnbilledCompletedTasks,
-        linkTasksToInvoice,
         clients,
         invoices,
         vendors,
         expenses,
         workOrders,
         events,
-        catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems,
+        catalogItems,
+        createCatalogItem,
+        updateCatalogItem,
+        deleteCatalogItem,
+        bulkImportCatalogItems,
         dashboard,
         settings,
         activeCurrency,
@@ -1599,8 +1780,24 @@ export function useActiveCurrency() {
 }
 
 export function useClients() {
-  const { clients, isLoading, error, createClient, updateClient, deleteClient, refresh } = useData();
-  return { clients, isLoading, error, createClient, updateClient, deleteClient, refresh };
+  const {
+    clients,
+    isLoading,
+    error,
+    createClient,
+    updateClient,
+    deleteClient,
+    refresh,
+  } = useData();
+  return {
+    clients,
+    isLoading,
+    error,
+    createClient,
+    updateClient,
+    deleteClient,
+    refresh,
+  };
 }
 
 export function useInvoices(filter?: { clientId?: string }) {
@@ -1739,63 +1936,54 @@ export function useWorkOrders() {
   };
 }
 
-export function useAnalyticsSummary(
-  period?: string,
-  currency?: string,
-  accountingMethod?: "accrual" | "cash",
-) {
-  const { getAnalyticsSummary, clients, invoices, vendors, activeCurrency } = useData();
-  const effectiveCurrency = currency ?? activeCurrency;
-  const query = useMemo(
-    () => ({ period, currency: effectiveCurrency, accountingMethod, clients, invoices, vendors }),
-    [period, effectiveCurrency, accountingMethod, clients, invoices, vendors]
-  );
-  const [result, setResult] = useState<{
-    query: typeof query;
-    data: AnalyticsSummaryPayload | null;
-    error: string | null;
-  } | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchSummary = useCallback((isCurrent: () => boolean = () => true) =>
-    getAnalyticsSummary(query.period, query.currency, query.accountingMethod).then((data) => {
-      if (isCurrent()) setResult({ query, data, error: null });
-    }).catch((err: unknown) => {
-      if (isCurrent()) {
-        const message = err instanceof Error ? err.message : "Failed to load analytics";
-        setResult({ query, data: null, error: message });
-      }
-    }), [getAnalyticsSummary, query]);
-
-  useEffect(() => {
-    let active = true;
-    void fetchSummary(() => active);
-    return () => { active = false; };
-  }, [fetchSummary]);
-
-  const refreshSummary = () => {
-    setRefreshing(true);
-    return fetchSummary().finally(() => setRefreshing(false));
-  };
-  return {
-    data: result?.data ?? null,
-    loading: refreshing || result?.query !== query,
-    error: result?.query === query ? result.error : null,
-    refreshSummary,
-  };
-}
-
 export function useCatalog() {
-  const { catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems, isLoading, isElectron, error } = useData();
-  return { catalogItems, createCatalogItem, updateCatalogItem, deleteCatalogItem, bulkImportCatalogItems, isLoading, isElectron, error };
+  const {
+    catalogItems,
+    createCatalogItem,
+    updateCatalogItem,
+    deleteCatalogItem,
+    bulkImportCatalogItems,
+    isLoading,
+    isElectron,
+    error,
+  } = useData();
+  return {
+    catalogItems,
+    createCatalogItem,
+    updateCatalogItem,
+    deleteCatalogItem,
+    bulkImportCatalogItems,
+    isLoading,
+    isElectron,
+    error,
+  };
 }
 
 export function useExpenses(filter?: { category?: string }) {
-  const { expenses, isLoading, error, createExpense, updateExpense, deleteExpense, attachExpenseReceipt, refresh } = useData();
+  const {
+    expenses,
+    isLoading,
+    error,
+    createExpense,
+    updateExpense,
+    deleteExpense,
+    attachExpenseReceipt,
+    refresh,
+  } = useData();
   const category = filter?.category;
   const filteredExpenses = useMemo(() => {
     if (!category || category === "All Categories") return expenses;
-    return expenses.filter(e => e.category === category);
+    return expenses.filter((e) => e.category === category);
   }, [expenses, category]);
-  return { expenses: filteredExpenses, allExpenses: expenses, isLoading, error, createExpense, updateExpense, deleteExpense, attachExpenseReceipt, refresh };
+  return {
+    expenses: filteredExpenses,
+    allExpenses: expenses,
+    isLoading,
+    error,
+    createExpense,
+    updateExpense,
+    deleteExpense,
+    attachExpenseReceipt,
+    refresh,
+  };
 }

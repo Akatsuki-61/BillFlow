@@ -1,5 +1,9 @@
 import type { InvoiceWithClient } from "@/types/billing";
-import { localDateKey, remainingBalance, isPastDue } from "@/lib/visual-metrics";
+import {
+  localDateKey,
+  remainingBalance,
+  isPastDue,
+} from "@/lib/visual-metrics";
 
 export type ExportFileFormat = "csv" | "excel";
 export type ExportTemplateMode = "executive" | "flat";
@@ -14,7 +18,8 @@ export function escapeCsvField(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
   }
-  const str = String(value);
+  // Text from client records must remain text when opened by a spreadsheet.
+  const str = spreadsheetText(value);
   if (
     str.includes('"') ||
     str.includes(",") ||
@@ -24,6 +29,15 @@ export function escapeCsvField(value: unknown): string {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
+}
+
+function spreadsheetText(value: unknown): string {
+  const raw = String(value ?? "");
+  return typeof value === "string" &&
+    !/^-\d+(?:\.\d+)?$/.test(raw) &&
+    /^[\s\u0000-\u001f]*[=+@-]/.test(raw)
+    ? "'" + raw
+    : raw;
 }
 
 /**
@@ -90,6 +104,22 @@ export function generateInvoicesCsv(
   invoices: InvoiceWithClient[],
   options?: { referenceDate?: Date; includeSummaryRow?: boolean },
 ): string {
+  const currencies = [...new Set(invoices.map((invoice) => invoice.currency))];
+  if (currencies.length > 1) {
+    const blocks = currencies.map((currency) =>
+      generateInvoicesCsv(
+        invoices.filter((invoice) => invoice.currency === currency),
+        options,
+      ),
+    );
+    return [
+      blocks[0],
+      ...blocks
+        .slice(1)
+        .map((block) => block.slice(block.indexOf("\r\n") + "\r\n".length)),
+    ].join("\r\n");
+  }
+
   const refDate = options?.referenceDate || new Date();
   const headers = [
     "Invoice Number",
@@ -178,6 +208,22 @@ export function generateOverdueSummaryCsv(
   invoices: InvoiceWithClient[],
   options?: { referenceDate?: Date },
 ): string {
+  const currencies = [...new Set(invoices.map((invoice) => invoice.currency))];
+  if (currencies.length > 1) {
+    const blocks = currencies.map((currency) =>
+      generateOverdueSummaryCsv(
+        invoices.filter((invoice) => invoice.currency === currency),
+        options,
+      ),
+    );
+    return [
+      blocks[0],
+      ...blocks
+        .slice(1)
+        .map((block) => block.slice(block.indexOf("\r\n") + "\r\n".length)),
+    ].join("\r\n");
+  }
+
   const refDate = options?.referenceDate || new Date();
   const todayKey = localDateKey(refDate);
 
@@ -234,7 +280,10 @@ export function generateOverdueSummaryCsv(
 
   if (overdueList.length > 0) {
     const totalBilled = overdueList.reduce((sum, i) => sum + i.amountCents, 0);
-    const totalPaid = overdueList.reduce((sum, i) => sum + (i.paidCents ?? 0), 0);
+    const totalPaid = overdueList.reduce(
+      (sum, i) => sum + (i.paidCents ?? 0),
+      0,
+    );
     const totalOverdue = overdueList.reduce(
       (sum, i) => sum + remainingBalance(i),
       0,
@@ -275,11 +324,7 @@ export interface ClientOverdueSummaryRow {
   oldestDueDate: string;
   maxDaysOverdue: number;
   agingBucket:
-    | "Current"
-    | "1-15 Days"
-    | "16-30 Days"
-    | "31-60 Days"
-    | "60+ Days";
+    "Current" | "1-15 Days" | "16-30 Days" | "31-60 Days" | "60+ Days";
   totalBilledCents: number;
   totalPaidCents: number;
   totalOverdueCents: number;
@@ -298,7 +343,7 @@ export function consolidateOverdueByClient(
   const map = new Map<string, ClientOverdueSummaryRow>();
 
   for (const inv of overdueList) {
-    const key = `${inv.clientName.trim().toLowerCase()}__${inv.currency}`;
+    const key = `${inv.clientId || inv.clientName.trim().toLowerCase()}__${inv.currency}`;
     const days = calculateDaysOverdue(inv.dueDate, referenceDate);
     const balance = remainingBalance(inv);
     const existing = map.get(key);
@@ -364,6 +409,21 @@ export function generateProfessionalOverdueTemplateCsv(
     primaryCurrency?: string;
   },
 ): string {
+  if (options?.primaryCurrency)
+    invoices = invoices.filter(
+      (invoice) => invoice.currency === options.primaryCurrency,
+    );
+  const currencies = [...new Set(invoices.map((invoice) => invoice.currency))];
+  if (currencies.length > 1)
+    return currencies
+      .map((currency) =>
+        generateProfessionalOverdueTemplateCsv(
+          invoices.filter((invoice) => invoice.currency === currency),
+          { ...options, primaryCurrency: currency },
+        ),
+      )
+      .join("\r\n\r\n");
+
   const refDate = options?.referenceDate || new Date();
   const todayKey = localDateKey(refDate);
   const businessName = options?.businessName || "BillFlow Freelance Studio";
@@ -425,9 +485,7 @@ export function generateProfessionalOverdueTemplateCsv(
   lines.push(
     [
       escapeCsvField("STATEMENT TITLE"),
-      escapeCsvField(
-        "OVERDUE INVOICES & ACCOUNTS RECEIVABLE AGING STATEMENT",
-      ),
+      escapeCsvField("OVERDUE INVOICES & ACCOUNTS RECEIVABLE AGING STATEMENT"),
     ].join(","),
   );
   lines.push(
@@ -624,6 +682,22 @@ export function generateOverdueTsvForClipboard(
   invoices: InvoiceWithClient[],
   referenceDate = new Date(),
 ): string {
+  const currencies = [...new Set(invoices.map((invoice) => invoice.currency))];
+  if (currencies.length > 1) {
+    const blocks = currencies.map((currency) =>
+      generateOverdueTsvForClipboard(
+        invoices.filter((invoice) => invoice.currency === currency),
+        referenceDate,
+      ),
+    );
+    return [
+      blocks[0],
+      ...blocks
+        .slice(1)
+        .map((block) => block.slice(block.indexOf("\n") + "\n".length)),
+    ].join("\n");
+  }
+
   const todayKey = localDateKey(referenceDate);
   const overdueList = invoices
     .filter((inv) => isPastDue(inv, todayKey))
@@ -651,7 +725,9 @@ export function generateOverdueTsvForClipboard(
   ];
 
   const cleanTab = (v: unknown) =>
-    String(v ?? "").replace(/[\t\r\n]+/g, " ").trim();
+    spreadsheetText(v)
+      .replace(/[\t\r\n]+/g, " ")
+      .trim();
 
   const rows = overdueList.map((inv, idx) => {
     const days = calculateDaysOverdue(inv.dueDate, referenceDate);
@@ -911,7 +987,8 @@ export function convertCsvToExcelWorkbook(
           if (isHeader) styleId = "TableHeader";
           else if (isTotalRow)
             styleId = isNumericDecimal ? "TotalRowAmount" : "TotalRowLabel";
-          else if (isMetaRow) styleId = colIdx === 0 ? "MetaLabel" : "MetaValue";
+          else if (isMetaRow)
+            styleId = colIdx === 0 ? "MetaLabel" : "MetaValue";
           else if (isNumericDecimal) styleId = "CurrencyCell";
           else if (colIdx === 0 && trimmed.startsWith("INV-"))
             styleId = "CodeCell";
@@ -963,6 +1040,27 @@ export function generateOverdueExcelWorkbook(
     includeClientRollup?: boolean;
   },
 ): string {
+  if (options?.primaryCurrency)
+    invoices = invoices.filter(
+      (invoice) => invoice.currency === options.primaryCurrency,
+    );
+  const currencies = [...new Set(invoices.map((invoice) => invoice.currency))];
+  if (currencies.length > 1) {
+    const workbooks = currencies.map((currency) =>
+      generateOverdueExcelWorkbook(
+        invoices.filter((invoice) => invoice.currency === currency),
+        { ...options, primaryCurrency: currency },
+      ).replace(
+        /ss:Name="([^"]+)"/g,
+        (_match, name: string) => `ss:Name="${currency} ${name}"`,
+      ),
+    );
+    const worksheets = workbooks
+      .flatMap((book) => book.match(/<Worksheet\b[\s\S]*?<\/Worksheet>/g) || [])
+      .join("\n");
+    return workbooks[0].replace(/<Worksheet\b[\s\S]*<\/Worksheet>/, worksheets);
+  }
+
   const refDate = options?.referenceDate || new Date();
   const execCsv = generateProfessionalOverdueTemplateCsv(invoices, options);
   const clientGroups = consolidateOverdueByClient(invoices, refDate);
@@ -1083,10 +1181,7 @@ export function generateOverdueExcelWorkbook(
     `  </Worksheet>`,
   ].join("\n");
 
-  return sheet1Workbook.replace(
-    "</Workbook>",
-    `${sheet2Xml}\n</Workbook>`,
-  );
+  return sheet1Workbook.replace("</Workbook>", `${sheet2Xml}\n</Workbook>`);
 }
 
 /**

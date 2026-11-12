@@ -1,17 +1,35 @@
-import { app, BrowserWindow, Menu, MenuItemConstructorOptions, dialog } from "electron";
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  MenuItemConstructorOptions,
+  dialog,
+} from "electron";
 import path from "path";
 import fs from "fs";
 
 export function getAboutIconPath(): string | undefined {
   const candidates: (string | undefined)[] = [
-    process.resourcesPath ? path.join(process.resourcesPath, "brand", "logo-white.png") : undefined,
-    typeof app?.getAppPath === "function" ? path.join(app.getAppPath(), "out", "brand", "logo-white.png") : undefined,
-    typeof app?.getAppPath === "function" ? path.join(app.getAppPath(), "public", "brand", "logo-white.png") : undefined,
+    process.resourcesPath
+      ? path.join(process.resourcesPath, "brand", "logo-white.png")
+      : undefined,
+    typeof app?.getAppPath === "function"
+      ? path.join(app.getAppPath(), "out", "brand", "logo-white.png")
+      : undefined,
+    typeof app?.getAppPath === "function"
+      ? path.join(app.getAppPath(), "public", "brand", "logo-white.png")
+      : undefined,
     path.join(process.cwd(), "out", "brand", "logo-white.png"),
     path.join(process.cwd(), "public", "brand", "logo-white.png"),
     path.join(__dirname, "../public/brand/logo-white.png"),
     path.join(__dirname, "../assets/brand/source/BillFlow-Logo-White-Icon.png"),
-    path.join(process.cwd(), "assets", "brand", "source", "BillFlow-Logo-White-Icon.png"),
+    path.join(
+      process.cwd(),
+      "assets",
+      "brand",
+      "source",
+      "BillFlow-Logo-White-Icon.png",
+    ),
   ];
   for (const c of candidates) {
     if (c && fs.existsSync(c)) return c;
@@ -62,8 +80,9 @@ export function buildMenuTemplate(
           const options = {
             type: "info" as const,
             title: "Check for Updates",
-            message: "BillFlow is up to date",
-            detail: `You are running the latest version of BillFlow (v${currentVersion}).`,
+            message: `Installed version: BillFlow v${currentVersion}`,
+            detail:
+              "Automatic update checks are not enabled. Compare this version with downloads at github.com/Akatsuki-61/BillFlow/releases.",
             buttons: ["OK"],
           };
           if (win && !win.isDestroyed()) {
@@ -183,10 +202,7 @@ export function buildMenuTemplate(
           { type: "separator" },
           { role: "front" },
         ]
-      : [
-          { role: "minimize" },
-          { role: "close" },
-        ],
+      : [{ role: "minimize" }, { role: "close" }],
   };
 
   return isMac
@@ -218,7 +234,11 @@ export function createApplicationMenu(
     }
   };
 
-  const template = buildMenuTemplate(navigate, process.platform === "darwin", getMainWindow);
+  const template = buildMenuTemplate(
+    navigate,
+    process.platform === "darwin",
+    getMainWindow,
+  );
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 }

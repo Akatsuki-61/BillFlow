@@ -2006,7 +2006,10 @@ input[type="checkbox"] {
   color: var(--ui-secondary);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 .overview-period-picker:hover {
   background: var(--ui-hover);
@@ -2858,7 +2861,8 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
 .bf-toast-trash-badge i.fa-solid.fa-trash {
   width: 0.9rem;
   height: 0.9rem;
-  animation: fa-trash-shake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) 0.08s both;
+  animation: fa-trash-shake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) 0.08s
+    both;
 }
 
 .bf-toast-add-badge i.fa-solid.fa-plus,
@@ -2964,4 +2968,19 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
     animation: none;
     transform: none;
   }
+}
+
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/nunito.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/plusjakartasans.woff2") format("woff2");
 }

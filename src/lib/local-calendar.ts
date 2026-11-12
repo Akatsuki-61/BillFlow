@@ -1,10 +1,16 @@
+import { profileStorageKey, activeProfileScope } from "./profile-scope";
 import type {
   CalendarEventItem,
   EventCategory,
   EventColor,
   NewCalendarEventInput,
 } from "@/types/calendar";
-import type { TaskItem, TaskPriority, TaskCategory, TaskStatus } from "@/types/tasks";
+import type {
+  TaskItem,
+  TaskPriority,
+  TaskCategory,
+  TaskStatus,
+} from "@/types/tasks";
 
 export interface ParsedLocalCalendarItem {
   uid: string;
@@ -30,7 +36,7 @@ export interface ParsedLocalCalendarItem {
  */
 export function normalizeAndAutoFixDate(
   rawDate?: string | null,
-  fallbackDate?: string
+  fallbackDate?: string,
 ): string {
   const defaultDate =
     fallbackDate && /^\d{4}-\d{2}-\d{2}$/.test(fallbackDate)
@@ -91,7 +97,7 @@ export function normalizeAndAutoFixDate(
 export function normalizeAndAutoFixTimeRange(
   startTime?: string | null,
   endTime?: string | null,
-  isAllDay?: boolean
+  isAllDay?: boolean,
 ): { startTime: string | null; endTime: string | null; isAllDay: boolean } {
   if (isAllDay) {
     return { startTime: null, endTime: null, isAllDay: true };
@@ -148,13 +154,19 @@ function readTaskTimeSlotsMap(): Record<
   string,
   { startTime: string | null; endTime: string | null }
 > {
-  const result: Record<string, { startTime: string | null; endTime: string | null }> = {};
+  const result: Record<
+    string,
+    { startTime: string | null; endTime: string | null }
+  > = {};
+  const prefix = `${activeProfileScope()}:`;
   for (const [k, v] of inMemoryTaskTimeSlots.entries()) {
-    result[k] = v;
+    if (k.startsWith(prefix)) result[k.slice(prefix.length)] = v;
   }
   if (typeof window !== "undefined") {
     try {
-      const raw = window.localStorage.getItem(TASK_TIME_SLOTS_STORAGE_KEY);
+      const raw = window.localStorage.getItem(
+        profileStorageKey(TASK_TIME_SLOTS_STORAGE_KEY),
+      );
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
@@ -174,7 +186,7 @@ export function getAllTaskTimeSlots(): Record<
 }
 
 export function getTaskTimeSlot(
-  taskId: string
+  taskId: string,
 ): { startTime: string | null; endTime: string | null } | null {
   if (!taskId) return null;
   const map = readTaskTimeSlotsMap();
@@ -183,26 +195,26 @@ export function getTaskTimeSlot(
 
 export function saveTaskTimeSlot(
   taskId: string,
-  slot: { startTime?: string | null; endTime?: string | null }
+  slot: { startTime?: string | null; endTime?: string | null },
 ): void {
   if (!taskId) return;
   const normalized = normalizeAndAutoFixTimeRange(
     slot.startTime,
     slot.endTime,
-    !slot.startTime
+    !slot.startTime,
   );
   const entry = {
     startTime: normalized.startTime,
     endTime: normalized.endTime,
   };
-  inMemoryTaskTimeSlots.set(taskId, entry);
+  inMemoryTaskTimeSlots.set(`${activeProfileScope()}:${taskId}`, entry);
   if (typeof window !== "undefined") {
     try {
       const existing = readTaskTimeSlotsMap();
       existing[taskId] = entry;
       window.localStorage.setItem(
-        TASK_TIME_SLOTS_STORAGE_KEY,
-        JSON.stringify(existing)
+        profileStorageKey(TASK_TIME_SLOTS_STORAGE_KEY),
+        JSON.stringify(existing),
       );
       if (window.billflow?.events?.syncNative) {
         void window.billflow.events.syncNative(existing).catch(() => {});
@@ -251,7 +263,9 @@ export function autoFixAndLinkCalendarData(params: {
       fixedClientName = clientMap.get(fixedClientId);
       changed = true;
     } else if (!fixedClientId && fixedClientName) {
-      const matchedId = clientNameToId.get(fixedClientName.toLowerCase().trim());
+      const matchedId = clientNameToId.get(
+        fixedClientName.toLowerCase().trim(),
+      );
       if (matchedId) {
         fixedClientId = matchedId;
         changed = true;
@@ -264,7 +278,7 @@ export function autoFixAndLinkCalendarData(params: {
     const normalizedTimes = normalizeAndAutoFixTimeRange(
       rawStartTime,
       rawEndTime,
-      !rawStartTime
+      !rawStartTime,
     );
 
     if (
@@ -299,7 +313,9 @@ export function autoFixAndLinkCalendarData(params: {
     const fixedStart = normalizeAndAutoFixDate(evt.startDate);
     if (fixedStart !== evt.startDate) changed = true;
 
-    let fixedEnd = evt.endDate ? normalizeAndAutoFixDate(evt.endDate, fixedStart) : null;
+    let fixedEnd = evt.endDate
+      ? normalizeAndAutoFixDate(evt.endDate, fixedStart)
+      : null;
     if (fixedEnd && fixedEnd < fixedStart) {
       fixedEnd = fixedStart;
       changed = true;
@@ -308,7 +324,7 @@ export function autoFixAndLinkCalendarData(params: {
     const fixedTimes = normalizeAndAutoFixTimeRange(
       evt.startTime,
       evt.endTime,
-      evt.isAllDay
+      evt.isAllDay,
     );
     if (
       fixedTimes.startTime !== (evt.startTime || null) ||
@@ -330,7 +346,8 @@ export function autoFixAndLinkCalendarData(params: {
       }
       if (!fixedClientId && linkedTask.clientId) {
         fixedClientId = linkedTask.clientId;
-        fixedClientName = linkedTask.clientName || clientMap.get(linkedTask.clientId) || null;
+        fixedClientName =
+          linkedTask.clientName || clientMap.get(linkedTask.clientId) || null;
         changed = true;
       }
       if (!linkedTask.startTime && fixedTimes.startTime) {
@@ -338,7 +355,9 @@ export function autoFixAndLinkCalendarData(params: {
         linkedTask.endTime = fixedTimes.endTime;
       }
     } else if (!fixedTaskId && fixedTaskTitle) {
-      const matchedTask = taskTitleToTask.get(fixedTaskTitle.toLowerCase().trim());
+      const matchedTask = taskTitleToTask.get(
+        fixedTaskTitle.toLowerCase().trim(),
+      );
       if (matchedTask) {
         fixedTaskId = matchedTask.id;
         fixedTaskTitle = matchedTask.title;
@@ -350,7 +369,9 @@ export function autoFixAndLinkCalendarData(params: {
       }
     } else if (!fixedTaskId) {
       // Auto-link if event title matches a task title
-      const matchedByTitle = taskTitleToTask.get(evt.title.toLowerCase().trim());
+      const matchedByTitle = taskTitleToTask.get(
+        evt.title.toLowerCase().trim(),
+      );
       if (matchedByTitle) {
         fixedTaskId = matchedByTitle.id;
         fixedTaskTitle = matchedByTitle.title;
@@ -430,7 +451,10 @@ function addOneDayDateOnly(dateStr: string): string {
   return d.toISOString().slice(0, 10).replace(/-/g, "");
 }
 
-function formatIcsDateTimeLocal(dateStr: string, timeStr?: string | null): string {
+function formatIcsDateTimeLocal(
+  dateStr: string,
+  timeStr?: string | null,
+): string {
   const datePart = formatIcsDateOnly(dateStr);
   const [hh = "09", mm = "00"] = (timeStr || "09:00").split(":");
   const cleanH = String(hh).padStart(2, "0").slice(0, 2);
@@ -441,15 +465,21 @@ function formatIcsDateTimeLocal(dateStr: string, timeStr?: string | null): strin
 function formatUtcStamp(isoStr?: string): string {
   const date = isoStr ? new Date(isoStr) : new Date();
   if (isNaN(date.getTime())) {
-    return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    return new Date()
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d{3}/, "");
   }
-  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return date
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 }
 
 export function buildVEventFromCalendarEvent(event: CalendarEventItem): string {
   const lines: string[] = [
     "BEGIN:VEVENT",
-    `UID:billflow-evt-${event.id}@billflow.local`,
+    `UID:billflow-${activeProfileScope()}-evt-${event.id}@billflow.local`,
     `DTSTAMP:${formatUtcStamp(event.updatedAt || event.createdAt)}`,
   ];
 
@@ -460,7 +490,9 @@ export function buildVEventFromCalendarEvent(event: CalendarEventItem): string {
       : addOneDayDateOnly(event.startDate);
     lines.push(`DTEND;VALUE=DATE:${endD}`);
   } else {
-    lines.push(`DTSTART:${formatIcsDateTimeLocal(event.startDate, event.startTime)}`);
+    lines.push(
+      `DTSTART:${formatIcsDateTimeLocal(event.startDate, event.startTime)}`,
+    );
     const endDateTarget = event.endDate || event.startDate;
     const endTimeTarget = event.endTime || event.startTime;
     lines.push(`DTEND:${formatIcsDateTimeLocal(endDateTarget, endTimeTarget)}`);
@@ -489,7 +521,7 @@ export function buildVEventFromCalendarEvent(event: CalendarEventItem): string {
 
 export function buildIcsBlocksFromTask(
   task: TaskItem,
-  options?: { includeTodo?: boolean }
+  options?: { includeTodo?: boolean },
 ): string {
   if (!task.dueDate) return "";
   const dueDateClean = normalizeAndAutoFixDate(task.dueDate);
@@ -519,7 +551,7 @@ export function buildIcsBlocksFromTask(
   const normalizedTimes = normalizeAndAutoFixTimeRange(
     effectiveStart,
     effectiveEnd,
-    !effectiveStart
+    !effectiveStart,
   );
 
   const dtStartLine = normalizedTimes.startTime
@@ -531,7 +563,7 @@ export function buildIcsBlocksFromTask(
 
   const veventLines: string[] = [
     "BEGIN:VEVENT",
-    `UID:billflow-task-${task.id}@billflow.local`,
+    `UID:billflow-${activeProfileScope()}-task-${task.id}@billflow.local`,
     `DTSTAMP:${dtStamp}`,
     dtStartLine,
     dtEndLine,
@@ -556,7 +588,7 @@ export function buildIcsBlocksFromTask(
 
   const vtodoLines: string[] = [
     "BEGIN:VTODO",
-    `UID:billflow-todo-${task.id}@billflow.local`,
+    `UID:billflow-${activeProfileScope()}-todo-${task.id}@billflow.local`,
     `DTSTAMP:${dtStamp}`,
     `DUE;VALUE=DATE:${formatIcsDateOnly(dueDateClean)}`,
     `SUMMARY:${escapeIcsText(task.title)}`,
@@ -606,7 +638,9 @@ function parseIcsDateTimeValue(rawVal: string): {
   isAllDay: boolean;
 } {
   const clean = rawVal.trim();
-  const match = clean.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/);
+  const match = clean.match(
+    /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/,
+  );
   if (!match) {
     return {
       dateStr: normalizeAndAutoFixDate(clean),
@@ -627,15 +661,30 @@ function parseIcsDateTimeValue(rawVal: string): {
   };
 }
 
-function inferEventCategory(rawCategories: string, title: string): EventCategory {
+function inferEventCategory(
+  rawCategories: string,
+  title: string,
+): EventCategory {
   const combined = `${rawCategories} ${title}`.toLowerCase();
-  if (combined.includes("milestone") || combined.includes("launch") || combined.includes("release")) {
+  if (
+    combined.includes("milestone") ||
+    combined.includes("launch") ||
+    combined.includes("release")
+  ) {
     return "milestone";
   }
-  if (combined.includes("review") || combined.includes("demo") || combined.includes("audit")) {
+  if (
+    combined.includes("review") ||
+    combined.includes("demo") ||
+    combined.includes("audit")
+  ) {
     return "review";
   }
-  if (combined.includes("deadline") || combined.includes("due") || combined.includes("delivery")) {
+  if (
+    combined.includes("deadline") ||
+    combined.includes("due") ||
+    combined.includes("delivery")
+  ) {
     return "deadline";
   }
   if (combined.includes("remind") || combined.includes("follow")) {
@@ -672,7 +721,8 @@ function inferEventColor(cat: EventCategory): EventColor {
 
 function inferTaskPriority(priorityVal: string, title: string): TaskPriority {
   const num = parseInt(priorityVal, 10);
-  if (num === 1 || num === 2 || /urgent|critical|asap/i.test(title)) return "urgent";
+  if (num === 1 || num === 2 || /urgent|critical|asap/i.test(title))
+    return "urgent";
   if (num === 3 || num === 4 || /high|important/i.test(title)) return "high";
   if (num >= 6 && num <= 9) return "low";
   return "medium";
@@ -680,22 +730,42 @@ function inferTaskPriority(priorityVal: string, title: string): TaskPriority {
 
 function inferTaskCategory(rawCategories: string, title: string): TaskCategory {
   const combined = `${rawCategories} ${title}`.toLowerCase();
-  if (combined.includes("design") || combined.includes("ui") || combined.includes("ux") || combined.includes("figma")) {
+  if (
+    combined.includes("design") ||
+    combined.includes("ui") ||
+    combined.includes("ux") ||
+    combined.includes("figma")
+  ) {
     return "Design";
   }
-  if (combined.includes("infra") || combined.includes("deploy") || combined.includes("server") || combined.includes("cloud")) {
+  if (
+    combined.includes("infra") ||
+    combined.includes("deploy") ||
+    combined.includes("server") ||
+    combined.includes("cloud")
+  ) {
     return "Infrastructure";
   }
-  if (combined.includes("legal") || combined.includes("contract") || combined.includes("nda")) {
+  if (
+    combined.includes("legal") ||
+    combined.includes("contract") ||
+    combined.includes("nda")
+  ) {
     return "Legal";
   }
-  if (combined.includes("doc") || combined.includes("spec") || combined.includes("guide")) {
+  if (
+    combined.includes("doc") ||
+    combined.includes("spec") ||
+    combined.includes("guide")
+  ) {
     return "Documentation";
   }
   return "Development";
 }
 
-export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] {
+export function parseIcsCalendar(
+  icsContent: string,
+): ParsedLocalCalendarItem[] {
   if (!icsContent || !icsContent.trim()) return [];
 
   const unfolded = icsContent.replace(/\r?\n[ \t]/g, "");
@@ -731,7 +801,7 @@ export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] 
 
         const isTaskTaggedEvent =
           currentBlock === "VEVENT" &&
-          (uid.startsWith("billflow-task-") ||
+          (/^billflow-(?:[a-zA-Z0-9_-]+-)?task-/.test(uid) ||
             rawSummary.startsWith("[TASK] ") ||
             rawSummary.startsWith("[DONE] ") ||
             (props["CATEGORIES"] || "").toUpperCase().includes("TASK"));
@@ -748,11 +818,15 @@ export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] 
         const parsedEnd = rawEnd ? parseIcsDateTimeValue(rawEnd) : null;
 
         const description = unescapeIcsText(props["DESCRIPTION"] || "").trim();
-        const location = unescapeIcsText(props["LOCATION"] || "").trim() || null;
+        const location =
+          unescapeIcsText(props["LOCATION"] || "").trim() || null;
         const categories = unescapeIcsText(props["CATEGORIES"] || "");
         const eventCategory = inferEventCategory(categories, cleanTitle);
         const eventColor = inferEventColor(eventCategory);
-        const taskPriority = inferTaskPriority(props["PRIORITY"] || "", cleanTitle);
+        const taskPriority = inferTaskPriority(
+          props["PRIORITY"] || "",
+          cleanTitle,
+        );
         const taskCategory = inferTaskCategory(categories, cleanTitle);
 
         const rawStatus = (props["STATUS"] || "").toUpperCase();
@@ -765,7 +839,8 @@ export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] 
 
         items.push({
           uid,
-          kind: currentBlock === "VTODO" || isTaskTaggedEvent ? "task" : "event",
+          kind:
+            currentBlock === "VTODO" || isTaskTaggedEvent ? "task" : "event",
           title: cleanTitle,
           description,
           startDate: parsedStart.dateStr,
@@ -799,9 +874,11 @@ export function parseIcsCalendar(icsContent: string): ParsedLocalCalendarItem[] 
 
   const seenTaskIds = new Set<string>();
   return items.filter((item) => {
-    const match = item.uid.match(/^billflow-(?:task|todo)-(.+)@billflow\.local$/);
+    const match = item.uid.match(
+      /^billflow-(?:(.+?)-)?(?:task|todo)-(.+)@billflow\.local$/,
+    );
     if (match) {
-      const taskKey = match[1];
+      const taskKey = `${match[1] || "legacy"}:${match[2]}`;
       if (seenTaskIds.has(taskKey)) return false;
       seenTaskIds.add(taskKey);
     }
@@ -829,7 +906,7 @@ export function downloadIcsFile(filename: string, icsContent: string): void {
 }
 
 export function toNewCalendarEventInput(
-  item: ParsedLocalCalendarItem
+  item: ParsedLocalCalendarItem,
 ): NewCalendarEventInput {
   return {
     title: item.title,
@@ -843,4 +920,19 @@ export function toNewCalendarEventInput(
     color: item.color,
     location: item.location,
   };
+}
+
+export function hydrateTaskTimeSlots(
+  slots: Record<string, { startTime: string | null; endTime: string | null }>,
+) {
+  const prefix = `${activeProfileScope()}:`;
+  for (const key of inMemoryTaskTimeSlots.keys())
+    if (key.startsWith(prefix)) inMemoryTaskTimeSlots.delete(key);
+  for (const [id, slot] of Object.entries(slots))
+    inMemoryTaskTimeSlots.set(prefix + id, slot);
+  if (typeof window !== "undefined")
+    window.localStorage.setItem(
+      profileStorageKey(TASK_TIME_SLOTS_STORAGE_KEY),
+      JSON.stringify(slots),
+    );
 }

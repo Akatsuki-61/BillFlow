@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import path from "path";
 
 const mocks = vi.hoisted(() => {
-  const mainFrame = {};
+  const mainFrame = { url: "app://billflow/index.html" };
   return {
     mainFrame,
-    sender: { mainFrame },
+    sender: { mainFrame, isDestroyed: () => false },
     handle: vi.fn(),
     on: vi.fn(),
     read: vi.fn(),
@@ -13,25 +13,53 @@ const mocks = vi.hoisted(() => {
     rename: vi.fn(),
     background: vi.fn(),
     overlay: vi.fn(),
-    nativeTheme: { themeSource: "system", shouldUseDarkColors: false, on: vi.fn() },
+    nativeTheme: {
+      themeSource: "system",
+      shouldUseDarkColors: false,
+      on: vi.fn(),
+    },
   };
 });
 
 vi.mock("electron", () => ({
   app: { getPath: () => "/test/userData" },
-  BrowserWindow: { getAllWindows: () => [{ setBackgroundColor: mocks.background, setTitleBarOverlay: mocks.overlay }] },
+  BrowserWindow: {
+    getAllWindows: () => [
+      {
+        setBackgroundColor: mocks.background,
+        setTitleBarOverlay: mocks.overlay,
+      },
+    ],
+  },
   ipcMain: { on: mocks.on, handle: mocks.handle },
   nativeTheme: mocks.nativeTheme,
 }));
-vi.mock("fs", () => ({ default: { readFileSync: mocks.read, writeFileSync: mocks.write, renameSync: mocks.rename } }));
+vi.mock("fs", () => ({
+  default: {
+    readFileSync: mocks.read,
+    writeFileSync: mocks.write,
+    renameSync: mocks.rename,
+  },
+}));
 
 async function setup() {
   const theme = await import("../theme");
+  const { configureIpcSecurity } = await import("../security");
+  configureIpcSecurity(
+    mocks.sender as unknown as Electron.WebContents,
+    null,
+    () => true,
+  );
   theme.registerThemeHandlers();
   return {
     ...theme,
-    set: mocks.handle.mock.calls[0][1] as (event: unknown, value: unknown) => void,
-    initial: mocks.on.mock.calls[0][1] as (event: Record<string, unknown>) => void,
+    set: mocks.handle.mock.calls[0][1] as (
+      event: unknown,
+      value: unknown,
+    ) => void,
+    initial: mocks.on.mock.calls[0][1] as (
+      event: Record<string, unknown>,
+    ) => void,
   };
 }
 
@@ -47,27 +75,47 @@ describe("desktop appearance", () => {
   it("restores the preference before window creation and exposes it to preload", async () => {
     const theme = await setup();
     expect(mocks.nativeTheme.themeSource).toBe("dark");
-    const event = { sender: mocks.sender, senderFrame: mocks.mainFrame, returnValue: null };
+    const event = {
+      sender: mocks.sender,
+      senderFrame: mocks.mainFrame,
+      returnValue: null,
+    };
     theme.initial(event);
     expect(event.returnValue).toBe("dark");
   });
   it("uses System for missing or corrupt saved preferences", async () => {
-    mocks.read.mockImplementation(() => { throw new Error("Missing file"); });
+    mocks.read.mockImplementation(() => {
+      throw new Error("Missing file");
+    });
     await setup();
     expect(mocks.nativeTheme.themeSource).toBe("system");
   });
   it("atomically persists a changed preference and updates the window", async () => {
     const theme = await setup();
     theme.set({ sender: mocks.sender, senderFrame: mocks.mainFrame }, "light");
-    expect(mocks.write).toHaveBeenCalledWith(path.join("/test/userData", "appearance.json.tmp"), '"light"', "utf8");
-    expect(mocks.rename).toHaveBeenCalledWith(path.join("/test/userData", "appearance.json.tmp"), path.join("/test/userData", "appearance.json"));
+    expect(mocks.write).toHaveBeenCalledWith(
+      path.join("/test/userData", "appearance.json.tmp"),
+      '"light"',
+      "utf8",
+    );
+    expect(mocks.rename).toHaveBeenCalledWith(
+      path.join("/test/userData", "appearance.json.tmp"),
+      path.join("/test/userData", "appearance.json"),
+    );
     expect(mocks.nativeTheme.themeSource).toBe("light");
     expect(mocks.background).toHaveBeenCalledWith("#f2f2f4");
   });
   it("rejects invalid preferences and iframe requests without writing", async () => {
     const theme = await setup();
-    expect(() => theme.set({ sender: mocks.sender, senderFrame: mocks.mainFrame }, "invalid")).toThrow();
-    expect(() => theme.set({ sender: mocks.sender, senderFrame: {} }, "light")).toThrow();
+    expect(() =>
+      theme.set(
+        { sender: mocks.sender, senderFrame: mocks.mainFrame },
+        "invalid",
+      ),
+    ).toThrow();
+    expect(() =>
+      theme.set({ sender: mocks.sender, senderFrame: {} }, "light"),
+    ).toThrow();
     expect(mocks.write).not.toHaveBeenCalled();
   });
   it("refreshes the window background when the system appearance changes", async () => {

@@ -30,7 +30,7 @@ import {
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE, SPRING_MENU_POPOVER } from "@/lib/motion";
 import {
   useClients,
@@ -45,7 +45,10 @@ import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import type { VendorItem, WorkOrderItem } from "@/types/outsourcing";
 import type { Currency } from "@/types/billing";
 import type { AttachmentItem } from "@/types/workflow";
-import { generateWhatsAppLink, createWhatsAppPayloadFromWorkOrder } from "@/lib/whatsapp";
+import {
+  generateWhatsAppLink,
+  createWhatsAppPayloadFromWorkOrder,
+} from "@/lib/whatsapp";
 import "./outsourcing.css";
 
 export type { VendorItem, WorkOrderItem };
@@ -167,10 +170,10 @@ export default function OutsourcingView() {
   const isWorkOrderFormDirty = () => {
     return Boolean(
       woScope.trim() ||
-        woFee.trim() ||
-        woNotes.trim() ||
-        woDeliveryUrl.trim() ||
-        newVendorInlineName.trim(),
+      woFee.trim() ||
+      woNotes.trim() ||
+      woDeliveryUrl.trim() ||
+      newVendorInlineName.trim(),
     );
   };
 
@@ -475,7 +478,7 @@ export default function OutsourcingView() {
       const res = await exportWorkOrderPdf(workOrderId);
       if (res?.filePath) {
         showToast("Work Order PDF Voucher generated successfully!");
-        await openWorkOrderPdf(res.filePath, false);
+        await openWorkOrderPdf(workOrderId, false);
       } else {
         if (typeof window !== "undefined") window.print();
       }
@@ -493,7 +496,9 @@ export default function OutsourcingView() {
     const payload = createWhatsAppPayloadFromWorkOrder(wo, freelancerName);
     const link = generateWhatsAppLink(payload);
     openExternalLink(link);
-    showToast(`Opening WhatsApp to dispatch task to ${wo.vendorName || "contractor"}...`);
+    showToast(
+      `Opening WhatsApp to dispatch task to ${wo.vendorName || "contractor"}...`,
+    );
   };
 
   // Attach receipt slip to payout
@@ -1771,11 +1776,17 @@ export default function OutsourcingView() {
                         variant="secondary"
                         size="small"
                         disabled={isExportingPdf}
-                        onClick={() => handleExportWorkOrderPdf(selectedWorkOrder.id)}
+                        onClick={() =>
+                          handleExportWorkOrderPdf(selectedWorkOrder.id)
+                        }
                         title="Export and view vector PDF voucher"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>{isExportingPdf ? "Exporting..." : "Download PDF Voucher"}</span>
+                        <span>
+                          {isExportingPdf
+                            ? "Exporting..."
+                            : "Download PDF Voucher"}
+                        </span>
                       </Button>
                     )}
                     <Button
@@ -1879,10 +1890,7 @@ export default function OutsourcingView() {
                           onClick={() =>
                             setReviewStatus(
                               s.id as
-                                | "todo"
-                                | "in-progress"
-                                | "review"
-                                | "done",
+                                "todo" | "in-progress" | "review" | "done",
                             )
                           }
                           className={`relative px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors text-center active:scale-[0.955] ${
@@ -2005,9 +2013,7 @@ export default function OutsourcingView() {
             <div className="app-dialog-header">
               <div className="flex items-center gap-2">
                 <GitFork className="w-4 h-4 text-accent" />
-                <h3 className="outsourcing-modal-title">
-                  New work order
-                </h3>
+                <h3 className="outsourcing-modal-title">New work order</h3>
               </div>
               <div className="flex items-center gap-2">
                 {hasWorkOrderDraft && (

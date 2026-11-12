@@ -1,6 +1,7 @@
 "use client";
+import { profileStorageKey } from "@/lib/profile-scope";
 
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Printer,
   CreditCard,
@@ -17,7 +18,11 @@ import { Button } from "@/components/ui/Workspace";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
 import { formatCents, formatDateDisplay } from "@/lib/format";
-import type { InvoiceWithClient, InvoiceTemplateId } from "@/types/billing";
+import type {
+  InvoiceWithClient,
+  InvoiceTemplateId,
+  NewInvoiceInput,
+} from "@/types/billing";
 import { useSettings, useClients, useInvoices } from "@/lib/data/DataProvider";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import {
@@ -72,7 +77,8 @@ const TEMPLATES: Array<{
     name: "Apex Orange",
     badge: "Template 4",
     color: "#F25C05",
-    description: "Tangerine diagonal header, full orange table with grid borders & numbered terms",
+    description:
+      "Tangerine diagonal header, full orange table with grid borders & numbered terms",
   },
   {
     id: "noir-crimson",
@@ -89,25 +95,41 @@ export default function InvoiceDocumentSheet({
   onOpenPdf,
   onRecordPayment,
 }: InvoiceDocumentSheetProps) {
-  const { settings } = useSettings();
+  const { settings: currentSettings } = useSettings();
+  const settings = (() => {
+    try {
+      return invoice.businessSnapshot
+        ? ({
+            ...currentSettings,
+            ...JSON.parse(invoice.businessSnapshot),
+          } as typeof currentSettings)
+        : currentSettings;
+    } catch {
+      return currentSettings;
+    }
+  })();
   const { clients } = useClients();
   const { saveInvoicePdfAs } = useInvoices();
 
-  const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplateId>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("billflow_invoice_template");
-      if (
-        stored === "geometric-teal" ||
-        stored === "executive-wave" ||
-        stored === "scarlet-modern" ||
-        stored === "apex-orange" ||
-        stored === "noir-crimson"
-      ) {
-        return stored;
+  const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplateId>(
+    () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem(
+          profileStorageKey("billflow_invoice_template"),
+        );
+        if (
+          stored === "geometric-teal" ||
+          stored === "executive-wave" ||
+          stored === "scarlet-modern" ||
+          stored === "apex-orange" ||
+          stored === "noir-crimson"
+        ) {
+          return stored;
+        }
       }
-    }
-    return settings?.defaultInvoiceTemplate || "geometric-teal";
-  });
+      return settings?.defaultInvoiceTemplate || "geometric-teal";
+    },
+  );
 
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
@@ -119,12 +141,14 @@ export default function InvoiceDocumentSheet({
   const handleSelectTemplate = (templateId: InvoiceTemplateId) => {
     setSelectedTemplate(templateId);
     if (typeof window !== "undefined") {
-      localStorage.setItem("billflow_invoice_template", templateId);
+      localStorage.setItem(
+        profileStorageKey("billflow_invoice_template"),
+        templateId,
+      );
     }
   };
 
-  const businessName =
-    settings?.businessName || "CHETHAKA LAKSHITHA";
+  const businessName = settings?.businessName || "CHETHAKA LAKSHITHA";
   const professionalTitle =
     settings?.professionalTitle || "SOFTWARE FREELANCING & CONSULTING";
 
@@ -187,18 +211,54 @@ export default function InvoiceDocumentSheet({
     setIsSavingPdf(true);
     setSavedNotice(null);
     try {
+      const draft: NewInvoiceInput | undefined =
+        invoice.id === "draft-preview"
+          ? {
+              ...(invoice.clientId
+                ? { clientId: invoice.clientId }
+                : {
+                    newClient: {
+                      name: invoice.clientName,
+                      email: invoice.clientEmail || "draft@billflow.local",
+                      currency: invoice.currency,
+                    },
+                  }),
+              code: invoice.code,
+              currency: invoice.currency,
+              amountCents: invoice.amountCents,
+              items: invoice.items || [],
+              discountCents: invoice.discountCents,
+              taxCents: invoice.taxCents,
+              advanceCents: invoice.advanceCents,
+              issueDate: invoice.issueDate.slice(0, 10),
+              dueDate: invoice.dueDate?.slice(0, 10),
+              deliveryUrl: invoice.deliveryUrl,
+              notes: invoice.notes,
+              status: "DRAFT",
+            }
+          : undefined;
       if (window.billflow?.invoices?.savePdfAs) {
-        const result = await window.billflow.invoices.savePdfAs(invoice.id, selectedTemplate);
+        const result = await window.billflow.invoices.savePdfAs(
+          invoice.id,
+          selectedTemplate,
+          draft,
+        );
         if (result.success && result.filePath) {
-          const fileName = result.filePath.split(/[\\/]/).pop() || "invoice.pdf";
+          const fileName =
+            result.filePath.split(/[\\/]/).pop() || "invoice.pdf";
           setSavedNotice(`Saved: ${fileName}`);
           setTimeout(() => setSavedNotice(null), 4500);
           return;
         }
       } else if (saveInvoicePdfAs) {
-        const result = await saveInvoicePdfAs(invoice.id, selectedTemplate);
+        const result = await saveInvoicePdfAs(
+          invoice.id,
+          selectedTemplate,
+          draft,
+        );
         if (result.success && result.filePath) {
-          const fileName = result.filePath.split(/[\\/]/).pop() || "invoice.pdf";
+          const fileName =
+            result.filePath.split(/[\\/]/).pop() || "invoice.pdf";
           setSavedNotice(`Saved: ${fileName}`);
           setTimeout(() => setSavedNotice(null), 4500);
           return;
@@ -256,7 +316,7 @@ export default function InvoiceDocumentSheet({
     setSavedNotice(
       pdfExported
         ? "Invoice PDF ready in Explorer to attach in WhatsApp!"
-        : "WhatsApp opened with invoice message!"
+        : "WhatsApp opened with invoice message!",
     );
     setTimeout(() => setSavedNotice(null), 5000);
   };
@@ -300,7 +360,7 @@ export default function InvoiceDocumentSheet({
     setSavedNotice(
       pdfExported
         ? "Invoice PDF ready in Explorer to attach to your email!"
-        : "Email draft opened with invoice message!"
+        : "Email draft opened with invoice message!",
     );
     setTimeout(() => setSavedNotice(null), 5000);
   };
@@ -313,11 +373,15 @@ export default function InvoiceDocumentSheet({
           <h3>Invoice Preview</h3>
           <p className="flex items-center gap-2 mt-1 text-xs">
             <span className="font-bold text-accent">{invoice.code}</span>
-            <span className="text-content-neutral-300 dark:text-neutral-600">•</span>
+            <span className="text-content-neutral-300 dark:text-neutral-600">
+              •
+            </span>
             <span className="font-medium text-content-neutral-600 dark:text-neutral-300">
               {invoice.clientName}
             </span>
-            <span className="text-content-neutral-300 dark:text-neutral-600">•</span>
+            <span className="text-content-neutral-300 dark:text-neutral-600">
+              •
+            </span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-accent/10 text-accent border border-accent/20">
               {invoice.status.replace("_", " ")}
             </span>
@@ -423,7 +487,6 @@ export default function InvoiceDocumentSheet({
         <style
           dangerouslySetInnerHTML={{
             __html: `
-              @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
               .invoice-sheet-font {
                 font-family: 'Nunito', 'Plus Jakarta Sans', ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', system-ui, sans-serif;
               }
@@ -597,11 +660,7 @@ export default function InvoiceDocumentSheet({
         </div>
 
         {onRecordPayment && invoice.status !== "PAID" && (
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={onRecordPayment}
-          >
+          <Button variant="secondary" type="button" onClick={onRecordPayment}>
             <CreditCard className="w-4 h-4 text-emerald-500" />
             <span>Record Payment</span>
           </Button>

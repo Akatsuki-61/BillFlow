@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   SPRING_NAV_GLIDE,
   SPRING_MENU_POPOVER,
@@ -79,7 +79,8 @@ const FAQ_DATABASE: FAQItem[] = [
   {
     id: "working-vs-elapsed-time",
     category: "tasks",
-    question: "Why does BillFlow separate active working time from total elapsed time?",
+    question:
+      "Why does BillFlow separate active working time from total elapsed time?",
     answer:
       "Calendar days do not equal active labor. BillFlow measures time spent actively in the 'In Progress' column separately from total calendar time. Time waiting in 'To Do' or pending client 'Review' does not inflate your recorded active hours, giving you an honest record of effort.",
     actionText: "Inspect Task Timing",
@@ -115,7 +116,8 @@ const FAQ_DATABASE: FAQItem[] = [
   {
     id: "local-first-storage",
     category: "data",
-    question: "Where is my data stored? Does BillFlow send data to cloud servers?",
+    question:
+      "Where is my data stored? Does BillFlow send data to cloud servers?",
     answer:
       "BillFlow is strictly local-first. All clients, invoices, tasks, work orders, and receipts reside on your computer inside an embedded SQLite database (billflow.db) located in your operating system's application support folder. Your business data never touches third-party cloud servers.",
     actionText: "Inspect Database Path",
@@ -183,7 +185,9 @@ export default function SupportPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [expandedId, setExpandedId] = useState<string | null>("advance-payment");
+  const [expandedId, setExpandedId] = useState<string | null>(
+    "advance-payment",
+  );
   const [dbPath, setDbPath] = useState<string>("Loading path...");
   const [copiedDiag, setCopiedDiag] = useState(false);
   const [revealSuccess, setRevealSuccess] = useState(false);
@@ -213,9 +217,9 @@ export default function SupportPage() {
   }, [searchQuery]);
 
   const effectiveExpandedId = searchQuery.trim()
-    ? (expandedId && liveSearchResults.some((f) => f.id === expandedId)
-        ? expandedId
-        : liveSearchResults[0]?.id || null)
+    ? expandedId && liveSearchResults.some((f) => f.id === expandedId)
+      ? expandedId
+      : liveSearchResults[0]?.id || null
     : expandedId;
 
   const filteredFAQs = useMemo(() => {
@@ -362,7 +366,11 @@ export default function SupportPage() {
             <div className="bg-surface rounded-xl border border-line-neutral-200/90 shadow-md p-3.5 max-h-72 overflow-y-auto space-y-2 mt-2">
               <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-content-neutral-500 uppercase tracking-wider">
                 <span>
-                  {liveSearchResults.length} {liveSearchResults.length === 1 ? "guide found" : "guides found"} for &ldquo;{searchQuery}&rdquo;
+                  {liveSearchResults.length}{" "}
+                  {liveSearchResults.length === 1
+                    ? "guide found"
+                    : "guides found"}{" "}
+                  for &ldquo;{searchQuery}&rdquo;
                 </span>
                 <button
                   type="button"
@@ -375,7 +383,9 @@ export default function SupportPage() {
 
               {liveSearchResults.length === 0 ? (
                 <div className="py-4 text-center text-xs text-content-neutral-500">
-                  No matching guides found. Try searching for &ldquo;advance&rdquo;, &ldquo;PDF&rdquo;, &ldquo;tasks&rdquo;, or &ldquo;database&rdquo;.
+                  No matching guides found. Try searching for
+                  &ldquo;advance&rdquo;, &ldquo;PDF&rdquo;, &ldquo;tasks&rdquo;,
+                  or &ldquo;database&rdquo;.
                 </div>
               ) : (
                 <div className="divide-y divide-line-neutral-100">
@@ -387,7 +397,11 @@ export default function SupportPage() {
                         setExpandedId(faq.id);
                         setSelectedCategory("all");
                         const el = document.getElementById(`faq-${faq.id}`);
-                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        if (el)
+                          el.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          });
                       }}
                       className="w-full text-left py-2.5 px-2 rounded-lg hover:bg-surface-neutral-50 transition-colors group cursor-pointer block"
                     >
@@ -429,7 +443,8 @@ export default function SupportPage() {
                 Invoices & PDF Export
               </h3>
               <p className="text-xs text-content-neutral-500 mt-1 leading-relaxed">
-                Itemize software services, request 50% deposits, and save printable PDFs.
+                Itemize software services, request 50% deposits, and save
+                printable PDFs.
               </p>
             </div>
           </div>
@@ -452,7 +467,8 @@ export default function SupportPage() {
                 Tasks & Delivery Links
               </h3>
               <p className="text-xs text-content-neutral-500 mt-1 leading-relaxed">
-                Track deliverables on the Kanban board with GitHub or staging URLs.
+                Track deliverables on the Kanban board with GitHub or staging
+                URLs.
               </p>
             </div>
           </div>
@@ -498,7 +514,8 @@ export default function SupportPage() {
                 Data & Backups
               </h3>
               <p className="text-xs text-content-neutral-500 mt-1 leading-relaxed">
-                Local SQLite database, managed receipts, and JSON backup exports.
+                Local SQLite database, managed receipts, and JSON backup
+                exports.
               </p>
             </div>
           </div>
@@ -521,7 +538,8 @@ export default function SupportPage() {
                 Workspace Diagnostics & Environment
               </h3>
               <p className="text-xs text-content-neutral-500 mt-0.5">
-                Technical state of your active local database and desktop session.
+                Technical state of your active local database and desktop
+                session.
               </p>
             </div>
           </div>
@@ -536,7 +554,9 @@ export default function SupportPage() {
                 title="Open SQLite database folder in Finder or Explorer"
               >
                 <Folder className="w-3.5 h-3.5 text-content-neutral-500" />
-                <span>{revealSuccess ? "Opened in Finder" : "Reveal Database"}</span>
+                <span>
+                  {revealSuccess ? "Opened in Finder" : "Reveal Database"}
+                </span>
               </Button>
             )}
 
@@ -597,7 +617,8 @@ export default function SupportPage() {
               Default Currency
             </span>
             <span className="text-xs font-semibold text-content-neutral-900 font-mono">
-              {settings?.defaultCurrency || "USD"} ({settings?.invoicePrefix || "INV-"})
+              {settings?.defaultCurrency || "USD"} (
+              {settings?.invoicePrefix || "INV-"})
             </span>
           </div>
         </div>
@@ -605,8 +626,13 @@ export default function SupportPage() {
         <div className="p-3.5 rounded-xl bg-surface-neutral-50/70 border border-line-neutral-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2 overflow-hidden">
             <Database className="w-4 h-4 text-accent shrink-0" />
-            <span className="text-content-neutral-500 shrink-0">Database File:</span>
-            <code className="font-mono text-content-neutral-800 truncate" title={dbPath}>
+            <span className="text-content-neutral-500 shrink-0">
+              Database File:
+            </span>
+            <code
+              className="font-mono text-content-neutral-800 truncate"
+              title={dbPath}
+            >
               {dbPath}
             </code>
           </div>
@@ -666,8 +692,8 @@ export default function SupportPage() {
                 No matching answers found
               </h4>
               <p className="text-xs text-content-neutral-500 max-w-sm mx-auto">
-                No articles matched &ldquo;{searchQuery}&rdquo;. Try another term or
-                switch categories.
+                No articles matched &ldquo;{searchQuery}&rdquo;. Try another
+                term or switch categories.
               </p>
               <Button
                 variant="secondary"
@@ -760,8 +786,9 @@ export default function SupportPage() {
             </h3>
           </div>
           <p className="text-xs text-content-neutral-600 leading-relaxed">
-            Need setup instructions, developer documentation, or want to contribute?
-            Check our GitHub repository or submit an issue directly to the team.
+            Need setup instructions, developer documentation, or want to
+            contribute? Check our GitHub repository or submit an issue directly
+            to the team.
           </p>
         </div>
 

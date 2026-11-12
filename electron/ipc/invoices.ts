@@ -1,8 +1,14 @@
-import { ipcMain, dialog, BrowserWindow } from "electron";
-import fs from "fs";
+import { validateInvoiceAmounts } from "../../src/lib/invoice-math";
+import { recordId } from "../workflow-validation";
+import { z } from "zod";
+import { dialog, BrowserWindow } from "electron";
+import { ipcMain } from "../security";
+
 import crypto from "crypto";
-import { eq, desc, asc } from "drizzle-orm";
-import { getDb } from "../db";
+import { eq, desc, asc, inArray } from "drizzle-orm";
+import { getDb, getSqlite } from "../db";
+import { captureWorkspace } from "../workspace-session";
+import { atomicWrite } from "../managed-files";
 import {
   clients,
   invoices,
@@ -12,15 +18,16 @@ import {
   invoiceItems,
   invoicePayments,
   invoicePdfExports,
-  attachments,
   tasks,
-  subtasks,
-  taskHistory,
   workOrders,
-  vendorPayouts,
   expenses,
 } from "../db/schema";
-import { newInvoiceSchema, invoicePatchSchema, recordPaymentSchema, promoteInvoiceClientSchema } from "../validation";
+import {
+  newInvoiceSchema,
+  invoicePatchSchema,
+  recordPaymentSchema,
+  promoteInvoiceClientSchema,
+} from "../validation";
 import { getOrCreateSettings } from "./settings";
 import { AppError, formatError } from "./errors";
 import { saveInvoicePdf } from "./files";
@@ -41,7 +48,11 @@ export function getNextInvoiceCode(): string {
   let minSeq = 1;
 
   try {
-    const s = db.select().from(settings).where(eq(settings.id, "default")).get();
+    const s = db
+      .select()
+      .from(settings)
+      .where(eq(settings.id, "default"))
+      .get();
     if (s) {
       if (s.invoicePrefix) prefixSetting = s.invoicePrefix;
       if (typeof s.nextInvoiceSeq === "number" && s.nextInvoiceSeq > 0) {
@@ -56,8 +67,8 @@ export function getNextInvoiceCode(): string {
   const activePrefix = prefixSetting.includes("{YYYY}")
     ? prefixSetting.replace("{YYYY}", String(currentYear))
     : prefixSetting.endsWith("-")
-    ? `${prefixSetting}${currentYear}-`
-    : `${prefixSetting}-${currentYear}-`;
+      ? `${prefixSetting}${currentYear}-`
+      : `${prefixSetting}-${currentYear}-`;
 
   const allRows = db.select({ code: invoices.code }).from(invoices).all();
   let maxSeq = minSeq - 1;
@@ -97,24 +108,38 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
     ? allInvoices.filter((r) => r.invoice.clientId === clientId)
     : allInvoices;
 
+  const ids = filtered.map((row) => row.invoice.id);
+  const allItems = ids.length
+    ? db
+        .select()
+        .from(invoiceItems)
+        .where(inArray(invoiceItems.invoiceId, ids))
+        .orderBy(asc(invoiceItems.position))
+        .all()
+    : [];
+  const allPayments = ids.length
+    ? db
+        .select()
+        .from(invoicePayments)
+        .where(inArray(invoicePayments.invoiceId, ids))
+        .orderBy(asc(invoicePayments.receivedAt))
+        .all()
+    : [];
+  const itemMap = new Map<string, typeof allItems>();
+  const paymentMap = new Map<string, InvoicePayment[]>();
+  for (const item of allItems) {
+    const rows = itemMap.get(item.invoiceId) || [];
+    rows.push(item);
+    itemMap.set(item.invoiceId, rows);
+  }
+  for (const payment of allPayments) {
+    const rows = paymentMap.get(payment.invoiceId) || [];
+    rows.push({ ...payment, currency: payment.currency as Currency });
+    paymentMap.set(payment.invoiceId, rows);
+  }
   return filtered.map((r) => {
-    const items = db
-      .select()
-      .from(invoiceItems)
-      .where(eq(invoiceItems.invoiceId, r.invoice.id))
-      .orderBy(asc(invoiceItems.position))
-      .all();
-
-    const payments = db
-      .select()
-      .from(invoicePayments)
-      .where(eq(invoicePayments.invoiceId, r.invoice.id))
-      .orderBy(asc(invoicePayments.receivedAt))
-      .all()
-      .map((p) => ({
-        ...p,
-        currency: p.currency as Currency,
-      }));
+    const items = itemMap.get(r.invoice.id) || [];
+    const payments = paymentMap.get(r.invoice.id) || [];
 
     let snapshot: {
       name?: string;
@@ -138,7 +163,8 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
       clientName: snapshot?.name || r.clientName || "Unknown Client",
       clientEmail: snapshot?.email || r.clientEmail || undefined,
       clientPhone: snapshot?.phone || r.clientPhone || null,
-      clientContactPerson: snapshot?.contactPerson || r.clientContactPerson || null,
+      clientContactPerson:
+        snapshot?.contactPerson || r.clientContactPerson || null,
       clientCategory: snapshot?.category || r.clientCategory || null,
       items,
       payments,
@@ -146,11 +172,57 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
   });
 }
 
-export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string, templateOverride?: string): Promise<{ invoice: { code?: string }; pdfBuffer: Buffer }> {
+export async function buildInvoicePdfPayloadAndBuffer(
+  invoiceId: string,
+  templateOverride?: string,
+  draftInput?: NewInvoiceInput,
+): Promise<{
+  invoice: { code?: string; updatedAt?: string };
+  pdfBuffer: Buffer;
+}> {
   const profile = getOrCreateSettings();
-  const template = templateOverride || profile.defaultInvoiceTemplate || "geometric-teal";
+  const template =
+    templateOverride || profile.defaultInvoiceTemplate || "geometric-teal";
 
-  if (invoiceId === "sample-preview" || invoiceId === "draft-preview") {
+  if (invoiceId === "draft-preview") {
+    const value = newInvoiceSchema.parse(draftInput);
+    validateInvoiceAmounts(value);
+    const client = value.clientId
+      ? getDb()
+          .select()
+          .from(clients)
+          .where(eq(clients.id, value.clientId))
+          .get()
+      : value.newClient;
+    if (!client)
+      throw new AppError(
+        "CLIENT_NOT_FOUND",
+        "Select a client before exporting this draft.",
+      );
+    const payload = {
+      code: value.code || "DRAFT",
+      issueDate: value.issueDate || new Date().toISOString().slice(0, 10),
+      dueDate: value.dueDate,
+      currency: value.currency,
+      status: "DRAFT",
+      template,
+      items: value.items || [],
+      discountCents: value.discountCents,
+      taxCents: value.taxCents,
+      advanceCents: value.advanceCents,
+      amountCents: value.amountCents,
+      paidCents: 0,
+      deliveryUrl: value.deliveryUrl,
+      notes: value.notes,
+      client: { name: client.name, email: client.email },
+      business: profile,
+    };
+    return {
+      invoice: payload,
+      pdfBuffer: await generateInvoiceHtmlPdfBuffer(payload),
+    };
+  }
+  if (invoiceId === "sample-preview") {
     const payload = {
       code: "INV-2026-001",
       issueDate: new Date().toISOString().split("T")[0],
@@ -159,8 +231,16 @@ export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string, templat
       status: "ADVANCE_PAID",
       template,
       items: [
-        { description: "Business Website Development & Integration", quantity: 1, unitPriceCents: 8000000 },
-        { description: "AI Consulting Session & Support Automation Roadmap", quantity: 1, unitPriceCents: 2000000 }
+        {
+          description: "Business Website Development & Integration",
+          quantity: 1,
+          unitPriceCents: 8000000,
+        },
+        {
+          description: "AI Consulting Session & Support Automation Roadmap",
+          quantity: 1,
+          unitPriceCents: 2000000,
+        },
       ],
       amountCents: 9000000,
       advanceCents: 4500000,
@@ -168,7 +248,8 @@ export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string, templat
       discountCents: 1000000,
       taxCents: 0,
       deliveryUrl: "https://github.com/Chethaka/acme-web-platform",
-      notes: "Milestone 1 begins upon advance receipt. Full code and deployment upon final settlement.",
+      notes:
+        "Milestone 1 begins upon advance receipt. Full code and deployment upon final settlement.",
       client: { name: "Acme Cloud Corp", email: "billing@acmecloud.com" },
       business: {
         businessName: profile.businessName,
@@ -177,14 +258,18 @@ export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string, templat
         phone: profile.phone,
         taxId: profile.taxId,
         paymentDetails: profile.paymentDetails,
-      }
+      },
     };
     const pdfBuffer = await generateInvoiceHtmlPdfBuffer(payload);
     return { invoice: payload, pdfBuffer };
   }
 
   const db = getDb();
-  const invoice = db.select().from(invoices).where(eq(invoices.id, invoiceId)).get();
+  const invoice = db
+    .select()
+    .from(invoices)
+    .where(eq(invoices.id, invoiceId))
+    .get();
   if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
 
   const client = invoice.clientId
@@ -221,39 +306,107 @@ export async function buildInvoicePdfPayloadAndBuffer(invoiceId: string, templat
     deliveryUrl: invoice.deliveryUrl,
     notes: invoice.notes,
     client: clientSnapshot,
-    business: profile,
+    business: invoice.businessSnapshot
+      ? JSON.parse(invoice.businessSnapshot)
+      : profile,
   });
 
   return { invoice, pdfBuffer };
 }
 
-export async function exportInvoicePdf(invoiceId: string, template?: string): Promise<string> {
-  const { pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(invoiceId, template);
-  return saveInvoicePdf(invoiceId, pdfBuffer);
+let exportQueue: Promise<unknown> = Promise.resolve();
+export function exportInvoicePdf(
+  invoiceId: string,
+  template?: string,
+): Promise<string> {
+  const workspace = captureWorkspace();
+  const result = exportQueue
+    .catch(() => {})
+    .then(async () => {
+      workspace.assertCurrent();
+      const { invoice, pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(
+        invoiceId,
+        template,
+      );
+      workspace.assertCurrent();
+      const current = getDb()
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, invoiceId))
+        .get();
+      if (invoice.updatedAt && current?.updatedAt !== invoice.updatedAt)
+        throw new Error(
+          "The invoice changed during PDF generation. Export it again.",
+        );
+      return saveInvoicePdf(invoiceId, pdfBuffer);
+    });
+  exportQueue = result;
+  return result;
+}
+const scheduledExports = new Map<string, ReturnType<typeof setTimeout>>();
+function scheduleInvoiceExport(id: string) {
+  if (getSqlite().inTransaction) return;
+  const workspace = captureWorkspace();
+  const key = `${workspace.databasePath}:${id}`;
+  const previous = scheduledExports.get(key);
+  if (previous) clearTimeout(previous);
+  scheduledExports.set(
+    key,
+    setTimeout(() => {
+      scheduledExports.delete(key);
+      try {
+        workspace.assertCurrent();
+        void exportInvoicePdf(id).catch((error) => {
+          if (!process.env.VITEST)
+            console.warn("Invoice PDF export deferred:", error.message);
+        });
+      } catch {
+        /* Switching profiles cancels background exports. */
+      }
+    }, 100),
+  );
 }
 
-export async function saveInvoicePdfAs(invoiceId: string, template?: string): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> {
-  const { invoice, pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(invoiceId, template);
-  const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+export async function saveInvoicePdfAs(
+  invoiceId: string,
+  template?: string,
+  draftInput?: NewInvoiceInput,
+): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> {
+  const workspace = captureWorkspace();
+  const { invoice, pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(
+    invoiceId,
+    template,
+    draftInput,
+  );
+  workspace.assertCurrent();
+  const win =
+    BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
   const defaultName = `Invoice-${(invoice.code || "INV").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
   const options = {
     title: "Save Invoice as PDF",
     defaultPath: defaultName,
     filters: [{ name: "PDF Documents", extensions: ["pdf"] }],
   };
-  const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+  const result = win
+    ? await dialog.showSaveDialog(win, options)
+    : await dialog.showSaveDialog(options);
 
+  workspace.assertCurrent();
   if (result.canceled || !result.filePath) {
     return { success: false, canceled: true };
   }
 
   const chosenPath = result.filePath;
-  fs.writeFileSync(chosenPath, pdfBuffer);
+  atomicWrite(chosenPath, pdfBuffer);
 
   if (invoiceId !== "sample-preview" && invoiceId !== "draft-preview") {
     const db = getDb();
     db.insert(invoicePdfExports)
-      .values({ invoiceId, filePath: chosenPath, exportedAt: new Date().toISOString() })
+      .values({
+        invoiceId,
+        filePath: chosenPath,
+        exportedAt: new Date().toISOString(),
+      })
       .onConflictDoUpdate({
         target: invoicePdfExports.invoiceId,
         set: { filePath: chosenPath, exportedAt: new Date().toISOString() },
@@ -266,21 +419,42 @@ export async function saveInvoicePdfAs(invoiceId: string, template?: string): Pr
 
 export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
   const value = newInvoiceSchema.parse(input);
+  validateInvoiceAmounts(value);
   const { requestId, ...details } = value;
-  const requestHash = crypto.createHash("sha256").update(JSON.stringify(details)).digest("hex");
+  const requestHash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(details))
+    .digest("hex");
   const id = requestId || crypto.randomUUID();
   const db = getDb();
 
   db.transaction((tx) => {
-    const existing = tx.select().from(invoices).where(eq(invoices.id, id)).get();
+    const existing = tx
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, id))
+      .get();
     if (existing) {
       if (existing.requestHash !== requestHash) {
-        throw new AppError("CONFLICT", "This invoice request was already used with different details.");
+        throw new AppError(
+          "CONFLICT",
+          "This invoice request was already used with different details.",
+        );
       }
       return;
     }
-    if (value.catalogItemId && !tx.select().from(catalogItems).where(eq(catalogItems.id, value.catalogItemId)).get()) {
-      throw new AppError("NOT_FOUND", "The selected Catalog item no longer exists.");
+    if (
+      value.catalogItemId &&
+      !tx
+        .select()
+        .from(catalogItems)
+        .where(eq(catalogItems.id, value.catalogItemId))
+        .get()
+    ) {
+      throw new AppError(
+        "NOT_FOUND",
+        "The selected Catalog item no longer exists.",
+      );
     }
 
     let clientId = value.clientId;
@@ -290,8 +464,14 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
     if (value.newClient) {
       if (value.saveAsPermanentClient !== false) {
         clientId = crypto.randomUUID();
-        tx.insert(clients).values({ id: clientId, ...value.newClient }).run();
-        client = tx.select().from(clients).where(eq(clients.id, clientId)).get();
+        tx.insert(clients)
+          .values({ id: clientId, ...value.newClient })
+          .run();
+        client = tx
+          .select()
+          .from(clients)
+          .where(eq(clients.id, clientId))
+          .get();
         clientSnapshotStr = client
           ? JSON.stringify({
               name: client.name,
@@ -319,7 +499,10 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
     } else if (clientId) {
       client = tx.select().from(clients).where(eq(clients.id, clientId)).get();
       if (!client) {
-        throw new AppError("CLIENT_NOT_FOUND", "The specified client does not exist.");
+        throw new AppError(
+          "CLIENT_NOT_FOUND",
+          "The specified client does not exist.",
+        );
       }
       clientSnapshotStr = JSON.stringify({
         name: client.name,
@@ -331,43 +514,109 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
         currency: client.currency,
       });
     } else {
-      throw new AppError("CLIENT_NOT_FOUND", "The specified client does not exist.");
+      throw new AppError(
+        "CLIENT_NOT_FOUND",
+        "The specified client does not exist.",
+      );
     }
 
+    const taskIds = [
+      ...(value.linkedTaskIds || []),
+      ...(value.items || []).flatMap((item) =>
+        item.sourceTaskId ? [item.sourceTaskId] : [],
+      ),
+    ];
+    const itemTaskIds = (value.items || []).flatMap((item) =>
+      item.sourceTaskId ? [item.sourceTaskId] : [],
+    );
+    if (
+      new Set(itemTaskIds).size !== itemTaskIds.length ||
+      new Set(value.linkedTaskIds || []).size !==
+        (value.linkedTaskIds || []).length
+    )
+      throw new AppError(
+        "INVALID_TASKS",
+        "A task can only be billed once per invoice.",
+      );
+    for (const taskId of new Set(taskIds)) {
+      const task = tx.select().from(tasks).where(eq(tasks.id, taskId)).get();
+      if (
+        !task ||
+        task.deletedAt ||
+        task.status !== "done" ||
+        task.invoiceId ||
+        task.invoiceItemId
+      )
+        throw new AppError(
+          "INVALID_TASKS",
+          "Only completed, active, unbilled tasks can be imported.",
+        );
+      if (
+        (task.clientId && task.clientId !== clientId) ||
+        (!task.clientId &&
+          task.clientName &&
+          task.clientName.toLowerCase() !==
+            (client?.name || value.newClient?.name || "").toLowerCase()) ||
+        task.currency !== value.currency
+      )
+        throw new AppError(
+          "TASK_MISMATCH",
+          "Imported tasks must belong to the invoice client and currency.",
+        );
+      if (
+        tx.select().from(workOrders).where(eq(workOrders.taskId, task.id)).get()
+      )
+        throw new AppError(
+          "TASK_MISMATCH",
+          "This task is already linked to contractor work.",
+        );
+    }
     const today = new Date().toISOString().split("T")[0];
     const issueDate = value.issueDate || today;
     const profile = getOrCreateSettings();
     const defaultDue = new Date(`${issueDate}T00:00:00Z`);
     defaultDue.setUTCDate(defaultDue.getUTCDate() + profile.defaultDueDays);
-    const dueDate = value.dueDate === undefined ? defaultDue.toISOString().slice(0, 10) : value.dueDate;
+    const dueDate =
+      value.dueDate === undefined
+        ? defaultDue.toISOString().slice(0, 10)
+        : value.dueDate;
 
     const discountCents = value.discountCents || 0;
     const taxCents = value.taxCents || 0;
     const advanceCents = value.advanceCents || 0;
-    const deliveryUrl = value.deliveryUrl || client?.driveUrl || (value.newClient?.driveUrl || null);
+    const deliveryUrl =
+      value.deliveryUrl ||
+      client?.driveUrl ||
+      value.newClient?.driveUrl ||
+      null;
     const notes = value.notes || profile.defaultNotes || null;
 
-    tx.insert(invoices).values({
-      id,
-      requestHash,
-      code: value.code || getNextInvoiceCode(),
-      clientId: clientId || null,
-      catalogItemId: value.catalogItemId || null,
-      title: value.title || null,
-      clientSnapshot: clientSnapshotStr,
-      businessSnapshot: JSON.stringify(profile),
-      deliveryUrl,
-      notes,
-      discountCents,
-      taxCents,
-      advanceCents,
-      amountCents: value.amountCents,
-      currency: value.currency,
-      issueDate,
-      dueDate,
-      status: value.status || "UNPAID",
-      paidCents: value.status === "PAID" ? value.amountCents : 0,
-    }).run();
+    tx.insert(invoices)
+      .values({
+        id,
+        requestHash,
+        code: value.code || getNextInvoiceCode(),
+        clientId: clientId || null,
+        catalogItemId: value.catalogItemId || null,
+        title: value.title || null,
+        clientSnapshot: clientSnapshotStr,
+        businessSnapshot: JSON.stringify(profile),
+        deliveryUrl,
+        notes,
+        discountCents,
+        taxCents,
+        advanceCents,
+        amountCents: value.amountCents,
+        currency: value.currency,
+        issueDate,
+        dueDate,
+        status: value.status || "UNPAID",
+        paidCents: 0,
+      })
+      .run();
+
+    if (value.status === "PAID" || value.status === "ADVANCE_PAID")
+      settleInvoiceStatus(id, value.status);
 
     // Persist line items and link any imported tasks atomically
     const resolvedClientName = client?.name || value.newClient?.name || null;
@@ -379,20 +628,30 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
         const item = value.items[i];
         const itemId = item.id || crypto.randomUUID();
         const validService = item.catalogId
-          ? tx.select().from(catalogServices).where(eq(catalogServices.id, item.catalogId)).get()
+          ? tx
+              .select()
+              .from(catalogServices)
+              .where(eq(catalogServices.id, item.catalogId))
+              .get()
           : undefined;
-        tx.insert(invoiceItems).values({
-          id: itemId,
-          invoiceId: id,
-          catalogId: validService ? item.catalogId : null,
-          description: item.description,
-          quantity: item.quantity || 1,
-          unitPriceCents: item.unitPriceCents,
-          position: i,
-        }).run();
+        tx.insert(invoiceItems)
+          .values({
+            id: itemId,
+            invoiceId: id,
+            catalogId: validService ? item.catalogId : null,
+            description: item.description,
+            quantity: item.quantity || 1,
+            unitPriceCents: item.unitPriceCents,
+            position: i,
+          })
+          .run();
 
         if (item.sourceTaskId) {
-          const existingTask = tx.select().from(tasks).where(eq(tasks.id, item.sourceTaskId)).get();
+          const existingTask = tx
+            .select()
+            .from(tasks)
+            .where(eq(tasks.id, item.sourceTaskId))
+            .get();
           if (existingTask && !existingTask.deletedAt) {
             tx.update(tasks)
               .set({
@@ -411,23 +670,33 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
     } else if (value.title) {
       // Default line item if title was supplied without items array
       const validService = value.catalogItemId
-        ? tx.select().from(catalogServices).where(eq(catalogServices.id, value.catalogItemId)).get()
+        ? tx
+            .select()
+            .from(catalogServices)
+            .where(eq(catalogServices.id, value.catalogItemId))
+            .get()
         : undefined;
-      tx.insert(invoiceItems).values({
-        id: crypto.randomUUID(),
-        invoiceId: id,
-        catalogId: validService ? value.catalogItemId : null,
-        description: value.title,
-        quantity: 1,
-        unitPriceCents: value.amountCents,
-        position: 0,
-      }).run();
+      tx.insert(invoiceItems)
+        .values({
+          id: crypto.randomUUID(),
+          invoiceId: id,
+          catalogId: validService ? value.catalogItemId : null,
+          description: value.title,
+          quantity: 1,
+          unitPriceCents: value.amountCents + discountCents - taxCents,
+          position: 0,
+        })
+        .run();
     }
 
     if (value.linkedTaskIds && value.linkedTaskIds.length > 0) {
       for (const linkedTaskId of value.linkedTaskIds) {
         if (linkedViaItemTaskIds.has(linkedTaskId)) continue;
-        const existingTask = tx.select().from(tasks).where(eq(tasks.id, linkedTaskId)).get();
+        const existingTask = tx
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, linkedTaskId))
+          .get();
         if (existingTask && !existingTask.deletedAt) {
           tx.update(tasks)
             .set({
@@ -444,16 +713,15 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
   });
 
   // Attempt auto-exporting PDF after invoice is created
-  exportInvoicePdf(id).catch((err) => {
-    if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-      console.warn(`[Invoice] Automatic PDF export for ${id} deferred:`, err.message);
-    }
-  });
+  scheduleInvoiceExport(id);
 
   return listInvoicesWithClient().find((row) => row.id === id)!;
 }
 
-export function recordPayment(input: RecordPaymentInput): { payment: InvoicePayment; invoice: InvoiceWithClient } {
+export function recordPayment(input: RecordPaymentInput): {
+  payment: InvoicePayment;
+  invoice: InvoiceWithClient;
+} {
   const value = recordPaymentSchema.parse(input);
   const db = getDb();
   const paymentId = value.requestId || crypto.randomUUID();
@@ -461,21 +729,52 @@ export function recordPayment(input: RecordPaymentInput): { payment: InvoicePaym
   let createdPayment: InvoicePayment | undefined;
 
   db.transaction((tx) => {
-    const invoice = tx.select().from(invoices).where(eq(invoices.id, value.invoiceId)).get();
+    const invoice = tx
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, value.invoiceId))
+      .get();
     if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
 
+    if (value.currency && value.currency !== invoice.currency)
+      throw new AppError(
+        "CURRENCY_MISMATCH",
+        "Payment currency must match the invoice.",
+      );
+    const previous = tx
+      .select()
+      .from(invoicePayments)
+      .where(eq(invoicePayments.id, paymentId))
+      .get();
+    if (previous) {
+      if (
+        previous.invoiceId !== invoice.id ||
+        previous.amountCents !== value.amountCents ||
+        previous.currency !== invoice.currency ||
+        previous.reference !== (value.reference || "") ||
+        (value.receivedAt && previous.receivedAt !== value.receivedAt)
+      )
+        throw new AppError(
+          "REQUEST_CONFLICT",
+          "This payment request was already used with different details.",
+        );
+      createdPayment = { ...previous, currency: previous.currency as Currency };
+      return;
+    }
     const now = new Date().toISOString();
     const receivedAt = value.receivedAt || now;
 
-    tx.insert(invoicePayments).values({
-      id: paymentId,
-      invoiceId: invoice.id,
-      amountCents: value.amountCents,
-      currency: value.currency || invoice.currency,
-      receivedAt,
-      reference: value.reference || "",
-      requestId: paymentId,
-    }).run();
+    tx.insert(invoicePayments)
+      .values({
+        id: paymentId,
+        invoiceId: invoice.id,
+        amountCents: value.amountCents,
+        currency: invoice.currency,
+        receivedAt,
+        reference: value.reference || "",
+        requestId: paymentId,
+      })
+      .run();
 
     // Calculate total received payments
     const allPayments = tx
@@ -483,12 +782,28 @@ export function recordPayment(input: RecordPaymentInput): { payment: InvoicePaym
       .from(invoicePayments)
       .where(eq(invoicePayments.invoiceId, invoice.id))
       .all();
-    const totalPaidCents = allPayments.reduce((sum, p) => sum + p.amountCents, 0);
+    if (allPayments.some((p) => p.currency !== invoice.currency))
+      throw new AppError(
+        "CURRENCY_MISMATCH",
+        "Existing payments have inconsistent currencies. Correct them before recording another payment.",
+      );
+    const totalPaidCents = allPayments.reduce(
+      (sum, p) => sum + p.amountCents,
+      0,
+    );
 
+    if (!Number.isSafeInteger(totalPaidCents))
+      throw new AppError(
+        "AMOUNT_OVERFLOW",
+        "Total payments exceed the supported amount.",
+      );
     let nextStatus: InvoiceStatus = invoice.status as InvoiceStatus;
     if (totalPaidCents >= invoice.amountCents) {
       nextStatus = "PAID";
-    } else if (invoice.advanceCents > 0 && totalPaidCents >= invoice.advanceCents) {
+    } else if (
+      invoice.advanceCents > 0 &&
+      totalPaidCents >= invoice.advanceCents
+    ) {
       nextStatus = "ADVANCE_PAID";
     } else if (totalPaidCents > 0 && invoice.status === "DRAFT") {
       nextStatus = "UNPAID";
@@ -507,7 +822,7 @@ export function recordPayment(input: RecordPaymentInput): { payment: InvoicePaym
       id: paymentId,
       invoiceId: invoice.id,
       amountCents: value.amountCents,
-      currency: (value.currency || invoice.currency) as Currency,
+      currency: invoice.currency as Currency,
       receivedAt,
       reference: value.reference || "",
       requestId: paymentId,
@@ -515,13 +830,11 @@ export function recordPayment(input: RecordPaymentInput): { payment: InvoicePaym
   });
 
   // Re-export PDF with updated payment details
-  exportInvoicePdf(value.invoiceId).catch((err) => {
-    if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-      console.warn(`[Invoice] PDF re-export after payment for ${value.invoiceId} deferred:`, err.message);
-    }
-  });
+  scheduleInvoiceExport(value.invoiceId);
 
-  const updatedInvoice = listInvoicesWithClient().find((row) => row.id === value.invoiceId)!;
+  const updatedInvoice = listInvoicesWithClient().find(
+    (row) => row.id === value.invoiceId,
+  )!;
   return { payment: createdPayment!, invoice: updatedInvoice };
 }
 
@@ -539,18 +852,31 @@ export function listPayments(invoiceId: string): InvoicePayment[] {
     }));
 }
 
-export function promoteInvoiceClient(invoiceId: string): typeof clients.$inferSelect {
+export function promoteInvoiceClient(
+  invoiceId: string,
+): typeof clients.$inferSelect {
   const db = getDb();
-  const invoice = db.select().from(invoices).where(eq(invoices.id, invoiceId)).get();
+  const invoice = db
+    .select()
+    .from(invoices)
+    .where(eq(invoices.id, invoiceId))
+    .get();
   if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
 
   if (invoice.clientId) {
-    const existing = db.select().from(clients).where(eq(clients.id, invoice.clientId)).get();
+    const existing = db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, invoice.clientId))
+      .get();
     if (existing) return existing;
   }
 
   if (!invoice.clientSnapshot) {
-    throw new AppError("BAD_REQUEST", "Invoice does not contain client details to save.");
+    throw new AppError(
+      "BAD_REQUEST",
+      "Invoice does not contain client details to save.",
+    );
   }
 
   let snapshot: {
@@ -565,7 +891,10 @@ export function promoteInvoiceClient(invoiceId: string): typeof clients.$inferSe
   try {
     snapshot = JSON.parse(invoice.clientSnapshot);
   } catch {
-    throw new AppError("BAD_REQUEST", "Failed to parse stored client snapshot.");
+    throw new AppError(
+      "BAD_REQUEST",
+      "Failed to parse stored client snapshot.",
+    );
   }
 
   const newClientId = crypto.randomUUID();
@@ -595,150 +924,141 @@ export function promoteInvoiceClient(invoiceId: string): typeof clients.$inferSe
 }
 
 export function removeInvoice(id: string): { success: boolean } {
+  recordId.parse(id);
   const db = getDb();
   return db.transaction((tx) => {
-    const existing = tx.select().from(invoices).where(eq(invoices.id, id)).get();
-    if (!existing) {
+    if (!tx.select().from(invoices).where(eq(invoices.id, id)).get())
       throw new AppError("NOT_FOUND", "Invoice not found.");
-    }
-
-    // 1. Clean up payments and their receipt attachments
-    const payments = tx
-      .select({ id: invoicePayments.id })
-      .from(invoicePayments)
-      .where(eq(invoicePayments.invoiceId, id))
-      .all();
-
-    for (const payment of payments) {
-      tx.delete(attachments)
-        .where(eq(attachments.paymentId, payment.id))
-        .run();
-    }
-
-    tx.delete(invoicePayments)
-      .where(eq(invoicePayments.invoiceId, id))
+    if (
+      tx
+        .select()
+        .from(invoicePayments)
+        .where(eq(invoicePayments.invoiceId, id))
+        .get()
+    )
+      throw new AppError(
+        "HAS_PAYMENTS",
+        "Invoices with recorded payments cannot be deleted. Payment history must be preserved.",
+      );
+    if (tx.select().from(workOrders).where(eq(workOrders.invoiceId, id)).get())
+      throw new AppError(
+        "HAS_WORK_ORDERS",
+        "Remove unpaid contractor work orders before deleting this invoice. Paid work must be retained.",
+      );
+    tx.update(tasks)
+      .set({
+        invoiceId: null,
+        invoiceItemId: null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(tasks.invoiceId, id))
       .run();
-
-    // 2. Clean up any work orders directly linked to this invoice, including their payouts and attachments
-    const linkedWorkOrders = tx
-      .select({ id: workOrders.id, taskId: workOrders.taskId })
-      .from(workOrders)
-      .where(eq(workOrders.invoiceId, id))
-      .all();
-
-    for (const wo of linkedWorkOrders) {
-      const payouts = tx
-        .select({ id: vendorPayouts.id })
-        .from(vendorPayouts)
-        .where(eq(vendorPayouts.workOrderId, wo.id))
-        .all();
-
-      for (const payout of payouts) {
-        tx.delete(attachments)
-          .where(eq(attachments.payoutId, payout.id))
-          .run();
-      }
-
-      tx.delete(vendorPayouts)
-        .where(eq(vendorPayouts.workOrderId, wo.id))
-        .run();
-
-      tx.delete(workOrders)
-        .where(eq(workOrders.id, wo.id))
-        .run();
-    }
-
-    // 3. Find any tasks linked to this invoice OR tasks linked to this invoice's items
-    const items = tx
-      .select({ id: invoiceItems.id })
-      .from(invoiceItems)
-      .where(eq(invoiceItems.invoiceId, id))
-      .all();
-    const itemIds = new Set(items.map((i) => i.id));
-
-    const allTasks = tx.select().from(tasks).all();
-    const tasksToDelete = allTasks.filter(
-      (t) => t.invoiceId === id || (t.invoiceItemId && itemIds.has(t.invoiceItemId))
-    );
-
-    for (const task of tasksToDelete) {
-      const taskWorkOrders = tx
-        .select({ id: workOrders.id })
-        .from(workOrders)
-        .where(eq(workOrders.taskId, task.id))
-        .all();
-
-      for (const two of taskWorkOrders) {
-        const payouts = tx
-          .select({ id: vendorPayouts.id })
-          .from(vendorPayouts)
-          .where(eq(vendorPayouts.workOrderId, two.id))
-          .all();
-
-        for (const payout of payouts) {
-          tx.delete(attachments)
-            .where(eq(attachments.payoutId, payout.id))
-            .run();
-        }
-
-        tx.delete(vendorPayouts)
-          .where(eq(vendorPayouts.workOrderId, two.id))
-          .run();
-
-        tx.delete(workOrders)
-          .where(eq(workOrders.id, two.id))
-          .run();
-      }
-
-      tx.delete(subtasks).where(eq(subtasks.taskId, task.id)).run();
-      tx.delete(taskHistory).where(eq(taskHistory.taskId, task.id)).run();
-      tx.delete(tasks).where(eq(tasks.id, task.id)).run();
-    }
-
-    // 4. Unlink any expenses linked to this invoice (preserves the general expense)
     tx.update(expenses)
       .set({ invoiceId: null })
       .where(eq(expenses.invoiceId, id))
       .run();
-
-    // 5. Delete invoice PDF export records
     tx.delete(invoicePdfExports)
       .where(eq(invoicePdfExports.invoiceId, id))
       .run();
-
-    // 6. Delete invoice items
-    tx.delete(invoiceItems)
-      .where(eq(invoiceItems.invoiceId, id))
-      .run();
-
-    // 7. Finally delete the invoice
-    tx.delete(invoices)
-      .where(eq(invoices.id, id))
-      .run();
-
+    tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id)).run();
+    tx.delete(invoices).where(eq(invoices.id, id)).run();
     return { success: true };
   });
 }
 
-export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
-  ipcMain.handle("invoices:list", async (_event, filter?: { clientId?: string }) => {
-    try {
-      return listInvoicesWithClient(filter?.clientId);
-    } catch (err) {
-      throw formatError(err);
-    }
+const invoiceStatusSchema = z.enum([
+  "DRAFT",
+  "UNPAID",
+  "ADVANCE_PAID",
+  "PAID",
+  "OVERDUE",
+]);
+export function settleInvoiceStatus(
+  id: string,
+  requested: InvoiceStatus,
+  recordMissing = true,
+): void {
+  recordId.parse(id);
+  const status = invoiceStatusSchema.parse(requested);
+  const db = getDb();
+  db.transaction((tx) => {
+    const invoice = tx.select().from(invoices).where(eq(invoices.id, id)).get();
+    if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
+    const payments = tx
+      .select()
+      .from(invoicePayments)
+      .where(eq(invoicePayments.invoiceId, id))
+      .all();
+    if (payments.some((p) => p.currency !== invoice.currency))
+      throw new AppError(
+        "CURRENCY_MISMATCH",
+        "Existing payments do not match the invoice currency.",
+      );
+    const paid = payments.reduce((sum, p) => sum + p.amountCents, 0);
+    const advance =
+      status === "ADVANCE_PAID" && !invoice.advanceCents
+        ? Math.round(invoice.amountCents * 0.5)
+        : invoice.advanceCents;
+    const target =
+      recordMissing && status === "PAID"
+        ? invoice.amountCents
+        : recordMissing && status === "ADVANCE_PAID"
+          ? advance
+          : paid;
+    if (target > paid)
+      recordPayment({
+        invoiceId: id,
+        amountCents: target - paid,
+        currency: invoice.currency as Currency,
+        reference:
+          status === "PAID" ? "Full payment settlement" : "Advance payment",
+      });
+    const finalPaid = Math.max(paid, target);
+    const derived =
+      finalPaid >= invoice.amountCents && finalPaid > 0
+        ? "PAID"
+        : advance > 0 && finalPaid >= advance
+          ? "ADVANCE_PAID"
+          : status === "PAID" || status === "ADVANCE_PAID"
+            ? "UNPAID"
+            : status;
+    tx.update(invoices)
+      .set({
+        status: derived,
+        advanceCents: advance,
+        paidCents: finalPaid,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(invoices.id, id))
+      .run();
   });
+}
 
-  ipcMain.handle("invoices:promoteClient", async (_event, invoiceId: string) => {
-    try {
-      const validated = promoteInvoiceClientSchema.parse({ invoiceId });
-      const created = promoteInvoiceClient(validated.invoiceId);
-      broadcastDataChanged();
-      return created;
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
+  ipcMain.handle(
+    "invoices:list",
+    async (_event, filter?: { clientId?: string }) => {
+      try {
+        return listInvoicesWithClient(filter?.clientId);
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "invoices:promoteClient",
+    async (_event, invoiceId: string) => {
+      try {
+        const validated = promoteInvoiceClientSchema.parse({ invoiceId });
+        const created = promoteInvoiceClient(validated.invoiceId);
+        broadcastDataChanged();
+        return created;
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 
   ipcMain.handle("invoices:nextCode", async () => {
     try {
@@ -765,57 +1085,193 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
         const validated = invoicePatchSchema.parse(patch);
         const db = getDb();
 
-        const existing = db.select().from(invoices).where(eq(invoices.id, id)).get();
+        const existing = db
+          .select()
+          .from(invoices)
+          .where(eq(invoices.id, id))
+          .get();
         if (!existing) {
           throw new AppError("NOT_FOUND", "Invoice not found.");
         }
 
-        const newStatus = validated.status ?? existing.status;
+        const paymentRows = db
+          .select()
+          .from(invoicePayments)
+          .where(eq(invoicePayments.invoiceId, id))
+          .all();
+        const newCurrency = validated.currency ?? existing.currency;
+        const newClientId = validated.clientId ?? existing.clientId;
+        if (newClientId !== existing.clientId && existing.status !== "DRAFT")
+          throw new AppError(
+            "ISSUED_CLIENT",
+            "An issued invoice keeps its original client. Create a new invoice for another client.",
+          );
+        if (newCurrency !== existing.currency && paymentRows.length)
+          throw new AppError(
+            "HAS_PAYMENTS",
+            "Currency cannot change after payments have been recorded.",
+          );
+        const linkedTasks = db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.invoiceId, id))
+          .all();
+        if (
+          linkedTasks.length &&
+          (newCurrency !== existing.currency ||
+            newClientId !== existing.clientId)
+        )
+          throw new AppError(
+            "LINKED_TASKS",
+            "Client and currency cannot change while deliverables are linked.",
+          );
+        if (paymentRows.length && newClientId !== existing.clientId)
+          throw new AppError(
+            "HAS_PAYMENTS",
+            "Client cannot change after payments have been recorded.",
+          );
+        const oldItems = db
+          .select()
+          .from(invoiceItems)
+          .where(eq(invoiceItems.invoiceId, id))
+          .all();
         const newAmount = validated.amountCents ?? existing.amountCents;
-        const newPaid = newStatus === "PAID" ? newAmount : existing.paidCents;
+        validateInvoiceAmounts({
+          amountCents: newAmount,
+          discountCents: validated.discountCents ?? existing.discountCents,
+          taxCents: validated.taxCents ?? existing.taxCents,
+          advanceCents: validated.advanceCents ?? existing.advanceCents,
+          items: validated.items ?? oldItems,
+        });
 
         db.transaction((tx) => {
           tx.update(invoices)
             .set({
               code: validated.code ?? existing.code,
               clientId: validated.clientId ?? existing.clientId,
-              catalogItemId: validated.catalogItemId !== undefined ? validated.catalogItemId : existing.catalogItemId,
-              title: validated.title !== undefined ? validated.title : existing.title,
-              discountCents: validated.discountCents !== undefined ? validated.discountCents : existing.discountCents,
-              taxCents: validated.taxCents !== undefined ? validated.taxCents : existing.taxCents,
-              advanceCents: validated.advanceCents !== undefined ? validated.advanceCents : existing.advanceCents,
-              deliveryUrl: validated.deliveryUrl !== undefined ? validated.deliveryUrl : existing.deliveryUrl,
-              notes: validated.notes !== undefined ? validated.notes : existing.notes,
+              clientSnapshot:
+                newClientId !== existing.clientId && newClientId
+                  ? JSON.stringify(
+                      tx
+                        .select()
+                        .from(clients)
+                        .where(eq(clients.id, newClientId))
+                        .get(),
+                    )
+                  : existing.clientSnapshot,
+              catalogItemId:
+                validated.catalogItemId !== undefined
+                  ? validated.catalogItemId
+                  : existing.catalogItemId,
+              title:
+                validated.title !== undefined
+                  ? validated.title
+                  : existing.title,
+              discountCents:
+                validated.discountCents !== undefined
+                  ? validated.discountCents
+                  : existing.discountCents,
+              taxCents:
+                validated.taxCents !== undefined
+                  ? validated.taxCents
+                  : existing.taxCents,
+              advanceCents:
+                validated.advanceCents !== undefined
+                  ? validated.advanceCents
+                  : existing.advanceCents,
+              deliveryUrl:
+                validated.deliveryUrl !== undefined
+                  ? validated.deliveryUrl
+                  : existing.deliveryUrl,
+              notes:
+                validated.notes !== undefined
+                  ? validated.notes
+                  : existing.notes,
               amountCents: newAmount,
               currency: validated.currency ?? existing.currency,
-              dueDate: validated.dueDate !== undefined ? validated.dueDate : existing.dueDate,
-              status: newStatus,
-              paidCents: newPaid,
+              dueDate:
+                validated.dueDate !== undefined
+                  ? validated.dueDate
+                  : existing.dueDate,
+              status: existing.status,
+              paidCents: paymentRows.reduce((sum, p) => sum + p.amountCents, 0),
               updatedAt: new Date().toISOString(),
             })
             .where(eq(invoices.id, id))
             .run();
 
           if (validated.items) {
-            tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id)).run();
-            for (let i = 0; i < validated.items.length; i++) {
-              const item = validated.items[i];
-              tx.insert(invoiceItems).values({
-                id: item.id || crypto.randomUUID(),
-                invoiceId: id,
-                catalogId: item.catalogId || null,
+            const ids = validated.items.map(
+              (item) => item.id || crypto.randomUUID(),
+            );
+            if (new Set(ids).size !== ids.length)
+              throw new AppError(
+                "DUPLICATE_ITEM",
+                "Invoice item IDs must be unique.",
+              );
+            oldItems.forEach((item, index) =>
+              tx
+                .update(invoiceItems)
+                .set({ position: -index - 1 })
+                .where(eq(invoiceItems.id, item.id))
+                .run(),
+            );
+            for (const item of oldItems)
+              if (!ids.includes(item.id)) {
+                tx.update(tasks)
+                  .set({ invoiceItemId: null })
+                  .where(eq(tasks.invoiceItemId, item.id))
+                  .run();
+                tx.delete(invoiceItems)
+                  .where(eq(invoiceItems.id, item.id))
+                  .run();
+              }
+            validated.items.forEach((item, index) => {
+              const row = tx
+                .select()
+                .from(invoiceItems)
+                .where(eq(invoiceItems.id, ids[index]))
+                .get();
+              if (row && row.invoiceId !== id)
+                throw new AppError(
+                  "ITEM_OWNER",
+                  "Invoice item belongs to another invoice.",
+                );
+              if (
+                item.sourceTaskId &&
+                !linkedTasks.some((task) => task.id === item.sourceTaskId)
+              )
+                throw new AppError(
+                  "INVALID_TASKS",
+                  "Import completed tasks when creating an invoice.",
+                );
+              const fields = {
                 description: item.description,
-                quantity: item.quantity || 1,
+                quantity: item.quantity,
                 unitPriceCents: item.unitPriceCents,
-                position: i,
-              }).run();
-            }
+                catalogId: item.catalogId || null,
+                position: index,
+              };
+              if (row)
+                tx.update(invoiceItems)
+                  .set(fields)
+                  .where(eq(invoiceItems.id, row.id))
+                  .run();
+              else
+                tx.insert(invoiceItems)
+                  .values({ id: ids[index], invoiceId: id, ...fields })
+                  .run();
+            });
           }
+          settleInvoiceStatus(
+            id,
+            (validated.status ?? existing.status) as InvoiceStatus,
+            validated.status !== undefined &&
+              validated.status !== existing.status,
+          );
         });
 
-        exportInvoicePdf(id).catch((err) => {
-          console.warn(`[Invoice] Re-export PDF after update for ${id} deferred:`, err.message);
-        });
+        scheduleInvoiceExport(id);
 
         broadcastDataChanged();
         const all = listInvoicesWithClient();
@@ -823,72 +1279,15 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
       } catch (err) {
         throw formatError(err);
       }
-    }
+    },
   );
 
   ipcMain.handle(
     "invoices:setStatus",
     async (_event, id: string, status: InvoiceStatus) => {
       try {
-        const db = getDb();
-        const existing = db.select().from(invoices).where(eq(invoices.id, id)).get();
-        if (!existing) {
-          throw new AppError("NOT_FOUND", "Invoice not found.");
-        }
-
-        const now = new Date().toISOString();
-        let targetAdvance = existing.advanceCents;
-        if (status === "ADVANCE_PAID" && targetAdvance <= 0) {
-          targetAdvance = Math.round(existing.amountCents * 0.5);
-        }
-
-        const allPayments = db
-          .select()
-          .from(invoicePayments)
-          .where(eq(invoicePayments.invoiceId, id))
-          .all();
-        const currentPaid = allPayments.reduce((sum, p) => sum + p.amountCents, 0);
-
-        if (status === "ADVANCE_PAID" && currentPaid < targetAdvance) {
-          const needed = targetAdvance - currentPaid;
-          db.insert(invoicePayments).values({
-            id: crypto.randomUUID(),
-            invoiceId: id,
-            amountCents: needed,
-            currency: existing.currency,
-            receivedAt: now,
-            reference: "Advance payment",
-            requestId: crypto.randomUUID(),
-          }).run();
-        } else if (status === "PAID" && currentPaid < existing.amountCents) {
-          const needed = existing.amountCents - currentPaid;
-          db.insert(invoicePayments).values({
-            id: crypto.randomUUID(),
-            invoiceId: id,
-            amountCents: needed,
-            currency: existing.currency,
-            receivedAt: now,
-            reference: "Full payment settlement",
-            requestId: crypto.randomUUID(),
-          }).run();
-        }
-
-        const updatedPayments = db
-          .select()
-          .from(invoicePayments)
-          .where(eq(invoicePayments.invoiceId, id))
-          .all();
-        const newPaidCents = updatedPayments.reduce((sum, p) => sum + p.amountCents, 0);
-
-        db.update(invoices)
-          .set({
-            status,
-            advanceCents: targetAdvance,
-            paidCents: newPaidCents,
-            updatedAt: now,
-          })
-          .where(eq(invoices.id, id))
-          .run();
+        settleInvoiceStatus(id, status);
+        scheduleInvoiceExport(id);
 
         broadcastDataChanged();
         const all = listInvoicesWithClient();
@@ -896,7 +1295,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
       } catch (err) {
         throw formatError(err);
       }
-    }
+    },
   );
 
   ipcMain.handle("invoices:remove", async (_event, id: string) => {
@@ -909,15 +1308,18 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
     }
   });
 
-  ipcMain.handle("invoices:recordPayment", async (_event, input: RecordPaymentInput) => {
-    try {
-      const result = recordPayment(input);
-      broadcastDataChanged();
-      return result;
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+  ipcMain.handle(
+    "invoices:recordPayment",
+    async (_event, input: RecordPaymentInput) => {
+      try {
+        const result = recordPayment(input);
+        broadcastDataChanged();
+        return result;
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 
   ipcMain.handle("invoices:listPayments", async (_event, invoiceId: string) => {
     try {
@@ -927,20 +1329,31 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
     }
   });
 
-  ipcMain.handle("invoices:exportPdf", async (_event, invoiceId: string, template?: string) => {
-    try {
-      const filePath = await exportInvoicePdf(invoiceId, template);
-      return { success: true, filePath };
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+  ipcMain.handle(
+    "invoices:exportPdf",
+    async (_event, invoiceId: string, template?: string) => {
+      try {
+        const filePath = await exportInvoicePdf(invoiceId, template);
+        return { success: true, filePath };
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 
-  ipcMain.handle("invoices:savePdfAs", async (_event, invoiceId: string, template?: string) => {
-    try {
-      return await saveInvoicePdfAs(invoiceId, template);
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+  ipcMain.handle(
+    "invoices:savePdfAs",
+    async (
+      _event,
+      invoiceId: string,
+      template?: string,
+      draft?: NewInvoiceInput,
+    ) => {
+      try {
+        return await saveInvoicePdfAs(invoiceId, template, draft);
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 }

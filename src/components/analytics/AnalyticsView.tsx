@@ -18,7 +18,7 @@ import {
   Switch,
 } from "@/components/ui/Workspace";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";

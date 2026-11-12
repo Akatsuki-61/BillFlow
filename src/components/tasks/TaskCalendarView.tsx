@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { motion } from "framer-motion";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
+import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   ChevronLeft,
@@ -24,7 +30,12 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
-import type { TaskItem, TaskStatus, TaskPriority, TaskCategory } from "@/types/tasks";
+import type {
+  TaskItem,
+  TaskStatus,
+  TaskPriority,
+  TaskCategory,
+} from "@/types/tasks";
 import type {
   CalendarEventItem,
   EventCategory,
@@ -86,19 +97,55 @@ const MONTH_NAMES = [
   "December",
 ];
 
-const PRIORITY_COLORS: Record<TaskPriority, { dot: string; text: string; bg: string }> = {
-  urgent: { dot: "bg-surface-red-500", text: "text-content-red-700", bg: "bg-surface-red-50" },
-  high: { dot: "bg-surface-amber-500", text: "text-content-amber-700", bg: "bg-surface-amber-50" },
-  medium: { dot: "bg-surface-blue-500", text: "text-content-blue-700", bg: "bg-surface-blue-50" },
-  low: { dot: "bg-surface-neutral-400", text: "text-content-neutral-600", bg: "bg-surface-neutral-100" },
+const PRIORITY_COLORS: Record<
+  TaskPriority,
+  { dot: string; text: string; bg: string }
+> = {
+  urgent: {
+    dot: "bg-surface-red-500",
+    text: "text-content-red-700",
+    bg: "bg-surface-red-50",
+  },
+  high: {
+    dot: "bg-surface-amber-500",
+    text: "text-content-amber-700",
+    bg: "bg-surface-amber-50",
+  },
+  medium: {
+    dot: "bg-surface-blue-500",
+    text: "text-content-blue-700",
+    bg: "bg-surface-blue-50",
+  },
+  low: {
+    dot: "bg-surface-neutral-400",
+    text: "text-content-neutral-600",
+    bg: "bg-surface-neutral-100",
+  },
 };
 
-const STATUS_BADGES: Record<TaskStatus, { label: string; badgeClass: string }> = {
-  todo: { label: "To Do", badgeClass: "bg-surface-neutral-100 text-content-neutral-700 border-line-neutral-300" },
-  "in-progress": { label: "In Progress", badgeClass: "bg-surface-blue-50 text-content-blue-700 border-line-blue-200" },
-  review: { label: "Review", badgeClass: "bg-surface-amber-50 text-content-amber-700 border-line-amber-200" },
-  done: { label: "Done", badgeClass: "bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200" },
-};
+const STATUS_BADGES: Record<TaskStatus, { label: string; badgeClass: string }> =
+  {
+    todo: {
+      label: "To Do",
+      badgeClass:
+        "bg-surface-neutral-100 text-content-neutral-700 border-line-neutral-300",
+    },
+    "in-progress": {
+      label: "In Progress",
+      badgeClass:
+        "bg-surface-blue-50 text-content-blue-700 border-line-blue-200",
+    },
+    review: {
+      label: "Review",
+      badgeClass:
+        "bg-surface-amber-50 text-content-amber-700 border-line-amber-200",
+    },
+    done: {
+      label: "Done",
+      badgeClass:
+        "bg-surface-emerald-50 text-content-emerald-700 border-line-emerald-200",
+    },
+  };
 
 const EVENT_CATEGORY_ICONS: Record<EventCategory, string> = {
   meeting: "👥",
@@ -109,13 +156,40 @@ const EVENT_CATEGORY_ICONS: Record<EventCategory, string> = {
   general: "📅",
 };
 
-const COLOR_PILL_CLASSES: Record<EventColor, { border: string; bg: string; text: string }> = {
-  blue: { border: "border-line-blue-400", bg: "bg-surface-blue-50/80", text: "text-content-blue-900" },
-  emerald: { border: "border-line-emerald-400", bg: "bg-surface-emerald-50/80", text: "text-content-emerald-900" },
-  amber: { border: "border-line-amber-400", bg: "bg-surface-amber-50/80", text: "text-content-amber-900" },
-  purple: { border: "border-line-purple-400", bg: "bg-surface-purple-50/80", text: "text-content-purple-900" },
-  rose: { border: "border-line-rose-400", bg: "bg-surface-rose-50/80", text: "text-content-rose-900" },
-  cyan: { border: "border-line-cyan-400", bg: "bg-surface-cyan-50/80", text: "text-content-cyan-900" },
+const COLOR_PILL_CLASSES: Record<
+  EventColor,
+  { border: string; bg: string; text: string }
+> = {
+  blue: {
+    border: "border-line-blue-400",
+    bg: "bg-surface-blue-50/80",
+    text: "text-content-blue-900",
+  },
+  emerald: {
+    border: "border-line-emerald-400",
+    bg: "bg-surface-emerald-50/80",
+    text: "text-content-emerald-900",
+  },
+  amber: {
+    border: "border-line-amber-400",
+    bg: "bg-surface-amber-50/80",
+    text: "text-content-amber-900",
+  },
+  purple: {
+    border: "border-line-purple-400",
+    bg: "bg-surface-purple-50/80",
+    text: "text-content-purple-900",
+  },
+  rose: {
+    border: "border-line-rose-400",
+    bg: "bg-surface-rose-50/80",
+    text: "text-content-rose-900",
+  },
+  cyan: {
+    border: "border-line-cyan-400",
+    bg: "bg-surface-cyan-50/80",
+    text: "text-content-cyan-900",
+  },
 };
 
 function formatMonthYear(year: number, month: number): string {
@@ -134,8 +208,16 @@ function formatDisplayDate(dateStr: string): string {
   if (!dateStr) return "Unscheduled";
   const parts = dateStr.split("-");
   if (parts.length === 3) {
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const d = new Date(
+      Number(parts[0]),
+      Number(parts[1]) - 1,
+      Number(parts[2]),
+    );
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
   }
   return dateStr;
 }
@@ -182,13 +264,10 @@ export default function TaskCalendarView({
   }, [todayYear, currentYear]);
 
   // Silent Internal Auto-Fixing & Linking Engine
-  const { tasks, events } = useMemo(
-    () => {
-      void timeSlotRevision;
-      return autoFixAndLinkCalendarData({ tasks: rawTasks, events: rawEvents });
-    },
-    [rawTasks, rawEvents, timeSlotRevision]
-  );
+  const { tasks, events } = useMemo(() => {
+    void timeSlotRevision;
+    return autoFixAndLinkCalendarData({ tasks: rawTasks, events: rawEvents });
+  }, [rawTasks, rawEvents, timeSlotRevision]);
 
   // Brief UI loading state while internal calendar sync/auto-linking runs
   const [isSyncingCalendar, setIsSyncingCalendar] = useState<boolean>(false);
@@ -201,7 +280,9 @@ export default function TaskCalendarView({
   const triggerBriefCalendarSync = useCallback((toastText?: string) => {
     setIsSyncingCalendar(true);
     if (typeof window !== "undefined" && window.billflow?.events?.syncNative) {
-      void window.billflow.events.syncNative(getAllTaskTimeSlots()).catch(() => {});
+      void window.billflow.events
+        .syncNative(getAllTaskTimeSlots())
+        .catch(() => {});
     }
     if (syncTimerRef.current) {
       clearTimeout(syncTimerRef.current);
@@ -224,12 +305,15 @@ export default function TaskCalendarView({
   }, []);
 
   // Filters
-  const [scopeFilter, setScopeFilter] = useState<"all" | "tasks" | "events">("all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | "tasks" | "events">(
+    "all",
+  );
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   // Selected date in Calendar Tasks section ("all-month" | "unscheduled" | YYYY-MM-DD)
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>("all-month");
+  const [selectedCalendarDate, setSelectedCalendarDate] =
+    useState<string>("all-month");
 
   // Inline Quick-Add Form State inside Calendar Tasks Section
   const [quickFormType, setQuickFormType] = useState<"task" | "event">("task");
@@ -237,9 +321,12 @@ export default function TaskCalendarView({
   const [quickDate, setQuickDate] = useState(todayStr);
   const [quickStartTime, setQuickStartTime] = useState("10:00");
   const [quickEndTime, setQuickEndTime] = useState("11:00");
-  const [quickTaskPriority, setQuickTaskPriority] = useState<TaskPriority>("medium");
-  const [quickTaskCategory, setQuickTaskCategory] = useState<TaskCategory>("Development");
-  const [quickEventCategory, setQuickEventCategory] = useState<EventCategory>("meeting");
+  const [quickTaskPriority, setQuickTaskPriority] =
+    useState<TaskPriority>("medium");
+  const [quickTaskCategory, setQuickTaskCategory] =
+    useState<TaskCategory>("Development");
+  const [quickEventCategory, setQuickEventCategory] =
+    useState<EventCategory>("meeting");
   const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
 
   // Inline Task Editing state inside Calendar Tasks Section
@@ -248,8 +335,10 @@ export default function TaskCalendarView({
   const [editingTaskDueDate, setEditingTaskDueDate] = useState("");
   const [editingTaskStartTime, setEditingTaskStartTime] = useState("");
   const [editingTaskEndTime, setEditingTaskEndTime] = useState("");
-  const [editingTaskPriority, setEditingTaskPriority] = useState<TaskPriority>("medium");
-  const [editingTaskStatus, setEditingTaskStatus] = useState<TaskStatus>("todo");
+  const [editingTaskPriority, setEditingTaskPriority] =
+    useState<TaskPriority>("medium");
+  const [editingTaskStatus, setEditingTaskStatus] =
+    useState<TaskStatus>("todo");
 
   // Local calendar .ics file input ref (silent background import + auto-fixing)
   const localCalendarFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -295,7 +384,9 @@ export default function TaskCalendarView({
     setCurrentMonth(newMonthIndex);
     setSelectedCalendarDate("all-month");
     const targetDay =
-      newMonthIndex === todayMonth && currentYear === todayYear ? today.getDate() : 1;
+      newMonthIndex === todayMonth && currentYear === todayYear
+        ? today.getDate()
+        : 1;
     setQuickDate(formatDateString(currentYear, newMonthIndex, targetDay));
   };
 
@@ -303,14 +394,20 @@ export default function TaskCalendarView({
     setCurrentYear(newYear);
     setSelectedCalendarDate("all-month");
     const targetDay =
-      currentMonth === todayMonth && newYear === todayYear ? today.getDate() : 1;
+      currentMonth === todayMonth && newYear === todayYear
+        ? today.getDate()
+        : 1;
     setQuickDate(formatDateString(newYear, currentMonth, targetDay));
   };
 
   // Calendar matrix calculation
   const calendarCells = useMemo(() => {
     const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
-    const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const daysInCurrentMonth = new Date(
+      currentYear,
+      currentMonth + 1,
+      0,
+    ).getDate();
     const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
 
     const cells: {
@@ -344,7 +441,8 @@ export default function TaskCalendarView({
     }
 
     const remaining = (7 - (cells.length % 7)) % 7;
-    const totalNeeded = cells.length + remaining < 35 ? 35 : cells.length + remaining;
+    const totalNeeded =
+      cells.length + remaining < 35 ? 35 : cells.length + remaining;
     const additionalDays = totalNeeded - cells.length;
 
     for (let day = 1; day <= additionalDays; day++) {
@@ -379,7 +477,8 @@ export default function TaskCalendarView({
   // Unscheduled tasks (no dueDate)
   const unscheduledTasks = useMemo(() => {
     return tasks.filter(
-      (t) => !t.dueDate && (statusFilter === "all" || t.status === statusFilter)
+      (t) =>
+        !t.dueDate && (statusFilter === "all" || t.status === statusFilter),
     );
   }, [tasks, statusFilter]);
 
@@ -400,10 +499,16 @@ export default function TaskCalendarView({
   // Monthly summary stats
   const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
   const monthStats = useMemo(() => {
-    const monthTasks = tasks.filter((t) => t.dueDate && t.dueDate.startsWith(monthPrefix));
-    const monthEvents = events.filter((e) => e.startDate && e.startDate.startsWith(monthPrefix));
+    const monthTasks = tasks.filter(
+      (t) => t.dueDate && t.dueDate.startsWith(monthPrefix),
+    );
+    const monthEvents = events.filter(
+      (e) => e.startDate && e.startDate.startsWith(monthPrefix),
+    );
     const completedTasks = monthTasks.filter((t) => t.status === "done").length;
-    const overdueTasks = tasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== "done").length;
+    const overdueTasks = tasks.filter(
+      (t) => t.dueDate && t.dueDate < todayStr && t.status !== "done",
+    ).length;
 
     return {
       totalTasks: monthTasks.length,
@@ -424,12 +529,19 @@ export default function TaskCalendarView({
           (t) =>
             t.dueDate &&
             t.dueDate.startsWith(monthPrefix) &&
-            (statusFilter === "all" || t.status === statusFilter)
+            (statusFilter === "all" || t.status === statusFilter),
         )
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     }
     return tasksByDate.get(selectedCalendarDate) || [];
-  }, [selectedCalendarDate, unscheduledTasks, tasks, monthPrefix, statusFilter, tasksByDate]);
+  }, [
+    selectedCalendarDate,
+    unscheduledTasks,
+    tasks,
+    monthPrefix,
+    statusFilter,
+    tasksByDate,
+  ]);
 
   const workbenchEvents = useMemo(() => {
     if (selectedCalendarDate === "unscheduled") {
@@ -441,7 +553,7 @@ export default function TaskCalendarView({
           (e) =>
             e.startDate &&
             e.startDate.startsWith(monthPrefix) &&
-            (categoryFilter === "all" || e.category === categoryFilter)
+            (categoryFilter === "all" || e.category === categoryFilter),
         )
         .sort((a, b) => a.startDate.localeCompare(b.startDate));
     }
@@ -482,14 +594,15 @@ export default function TaskCalendarView({
 
     const rawTargetDate =
       quickDate ||
-      (selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+      (selectedCalendarDate !== "all-month" &&
+      selectedCalendarDate !== "unscheduled"
         ? selectedCalendarDate
         : todayStr);
     const targetDate = normalizeAndAutoFixDate(rawTargetDate, todayStr);
     const normalizedTime = normalizeAndAutoFixTimeRange(
       quickStartTime,
       quickEndTime,
-      !quickStartTime
+      !quickStartTime,
     );
 
     setIsSubmittingQuick(true);
@@ -576,7 +689,9 @@ export default function TaskCalendarView({
     if (typeof window !== "undefined" && window.billflow?.events?.openNative) {
       try {
         await window.billflow.events.openNative(getAllTaskTimeSlots());
-        onNotifyRef.current?.("Opened your macOS Calendar app ('BillFlow' calendar).");
+        onNotifyRef.current?.(
+          "Opened your macOS Calendar app ('BillFlow' calendar).",
+        );
         return;
       } catch {
         // Fallback to .ics download below
@@ -593,7 +708,7 @@ export default function TaskCalendarView({
 
   // One-click silent import from user's Local OS Calendar (.ics) with automatic background auto-fixing
   const handleSilentImportFromLocalCalendar = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -605,10 +720,12 @@ export default function TaskCalendarView({
       const parsedItems = parseIcsCalendar(rawText);
 
       const existingTaskKeys = new Set(
-        tasks.map((t) => `${t.title.toLowerCase().trim()}|${t.dueDate}`)
+        tasks.map((t) => `${t.title.toLowerCase().trim()}|${t.dueDate}`),
       );
       const existingEventKeys = new Set(
-        events.map((evt) => `${evt.title.toLowerCase().trim()}|${evt.startDate}`)
+        events.map(
+          (evt) => `${evt.title.toLowerCase().trim()}|${evt.startDate}`,
+        ),
       );
 
       let importedTasksCount = 0;
@@ -619,7 +736,7 @@ export default function TaskCalendarView({
         const cleanTimes = normalizeAndAutoFixTimeRange(
           item.startTime,
           item.endTime,
-          item.isAllDay
+          item.isAllDay,
         );
 
         if (item.kind === "task" && onQuickCreateTask) {
@@ -649,7 +766,7 @@ export default function TaskCalendarView({
                 startTime: cleanTimes.startTime,
                 endTime: cleanTimes.endTime,
                 isAllDay: cleanTimes.isAllDay,
-              })
+              }),
             );
             importedEventsCount++;
           }
@@ -660,7 +777,7 @@ export default function TaskCalendarView({
       triggerBriefCalendarSync(
         importedTasksCount + importedEventsCount > 0
           ? `Linked ${importedTasksCount} task(s) and ${importedEventsCount} event(s) from local calendar.`
-          : "Local calendar is already up to date with Application Calendar."
+          : "Local calendar is already up to date with Application Calendar.",
       );
     } catch {
       setIsSyncingCalendar(false);
@@ -688,7 +805,11 @@ export default function TaskCalendarView({
       events.forEach((e) => {
         if (!e.startDate) return;
         if (categoryFilter !== "all" && e.category !== categoryFilter) return;
-        items.push({ type: "event", dateStr: e.startDate.split("T")[0], item: e });
+        items.push({
+          type: "event",
+          dateStr: e.startDate.split("T")[0],
+          item: e,
+        });
       });
     }
 
@@ -755,7 +876,8 @@ export default function TaskCalendarView({
                   : "text-content-neutral-600 hover:text-content-neutral-900"
               }`}
             >
-              All Linked ({tasks.filter((t) => Boolean(t.dueDate)).length + events.length})
+              All Linked (
+              {tasks.filter((t) => Boolean(t.dueDate)).length + events.length})
             </button>
             <button
               type="button"
@@ -766,7 +888,8 @@ export default function TaskCalendarView({
                   : "text-content-neutral-600 hover:text-content-neutral-900"
               }`}
             >
-              Application Calendar ({tasks.filter((t) => Boolean(t.dueDate)).length})
+              Application Calendar (
+              {tasks.filter((t) => Boolean(t.dueDate)).length})
             </button>
             <button
               type="button"
@@ -789,7 +912,9 @@ export default function TaskCalendarView({
             className="flex items-center gap-1.5 text-xs font-medium"
             title="Silently synchronize tasks and events with macOS Calendar in the background without opening the Calendar app"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCalendar ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${isSyncingCalendar ? "animate-spin" : ""}`}
+            />
             <span>Sync Local Calendar</span>
           </Button>
 
@@ -876,7 +1001,9 @@ export default function TaskCalendarView({
               {MONTH_NAMES.map((mName, idx) => (
                 <option key={mName} value={idx}>
                   {mName}
-                  {idx === todayMonth && currentYear === todayYear ? " (Current)" : ""}
+                  {idx === todayMonth && currentYear === todayYear
+                    ? " (Current)"
+                    : ""}
                 </option>
               ))}
             </select>
@@ -1014,7 +1141,9 @@ export default function TaskCalendarView({
             size="small"
             disabled={isSyncingCalendar}
             onClick={() =>
-              triggerBriefCalendarSync("Application & Local calendar synchronized.")
+              triggerBriefCalendarSync(
+                "Application & Local calendar synchronized.",
+              )
             }
             className="flex items-center gap-1.5"
             title="Synchronize Application Calendar and Local Calendar"
@@ -1031,9 +1160,10 @@ export default function TaskCalendarView({
             size="small"
             onClick={() =>
               onAddTaskForDate(
-                selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+                selectedCalendarDate !== "all-month" &&
+                  selectedCalendarDate !== "unscheduled"
                   ? selectedCalendarDate
-                  : todayStr
+                  : todayStr,
               )
             }
             className="flex items-center gap-1.5"
@@ -1048,8 +1178,12 @@ export default function TaskCalendarView({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3 rounded-xl bg-surface border border-line-neutral-200/70 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-neutral-500">Scheduled Tasks</p>
-            <p className="text-xl font-newspaper font-bold text-content-neutral-900">{monthStats.totalTasks}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-neutral-500">
+              Scheduled Tasks
+            </p>
+            <p className="text-xl font-newspaper font-bold text-content-neutral-900">
+              {monthStats.totalTasks}
+            </p>
           </div>
           <div className="p-2 rounded-xl bg-surface-blue-50 text-content-blue-700">
             <CalendarDays className="w-4 h-4" />
@@ -1058,8 +1192,12 @@ export default function TaskCalendarView({
 
         <div className="p-3 rounded-xl bg-surface border border-line-neutral-200/70 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-neutral-500">Local Events</p>
-            <p className="text-xl font-newspaper font-bold text-content-neutral-900">{monthStats.totalEvents}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-neutral-500">
+              Local Events
+            </p>
+            <p className="text-xl font-newspaper font-bold text-content-neutral-900">
+              {monthStats.totalEvents}
+            </p>
           </div>
           <div className="p-2 rounded-xl bg-surface-purple-50 text-content-purple-700">
             <Clock className="w-4 h-4" />
@@ -1068,8 +1206,12 @@ export default function TaskCalendarView({
 
         <div className="p-3 rounded-xl bg-surface border border-line-neutral-200/70 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-neutral-500">Done This Month</p>
-            <p className="text-xl font-newspaper font-bold text-content-emerald-700">{monthStats.completedTasks}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-neutral-500">
+              Done This Month
+            </p>
+            <p className="text-xl font-newspaper font-bold text-content-emerald-700">
+              {monthStats.completedTasks}
+            </p>
           </div>
           <div className="p-2 rounded-xl bg-surface-emerald-50 text-content-emerald-700">
             <CheckCircle2 className="w-4 h-4" />
@@ -1078,8 +1220,12 @@ export default function TaskCalendarView({
 
         <div className="p-3 rounded-xl bg-surface border border-line-neutral-200/70 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-neutral-500">Overdue Tasks</p>
-            <p className="text-xl font-newspaper font-bold text-content-red-700">{monthStats.overdueTasks}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-neutral-500">
+              Overdue Tasks
+            </p>
+            <p className="text-xl font-newspaper font-bold text-content-red-700">
+              {monthStats.overdueTasks}
+            </p>
           </div>
           <div className="p-2 rounded-xl bg-surface-red-50 text-content-red-700">
             <AlertCircle className="w-4 h-4" />
@@ -1088,13 +1234,20 @@ export default function TaskCalendarView({
       </div>
 
       {/* Main Calendar View: Month Grid vs Agenda List */}
-      <div className={`transition-opacity duration-300 ${isSyncingCalendar ? "opacity-80" : "opacity-100"}`}>
+      <div
+        className={`transition-opacity duration-300 ${isSyncingCalendar ? "opacity-80" : "opacity-100"}`}
+      >
         {viewType === "grid" ? (
           <div className="ui-card overflow-hidden border border-line-neutral-200/80">
             {/* Day of Week Header */}
             <div className="grid grid-cols-7 border-b border-line-neutral-200/80 bg-surface-neutral-50/90 text-center text-xs font-semibold text-content-neutral-600 py-2.5">
               {DAYS_OF_WEEK.map((day, idx) => (
-                <div key={day} className={idx === 0 || idx === 6 ? "text-content-neutral-400" : ""}>
+                <div
+                  key={day}
+                  className={
+                    idx === 0 || idx === 6 ? "text-content-neutral-400" : ""
+                  }
+                >
                   {day}
                 </div>
               ))}
@@ -1103,8 +1256,14 @@ export default function TaskCalendarView({
             {/* Grid Cells */}
             <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-line-neutral-200/60 bg-surface-neutral-100/30">
               {calendarCells.map((cell) => {
-                const cellTasks = scopeFilter !== "events" ? tasksByDate.get(cell.dateStr) || [] : [];
-                const cellEvents = scopeFilter !== "tasks" ? eventsByDate.get(cell.dateStr) || [] : [];
+                const cellTasks =
+                  scopeFilter !== "events"
+                    ? tasksByDate.get(cell.dateStr) || []
+                    : [];
+                const cellEvents =
+                  scopeFilter !== "tasks"
+                    ? eventsByDate.get(cell.dateStr) || []
+                    : [];
                 const totalItems = cellTasks.length + cellEvents.length;
                 const isOver = dragOverDate === cell.dateStr;
                 const isSelectedDay = selectedCalendarDate === cell.dateStr;
@@ -1164,7 +1323,9 @@ export default function TaskCalendarView({
                     <div className="flex-1 mt-1 space-y-1 overflow-hidden">
                       {/* Render Local Events first */}
                       {cellEvents.slice(0, 2).map((evt) => {
-                        const pillStyle = COLOR_PILL_CLASSES[evt.color] || COLOR_PILL_CLASSES.blue;
+                        const pillStyle =
+                          COLOR_PILL_CLASSES[evt.color] ||
+                          COLOR_PILL_CLASSES.blue;
                         return (
                           <div
                             key={evt.id}
@@ -1175,9 +1336,13 @@ export default function TaskCalendarView({
                             title={`${evt.title} (${evt.category})${evt.startTime ? ` at ${evt.startTime}` : ""} — Click to view, edit, or delete`}
                             className={`px-1.5 py-0.5 rounded text-[11px] font-medium border-l-2 truncate cursor-pointer hover:brightness-95 transition-all flex items-center gap-1 ${pillStyle.border} ${pillStyle.bg} ${pillStyle.text}`}
                           >
-                            <span className="shrink-0">{EVENT_CATEGORY_ICONS[evt.category]}</span>
+                            <span className="shrink-0">
+                              {EVENT_CATEGORY_ICONS[evt.category]}
+                            </span>
                             {evt.startTime && !evt.isAllDay && (
-                              <span className="text-[9px] font-mono opacity-80 shrink-0">{evt.startTime}</span>
+                              <span className="text-[9px] font-mono opacity-80 shrink-0">
+                                {evt.startTime}
+                              </span>
                             )}
                             <span className="truncate">{evt.title}</span>
                           </div>
@@ -1185,48 +1350,59 @@ export default function TaskCalendarView({
                       })}
 
                       {/* Render Tasks next */}
-                      {cellTasks.slice(0, 3 - Math.min(2, cellEvents.length)).map((t) => {
-                        const priorityStyle = PRIORITY_COLORS[t.priority];
-                        const statusBadge = STATUS_BADGES[t.status];
-                        return (
-                          <div
-                            key={t.id}
-                            draggable
-                            onDragStart={(e) => handleTaskDragStart(e, t.id)}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectTask(t);
-                            }}
-                            title={`[${statusBadge.label}] ${t.title}${t.startTime ? ` (${t.startTime}${t.endTime ? ` - ${t.endTime}` : ""})` : ""} (${t.priority} priority) - Click to view/edit or drag to reschedule`}
-                            className={`px-1.5 py-0.5 rounded text-[11px] border border-line-neutral-200/90 bg-surface hover:bg-surface-neutral-100/80 cursor-grab active:cursor-grabbing truncate transition-all shadow-2xs flex items-center gap-1 ${
-                              t.status === "done" ? "opacity-60 line-through" : ""
-                            }`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityStyle.dot}`} />
-                            {t.startTime && (
-                              <span className="text-[9px] font-mono text-content-neutral-500 shrink-0">
-                                {t.startTime}
+                      {cellTasks
+                        .slice(0, 3 - Math.min(2, cellEvents.length))
+                        .map((t) => {
+                          const priorityStyle = PRIORITY_COLORS[t.priority];
+                          const statusBadge = STATUS_BADGES[t.status];
+                          return (
+                            <div
+                              key={t.id}
+                              draggable
+                              onDragStart={(e) => handleTaskDragStart(e, t.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectTask(t);
+                              }}
+                              title={`[${statusBadge.label}] ${t.title}${t.startTime ? ` (${t.startTime}${t.endTime ? ` - ${t.endTime}` : ""})` : ""} (${t.priority} priority) - Click to view/edit or drag to reschedule`}
+                              className={`px-1.5 py-0.5 rounded text-[11px] border border-line-neutral-200/90 bg-surface hover:bg-surface-neutral-100/80 cursor-grab active:cursor-grabbing truncate transition-all shadow-2xs flex items-center gap-1 ${
+                                t.status === "done"
+                                  ? "opacity-60 line-through"
+                                  : ""
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityStyle.dot}`}
+                              />
+                              {t.startTime && (
+                                <span className="text-[9px] font-mono text-content-neutral-500 shrink-0">
+                                  {t.startTime}
+                                </span>
+                              )}
+                              <span className="truncate font-medium text-content-neutral-900 flex-1">
+                                {t.title}
                               </span>
-                            )}
-                            <span className="truncate font-medium text-content-neutral-900 flex-1">{t.title}</span>
-                            {onDeleteTask && (
-                              <button
-                                type="button"
-                                data-trash-popup="Delete Task"
-                                title="Delete task"
-                                aria-label={`Delete task ${t.title}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void onDeleteTask(t.id);
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-content-neutral-400 hover:text-content-rose-600 transition-opacity shrink-0 cursor-pointer"
-                              >
-                                <i className="fa-solid fa-trash !w-2.5 !h-2.5" aria-hidden="true" />
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
+                              {onDeleteTask && (
+                                <button
+                                  type="button"
+                                  data-trash-popup="Delete Task"
+                                  title="Delete task"
+                                  aria-label={`Delete task ${t.title}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void onDeleteTask(t.id);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-content-neutral-400 hover:text-content-rose-600 transition-opacity shrink-0 cursor-pointer"
+                                >
+                                  <i
+                                    className="fa-solid fa-trash !w-2.5 !h-2.5"
+                                    aria-hidden="true"
+                                  />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
 
                       {/* Overflow Badge */}
                       {totalItems > 3 && (
@@ -1262,9 +1438,12 @@ export default function TaskCalendarView({
             {agendaItems.length === 0 ? (
               <div className="py-12 text-center text-content-neutral-500 space-y-2">
                 <CalendarIcon className="w-8 h-8 mx-auto text-content-neutral-400" />
-                <p className="text-sm font-medium">No tasks or events found for the active filters.</p>
+                <p className="text-sm font-medium">
+                  No tasks or events found for the active filters.
+                </p>
                 <p className="text-xs text-content-neutral-400">
-                  Schedule a new sprint task or add a local event using the buttons above.
+                  Schedule a new sprint task or add a local event using the
+                  buttons above.
                 </p>
               </div>
             ) : (
@@ -1297,11 +1476,17 @@ export default function TaskCalendarView({
                                   {task.endTime ? ` - ${task.endTime}` : ""}
                                 </span>
                               )}
-                              <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border ${statusBadge.badgeClass}`}>
+                              <span
+                                className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border ${statusBadge.badgeClass}`}
+                              >
                                 {statusBadge.label}
                               </span>
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 ${priorityStyle.bg} ${priorityStyle.text}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`} />
+                              <span
+                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 ${priorityStyle.bg} ${priorityStyle.text}`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`}
+                                />
                                 {task.priority}
                               </span>
                               {task.clientName && (
@@ -1310,7 +1495,9 @@ export default function TaskCalendarView({
                                 </span>
                               )}
                             </div>
-                            <h4 className={`text-sm font-semibold mt-1 text-content-neutral-900 ${task.status === "done" ? "line-through opacity-70" : ""}`}>
+                            <h4
+                              className={`text-sm font-semibold mt-1 text-content-neutral-900 ${task.status === "done" ? "line-through opacity-70" : ""}`}
+                            >
                               {task.title}
                             </h4>
                             {task.description && (
@@ -1331,7 +1518,10 @@ export default function TaskCalendarView({
                             onClick={() => onSelectTask(task)}
                             className="text-xs flex items-center gap-1.5"
                           >
-                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                            <i
+                              className="fa-solid fa-pen-to-square text-xs"
+                              aria-hidden="true"
+                            />
                             <span>Edit</span>
                           </Button>
                           {onDeleteTask && (
@@ -1344,7 +1534,10 @@ export default function TaskCalendarView({
                               className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
                               title="Delete task"
                             >
-                              <i className="fa-solid fa-trash" aria-hidden="true" />
+                              <i
+                                className="fa-solid fa-trash"
+                                aria-hidden="true"
+                              />
                             </Button>
                           )}
                         </div>
@@ -1352,7 +1545,9 @@ export default function TaskCalendarView({
                     );
                   } else {
                     const event = entry.item as CalendarEventItem;
-                    const pillStyle = COLOR_PILL_CLASSES[event.color] || COLOR_PILL_CLASSES.blue;
+                    const pillStyle =
+                      COLOR_PILL_CLASSES[event.color] ||
+                      COLOR_PILL_CLASSES.blue;
 
                     return (
                       <div
@@ -1380,12 +1575,15 @@ export default function TaskCalendarView({
                                   All-Day
                                 </span>
                               )}
-                              <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded ${pillStyle.bg} ${pillStyle.text}`}>
+                              <span
+                                className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded ${pillStyle.bg} ${pillStyle.text}`}
+                              >
                                 {event.category}
                               </span>
                               {event.clientName && (
                                 <span className="text-[11px] text-content-neutral-500 font-medium flex items-center gap-1">
-                                  <Link2 className="w-3 h-3" /> {event.clientName}
+                                  <Link2 className="w-3 h-3" />{" "}
+                                  {event.clientName}
                                 </span>
                               )}
                             </div>
@@ -1420,7 +1618,10 @@ export default function TaskCalendarView({
                             onClick={() => onSelectEvent(event)}
                             className="text-xs flex items-center gap-1.5"
                           >
-                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                            <i
+                              className="fa-solid fa-pen-to-square text-xs"
+                              aria-hidden="true"
+                            />
                             <span>Edit</span>
                           </Button>
                           {onDeleteEvent && (
@@ -1433,7 +1634,10 @@ export default function TaskCalendarView({
                               className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
                               title="Delete event"
                             >
-                              <i className="fa-solid fa-trash" aria-hidden="true" />
+                              <i
+                                className="fa-solid fa-trash"
+                                aria-hidden="true"
+                              />
                             </Button>
                           )}
                         </div>
@@ -1464,7 +1668,8 @@ export default function TaskCalendarView({
               </span>
             </div>
             <p className="text-xs text-content-neutral-500 mt-0.5">
-              Add, view, edit, or delete tasks and events directly in your calendar. Click any date cell above to filter by that day.
+              Add, view, edit, or delete tasks and events directly in your
+              calendar. Click any date cell above to filter by that day.
             </p>
           </div>
 
@@ -1479,7 +1684,9 @@ export default function TaskCalendarView({
               {MONTH_NAMES.map((mName, idx) => (
                 <option key={mName} value={idx}>
                   {mName} {currentYear}
-                  {idx === todayMonth && currentYear === todayYear ? " (Current)" : ""}
+                  {idx === todayMonth && currentYear === todayYear
+                    ? " (Current)"
+                    : ""}
                 </option>
               ))}
             </select>
@@ -1619,7 +1826,9 @@ export default function TaskCalendarView({
               <select
                 aria-label="Quick task priority"
                 value={quickTaskPriority}
-                onChange={(e) => setQuickTaskPriority(e.target.value as TaskPriority)}
+                onChange={(e) =>
+                  setQuickTaskPriority(e.target.value as TaskPriority)
+                }
                 className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
               >
                 <option value="low">Low Priority</option>
@@ -1630,7 +1839,9 @@ export default function TaskCalendarView({
               <select
                 aria-label="Quick task category"
                 value={quickTaskCategory}
-                onChange={(e) => setQuickTaskCategory(e.target.value as TaskCategory)}
+                onChange={(e) =>
+                  setQuickTaskCategory(e.target.value as TaskCategory)
+                }
                 className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
               >
                 <option value="Development">Development</option>
@@ -1644,7 +1855,9 @@ export default function TaskCalendarView({
             <select
               aria-label="Quick event category"
               value={quickEventCategory}
-              onChange={(e) => setQuickEventCategory(e.target.value as EventCategory)}
+              onChange={(e) =>
+                setQuickEventCategory(e.target.value as EventCategory)
+              }
               className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
             >
               <option value="meeting">👥 Meeting</option>
@@ -1675,21 +1888,27 @@ export default function TaskCalendarView({
             <div className="flex items-center justify-between pb-2 border-b border-line-neutral-100">
               <span className="text-xs font-semibold uppercase tracking-wider text-content-neutral-700 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
-                <span>Application Calendar Tasks ({workbenchTasks.length})</span>
+                <span>
+                  Application Calendar Tasks ({workbenchTasks.length})
+                </span>
               </span>
               <Button
                 variant="ghost"
                 size="small"
                 onClick={() =>
                   onAddTaskForDate(
-                    selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+                    selectedCalendarDate !== "all-month" &&
+                      selectedCalendarDate !== "unscheduled"
                       ? selectedCalendarDate
-                      : todayStr
+                      : todayStr,
                   )
                 }
                 className="text-xs flex items-center gap-1.5"
               >
-                <i className="fa-solid fa-plus text-[11px]" aria-hidden="true" />
+                <i
+                  className="fa-solid fa-plus text-[11px]"
+                  aria-hidden="true"
+                />
                 <span>New Task / Event</span>
               </Button>
             </div>
@@ -1697,7 +1916,10 @@ export default function TaskCalendarView({
             {workbenchTasks.length === 0 ? (
               <div className="py-8 text-center text-xs text-content-neutral-400 space-y-1.5">
                 <p>No tasks scheduled for this view.</p>
-                <p>Use the Quick Task bar above or click &ldquo;New Task / Event&rdquo; to add one.</p>
+                <p>
+                  Use the Quick Task bar above or click &ldquo;New Task /
+                  Event&rdquo; to add one.
+                </p>
               </div>
             ) : (
               <div className="bf-scroll-area space-y-2.5 max-h-[380px] overflow-y-auto overflow-x-hidden pr-1">
@@ -1724,7 +1946,9 @@ export default function TaskCalendarView({
                             type="date"
                             aria-label="Edit task due date"
                             value={editingTaskDueDate}
-                            onChange={(e) => setEditingTaskDueDate(e.target.value)}
+                            onChange={(e) =>
+                              setEditingTaskDueDate(e.target.value)
+                            }
                             className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
                           />
                           <input
@@ -1732,7 +1956,9 @@ export default function TaskCalendarView({
                             aria-label="Edit task start time"
                             title="Start Time"
                             value={editingTaskStartTime}
-                            onChange={(e) => setEditingTaskStartTime(e.target.value)}
+                            onChange={(e) =>
+                              setEditingTaskStartTime(e.target.value)
+                            }
                             className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
                           />
                           <input
@@ -1740,7 +1966,9 @@ export default function TaskCalendarView({
                             aria-label="Edit task end time"
                             title="End Time"
                             value={editingTaskEndTime}
-                            onChange={(e) => setEditingTaskEndTime(e.target.value)}
+                            onChange={(e) =>
+                              setEditingTaskEndTime(e.target.value)
+                            }
                             className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
                           />
                         </div>
@@ -1748,7 +1976,9 @@ export default function TaskCalendarView({
                           <select
                             aria-label="Edit task status"
                             value={editingTaskStatus}
-                            onChange={(e) => setEditingTaskStatus(e.target.value as TaskStatus)}
+                            onChange={(e) =>
+                              setEditingTaskStatus(e.target.value as TaskStatus)
+                            }
                             className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
                           >
                             <option value="todo">To Do</option>
@@ -1760,7 +1990,9 @@ export default function TaskCalendarView({
                             aria-label="Edit task priority"
                             value={editingTaskPriority}
                             onChange={(e) =>
-                              setEditingTaskPriority(e.target.value as TaskPriority)
+                              setEditingTaskPriority(
+                                e.target.value as TaskPriority,
+                              )
                             }
                             className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
                           >
@@ -1786,7 +2018,10 @@ export default function TaskCalendarView({
                             onClick={() => void saveInlineEditTask(task.id)}
                             className="flex items-center gap-1.5"
                           >
-                            <i className="fa-solid fa-arrows-rotate text-xs" aria-hidden="true" />
+                            <i
+                              className="fa-solid fa-arrows-rotate text-xs"
+                              aria-hidden="true"
+                            />
                             <span>Save Task</span>
                           </Button>
                         </div>
@@ -1805,7 +2040,9 @@ export default function TaskCalendarView({
                       >
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700">
-                            {formatDisplayDate(task.dueDate?.split("T")[0] || "")}
+                            {formatDisplayDate(
+                              task.dueDate?.split("T")[0] || "",
+                            )}
                           </span>
                           {task.startTime && (
                             <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-neutral-100 text-content-neutral-700 flex items-center gap-1">
@@ -1822,13 +2059,17 @@ export default function TaskCalendarView({
                           <span
                             className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 ${priorityStyle.bg} ${priorityStyle.text}`}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`} />
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`}
+                            />
                             {task.priority}
                           </span>
                         </div>
                         <h4
                           className={`text-xs font-semibold text-content-neutral-900 mt-1 truncate ${
-                            task.status === "done" ? "line-through opacity-65" : ""
+                            task.status === "done"
+                              ? "line-through opacity-65"
+                              : ""
                           }`}
                         >
                           {task.title}
@@ -1849,7 +2090,10 @@ export default function TaskCalendarView({
                             title="Edit task"
                             className="p-1.5 rounded-lg text-content-neutral-500 hover:text-accent hover:bg-surface-neutral-100 transition-colors cursor-pointer"
                           >
-                            <i className="fa-solid fa-pen-to-square text-xs" aria-hidden="true" />
+                            <i
+                              className="fa-solid fa-pen-to-square text-xs"
+                              aria-hidden="true"
+                            />
                           </button>
                         )}
                         {onDeleteTask && (
@@ -1861,7 +2105,10 @@ export default function TaskCalendarView({
                             title="Delete task"
                             className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors cursor-pointer"
                           >
-                            <i className="fa-solid fa-trash" aria-hidden="true" />
+                            <i
+                              className="fa-solid fa-trash"
+                              aria-hidden="true"
+                            />
                           </button>
                         )}
                       </div>
@@ -1884,9 +2131,10 @@ export default function TaskCalendarView({
                 size="small"
                 onClick={() =>
                   onAddEventForDate(
-                    selectedCalendarDate !== "all-month" && selectedCalendarDate !== "unscheduled"
+                    selectedCalendarDate !== "all-month" &&
+                      selectedCalendarDate !== "unscheduled"
                       ? selectedCalendarDate
-                      : todayStr
+                      : todayStr,
                   )
                 }
                 className="text-xs"
@@ -1899,12 +2147,16 @@ export default function TaskCalendarView({
             {workbenchEvents.length === 0 ? (
               <div className="py-8 text-center text-xs text-content-neutral-400 space-y-1.5">
                 <p>No calendar events scheduled for this view.</p>
-                <p>Use the Quick Event bar above or click &ldquo;New Event&rdquo; to schedule one.</p>
+                <p>
+                  Use the Quick Event bar above or click &ldquo;New Event&rdquo;
+                  to schedule one.
+                </p>
               </div>
             ) : (
               <div className="bf-scroll-area space-y-2.5 max-h-[380px] overflow-y-auto overflow-x-hidden pr-1">
                 {workbenchEvents.map((evt) => {
-                  const pillStyle = COLOR_PILL_CLASSES[evt.color] || COLOR_PILL_CLASSES.blue;
+                  const pillStyle =
+                    COLOR_PILL_CLASSES[evt.color] || COLOR_PILL_CLASSES.blue;
                   return (
                     <div
                       key={evt.id}
@@ -1964,7 +2216,10 @@ export default function TaskCalendarView({
                             title="Delete calendar event"
                             className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors cursor-pointer"
                           >
-                            <i className="fa-solid fa-trash" aria-hidden="true" />
+                            <i
+                              className="fa-solid fa-trash"
+                              aria-hidden="true"
+                            />
                           </button>
                         )}
                       </div>

@@ -161,10 +161,12 @@ describe("CSV Export & Overdue Analysis Engine", () => {
       });
 
       const lines = csv.split("\r\n");
-      expect(lines.length).toBe(4); // Header + 2 data + 1 summary
-      const summaryLine = lines[3];
-      expect(summaryLine).toContain("TOTALS");
-      expect(summaryLine).toContain("2 invoices");
+      expect(lines.length).toBe(5); // Header + two records + a separate summary per currency.
+      const summaries = lines.filter((line) => line.startsWith("TOTALS"));
+      expect(summaries).toHaveLength(2);
+      expect(summaries.every((line) => line.includes("1 invoices"))).toBe(true);
+      expect(summaries.some((line) => line.includes("LKR"))).toBe(true);
+      expect(summaries.some((line) => line.includes("USD"))).toBe(true);
     });
   });
 

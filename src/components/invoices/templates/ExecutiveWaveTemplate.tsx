@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { ExternalLink } from "lucide-react";
 import type { InvoiceTemplateProps } from "./types";
 
@@ -62,10 +61,7 @@ export function ExecutiveWaveTemplate({
           />
 
           {/* 2. Top-Right Dark Slate Accent Curve */}
-          <path
-            d="M 548 0 C 608 18, 672 31, 720 38 L 720 0 Z"
-            fill="#383D46"
-          />
+          <path d="M 548 0 C 608 18, 672 31, 720 38 L 720 0 Z" fill="#383D46" />
 
           {/* 3. Medium Charcoal Grey Ribbon */}
           <path
@@ -156,13 +152,19 @@ export function ExecutiveWaveTemplate({
               {invoice.clientName}
             </h2>
             {client?.contactPerson && (
-              <p className="text-xs text-slate-600 mt-1">Attn: {client.contactPerson}</p>
+              <p className="text-xs text-slate-600 mt-1">
+                Attn: {client.contactPerson}
+              </p>
             )}
             {client?.phone && (
-              <p className="text-xs text-slate-600 mt-0.5">Phone: {client.phone}</p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Phone: {client.phone}
+              </p>
             )}
             {invoice.clientEmail && (
-              <p className="text-xs text-slate-600 mt-0.5">{invoice.clientEmail}</p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {invoice.clientEmail}
+              </p>
             )}
             {delivery.hasLink && (
               <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-700 font-medium">
@@ -260,7 +262,10 @@ export function ExecutiveWaveTemplate({
                     {item.quantity}
                   </td>
                   <td className="py-3 px-4 text-right text-xs font-extrabold text-slate-900 tabular-nums">
-                    {formatMoney(item.quantity * item.unitPriceCents, invoice.currency)}
+                    {formatMoney(
+                      item.quantity * item.unitPriceCents,
+                      invoice.currency,
+                    )}
                   </td>
                 </tr>
               ))}
@@ -299,7 +304,9 @@ export function ExecutiveWaveTemplate({
 
             {/* Grand Total Solid Amber Bar */}
             <div className="mt-2 bg-[#EAA828] text-slate-950 px-4 py-2.5 rounded-sm flex justify-between items-center font-black">
-              <span className="text-xs uppercase tracking-wider">Grand Total</span>
+              <span className="text-xs uppercase tracking-wider">
+                Grand Total
+              </span>
               <span className="text-base tabular-nums">
                 {formatMoney(invoice.amountCents, invoice.currency)}
               </span>

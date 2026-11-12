@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { ExternalLink, Phone, Mail, MapPin } from "lucide-react";
 import type { InvoiceTemplateProps } from "./types";
 
@@ -135,10 +134,14 @@ export function ScarletModernTemplate({
               </p>
             )}
             {client?.phone && (
-              <p className="text-xs text-slate-600 mt-0.5">Phone: {client.phone}</p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Phone: {client.phone}
+              </p>
             )}
             {invoice.clientEmail && (
-              <p className="text-xs text-slate-600 mt-0.5">{invoice.clientEmail}</p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {invoice.clientEmail}
+              </p>
             )}
             {delivery.hasLink && (
               <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-700 font-medium">
@@ -202,7 +205,10 @@ export function ScarletModernTemplate({
                     {item.quantity}
                   </td>
                   <td className="py-3.5 px-4 text-right text-xs font-bold text-slate-900 tabular-nums align-top">
-                    {formatMoney(item.quantity * item.unitPriceCents, invoice.currency)}
+                    {formatMoney(
+                      item.quantity * item.unitPriceCents,
+                      invoice.currency,
+                    )}
                   </td>
                 </tr>
               ))}
@@ -218,16 +224,26 @@ export function ScarletModernTemplate({
               {balanceDueCents > 0 ? "Total Due" : "Amount Settled"}
             </div>
             <div className="text-[28px] font-black text-[#E5252A] tabular-nums mt-1 leading-none tracking-tight">
-              {formatMoney(balanceDueCents > 0 ? balanceDueCents : invoice.amountCents, invoice.currency)} {invoice.currency}
+              {formatMoney(
+                balanceDueCents > 0 ? balanceDueCents : invoice.amountCents,
+                invoice.currency,
+              )}{" "}
+              {invoice.currency}
             </div>
             {invoice.advanceCents ? (
               <div className="mt-2 text-xs text-slate-600 font-semibold">
-                Required Advance: <span className="font-bold text-slate-900">{formatMoney(invoice.advanceCents, invoice.currency)}</span>
+                Required Advance:{" "}
+                <span className="font-bold text-slate-900">
+                  {formatMoney(invoice.advanceCents, invoice.currency)}
+                </span>
               </div>
             ) : null}
             {paidCents > 0 ? (
               <div className="text-xs text-emerald-600 font-semibold mt-0.5">
-                Paid to date: <span className="font-bold">{formatMoney(paidCents, invoice.currency)}</span>
+                Paid to date:{" "}
+                <span className="font-bold">
+                  {formatMoney(paidCents, invoice.currency)}
+                </span>
               </div>
             ) : null}
           </div>

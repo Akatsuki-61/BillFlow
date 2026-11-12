@@ -36,7 +36,7 @@ export interface AnalyticsMonthlyTrend {
 
 /**
  * Accounting view mode:
- * - 'accrual': Evaluates financial performance based on total invoiced/billed revenue and committed vendor costs.
+ * - 'accrual': Evaluates financial performance based on total invoiced/billed revenue minus actual contractor payouts and OPEX.
  * - 'cash': Evaluates financial performance based strictly on actual cash collections received and paid vendor costs.
  */
 export type AccountingViewMode = "accrual" | "cash";
@@ -61,9 +61,9 @@ export interface AnalyticsSummaryPayload {
   /** Explicit alias for outstanding uncollected receivables in cents */
   outstandingCents: number;
 
-  /** Total committed subcontractor and vendor payables in cents */
+  /** Actual subcontractor payouts in the selected currency and period */
   totalOutsourcedCents: number;
-  /** Explicit alias for total committed contractor costs in cents */
+  /** Quoted contractor commitments for the selected invoice cohort, separate from actual payouts */
   committedCostCents: number;
 
   /** Total actual paid contractor costs in cents */
@@ -72,11 +72,11 @@ export interface AnalyticsSummaryPayload {
   /** Total general business operating expenses in cents from the expenses ledger */
   generalExpensesCents: number;
 
-  /** Total operating costs in cents (committed subcontractor costs + general expenses) */
+  /** Total operating costs in cents (actual contractor payouts + general expenses) */
   totalOperatingCostsCents: number;
 
   /**
-   * Accrual profit in cents: Billed Revenue minus Committed Contractor Costs.
+   * Accrual profit in cents: Billed revenue minus actual contractor payouts and OPEX.
    * Preserves business losses as negative integers (never clamped to zero).
    */
   accrualProfitCents: number;

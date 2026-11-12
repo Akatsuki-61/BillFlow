@@ -1,6 +1,9 @@
-import { ipcMain } from "electron";
+import { updateTask } from "./tasks";
+import { captureWorkspace } from "../workspace-session";
+
+import { ipcMain } from "../security";
 import crypto from "crypto";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   workOrders,
@@ -9,7 +12,6 @@ import {
   invoices,
   clients,
   vendorPayouts,
-  attachments,
 } from "../db/schema";
 import {
   newWorkOrderSchema,
@@ -64,7 +66,11 @@ export function listWorkOrders(filter?: {
   const allClients = db.select().from(clients).all();
   const clientMap = new Map(allClients.map((c) => [c.id, c.name]));
 
-  const allPayouts = db.select().from(vendorPayouts).all();
+  const allPayouts = db
+    .select()
+    .from(vendorPayouts)
+    .where(isNull(vendorPayouts.voidedAt))
+    .all();
   const payoutMap = new Map(allPayouts.map((p) => [p.workOrderId, p]));
 
   return query.map((wo) => {
@@ -139,7 +145,10 @@ export function createWorkOrder(
     .where(eq(vendors.id, validated.vendorId))
     .get();
   if (!vendor) {
-    throw new AppError("NOT_FOUND", `Vendor with ID ${validated.vendorId} not found.`);
+    throw new AppError(
+      "NOT_FOUND",
+      `Vendor with ID ${validated.vendorId} not found.`,
+    );
   }
 
   const task = db
@@ -148,7 +157,10 @@ export function createWorkOrder(
     .where(eq(tasks.id, validated.taskId))
     .get();
   if (!task) {
-    throw new AppError("NOT_FOUND", `Task with ID ${validated.taskId} not found.`);
+    throw new AppError(
+      "NOT_FOUND",
+      `Task with ID ${validated.taskId} not found.`,
+    );
   }
 
   const invoice = db
@@ -157,12 +169,24 @@ export function createWorkOrder(
     .where(eq(invoices.id, validated.invoiceId))
     .get();
   if (!invoice) {
-    throw new AppError("NOT_FOUND", `Invoice with ID ${validated.invoiceId} not found.`);
+    throw new AppError(
+      "NOT_FOUND",
+      `Invoice with ID ${validated.invoiceId} not found.`,
+    );
   }
 
+  if (
+    task.deletedAt ||
+    (task.invoiceId && task.invoiceId !== invoice.id) ||
+    (task.clientId && task.clientId !== invoice.clientId) ||
+    task.currency !== invoice.currency
+  )
+    throw new AppError(
+      "SOURCE_MISMATCH",
+      "Contractor work must reference the task's invoice and client.",
+    );
   const id =
-    validated.id ||
-    `wo-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+    validated.id || `wo-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 
   db.transaction(() => {
     // 1. Insert into work_orders
@@ -188,7 +212,8 @@ export function createWorkOrder(
         isOutsourced: true,
         outsourcedVendor: vendor.name,
         outsourceBudgetCents: validated.feeCents,
-        currency: validated.currency,
+        invoiceId: invoice.id,
+        clientId: invoice.clientId,
         deliveryUrl: validated.deliveryUrl || task.deliveryUrl || null,
         updatedAt: new Date().toISOString(),
       })
@@ -208,7 +233,8 @@ export function createWorkOrder(
 
   broadcastDataChanged?.();
   const created = getWorkOrder(id);
-  if (!created) throw new AppError("INTERNAL", "Failed to retrieve created work order.");
+  if (!created)
+    throw new AppError("INTERNAL", "Failed to retrieve created work order.");
   return created;
 }
 
@@ -234,13 +260,26 @@ export function updateWorkOrder(
     throw new AppError("NOT_FOUND", "Work order not found");
   }
 
+  const payout = db
+    .select()
+    .from(vendorPayouts)
+    .where(eq(vendorPayouts.workOrderId, id))
+    .get();
+  if (validated.currency && validated.currency !== existing.currency && payout)
+    throw new AppError(
+      "HAS_PAYOUT",
+      "Voucher currency cannot change after payout.",
+    );
   const updateData: Record<string, unknown> = {};
   if (validated.scope !== undefined) updateData.scope = validated.scope;
-  if (validated.feeCents !== undefined) updateData.feeCents = validated.feeCents;
-  if (validated.currency !== undefined) updateData.currency = validated.currency;
+  if (validated.feeCents !== undefined)
+    updateData.feeCents = validated.feeCents;
+  if (validated.currency !== undefined)
+    updateData.currency = validated.currency;
   if (validated.dueDate !== undefined) updateData.dueDate = validated.dueDate;
   if (validated.notes !== undefined) updateData.notes = validated.notes;
-  if (validated.deliveryUrl !== undefined) updateData.deliveryUrl = validated.deliveryUrl;
+  if (validated.deliveryUrl !== undefined)
+    updateData.deliveryUrl = validated.deliveryUrl;
 
   if (validated.status !== undefined) {
     updateData.status = validated.status;
@@ -248,14 +287,12 @@ export function updateWorkOrder(
       updateData.completedAt = new Date().toISOString();
     }
   }
-  if (validated.completedAt !== undefined) updateData.completedAt = validated.completedAt;
+  if (validated.completedAt !== undefined)
+    updateData.completedAt = validated.completedAt;
 
   db.transaction(() => {
     if (Object.keys(updateData).length > 0) {
-      db.update(workOrders)
-        .set(updateData)
-        .where(eq(workOrders.id, id))
-        .run();
+      db.update(workOrders).set(updateData).where(eq(workOrders.id, id)).run();
     }
 
     // If fee or currency changed, keep task in sync
@@ -263,8 +300,8 @@ export function updateWorkOrder(
       const taskUpdate: Record<string, unknown> = {
         updatedAt: new Date().toISOString(),
       };
-      if (validated.feeCents !== undefined) taskUpdate.outsourceBudgetCents = validated.feeCents;
-      if (validated.currency !== undefined) taskUpdate.currency = validated.currency;
+      if (validated.feeCents !== undefined)
+        taskUpdate.outsourceBudgetCents = validated.feeCents;
 
       db.update(tasks)
         .set(taskUpdate)
@@ -277,54 +314,41 @@ export function updateWorkOrder(
       const taskUpdate: Record<string, unknown> = {
         updatedAt: new Date().toISOString(),
       };
-      const finalDeliveryUrl = validated.deliveryUrl !== undefined ? validated.deliveryUrl : existing.deliveryUrl;
+      const finalDeliveryUrl =
+        validated.deliveryUrl !== undefined
+          ? validated.deliveryUrl
+          : existing.deliveryUrl;
       if (finalDeliveryUrl) {
         taskUpdate.deliveryUrl = finalDeliveryUrl;
       }
-      const targetStatus = validated.taskStatus ?? (validated.status === "done" ? "done" : validated.status === "review" ? "review" : undefined);
+      const targetStatus =
+        validated.taskStatus ??
+        (validated.status === "done"
+          ? "done"
+          : validated.status === "review"
+            ? "review"
+            : undefined);
       if (targetStatus) {
         taskUpdate.status = targetStatus;
         if (targetStatus === "done") {
           taskUpdate.completedAt = new Date().toISOString();
         }
       }
-      db.update(tasks)
-        .set(taskUpdate)
-        .where(eq(tasks.id, existing.taskId))
-        .run();
+      updateTask(existing.taskId, {
+        ...(finalDeliveryUrl ? { deliveryUrl: finalDeliveryUrl } : {}),
+        ...(targetStatus ? { status: targetStatus } : {}),
+      });
     }
 
-    // If payoutStatus was explicitly supplied (toggle action)
-    if (validated.payoutStatus) {
-      if (validated.payoutStatus === "PAID") {
-        const existingPayout = db
-          .select()
-          .from(vendorPayouts)
-          .where(eq(vendorPayouts.workOrderId, id))
-          .get();
-        if (!existingPayout) {
-          db.insert(vendorPayouts)
-            .values({
-              id: `payout-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
-              workOrderId: id,
-              amountCents: validated.feeCents ?? existing.feeCents,
-              currency: validated.currency ?? existing.currency,
-              paidAt: new Date().toISOString(),
-              requestId: crypto.randomUUID(),
-            })
-            .run();
-        }
-      } else {
-        db.delete(vendorPayouts)
-          .where(eq(vendorPayouts.workOrderId, id))
-          .run();
-      }
-    }
+    if (validated.payoutStatus === "PAID")
+      recordWorkOrderPayout({ workOrderId: id });
+    else if (validated.payoutStatus === "PENDING") removeWorkOrderPayout(id);
   });
 
   broadcastDataChanged?.();
   const updated = getWorkOrder(id);
-  if (!updated) throw new AppError("INTERNAL", "Failed to retrieve updated work order.");
+  if (!updated)
+    throw new AppError("INTERNAL", "Failed to retrieve updated work order.");
   return updated;
 }
 
@@ -368,48 +392,63 @@ export function recordWorkOrderPayout(
     throw new AppError("NOT_FOUND", "Work order not found");
   }
 
+  if (validated.currency && validated.currency !== existing.currency)
+    throw new AppError(
+      "CURRENCY_MISMATCH",
+      "Payout currency must match the voucher.",
+    );
   const existingPayout = db
     .select()
     .from(vendorPayouts)
-    .where(eq(vendorPayouts.workOrderId, validated.workOrderId))
+    .where(
+      and(
+        eq(vendorPayouts.workOrderId, validated.workOrderId),
+        isNull(vendorPayouts.voidedAt),
+      ),
+    )
     .get();
 
-  const payoutId = existingPayout
-    ? existingPayout.id
-    : `payout-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+  const amountCents =
+    validated.amountCents ?? existingPayout?.amountCents ?? existing.feeCents;
+  const paidAt =
+    validated.paidAt ?? existingPayout?.paidAt ?? new Date().toISOString();
+  if (
+    existingPayout &&
+    existingPayout.amountCents === amountCents &&
+    existingPayout.paidAt === paidAt
+  ) {
+    return getWorkOrder(validated.workOrderId)!;
+  }
+  const payoutId = `payout-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 
   db.transaction(() => {
     if (existingPayout) {
       db.update(vendorPayouts)
-        .set({
-          amountCents: validated.amountCents ?? existing.feeCents,
-          currency: validated.currency ?? existing.currency,
-          paidAt: validated.paidAt ?? new Date().toISOString(),
-        })
+        .set({ voidedAt: new Date().toISOString() })
         .where(eq(vendorPayouts.id, existingPayout.id))
         .run();
-    } else {
-      db.insert(vendorPayouts)
-        .values({
-          id: payoutId,
-          workOrderId: validated.workOrderId,
-          amountCents: validated.amountCents ?? existing.feeCents,
-          currency: validated.currency ?? existing.currency,
-          paidAt: validated.paidAt ?? new Date().toISOString(),
-          requestId: crypto.randomUUID(),
-        })
-        .run();
     }
+    db.insert(vendorPayouts)
+      .values({
+        id: payoutId,
+        workOrderId: validated.workOrderId,
+        amountCents,
+        currency: existing.currency,
+        paidAt,
+        requestId: crypto.randomUUID(),
+      })
+      .run();
   });
 
   broadcastDataChanged?.();
   const updated = getWorkOrder(validated.workOrderId);
-  if (!updated) throw new AppError("INTERNAL", "Failed to retrieve work order.");
+  if (!updated)
+    throw new AppError("INTERNAL", "Failed to retrieve work order.");
   return updated;
 }
 
 /**
- * Removes a vendor payout entry from SQLite `vendor_payouts` and any attached receipts,
+ * Voids the active vendor payout while retaining its ledger entry and attached receipts,
  * reverting payoutStatus to PENDING without modifying contractor work status.
  */
 export function removeWorkOrderPayout(
@@ -427,34 +466,34 @@ export function removeWorkOrderPayout(
   }
 
   db.transaction((tx) => {
-    // Delete any attachments associated with this payout
-    const payouts = tx
-      .select()
-      .from(vendorPayouts)
-      .where(eq(vendorPayouts.workOrderId, workOrderId))
-      .all();
-    for (const p of payouts) {
-      tx.delete(attachments).where(eq(attachments.payoutId, p.id)).run();
-    }
-    tx.delete(vendorPayouts)
-      .where(eq(vendorPayouts.workOrderId, workOrderId))
+    tx.update(vendorPayouts)
+      .set({ voidedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(vendorPayouts.workOrderId, workOrderId),
+          isNull(vendorPayouts.voidedAt),
+        ),
+      )
       .run();
   });
 
   broadcastDataChanged?.();
   const updated = getWorkOrder(workOrderId);
-  if (!updated) throw new AppError("INTERNAL", "Failed to retrieve work order.");
+  if (!updated)
+    throw new AppError("INTERNAL", "Failed to retrieve work order.");
   return updated;
 }
 
 /**
- * Toggles payout status of a work order (creates or removes a vendorPayouts ledger entry).
+ * Toggles payout status while preserving previous ledger entries.
  */
 export function setWorkOrderPayoutStatus(
   id: string,
   status: "PENDING" | "PAID",
   broadcastDataChanged?: () => void,
 ): WorkOrderItem {
+  if (status !== "PAID" && status !== "PENDING")
+    throw new AppError("INVALID_STATUS", "Select a valid payout status.");
   if (status === "PAID") {
     return recordWorkOrderPayout({ workOrderId: id }, broadcastDataChanged);
   } else {
@@ -480,23 +519,19 @@ export function removeWorkOrder(
   }
 
   db.transaction((tx) => {
-    // 1. Remove payouts and attachments
-    const payouts = tx
-      .select()
-      .from(vendorPayouts)
-      .where(eq(vendorPayouts.workOrderId, id))
-      .all();
-    for (const p of payouts) {
-      tx.delete(attachments).where(eq(attachments.payoutId, p.id)).run();
-    }
-    tx.delete(vendorPayouts)
-      .where(eq(vendorPayouts.workOrderId, id))
-      .run();
-
+    if (
+      tx
+        .select()
+        .from(vendorPayouts)
+        .where(eq(vendorPayouts.workOrderId, id))
+        .get()
+    )
+      throw new AppError(
+        "HAS_PAYOUT",
+        "Work orders with payout history cannot be deleted. Corrected settlements and receipts are retained.",
+      );
     // 2. Remove work order
-    tx.delete(workOrders)
-      .where(eq(workOrders.id, id))
-      .run();
+    tx.delete(workOrders).where(eq(workOrders.id, id)).run();
 
     // 3. Reset task outsource state
     tx.update(tasks)
@@ -518,6 +553,7 @@ export function removeWorkOrder(
  * Generates and saves a formal PDF voucher for a work order.
  */
 export async function exportWorkOrderPdf(id: string): Promise<string> {
+  const workspace = captureWorkspace();
   const wo = getWorkOrder(id);
   if (!wo) throw new AppError("NOT_FOUND", "Work order not found");
 
@@ -561,6 +597,7 @@ export async function exportWorkOrderPdf(id: string): Promise<string> {
     },
   });
 
+  workspace.assertCurrent();
   return saveWorkOrderPdf(wo.id, pdfBuffer);
 }
 
@@ -636,13 +673,16 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
     },
   );
 
-  ipcMain.handle("workOrders:removePayout", async (_event, workOrderId: string) => {
-    try {
-      return removeWorkOrderPayout(workOrderId, broadcastDataChanged);
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+  ipcMain.handle(
+    "workOrders:removePayout",
+    async (_event, workOrderId: string) => {
+      try {
+        return removeWorkOrderPayout(workOrderId, broadcastDataChanged);
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 
   ipcMain.handle(
     "workOrders:setPayoutStatus",
@@ -672,12 +712,15 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
     }
   });
 
-  ipcMain.handle("workOrders:openPdf", async (_event, filePath: string, reveal?: boolean) => {
-    try {
-      await openWorkOrderPdf(filePath, reveal);
-      return { success: true };
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+  ipcMain.handle(
+    "workOrders:openPdf",
+    async (_event, filePath: string, reveal?: boolean) => {
+      try {
+        await openWorkOrderPdf(filePath, reveal);
+        return { success: true };
+      } catch (err) {
+        throw formatError(err);
+      }
+    },
+  );
 }

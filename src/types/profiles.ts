@@ -91,6 +91,7 @@ export interface CompleteOnboardingInput {
 }
 
 export interface ProfileListResponse {
+  isLocked?: boolean;
   profiles: UserProfile[];
   activeProfileId: string;
   maxProfiles: number;

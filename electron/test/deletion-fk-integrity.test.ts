@@ -16,7 +16,12 @@ import {
   vendors,
   catalogItems,
 } from "../db/schema";
-import { createInvoice, recordPayment, removeInvoice, exportInvoicePdf } from "../ipc/invoices";
+import {
+  createInvoice,
+  recordPayment,
+  removeInvoice,
+  exportInvoicePdf,
+} from "../ipc/invoices";
 import { decideTracking, createTask } from "../ipc/tasks";
 import { copyReceipt } from "../ipc/files";
 import { updateSettings } from "../ipc/settings";
@@ -62,14 +67,15 @@ afterEach(() => {
 function createDummyReceipt(name = "slip.png"): string {
   const filePath = path.join(directory, name);
   const pngHeader = Buffer.from([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+    0x49, 0x48, 0x44, 0x52,
   ]);
   fs.writeFileSync(filePath, pngHeader);
   return filePath;
 }
 
 describe("Database Foreign Key Integrity on Deletions", () => {
-  it("deleting an invoice with payments, receipts, tasks, work orders, payouts, and expenses succeeds without FK errors", async () => {
+  it("preserves an invoice with payments, receipts, tasks, contractor payouts and expenses when deletion is requested", async () => {
     // 1. Create invoice with 2 items in LKR minor units
     const invoice = createInvoice({
       requestId: crypto.randomUUID(),
@@ -81,8 +87,16 @@ describe("Database Foreign Key Integrity on Deletions", () => {
       },
       code: "INV-2026-001",
       items: [
-        { description: "Website Development", quantity: 1, unitPriceCents: 8000000 },
-        { description: "AI Automation Consulting", quantity: 1, unitPriceCents: 2000000 },
+        {
+          description: "Website Development",
+          quantity: 1,
+          unitPriceCents: 8000000,
+        },
+        {
+          description: "AI Automation Consulting",
+          quantity: 1,
+          unitPriceCents: 2000000,
+        },
       ],
       amountCents: 9000000,
       discountCents: 1000000,
@@ -108,7 +122,11 @@ describe("Database Foreign Key Integrity on Deletions", () => {
 
     // 4. Attach payment receipt
     const receiptPath = createDummyReceipt("advance_slip.png");
-    copyReceipt({ type: "payment", id: payment.payment.id }, receiptPath, crypto.randomUUID());
+    copyReceipt(
+      { type: "payment", id: payment.payment.id },
+      receiptPath,
+      crypto.randomUUID(),
+    );
 
     // 5. Generate tasks via tracking decision
     const trackingRes = decideTracking(invoice.id, "yes");
@@ -150,7 +168,11 @@ describe("Database Foreign Key Integrity on Deletions", () => {
     expect(payout).toBeDefined();
 
     const payoutReceiptPath = createDummyReceipt("payout_slip.png");
-    copyReceipt({ type: "payout", id: payout.id }, payoutReceiptPath, crypto.randomUUID());
+    copyReceipt(
+      { type: "payout", id: payout.id },
+      payoutReceiptPath,
+      crypto.randomUUID(),
+    );
 
     // 8. Create general expense linked to this invoice
     const expense = createExpense({
@@ -173,30 +195,17 @@ describe("Database Foreign Key Integrity on Deletions", () => {
     expect(db.select().from(vendorPayouts).all()).toHaveLength(1);
     expect(db.select().from(expenses).all()).toHaveLength(1);
 
-    // 9. DELETE INVOICE - Must not throw ANY foreign key constraint error!
-    const deleteResult = removeInvoice(invoice.id);
-    expect(deleteResult).toEqual({ success: true });
-
-    // 10. Verify DB state after deletion
-    expect(db.select().from(invoices).all()).toHaveLength(0);
-    expect(db.select().from(invoicePayments).all()).toHaveLength(0);
-    expect(db.select().from(workOrders).all()).toHaveLength(0);
-    expect(db.select().from(vendorPayouts).all()).toHaveLength(0);
-    expect(db.select().from(tasks).all()).toHaveLength(0);
-    expect(db.select().from(attachments).all()).toHaveLength(0);
-
-    // Expense must be preserved with invoiceId = null
-    const remainingExpenses = db.select().from(expenses).all();
-    expect(remainingExpenses).toHaveLength(1);
-    expect(remainingExpenses[0].invoiceId).toBeNull();
-    expect(remainingExpenses[0].amountCents).toBe(500000);
-
-    // 11. Verify persistence survives restart
+    expect(() => removeInvoice(invoice.id)).toThrow(/recorded payments/);
+    expect(db.select().from(invoices).all()).toHaveLength(1);
+    expect(db.select().from(invoicePayments).all()).toHaveLength(1);
+    expect(db.select().from(workOrders).all()).toHaveLength(1);
+    expect(db.select().from(vendorPayouts).all()).toHaveLength(1);
+    expect(db.select().from(tasks).all()).toHaveLength(2);
+    expect(db.select().from(attachments).all()).toHaveLength(2);
+    expect(db.select().from(expenses).all()[0].invoiceId).toBe(invoice.id);
     closeDatabaseForTesting();
     initDatabase(databasePath);
-    const dbReloaded = getDb();
-    expect(dbReloaded.select().from(invoices).all()).toHaveLength(0);
-    expect(dbReloaded.select().from(expenses).all()).toHaveLength(1);
+    expect(getDb().select().from(invoicePayments).all()).toHaveLength(1);
   });
 
   it("deleting a client with invoices throws CLIENT_HAS_INVOICES", () => {
@@ -209,7 +218,9 @@ describe("Database Foreign Key Integrity on Deletions", () => {
         contactPerson: "Bob",
       },
       code: "INV-2026-002",
-      items: [{ description: "Consulting", quantity: 1, unitPriceCents: 50000 }],
+      items: [
+        { description: "Consulting", quantity: 1, unitPriceCents: 50000 },
+      ],
       amountCents: 50000,
       currency: "USD",
       issueDate: "2026-10-01",
@@ -217,7 +228,9 @@ describe("Database Foreign Key Integrity on Deletions", () => {
 
     expect(invoice.clientId).toBeDefined();
 
-    expect(() => removeClient(invoice.clientId!)).toThrowError(/Cannot delete client/);
+    expect(() => removeClient(invoice.clientId!)).toThrowError(
+      /Cannot delete client/,
+    );
   });
 
   it("deleting a client with tasks but no invoices unlinks tasks without FK errors", () => {
@@ -265,7 +278,11 @@ describe("Database Foreign Key Integrity on Deletions", () => {
     expect(res).toEqual({ success: true });
 
     // Client is gone
-    const clientAfter = db.select().from(clients).where(eq(clients.id, clientId)).get();
+    const clientAfter = db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, clientId))
+      .get();
     expect(clientAfter).toBeUndefined();
 
     // Task remains with clientId = null
@@ -303,6 +320,8 @@ describe("Database Foreign Key Integrity on Deletions", () => {
 
     const task = createTask({
       id: crypto.randomUUID(),
+      currency: "USD",
+      clientId: invoice.clientId,
       title: "Deploy Cluster",
       description: "Kubernetes setup",
       status: "todo",
@@ -340,7 +359,9 @@ describe("Database Foreign Key Integrity on Deletions", () => {
     const res = removeVendor(vendorId);
     expect(res).toEqual({ success: true });
 
-    expect(db.select().from(vendors).where(eq(vendors.id, vendorId)).get()).toBeUndefined();
+    expect(
+      db.select().from(vendors).where(eq(vendors.id, vendorId)).get(),
+    ).toBeUndefined();
   });
 
   it("deleting a catalog item unlinks invoices without deleting them or FK error", () => {
@@ -365,14 +386,20 @@ describe("Database Foreign Key Integrity on Deletions", () => {
         contactPerson: "Dave",
       },
       code: "INV-2026-005",
-      items: [{ description: catItem.title, quantity: 1, unitPriceCents: 150000 }],
+      items: [
+        { description: catItem.title, quantity: 1, unitPriceCents: 150000 },
+      ],
       amountCents: 150000,
       currency: "USD",
       issueDate: "2026-10-01",
     });
 
     const db = getDb();
-    const invBefore = db.select().from(invoices).where(eq(invoices.id, invoice.id)).get()!;
+    const invBefore = db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, invoice.id))
+      .get()!;
     expect(invBefore.catalogItemId).toBe(catItem.id);
 
     // Delete catalog item
@@ -380,10 +407,20 @@ describe("Database Foreign Key Integrity on Deletions", () => {
     expect(res).toEqual({ success: true });
 
     // Catalog item is deleted
-    expect(db.select().from(catalogItems).where(eq(catalogItems.id, catItem.id)).get()).toBeUndefined();
+    expect(
+      db
+        .select()
+        .from(catalogItems)
+        .where(eq(catalogItems.id, catItem.id))
+        .get(),
+    ).toBeUndefined();
 
     // Invoice still exists, but catalogItemId is nullified
-    const invAfter = db.select().from(invoices).where(eq(invoices.id, invoice.id)).get()!;
+    const invAfter = db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, invoice.id))
+      .get()!;
     expect(invAfter).toBeDefined();
     expect(invAfter.catalogItemId).toBeNull();
     expect(invAfter.code).toBe("INV-2026-005");

@@ -1,49 +1,75 @@
-import { ipcMain } from "electron";
+import { ipcMain } from "../security";
 import crypto from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { clients, invoices, tasks, vendors } from "../db/schema";
 import { newClientSchema, clientPatchSchema } from "../validation";
 import { AppError, formatError } from "./errors";
-import { ClientWithStats, NewClientInput, ClientPatchInput } from "../../src/types/billing";
+import {
+  ClientWithStats,
+  NewClientInput,
+  ClientPatchInput,
+} from "../../src/types/billing";
 
 export function listClientsWithStats(): ClientWithStats[] {
   const db = getDb();
-  const allClients = db.select().from(clients).orderBy(desc(clients.createdAt)).all();
-  const allInvoices = db.select().from(invoices).orderBy(desc(invoices.issueDate), desc(invoices.createdAt)).all();
+  const allClients = db
+    .select()
+    .from(clients)
+    .orderBy(desc(clients.createdAt))
+    .all();
+  const allInvoices = db
+    .select()
+    .from(invoices)
+    .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
+    .all();
 
+  const invoiceMap = new Map<string, typeof allInvoices>();
+  for (const invoice of allInvoices) {
+    if (!invoice.clientId) continue;
+    const list = invoiceMap.get(invoice.clientId) || [];
+    list.push(invoice);
+    invoiceMap.set(invoice.clientId, list);
+  }
   return allClients.map((c) => {
-    const clientInvoices = allInvoices.filter((inv) => inv.clientId === c.id);
-
-    let totalBilledCents = 0;
-    let totalPaidCents = 0;
-
-    for (const inv of clientInvoices) {
-      if (inv.status !== "DRAFT") {
-        totalBilledCents += inv.amountCents;
-        totalPaidCents += inv.paidCents;
+    const linked = invoiceMap.get(c.id) || [];
+    const totalsByCurrency: NonNullable<ClientWithStats["totalsByCurrency"]> =
+      {};
+    for (const invoice of linked)
+      if (invoice.status !== "DRAFT") {
+        const currency = invoice.currency as ClientWithStats["currency"];
+        const totals = (totalsByCurrency[currency] ||= {
+          billed: 0,
+          paid: 0,
+          outstanding: 0,
+        });
+        totals.billed += invoice.amountCents;
+        totals.paid += invoice.paidCents;
+        totals.outstanding += Math.max(
+          0,
+          invoice.amountCents - invoice.paidCents,
+        );
       }
-    }
-
-    const outstandingBalanceCents = Math.max(0, totalBilledCents - totalPaidCents);
-
-    const recentInvoices = clientInvoices.slice(0, 3).map((inv) => ({
-      id: inv.id,
-      code: inv.code,
-      date: inv.issueDate,
-      amountCents: inv.amountCents,
-      currency: inv.currency as ClientWithStats["currency"],
-      status: inv.status as ClientWithStats["recentInvoices"][number]["status"],
-    }));
-
+    const preferred = totalsByCurrency[
+      c.currency as ClientWithStats["currency"]
+    ] || { billed: 0, paid: 0, outstanding: 0 };
     return {
       ...c,
-      currency: c.currency as "USD" | "LKR" | "EUR",
-      totalBilledCents,
-      totalPaidCents,
-      outstandingBalanceCents,
-      invoicesCount: clientInvoices.length,
-      recentInvoices,
+      currency: c.currency as ClientWithStats["currency"],
+      totalsByCurrency,
+      totalBilledCents: preferred.billed,
+      totalPaidCents: preferred.paid,
+      outstandingBalanceCents: preferred.outstanding,
+      invoicesCount: linked.length,
+      recentInvoices: linked.slice(0, 3).map((invoice) => ({
+        id: invoice.id,
+        code: invoice.code,
+        date: invoice.issueDate,
+        amountCents: invoice.amountCents,
+        currency: invoice.currency as ClientWithStats["currency"],
+        status:
+          invoice.status as ClientWithStats["recentInvoices"][number]["status"],
+      })),
     };
   });
 }
@@ -60,13 +86,19 @@ export function removeClient(id: string): { success: boolean } {
   if (count > 0) {
     throw new AppError(
       "CLIENT_HAS_INVOICES",
-      `Cannot delete client. This client is linked to ${count} invoice${count > 1 ? "s" : ""}.`
+      `Cannot delete client. This client is linked to ${count} invoice${count > 1 ? "s" : ""}.`,
     );
   }
 
   return db.transaction((tx) => {
-    tx.update(tasks).set({ clientId: null }).where(eq(tasks.clientId, id)).run();
-    tx.update(vendors).set({ linkedClientId: null }).where(eq(vendors.linkedClientId, id)).run();
+    tx.update(tasks)
+      .set({ clientId: null })
+      .where(eq(tasks.clientId, id))
+      .run();
+    tx.update(vendors)
+      .set({ linkedClientId: null })
+      .where(eq(vendors.linkedClientId, id))
+      .run();
     tx.delete(clients).where(eq(clients.id, id)).run();
     return { success: true };
   });
@@ -121,38 +153,55 @@ export function registerClientHandlers(broadcastDataChanged: () => void) {
     }
   });
 
-  ipcMain.handle("clients:update", async (_event, id: string, patch: ClientPatchInput) => {
-    try {
-      const validated = clientPatchSchema.parse(patch);
-      const db = getDb();
+  ipcMain.handle(
+    "clients:update",
+    async (_event, id: string, patch: ClientPatchInput) => {
+      try {
+        const validated = clientPatchSchema.parse(patch);
+        const db = getDb();
 
-      const existing = db.select().from(clients).where(eq(clients.id, id)).get();
-      if (!existing) {
-        throw new AppError("NOT_FOUND", "Client not found");
+        const existing = db
+          .select()
+          .from(clients)
+          .where(eq(clients.id, id))
+          .get();
+        if (!existing) {
+          throw new AppError("NOT_FOUND", "Client not found");
+        }
+
+        db.update(clients)
+          .set({
+            ...(validated.name !== undefined && { name: validated.name }),
+            ...(validated.category !== undefined && {
+              category: validated.category,
+            }),
+            ...(validated.contactPerson !== undefined && {
+              contactPerson: validated.contactPerson,
+            }),
+            ...(validated.contactRole !== undefined && {
+              contactRole: validated.contactRole,
+            }),
+            ...(validated.email !== undefined && { email: validated.email }),
+            ...(validated.phone !== undefined && { phone: validated.phone }),
+            ...(validated.currency !== undefined && {
+              currency: validated.currency,
+            }),
+            ...(validated.driveUrl !== undefined && {
+              driveUrl: validated.driveUrl,
+            }),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(clients.id, id))
+          .run();
+
+        broadcastDataChanged();
+        const updated = listClientsWithStats().find((c) => c.id === id);
+        return updated!;
+      } catch (err) {
+        throw formatError(err);
       }
-
-      db.update(clients)
-        .set({
-          ...(validated.name !== undefined && { name: validated.name }),
-          ...(validated.category !== undefined && { category: validated.category }),
-          ...(validated.contactPerson !== undefined && { contactPerson: validated.contactPerson }),
-          ...(validated.contactRole !== undefined && { contactRole: validated.contactRole }),
-          ...(validated.email !== undefined && { email: validated.email }),
-          ...(validated.phone !== undefined && { phone: validated.phone }),
-          ...(validated.currency !== undefined && { currency: validated.currency }),
-          ...(validated.driveUrl !== undefined && { driveUrl: validated.driveUrl }),
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(clients.id, id))
-        .run();
-
-      broadcastDataChanged();
-      const updated = listClientsWithStats().find((c) => c.id === id);
-      return updated!;
-    } catch (err) {
-      throw formatError(err);
-    }
-  });
+    },
+  );
 
   ipcMain.handle("clients:remove", async (_event, id: string) => {
     try {

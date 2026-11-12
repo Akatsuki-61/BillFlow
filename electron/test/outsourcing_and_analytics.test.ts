@@ -1,9 +1,19 @@
+import { seedPayout, seedCollection } from "./financial-fixtures";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import path from "path";
 import fs from "fs";
 import os from "os";
 import { initDatabase, closeDatabaseForTesting, getDb } from "../db";
-import { clients, invoices, vendors, tasks, workOrders, vendorPayouts, attachments, expenses } from "../db/schema";
+import {
+  clients,
+  invoices,
+  vendors,
+  tasks,
+  workOrders,
+  vendorPayouts,
+  attachments,
+  expenses,
+} from "../db/schema";
 import { listVendors } from "../ipc/vendors";
 import {
   getWorkOrder,
@@ -77,7 +87,11 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       });
       expect(blankName.success).toBe(false);
       if (!blankName.success) {
-        expect(blankName.error.issues.some((i) => i.message.toLowerCase().includes("blank"))).toBe(true);
+        expect(
+          blankName.error.issues.some((i) =>
+            i.message.toLowerCase().includes("blank"),
+          ),
+        ).toBe(true);
       }
 
       // 3. Reject blank or whitespace-only service description
@@ -89,7 +103,11 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       });
       expect(blankService.success).toBe(false);
       if (!blankService.success) {
-        expect(blankService.error.issues.some((i) => i.message.toLowerCase().includes("blank"))).toBe(true);
+        expect(
+          blankService.error.issues.some((i) =>
+            i.message.toLowerCase().includes("blank"),
+          ),
+        ).toBe(true);
       }
 
       // 4. Reject invalid email without '@' sign
@@ -102,7 +120,9 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       });
       expect(invalidEmail.success).toBe(false);
       if (!invalidEmail.success) {
-        expect(invalidEmail.error.issues.some((i) => i.message.includes("@"))).toBe(true);
+        expect(
+          invalidEmail.error.issues.some((i) => i.message.includes("@")),
+        ).toBe(true);
       }
 
       // 5. Reject negative balance cents
@@ -122,18 +142,20 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
 
       // CREATE
       const vendorId = "vnd-test-crud-1";
-      db.insert(vendors).values({
-        id: vendorId,
-        name: "Quantum Logic Labs",
-        service: "AI Model Fine-Tuning",
-        balanceCents: 520000, // $5,200
-        status: "PENDING",
-        iconType: "development",
-        email: "team@quantumlogic.ai",
-        phone: "+1 (555) 234-5678",
-        payoutDueDate: "2026-11-15",
-        notes: "Milestone 1 completed",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: vendorId,
+          name: "Quantum Logic Labs",
+          service: "AI Model Fine-Tuning",
+          balanceCents: 520000, // $5,200
+          status: "PENDING",
+          iconType: "development",
+          email: "team@quantumlogic.ai",
+          phone: "+1 (555) 234-5678",
+          payoutDueDate: "2026-11-15",
+          notes: "Milestone 1 completed",
+        })
+        .run();
 
       // READ
       let allVendors = listVendors();
@@ -182,26 +204,30 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
 
       // Insert Client
       const clientId = "cli-acme-corp";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Acme Enterprises Inc.",
-        contactPerson: "Alice Johnson",
-        email: "alice@acme.com",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Acme Enterprises Inc.",
+          contactPerson: "Alice Johnson",
+          email: "alice@acme.com",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
       // Insert Vendor linked to Client
       const vendorId = "vnd-contractor-acme";
-      db.insert(vendors).values({
-        id: vendorId,
-        name: "VectorFlow UX",
-        service: "Design Retainer for Acme",
-        balanceCents: 240000, // $2,400
-        status: "PENDING",
-        iconType: "design",
-        linkedClientId: clientId,
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: vendorId,
+          name: "VectorFlow UX",
+          service: "Design Retainer for Acme",
+          balanceCents: 240000, // $2,400
+          status: "PENDING",
+          iconType: "design",
+          linkedClientId: clientId,
+        })
+        .run();
 
       const vendorList = listVendors();
       const contractor = vendorList.find((v) => v.id === vendorId);
@@ -214,32 +240,38 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       const db = getDb();
       db.delete(vendors).run();
 
-      db.insert(vendors).values({
-        id: "vnd-sum-1",
-        name: "Vendor One",
-        service: "DevOps",
-        balanceCents: 320000, // $3,200
-        status: "PENDING",
-        iconType: "devops",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: "vnd-sum-1",
+          name: "Vendor One",
+          service: "DevOps",
+          balanceCents: 320000, // $3,200
+          status: "PENDING",
+          iconType: "devops",
+        })
+        .run();
 
-      db.insert(vendors).values({
-        id: "vnd-sum-2",
-        name: "Vendor Two",
-        service: "Design",
-        balanceCents: 180000, // $1,800
-        status: "PAID",
-        iconType: "design",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: "vnd-sum-2",
+          name: "Vendor Two",
+          service: "Design",
+          balanceCents: 180000, // $1,800
+          status: "PAID",
+          iconType: "design",
+        })
+        .run();
 
-      db.insert(vendors).values({
-        id: "vnd-sum-3",
-        name: "Vendor Three",
-        service: "Legal",
-        balanceCents: 140000, // $1,400
-        status: "PENDING",
-        iconType: "legal",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: "vnd-sum-3",
+          name: "Vendor Three",
+          service: "Legal",
+          balanceCents: 140000, // $1,400
+          status: "PENDING",
+          iconType: "legal",
+        })
+        .run();
 
       const vendorItems = listVendors();
 
@@ -266,48 +298,58 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
 
       // Client
       const clientId = "cli-analytics-1";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Horizon Fintech",
-        contactPerson: "David",
-        email: "david@horizon.io",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Horizon Fintech",
+          contactPerson: "David",
+          email: "david@horizon.io",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
       // Invoices: Total $10,000 billed ($6,000 paid, $4,000 unpaid/pending)
-      db.insert(invoices).values({
-        id: "inv-an-101",
-        code: "INV-2026-101",
-        clientId,
-        amountCents: 600000, // $6,000
-        paidCents: 600000,
-        currency: "USD",
-        issueDate: "2026-10-01",
-        status: "PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-an-101",
+          code: "INV-2026-101",
+          clientId,
+          amountCents: 600000, // $6,000
+          paidCents: 600000,
+          currency: "USD",
+          issueDate: "2026-10-01",
+          status: "PAID",
+        })
+        .run();
 
-      db.insert(invoices).values({
-        id: "inv-an-102",
-        code: "INV-2026-102",
-        clientId,
-        amountCents: 400000, // $4,000
-        paidCents: 0,
-        currency: "USD",
-        issueDate: "2026-10-03",
-        status: "UNPAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-an-102",
+          code: "INV-2026-102",
+          clientId,
+          amountCents: 400000, // $4,000
+          paidCents: 0,
+          currency: "USD",
+          issueDate: "2026-10-03",
+          status: "UNPAID",
+        })
+        .run();
 
       // Subcontractors: $3,000 total outsourced cost
-      db.insert(vendors).values({
-        id: "vnd-an-101",
-        name: "Cloud Solutions",
-        service: "Cloud Hosting & DevOps",
-        balanceCents: 300000, // $3,000
-        status: "PENDING",
-        iconType: "devops",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: "vnd-an-101",
+          name: "Cloud Solutions",
+          service: "Cloud Hosting & DevOps",
+          balanceCents: 300000, // $3,000
+          status: "PENDING",
+          iconType: "devops",
+        })
+        .run();
 
+      seedPayout("inv-an-101", "vnd-an-101", 300000);
+      seedCollection("inv-an-101");
       const summary = getAnalyticsSummary();
 
       expect(summary.totalRevenueCents).toBe(1000000); // $10,000 total revenue
@@ -329,50 +371,60 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       db.delete(clients).run();
 
       const clientId = "cli-analytics-2";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Starlight Digital",
-        contactPerson: "Elena",
-        email: "elena@starlight.io",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Starlight Digital",
+          contactPerson: "Elena",
+          email: "elena@starlight.io",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
       // Overdue invoice ($2,500)
-      db.insert(invoices).values({
-        id: "inv-an-overdue",
-        code: "INV-2026-OD",
-        clientId,
-        amountCents: 250000, // $2,500
-        paidCents: 0,
-        currency: "USD",
-        issueDate: "2026-08-01",
-        dueDate: "2026-08-15", // past date
-        status: "OVERDUE",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-an-overdue",
+          code: "INV-2026-OD",
+          clientId,
+          amountCents: 250000, // $2,500
+          paidCents: 0,
+          currency: "USD",
+          issueDate: "2026-08-01",
+          dueDate: "2026-08-15", // past date
+          status: "OVERDUE",
+        })
+        .run();
 
       // Paid invoice ($7,500)
-      db.insert(invoices).values({
-        id: "inv-an-paid",
-        code: "INV-2026-OK",
-        clientId,
-        amountCents: 750000, // $7,500
-        paidCents: 750000,
-        currency: "USD",
-        issueDate: "2026-10-01",
-        status: "PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-an-paid",
+          code: "INV-2026-OK",
+          clientId,
+          amountCents: 750000, // $7,500
+          paidCents: 750000,
+          currency: "USD",
+          issueDate: "2026-10-01",
+          status: "PAID",
+        })
+        .run();
 
       // Vendor ($1,500)
-      db.insert(vendors).values({
-        id: "vnd-infra",
-        name: "Security Auditing Ltd",
-        service: "Penetration Testing",
-        balanceCents: 150000, // $1,500
-        status: "PAID",
-        iconType: "legal",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: "vnd-infra",
+          name: "Security Auditing Ltd",
+          service: "Penetration Testing",
+          balanceCents: 150000, // $1,500
+          status: "PAID",
+          iconType: "legal",
+        })
+        .run();
 
+      seedPayout("inv-an-paid", "vnd-infra", 150000);
+      seedCollection("inv-an-paid");
       const summary = getAnalyticsSummary();
 
       expect(summary.overdueCents).toBe(250000); // $2,500 overdue
@@ -385,17 +437,25 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(summary.monthlyTrends.length).toBe(6);
 
       // Now insert a task with tracked active hours (2.0 hours = 7,200,000 ms)
-      db.insert(tasks).values({
-        id: "task-test-hourly",
-        title: "Penetration Testing Review",
-        status: "in-progress",
-        priority: "medium",
-        category: "Development",
-        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
-        createdAt: "2026-10-01",
-        updatedAt: "2026-10-01",
-        activeMilliseconds: 7200000,
-      }).run();
+      db.insert(tasks)
+        .values({
+          currency: "USD",
+          id: "task-test-hourly",
+          title: "Penetration Testing Review",
+          status: "in-progress",
+          priority: "medium",
+          category: "Development",
+          assignee: {
+            name: "Chethaka",
+            avatarLetter: "C",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+          },
+          createdAt: "2026-10-01",
+          updatedAt: "2026-10-01",
+          activeMilliseconds: 7200000,
+        })
+        .run();
 
       const summaryWithHours = getAnalyticsSummary();
       // Net profit = $10,000 revenue - $1,500 vendor = $8,500 net profit
@@ -423,28 +483,33 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
 
       // 2. Invoice with ADVANCE_PAID status
       const clientId = "cli-adv-test";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Acme Logistics",
-        contactPerson: "Alice",
-        email: "alice@acme.io",
-        currency: "LKR",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Acme Logistics",
+          contactPerson: "Alice",
+          email: "alice@acme.io",
+          currency: "LKR",
+          hasQuickBill: true,
+        })
+        .run();
 
       // Total 90,000 LKR invoice with 45,000 LKR advance recorded
-      db.insert(invoices).values({
-        id: "inv-adv-1",
-        code: "INV-2026-ADV",
-        clientId,
-        amountCents: 9000000, // 90,000.00
-        paidCents: 4500000, // 45,000.00 advance received
-        currency: "LKR",
-        issueDate: "2026-10-06",
-        status: "ADVANCE_PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-adv-1",
+          code: "INV-2026-ADV",
+          clientId,
+          amountCents: 9000000, // 90,000.00
+          paidCents: 4500000, // 45,000.00 advance received
+          currency: "LKR",
+          issueDate: "2026-10-06",
+          status: "ADVANCE_PAID",
+        })
+        .run();
 
-      const advanceSummary = getAnalyticsSummary();
+      seedCollection("inv-adv-1");
+      const advanceSummary = getAnalyticsSummary("all", "LKR");
       expect(advanceSummary.totalRevenueCents).toBe(9000000);
       expect(advanceSummary.paidCents).toBe(4500000); // Actually counted in paidCents
       expect(advanceSummary.pendingReceivablesCents).toBe(4500000); // 45,000 remaining due
@@ -452,30 +517,34 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(advanceSummary.unpaidCount).toBe(1); // 1 invoice with remaining balance
     });
 
-    it("dynamically recalculates metrics when outsourcing vendors change", () => {
+    it("changes profit only when contractor payouts are recorded, independently of vendor balances", () => {
       const db = getDb();
       db.delete(invoices).run();
       db.delete(vendors).run();
       db.delete(clients).run();
 
-      db.insert(clients).values({
-        id: "cli-dyn",
-        name: "Omni Labs",
-        contactPerson: "Sam",
-        email: "sam@omni.com",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: "cli-dyn",
+          name: "Omni Labs",
+          contactPerson: "Sam",
+          email: "sam@omni.com",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
-      db.insert(invoices).values({
-        id: "inv-dyn-1",
-        code: "INV-DYN-1",
-        clientId: "cli-dyn",
-        amountCents: 1000000, // $10,000
-        currency: "USD",
-        issueDate: "2026-10-05",
-        status: "PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-dyn-1",
+          code: "INV-DYN-1",
+          clientId: "cli-dyn",
+          amountCents: 1000000, // $10,000
+          currency: "USD",
+          issueDate: "2026-10-05",
+          status: "PAID",
+        })
+        .run();
 
       // Initial state: 0 vendors -> 100% margin
       let summary = getAnalyticsSummary();
@@ -484,15 +553,21 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(summary.marginPct).toBe(100);
 
       // Add Subcontractor $4,000
-      db.insert(vendors).values({
-        id: "vnd-dyn-1",
-        name: "FrontEnd Wizards",
-        service: "Web UI Components",
-        balanceCents: 400000,
-        status: "PENDING",
-        iconType: "development",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: "vnd-dyn-1",
+          name: "FrontEnd Wizards",
+          service: "Web UI Components",
+          balanceCents: 400000,
+          status: "PENDING",
+          iconType: "development",
+        })
+        .run();
 
+      summary = getAnalyticsSummary();
+      expect(summary.totalOutsourcedCents).toBe(0);
+      expect(summary.netProfitCents).toBe(1000000);
+      seedPayout("inv-dyn-1", "vnd-dyn-1", 400000);
       summary = getAnalyticsSummary();
       expect(summary.totalOutsourcedCents).toBe(400000);
       expect(summary.netProfitCents).toBe(600000); // $6,000 net profit
@@ -509,25 +584,29 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       db.delete(clients).run();
 
       // Setup client
-      db.insert(clients).values({
-        id: "cli-curr",
-        name: "Global Tech Inc.",
-        contactPerson: "Elena Rostova",
-        email: "elena@globaltech.com",
-        currency: "USD",
-        hasQuickBill: true,
-      }).run();
+      db.insert(clients)
+        .values({
+          id: "cli-curr",
+          name: "Global Tech Inc.",
+          contactPerson: "Elena Rostova",
+          email: "elena@globaltech.com",
+          currency: "USD",
+          hasQuickBill: true,
+        })
+        .run();
 
       // Initial invoice with USD
-      db.insert(invoices).values({
-        id: "inv-curr-1",
-        code: "INV-2026-001",
-        clientId: "cli-curr",
-        amountCents: 500000, // $5,000
-        currency: "USD",
-        issueDate: "2026-10-01",
-        status: "UNPAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-curr-1",
+          code: "INV-2026-001",
+          clientId: "cli-curr",
+          amountCents: 500000, // $5,000
+          currency: "USD",
+          issueDate: "2026-10-01",
+          status: "UNPAID",
+        })
+        .run();
 
       let currentInvoices = db.select().from(invoices).all();
       let activeCurrency = getActiveInvoiceCurrency(currentInvoices);
@@ -696,51 +775,64 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
 
       // Seed client, invoice, task, and vendor
       const clientId = "cli-sep-1";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Lanka Digital Media",
-        contactPerson: "Nimal Perera",
-        email: "nimal@lankamedia.lk",
-        currency: "LKR",
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Lanka Digital Media",
+          contactPerson: "Nimal Perera",
+          email: "nimal@lankamedia.lk",
+          currency: "LKR",
+        })
+        .run();
 
       const invoiceId = "inv-sep-1";
-      db.insert(invoices).values({
-        id: invoiceId,
-        code: "INV-2026-001",
-        clientId,
-        amountCents: 9000000, // 90,000 LKR
-        currency: "LKR",
-        issueDate: "2026-10-06",
-        status: "ADVANCE_PAID",
-        paidCents: 4500000,
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: invoiceId,
+          code: "INV-2026-001",
+          clientId,
+          amountCents: 9000000, // 90,000 LKR
+          currency: "LKR",
+          issueDate: "2026-10-06",
+          status: "ADVANCE_PAID",
+          paidCents: 4500000,
+        })
+        .run();
 
       const taskId = "task-sep-1";
-      db.insert(tasks).values({
-        id: taskId,
-        title: "Business website development",
-        clientId,
-        clientName: "Lanka Digital Media",
-        invoiceId,
-        status: "todo",
-        priority: "high",
-        category: "Development",
-        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }).run();
+      db.insert(tasks)
+        .values({
+          id: taskId,
+          title: "Business website development",
+          clientId,
+          clientName: "Lanka Digital Media",
+          invoiceId,
+          status: "todo",
+          priority: "high",
+          category: "Development",
+          assignee: {
+            name: "Chethaka",
+            avatarLetter: "C",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .run();
 
       const vendorId = "vnd-sep-1";
-      db.insert(vendors).values({
-        id: vendorId,
-        name: "Kasun Silva",
-        service: "Frontend Web Development",
-        email: "kasun@webcraft.lk",
-        balanceCents: 0,
-        status: "PENDING",
-        iconType: "development",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: vendorId,
+          name: "Kasun Silva",
+          service: "Frontend Web Development",
+          email: "kasun@webcraft.lk",
+          balanceCents: 0,
+          status: "PENDING",
+          iconType: "development",
+        })
+        .run();
 
       // 1. Create work order: initially "todo" and payoutStatus is "PENDING"
       const createdWo = createWorkOrder({
@@ -761,7 +853,9 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(createdWo.notes).toBeNull();
 
       // 2. Contractor starts work: status -> "in-progress"
-      const inProgressWo = updateWorkOrder(createdWo.id, { status: "in-progress" });
+      const inProgressWo = updateWorkOrder(createdWo.id, {
+        status: "in-progress",
+      });
       expect(inProgressWo.status).toBe("in-progress");
       expect(inProgressWo.payoutStatus).toBe("PENDING"); // Still unpaid
 
@@ -785,7 +879,11 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(doneWo.payoutId).toBeNull();
 
       // Check SQLite table directly: no vendor payout records exist
-      const existingPayouts = db.select().from(vendorPayouts).where(eq(vendorPayouts.workOrderId, createdWo.id)).all();
+      const existingPayouts = db
+        .select()
+        .from(vendorPayouts)
+        .where(eq(vendorPayouts.workOrderId, createdWo.id))
+        .all();
       expect(existingPayouts.length).toBe(0);
     });
 
@@ -799,48 +897,61 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       db.delete(clients).run();
 
       const clientId = "cli-rev-1";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Apex Consulting",
-        contactPerson: "Kamal Gunaratne",
-        email: "kamal@apex.lk",
-        currency: "LKR",
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Apex Consulting",
+          contactPerson: "Kamal Gunaratne",
+          email: "kamal@apex.lk",
+          currency: "LKR",
+        })
+        .run();
 
       const invoiceId = "inv-rev-1";
-      db.insert(invoices).values({
-        id: invoiceId,
-        code: "INV-2026-002",
-        clientId,
-        amountCents: 8000000,
-        currency: "LKR",
-        issueDate: "2026-10-06",
-        status: "ADVANCE_PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: invoiceId,
+          code: "INV-2026-002",
+          clientId,
+          amountCents: 8000000,
+          currency: "LKR",
+          issueDate: "2026-10-06",
+          status: "ADVANCE_PAID",
+        })
+        .run();
 
       const taskId = "task-rev-1";
-      db.insert(tasks).values({
-        id: taskId,
-        title: "Frontend Development Retainer",
-        clientId,
-        clientName: "Apex Consulting",
-        invoiceId,
-        status: "in-progress",
-        priority: "medium",
-        category: "Development",
-        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }).run();
+      db.insert(tasks)
+        .values({
+          id: taskId,
+          title: "Frontend Development Retainer",
+          clientId,
+          clientName: "Apex Consulting",
+          invoiceId,
+          status: "in-progress",
+          priority: "medium",
+          category: "Development",
+          assignee: {
+            name: "Chethaka",
+            avatarLetter: "C",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .run();
 
       const vendorId = "vnd-rev-1";
-      db.insert(vendors).values({
-        id: vendorId,
-        name: "DevStudio Lanka",
-        service: "Web Engineering",
-        balanceCents: 0,
-        status: "PENDING",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: vendorId,
+          name: "DevStudio Lanka",
+          service: "Web Engineering",
+          balanceCents: 0,
+          status: "PENDING",
+        })
+        .run();
 
       const wo = createWorkOrder({
         vendorId,
@@ -854,7 +965,8 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
 
       // Call reviewWorkOrder with updateTask: true
       const deliverableUrl = "https://github.com/apex-consulting/web-build";
-      const reviewNotes = "Approved PR #14 with verified unit tests and responsive layout.";
+      const reviewNotes =
+        "Approved PR #14 with verified unit tests and responsive layout.";
       const reviewedWo = reviewWorkOrder({
         workOrderId: wo.id,
         status: "done",
@@ -870,7 +982,11 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(reviewedWo.completedAt).toBeDefined();
 
       // 2. Verify original task was updated with delivery URL, status done, and completedAt timestamp
-      const originalTask = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+      const originalTask = db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .get();
       expect(originalTask).toBeDefined();
       expect(originalTask?.status).toBe("done");
       expect(originalTask?.deliveryUrl).toBe(deliverableUrl);
@@ -888,47 +1004,60 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       db.delete(clients).run();
 
       const clientId = "cli-pay-1";
-      db.insert(clients).values({
-        id: clientId,
-        name: "FinTech Ventures",
-        contactPerson: "Dilshan Silva",
-        email: "dilshan@fintech.lk",
-        currency: "LKR",
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "FinTech Ventures",
+          contactPerson: "Dilshan Silva",
+          email: "dilshan@fintech.lk",
+          currency: "LKR",
+        })
+        .run();
 
       const invoiceId = "inv-pay-1";
-      db.insert(invoices).values({
-        id: invoiceId,
-        code: "INV-2026-003",
-        clientId,
-        amountCents: 5000000,
-        currency: "LKR",
-        issueDate: "2026-10-06",
-        status: "PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: invoiceId,
+          code: "INV-2026-003",
+          clientId,
+          amountCents: 5000000,
+          currency: "LKR",
+          issueDate: "2026-10-06",
+          status: "PAID",
+        })
+        .run();
 
       const taskId = "task-pay-1";
-      db.insert(tasks).values({
-        id: taskId,
-        title: "API Integration Module",
-        clientId,
-        invoiceId,
-        status: "done",
-        priority: "medium",
-        category: "Development",
-        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }).run();
+      db.insert(tasks)
+        .values({
+          id: taskId,
+          title: "API Integration Module",
+          clientId,
+          invoiceId,
+          status: "done",
+          priority: "medium",
+          category: "Development",
+          assignee: {
+            name: "Chethaka",
+            avatarLetter: "C",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .run();
 
       const vendorId = "vnd-pay-1";
-      db.insert(vendors).values({
-        id: vendorId,
-        name: "CloudForge Labs",
-        service: "Backend Systems",
-        balanceCents: 0,
-        status: "PENDING",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: vendorId,
+          name: "CloudForge Labs",
+          service: "Backend Systems",
+          balanceCents: 0,
+          status: "PENDING",
+        })
+        .run();
 
       // Create completed work order
       const wo = createWorkOrder({
@@ -965,22 +1094,29 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
 
       // 2. Attach payment confirmation receipt slip to the payout
       const payoutId = paidWo.payoutId!;
-      db.insert(attachments).values({
-        id: "att-slip-101",
-        payoutId,
-        originalName: "bank_slip_oct6.pdf",
-        storedName: "stored_bank_slip.pdf",
-        mimeType: "application/pdf",
-        sizeBytes: 102400,
-        sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        createdAt: new Date().toISOString(),
-      }).run();
+      db.insert(attachments)
+        .values({
+          id: "att-slip-101",
+          payoutId,
+          originalName: "bank_slip_oct6.pdf",
+          storedName: "stored_bank_slip.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 102400,
+          sha256:
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          createdAt: new Date().toISOString(),
+        })
+        .run();
 
-      const attachedReceipts = db.select().from(attachments).where(eq(attachments.payoutId, payoutId)).all();
+      const attachedReceipts = db
+        .select()
+        .from(attachments)
+        .where(eq(attachments.payoutId, payoutId))
+        .all();
       expect(attachedReceipts.length).toBe(1);
       expect(attachedReceipts[0].originalName).toBe("bank_slip_oct6.pdf");
 
-      // 3. Remove payout entry: reverts payoutStatus to PENDING and cleans up receipt attachments
+      // 3. Void the payout: pending settlement, with ledger history and receipts retained.
       const revertedWo = removeWorkOrderPayout(wo.id);
       expect(revertedWo.payoutStatus).toBe("PENDING");
       expect(revertedWo.payoutId).toBeNull();
@@ -989,9 +1125,20 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(revertedWo.deliveryUrl).toBe("https://api.fintech.lk/v1");
       expect(revertedWo.notes).toBe("All endpoints passing integration tests.");
 
-      // Check SQLite table: receipt attachment was cleanly removed
-      const remainingReceipts = db.select().from(attachments).where(eq(attachments.payoutId, payoutId)).all();
-      expect(remainingReceipts.length).toBe(0);
+      // Correcting a payout preserves the receipt and marks the historical ledger row void.
+      const remainingReceipts = db
+        .select()
+        .from(attachments)
+        .where(eq(attachments.payoutId, payoutId))
+        .all();
+      expect(remainingReceipts.length).toBe(1);
+      expect(
+        db
+          .select()
+          .from(vendorPayouts)
+          .where(eq(vendorPayouts.id, payoutId))
+          .get()?.voidedAt,
+      ).toBeTruthy();
     });
 
     it("persists deliverable URL, review notes, and independent payout state across database restart", () => {
@@ -1004,47 +1151,60 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       db.delete(clients).run();
 
       const clientId = "cli-rst-1";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Colombo Cloud Tech",
-        contactPerson: "Kavinda Fernando",
-        email: "kavinda@colombocloud.lk",
-        currency: "LKR",
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Colombo Cloud Tech",
+          contactPerson: "Kavinda Fernando",
+          email: "kavinda@colombocloud.lk",
+          currency: "LKR",
+        })
+        .run();
 
       const invoiceId = "inv-rst-1";
-      db.insert(invoices).values({
-        id: invoiceId,
-        code: "INV-2026-RST",
-        clientId,
-        amountCents: 10000000,
-        currency: "LKR",
-        issueDate: "2026-10-06",
-        status: "ADVANCE_PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: invoiceId,
+          code: "INV-2026-RST",
+          clientId,
+          amountCents: 10000000,
+          currency: "LKR",
+          issueDate: "2026-10-06",
+          status: "ADVANCE_PAID",
+        })
+        .run();
 
       const taskId = "task-rst-1";
-      db.insert(tasks).values({
-        id: taskId,
-        title: "Docker & CI/CD Pipeline Setup",
-        clientId,
-        invoiceId,
-        status: "in-progress",
-        priority: "high",
-        category: "Development",
-        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }).run();
+      db.insert(tasks)
+        .values({
+          id: taskId,
+          title: "Docker & CI/CD Pipeline Setup",
+          clientId,
+          invoiceId,
+          status: "in-progress",
+          priority: "high",
+          category: "Development",
+          assignee: {
+            name: "Chethaka",
+            avatarLetter: "C",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .run();
 
       const vendorId = "vnd-rst-1";
-      db.insert(vendors).values({
-        id: vendorId,
-        name: "DevOps Global",
-        service: "Infrastructure Automation",
-        balanceCents: 0,
-        status: "PENDING",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: vendorId,
+          name: "DevOps Global",
+          service: "Infrastructure Automation",
+          balanceCents: 0,
+          status: "PENDING",
+        })
+        .run();
 
       const createdWo = createWorkOrder({
         vendorId,
@@ -1081,8 +1241,12 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       const restoredWo = getWorkOrder(createdWo.id);
       expect(restoredWo).toBeDefined();
       expect(restoredWo?.status).toBe("done");
-      expect(restoredWo?.deliveryUrl).toBe("https://github.com/Chethaka/devops-pipeline");
-      expect(restoredWo?.notes).toBe("Pipelines green. Automated deployment tested on staging.");
+      expect(restoredWo?.deliveryUrl).toBe(
+        "https://github.com/Chethaka/devops-pipeline",
+      );
+      expect(restoredWo?.notes).toBe(
+        "Pipelines green. Automated deployment tested on staging.",
+      );
       expect(restoredWo?.payoutStatus).toBe("PAID");
       expect(restoredWo?.payoutAmountCents).toBe(3500000);
       expect(restoredWo?.vendorName).toBe("DevOps Global");
@@ -1090,10 +1254,16 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
 
       // Verify task in SQLite also retained its delivery URL and done status across restart
       const reloadedDb = getDb();
-      const restoredTask = reloadedDb.select().from(tasks).where(eq(tasks.id, taskId)).get();
+      const restoredTask = reloadedDb
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .get();
       expect(restoredTask).toBeDefined();
       expect(restoredTask?.status).toBe("done");
-      expect(restoredTask?.deliveryUrl).toBe("https://github.com/Chethaka/devops-pipeline");
+      expect(restoredTask?.deliveryUrl).toBe(
+        "https://github.com/Chethaka/devops-pipeline",
+      );
       expect(restoredTask?.completedAt).toBeDefined();
     });
 
@@ -1107,38 +1277,46 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       db.delete(expenses).run();
 
       // 1. Client Invoice: 90,000 LKR paid
-      db.insert(invoices).values({
-        id: "inv-demo-90k",
-        code: "INV-2026-001",
-        title: "Website & AI Consulting Sprint",
-        amountCents: 9000000,
-        paidCents: 9000000,
-        currency: "LKR",
-        issueDate: "2026-10-01",
-        status: "PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: "inv-demo-90k",
+          code: "INV-2026-001",
+          title: "Website & AI Consulting Sprint",
+          amountCents: 9000000,
+          paidCents: 9000000,
+          currency: "LKR",
+          issueDate: "2026-10-01",
+          status: "PAID",
+        })
+        .run();
 
       // 2. Subcontractor Vendor: 30,000 LKR paid
-      db.insert(vendors).values({
-        id: "ven-demo-30k",
-        name: "External Developer",
-        service: "Website Implementation",
-        balanceCents: 3000000,
-        status: "PAID",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: "ven-demo-30k",
+          name: "External Developer",
+          service: "Website Implementation",
+          balanceCents: 3000000,
+          status: "PAID",
+        })
+        .run();
 
       // 3. General Business Expense: 5,000 LKR (e.g. software/hosting)
-      db.insert(expenses).values({
-        id: "exp-demo-5k",
-        merchant: "Hosting & AI Tools",
-        description: "Cloud hosting and AI tokens",
-        category: "SOFTWARE",
-        amountCents: 500000,
-        currency: "LKR",
-        incurredAt: "2026-10-02",
-        deductible: true,
-      }).run();
+      db.insert(expenses)
+        .values({
+          id: "exp-demo-5k",
+          merchant: "Hosting & AI Tools",
+          description: "Cloud hosting and AI tokens",
+          category: "SOFTWARE",
+          amountCents: 500000,
+          currency: "LKR",
+          incurredAt: "2026-10-02",
+          deductible: true,
+        })
+        .run();
 
+      seedPayout("inv-demo-90k", "ven-demo-30k", 3000000);
+      seedCollection("inv-demo-90k");
       const summary = getAnalyticsSummary("all", "LKR", "accrual");
 
       // Billed: 90,000 LKR
@@ -1183,55 +1361,69 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       });
 
       const clientId = "cli-pdf-1";
-      db.insert(clients).values({
-        id: clientId,
-        name: "Lanka Retail Systems",
-        contactPerson: "Nimal Perera",
-        email: "nimal@lankaretail.lk",
-        currency: "LKR",
-      }).run();
+      db.insert(clients)
+        .values({
+          id: clientId,
+          name: "Lanka Retail Systems",
+          contactPerson: "Nimal Perera",
+          email: "nimal@lankaretail.lk",
+          currency: "LKR",
+        })
+        .run();
 
       const invoiceId = "inv-pdf-1";
-      db.insert(invoices).values({
-        id: invoiceId,
-        code: "INV-2026-PDF",
-        clientId,
-        amountCents: 9000000,
-        currency: "LKR",
-        issueDate: "2026-10-01",
-        status: "ADVANCE_PAID",
-      }).run();
+      db.insert(invoices)
+        .values({
+          id: invoiceId,
+          code: "INV-2026-PDF",
+          clientId,
+          amountCents: 9000000,
+          currency: "LKR",
+          issueDate: "2026-10-01",
+          status: "ADVANCE_PAID",
+        })
+        .run();
 
       const taskId = "task-pdf-1";
-      db.insert(tasks).values({
-        id: taskId,
-        title: "Business Website Development",
-        clientId,
-        invoiceId,
-        status: "in-progress",
-        priority: "high",
-        category: "Development",
-        assignee: { name: "Chethaka", avatarLetter: "C", bgColor: "#7c3aed", textColor: "#ffffff" },
-        createdAt: "2026-10-02T10:00:00Z",
-        updatedAt: "2026-10-02T10:00:00Z",
-      }).run();
+      db.insert(tasks)
+        .values({
+          id: taskId,
+          title: "Business Website Development",
+          clientId,
+          invoiceId,
+          status: "in-progress",
+          priority: "high",
+          category: "Development",
+          assignee: {
+            name: "Chethaka",
+            avatarLetter: "C",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+          },
+          createdAt: "2026-10-02T10:00:00Z",
+          updatedAt: "2026-10-02T10:00:00Z",
+        })
+        .run();
 
       const vendorId = "vnd-pdf-1";
-      db.insert(vendors).values({
-        id: vendorId,
-        name: "Kasun Jayasuriya",
-        service: "Frontend Engineering",
-        email: "kasun@webcraft.lk",
-        phone: "+94 71 987 6543",
-        balanceCents: 3000000,
-        status: "PENDING",
-      }).run();
+      db.insert(vendors)
+        .values({
+          id: vendorId,
+          name: "Kasun Jayasuriya",
+          service: "Frontend Engineering",
+          email: "kasun@webcraft.lk",
+          phone: "+94 71 987 6543",
+          balanceCents: 3000000,
+          status: "PENDING",
+        })
+        .run();
 
       const createdWo = createWorkOrder({
         vendorId,
         taskId,
         invoiceId,
-        scope: "Responsive Next.js landing page with Tailwind and dynamic contact inquiry form",
+        scope:
+          "Responsive Next.js landing page with Tailwind and dynamic contact inquiry form",
         feeCents: 3000000, // 30,000 LKR
         currency: "LKR",
         dueDate: "2026-10-15",
@@ -1285,9 +1477,9 @@ describe("Outsourcing & Analytics Pages Test Suite", () => {
       expect(savedBytes.length).toBeGreaterThan(1000);
 
       // 3. Rejection on non-PDF bytes in saveWorkOrderPdf
-      expect(() => saveWorkOrderPdf(createdWo.id, Buffer.from("invalid-binary-data"))).toThrow(
-        "Voucher exporter did not produce a PDF."
-      );
+      expect(() =>
+        saveWorkOrderPdf(createdWo.id, Buffer.from("invalid-binary-data")),
+      ).toThrow("Voucher exporter did not produce a PDF.");
     });
   });
 });

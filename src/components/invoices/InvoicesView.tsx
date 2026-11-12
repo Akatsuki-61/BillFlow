@@ -1,5 +1,7 @@
 "use client";
 
+import { profileStorageKey } from "@/lib/profile-scope";
+
 import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
@@ -78,11 +80,7 @@ import "./invoices.css";
 import InvoiceDocumentSheet from "./InvoiceDocumentSheet";
 
 type FilterTab =
-  | "All Invoices"
-  | "Advance Paid"
-  | "Drafts"
-  | "Overdue"
-  | "Paid";
+  "All Invoices" | "Advance Paid" | "Drafts" | "Overdue" | "Paid";
 
 interface LineItemDraft {
   id: string;
@@ -126,13 +124,8 @@ export default function InvoicesView() {
   const { clients } = useClients();
   const { catalogItems } = useCatalog();
   const { settings } = useSettings();
-  const {
-    tasks,
-    workflow,
-    activeCurrency,
-    getUnbilledCompletedTasks,
-    linkTasksToInvoice,
-  } = useData();
+  const { tasks, workflow, activeCurrency, getUnbilledCompletedTasks } =
+    useData();
 
   const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
   const [clientName, setClientName] = useState("");
@@ -156,7 +149,8 @@ export default function InvoicesView() {
   >(null);
 
   // Document Design Preview Sheet Modal
-  const [previewInvoice, setPreviewInvoice] = useState<InvoiceWithClient | null>(null);
+  const [previewInvoice, setPreviewInvoice] =
+    useState<InvoiceWithClient | null>(null);
 
   const getSampleInvoice = (): InvoiceWithClient => ({
     id: "sample-preview",
@@ -173,7 +167,8 @@ export default function InvoicesView() {
     paidCents: 4500000,
     taxCents: 0,
     discountCents: 1000000,
-    notes: "Milestone 1 (Website staging) begins upon advance receipt. Full code and deployment upon final settlement.",
+    notes:
+      "Milestone 1 (Website staging) begins upon advance receipt. Full code and deployment upon final settlement.",
     deliveryUrl: "https://github.com/Chethaka/acme-web-platform",
     items: [
       {
@@ -340,7 +335,9 @@ export default function InvoicesView() {
   const viewParam = searchParams.get("view");
   const summaryParam = searchParams.get("summary");
   const overdueQueryKey = `${viewParam ?? ""}:${summaryParam ?? ""}`;
-  const [prevOverdueQueryKey, setPrevOverdueQueryKey] = useState<string | null>(null);
+  const [prevOverdueQueryKey, setPrevOverdueQueryKey] = useState<string | null>(
+    null,
+  );
   if (prevOverdueQueryKey !== overdueQueryKey) {
     setPrevOverdueQueryKey(overdueQueryKey);
     if (viewParam === "overdue-summary" || summaryParam === "overdue") {
@@ -412,7 +409,9 @@ export default function InvoicesView() {
             includeSummaryRow: true,
           });
           downloadCsvFile(`invoices-all-${todayStr}.csv`, csv);
-          showToast(`Exported all ${allInvoices.length} invoices to CSV (.csv).`);
+          showToast(
+            `Exported all ${allInvoices.length} invoices to CSV (.csv).`,
+          );
         }
       } else {
         if (isExcel) {
@@ -477,9 +476,17 @@ export default function InvoicesView() {
     invoiceHighlightParam && previewParam === "1"
       ? allInvoices.find((inv) => inv.id === invoiceHighlightParam)
       : undefined;
-  const previewQueryKey = previewTargetInv ? `${invoiceHighlightParam}:${previewParam}` : null;
-  const [prevPreviewQueryKey, setPrevPreviewQueryKey] = useState<string | null>(null);
-  if (previewQueryKey && prevPreviewQueryKey !== previewQueryKey && previewTargetInv) {
+  const previewQueryKey = previewTargetInv
+    ? `${invoiceHighlightParam}:${previewParam}`
+    : null;
+  const [prevPreviewQueryKey, setPrevPreviewQueryKey] = useState<string | null>(
+    null,
+  );
+  if (
+    previewQueryKey &&
+    prevPreviewQueryKey !== previewQueryKey &&
+    previewTargetInv
+  ) {
     setPrevPreviewQueryKey(previewQueryKey);
     setPreviewInvoice(previewTargetInv);
   }
@@ -533,9 +540,7 @@ export default function InvoicesView() {
     const defaultDueStr = due.toISOString().slice(0, 10);
 
     // Pre-populate client from first task with a clientId or clientName
-    const taskWithClient = matchedTasks.find(
-      (t) => t.clientId || t.clientName,
-    );
+    const taskWithClient = matchedTasks.find((t) => t.clientId || t.clientName);
     const matchedClient = taskWithClient
       ? clients.find(
           (c) =>
@@ -572,7 +577,7 @@ export default function InvoicesView() {
       if (matchedClient) {
         setClientMode("existing");
         setNewClientId(matchedClient.id);
-        setNewCurrency(matchedClient.currency);
+        setNewCurrency(taskWithClient?.currency || matchedClient.currency);
         if (matchedClient.driveUrl) {
           setNewDeliveryUrl(matchedClient.driveUrl);
         }
@@ -591,9 +596,7 @@ export default function InvoicesView() {
     void getNextInvoiceCode()
       .then((code) => setNewCode((prev) => prev || code))
       .catch(() =>
-        setNewCode(
-          (prev) => prev || `INV-${new Date().getFullYear()}-001`,
-        ),
+        setNewCode((prev) => prev || `INV-${new Date().getFullYear()}-001`),
       );
   }, [
     importTaskIdsParam,
@@ -639,21 +642,26 @@ export default function InvoicesView() {
       newNotes,
     };
     try {
-      localStorage.setItem("billflow_draft_invoice", JSON.stringify(draft));
+      localStorage.setItem(
+        profileStorageKey("billflow_draft_invoice"),
+        JSON.stringify(draft),
+      );
       setHasInvoiceDraft(true);
     } catch {}
   };
 
   const clearInvoiceDraft = () => {
     try {
-      localStorage.removeItem("billflow_draft_invoice");
+      localStorage.removeItem(profileStorageKey("billflow_draft_invoice"));
     } catch {}
     setHasInvoiceDraft(false);
   };
 
   const handleRestoreInvoiceDraft = () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_invoice");
+      const saved = localStorage.getItem(
+        profileStorageKey("billflow_draft_invoice"),
+      );
       if (!saved) return;
       const draft = JSON.parse(saved);
       if (draft.clientMode !== undefined) setClientMode(draft.clientMode);
@@ -778,7 +786,9 @@ export default function InvoicesView() {
     }
 
     try {
-      const saved = localStorage.getItem("billflow_draft_invoice");
+      const saved = localStorage.getItem(
+        profileStorageKey("billflow_draft_invoice"),
+      );
       setHasInvoiceDraft(Boolean(saved));
     } catch {
       setHasInvoiceDraft(false);
@@ -1300,9 +1310,18 @@ export default function InvoicesView() {
     alreadyDraftedTaskIds,
   ]);
 
-  const displayedImportTasks = importTasksShowAllClients
-    ? allUnbilledTasks
-    : clientFilteredUnbilledTasks;
+  const taskBillingGroup = (task: TaskItem) =>
+    `${task.clientId || task.clientName?.trim().toLowerCase() || "unassigned"}:${task.currency || newCurrency}`;
+  const selectedAnchor = allUnbilledTasks.find((task) =>
+    selectedImportTaskIds.includes(task.id),
+  );
+  const displayedImportTasks = (
+    importTasksShowAllClients ? allUnbilledTasks : clientFilteredUnbilledTasks
+  ).filter(
+    (task) =>
+      !selectedAnchor ||
+      taskBillingGroup(task) === taskBillingGroup(selectedAnchor),
+  );
 
   const handleOpenImportTasksModal = () => {
     // Initialize fee and quantity map for all eligible unbilled tasks
@@ -1327,6 +1346,16 @@ export default function InvoicesView() {
   };
 
   const handleToggleImportTask = (task: TaskItem) => {
+    if (
+      selectedAnchor &&
+      taskBillingGroup(task) !== taskBillingGroup(selectedAnchor)
+    ) {
+      showToast(
+        "Select tasks for one client and currency per invoice.",
+        "error",
+      );
+      return;
+    }
     setSelectedImportTaskIds((prev) => {
       const isRemoving = prev.includes(task.id);
       const next = isRemoving
@@ -1344,7 +1373,7 @@ export default function InvoicesView() {
         if (matchedClient && (!newClientId || importTasksShowAllClients)) {
           setClientMode("existing");
           setNewClientId(matchedClient.id);
-          setNewCurrency(matchedClient.currency);
+          setNewCurrency(task.currency || matchedClient.currency);
           if (matchedClient.driveUrl && !newDeliveryUrl) {
             setNewDeliveryUrl(matchedClient.driveUrl);
           }
@@ -1363,10 +1392,16 @@ export default function InvoicesView() {
   };
 
   const handleSelectAllImportTasks = () => {
-    const ids = displayedImportTasks.map((t) => t.id);
+    const anchor = selectedAnchor || displayedImportTasks[0];
+    const ids = displayedImportTasks
+      .filter(
+        (task) =>
+          !anchor || taskBillingGroup(task) === taskBillingGroup(anchor),
+      )
+      .map((t) => t.id);
     setSelectedImportTaskIds(ids);
     const firstWithClient = displayedImportTasks.find(
-      (t) => t.clientId || t.clientName,
+      (t) => ids.includes(t.id) && (t.clientId || t.clientName),
     );
     if (firstWithClient) {
       const matchedClient = clients.find(
@@ -1391,6 +1426,17 @@ export default function InvoicesView() {
     const selectedTasks = allUnbilledTasks.filter((t) =>
       selectedImportTaskIds.includes(t.id),
     );
+    if (
+      selectedTasks.some(
+        (task) => taskBillingGroup(task) !== taskBillingGroup(selectedTasks[0]),
+      )
+    ) {
+      showToast(
+        "Select tasks for one client and currency per invoice.",
+        "error",
+      );
+      return;
+    }
     if (selectedTasks.length === 0) {
       showToast("Select at least one completed task to import", "error");
       return;
@@ -1529,10 +1575,6 @@ export default function InvoicesView() {
         status: newStatus,
       });
 
-      if (allLinkedTaskIds.length > 0) {
-        await linkTasksToInvoice(created.id, created.code, allLinkedTaskIds);
-      }
-
       clearInvoiceDraft();
       closeAddInvoiceModal(false);
       requestId.current = null;
@@ -1546,7 +1588,7 @@ export default function InvoicesView() {
       setNewNotes("");
       setNewDueDate("");
       setNewStatus("UNPAID");
-      showToast(`Invoice ${created.code} created and PDF exported.`);
+      showToast(`Invoice ${created.code} saved. PDF export is queued.`);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -1609,38 +1651,13 @@ export default function InvoicesView() {
   };
 
   const handleSlipInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    let filePath = "";
-    if (typeof window !== "undefined" && window.billflow?.getPathForFile) {
-      filePath = window.billflow.getPathForFile(file);
-    } else if ((file as unknown as { path?: string }).path) {
-      filePath = (file as unknown as { path?: string }).path || "";
-    }
-    setSelectedSlip({
-      path: filePath || file.name,
-      name: file.name,
-      size: file.size,
-    });
     e.target.value = "";
+    void handlePickReceipt();
   };
-
   const handleSlipDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingSlip(false);
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    let filePath = "";
-    if (typeof window !== "undefined" && window.billflow?.getPathForFile) {
-      filePath = window.billflow.getPathForFile(file);
-    } else if ((file as unknown as { path?: string }).path) {
-      filePath = (file as unknown as { path?: string }).path || "";
-    }
-    setSelectedSlip({
-      path: filePath || file.name,
-      name: file.name,
-      size: file.size,
-    });
+    void handlePickReceipt();
   };
 
   // Submit Payment
@@ -3059,10 +3076,7 @@ export default function InvoicesView() {
       {/* Import Completed Tasks Modal */}
       <MotionPresence>
         {showImportTasksModal && (
-          <Dialog
-            onClose={() => setShowImportTasksModal(false)}
-            width={680}
-          >
+          <Dialog onClose={() => setShowImportTasksModal(false)} width={680}>
             <div className="app-dialog-header">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
@@ -4163,7 +4177,9 @@ export default function InvoicesView() {
                 <strong className="text-content-neutral-900">
                   {deletingInvoice.code}
                 </strong>{" "}
-                for {deletingInvoice.clientName}? This action cannot be undone.
+                for {deletingInvoice.clientName}? Linked tasks will be kept and
+                unlinked. Recorded payments and contractor work prevent
+                deletion. This action cannot be undone.
               </p>
             </div>
             <div className="app-dialog-footer">
@@ -4235,7 +4251,9 @@ export default function InvoicesView() {
             style={{
               position: "fixed",
               top:
-                statusMenu.top !== undefined ? `${statusMenu.top}px` : undefined,
+                statusMenu.top !== undefined
+                  ? `${statusMenu.top}px`
+                  : undefined,
               bottom:
                 statusMenu.bottom !== undefined
                   ? `${statusMenu.bottom}px`
@@ -4349,7 +4367,9 @@ export default function InvoicesView() {
             style={{
               position: "fixed",
               top:
-                actionMenu.top !== undefined ? `${actionMenu.top}px` : undefined,
+                actionMenu.top !== undefined
+                  ? `${actionMenu.top}px`
+                  : undefined,
               bottom:
                 actionMenu.bottom !== undefined
                   ? `${actionMenu.bottom}px`

@@ -153,7 +153,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [isGateOpen, setIsGateOpen] = useState<boolean>(false);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<ProfileModalMode>("select");
-  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
+  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(
+    null,
+  );
 
   const initialBootHandledRef = useRef(false);
 
@@ -164,6 +166,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setPreference(profile.themePreference);
       }
       if (typeof window !== "undefined") {
+        sessionStorage.setItem("billflow_active_profile_scope", profile.id);
         window.dispatchEvent(
           new CustomEvent("billflow:profile-switched", {
             detail: { profileId: profile.id },
@@ -187,6 +190,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         FALLBACK_DEFAULT_PROFILE;
 
       applyProfileVisuals(active);
+      if (res.isLocked) {
+        setIsLocked(true);
+        setIsGateOpen(true);
+        setModalMode("select");
+      }
 
       if (isInitialBoot && !initialBootHandledRef.current) {
         initialBootHandledRef.current = true;
@@ -200,7 +208,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           typeof window !== "undefined"
             ? sessionStorage.getItem(SESSION_UNLOCKED_KEY)
             : null;
-        if (active.hasPassword && unlockedId !== active.id) {
+        if (res.isLocked ?? (active.hasPassword && unlockedId !== active.id)) {
           setIsLocked(true);
           setModalMode("select");
           setIsGateOpen(true);
@@ -250,6 +258,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [isLocked]);
 
   const lockCurrentProfile = useCallback(() => {
+    if (window.billflow?.profiles)
+      void window.billflow.profiles.lock().catch(console.error);
+    window.dispatchEvent(new Event("billflow:workspace-locked"));
     if (typeof window !== "undefined") {
       sessionStorage.removeItem(SESSION_UNLOCKED_KEY);
     }

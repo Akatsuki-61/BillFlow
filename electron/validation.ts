@@ -1,5 +1,19 @@
 import path from "path";
 import { z } from "zod";
+import { deliveryLink, minorAmount } from "./workflow-validation";
+const invoiceDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine(
+    (v) =>
+      Number.isFinite(Date.parse(v)) &&
+      new Date(v).toISOString().slice(0, 10) === v,
+    "Use a valid YYYY-MM-DD date",
+  );
+const timestamp = z
+  .string()
+  .max(40)
+  .refine((v) => Number.isFinite(Date.parse(v)), "Use a valid payment date");
 
 export const newClientSchema = z.object({
   name: z
@@ -22,6 +36,7 @@ export const newClientSchema = z.object({
     .string()
     .trim()
     .url("Please provide a valid URL")
+    .regex(/^https?:\/\//i, "Use an HTTP or HTTPS URL")
     .optional()
     .or(z.literal("")),
 });
@@ -49,6 +64,7 @@ export const clientPatchSchema = z.object({
     .string()
     .trim()
     .url("Please provide a valid URL")
+    .regex(/^https?:\/\//i, "Use an HTTP or HTTPS URL")
     .nullable()
     .optional()
     .or(z.literal("")),
@@ -58,32 +74,42 @@ export const newInvoiceItemSchema = z.object({
   id: z.string().optional(),
   description: z.string().trim().min(1, "Description is required").max(500),
   quantity: z.number().int().positive("Quantity must be positive").default(1),
-  unitPriceCents: z.number().int().nonnegative("Unit price must be non-negative"),
+  unitPriceCents: minorAmount,
   catalogId: z.string().nullable().optional(),
   sourceTaskId: z.string().nullable().optional(),
 });
 
-export const newInvoiceSchema = z.object({
-  clientId: z.string().min(1).optional(),
-  newClient: newClientSchema.optional(),
-  saveAsPermanentClient: z.boolean().optional().default(true),
-  requestId: z.string().uuid().optional(),
-  code: z.string().trim().min(1).max(40).optional(),
-  catalogItemId: z.string().trim().nullable().optional(),
-  title: z.string().trim().max(160).optional(),
-  items: z.array(newInvoiceItemSchema).optional(),
-  linkedTaskIds: z.array(z.string().trim().min(1)).optional(),
-  discountCents: z.number().int().nonnegative().optional().default(0),
-  taxCents: z.number().int().nonnegative().optional().default(0),
-  advanceCents: z.number().int().nonnegative().optional().default(0),
-  deliveryUrl: z.string().trim().url().nullable().optional().or(z.literal("")),
-  notes: z.string().trim().max(1000).nullable().optional(),
-  amountCents: z.number().int().nonnegative("Amount must be positive"),
-  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
-  issueDate: z.string().optional(),
-  dueDate: z.string().nullable().optional(),
-  status: z.enum(["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"]).default("UNPAID"),
-}).refine(input => Boolean(input.clientId) !== Boolean(input.newClient), "Select a client or provide new client details.");
+export const newInvoiceSchema = z
+  .object({
+    clientId: z.string().min(1).optional(),
+    newClient: newClientSchema.optional(),
+    saveAsPermanentClient: z.boolean().optional().default(true),
+    requestId: z.string().uuid().optional(),
+    code: z.string().trim().min(1).max(40).optional(),
+    catalogItemId: z.string().trim().nullable().optional(),
+    title: z.string().trim().max(160).optional(),
+    items: z.array(newInvoiceItemSchema).max(500).optional(),
+    linkedTaskIds: z
+      .array(z.string().trim().min(1).max(160))
+      .max(500)
+      .optional(),
+    discountCents: minorAmount.optional().default(0),
+    taxCents: minorAmount.optional().default(0),
+    advanceCents: minorAmount.optional().default(0),
+    deliveryUrl: deliveryLink,
+    notes: z.string().trim().max(1000).nullable().optional(),
+    amountCents: minorAmount,
+    currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
+    issueDate: invoiceDate.optional(),
+    dueDate: invoiceDate.nullable().optional(),
+    status: z
+      .enum(["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"])
+      .default("UNPAID"),
+  })
+  .refine(
+    (input) => Boolean(input.clientId) !== Boolean(input.newClient),
+    "Select a client or provide new client details.",
+  );
 
 export const promoteInvoiceClientSchema = z.object({
   invoiceId: z.string().min(1, "Invoice ID is required"),
@@ -94,33 +120,47 @@ export const invoicePatchSchema = z.object({
   clientId: z.string().min(1).optional(),
   catalogItemId: z.string().trim().nullable().optional(),
   title: z.string().trim().max(160).optional(),
-  items: z.array(newInvoiceItemSchema).optional(),
-  discountCents: z.number().int().nonnegative().optional(),
-  taxCents: z.number().int().nonnegative().optional(),
-  advanceCents: z.number().int().nonnegative().optional(),
-  deliveryUrl: z.string().trim().url().nullable().optional().or(z.literal("")),
+  items: z.array(newInvoiceItemSchema).max(500).optional(),
+  discountCents: minorAmount.optional(),
+  taxCents: minorAmount.optional(),
+  advanceCents: minorAmount.optional(),
+  deliveryUrl: deliveryLink,
   notes: z.string().trim().max(1000).nullable().optional(),
-  amountCents: z.number().int().nonnegative().optional(),
+  amountCents: minorAmount.optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
-  dueDate: z.string().nullable().optional(),
-  status: z.enum(["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"]).optional(),
+  dueDate: invoiceDate.nullable().optional(),
+  status: z
+    .enum(["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"])
+    .optional(),
 });
 
 export const recordPaymentSchema = z.object({
   invoiceId: z.string().min(1),
-  amountCents: z.number().int().positive("Payment amount must be greater than 0"),
-  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("LKR"),
-  receivedAt: z.string().optional(),
+  amountCents: minorAmount.refine((n) => n > 0, "Payment must be positive"),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  receivedAt: timestamp.optional(),
   reference: z.string().trim().max(200).optional().default(""),
   requestId: z.string().uuid().optional(),
 });
 
-export const catalogPriceSchema = z.string().trim().regex(/^\d+(?:\.\d{1,2})?$/, "Price must be a non-negative amount with up to two decimal places.").refine(value => Number.isSafeInteger(Math.round(Number(value) * 100)), "Price is too large.");
+export const catalogPriceSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\d+(?:\.\d{1,2})?$/,
+    "Price must be a non-negative amount with up to two decimal places.",
+  )
+  .refine(
+    (value) => Number.isSafeInteger(Math.round(Number(value) * 100)),
+    "Price is too large.",
+  );
 
 export const newCatalogItemSchema = z.object({
   requestId: z.string().uuid().optional(),
   title: z.string().trim().min(1, "Title is required").max(160),
-  category: z.enum(["Development", "Design", "Consulting", "Licensing"]).default("Development"),
+  category: z
+    .enum(["Development", "Design", "Consulting", "Licensing"])
+    .default("Development"),
   sku: z.string().trim().min(1, "SKU is required").max(60),
   description: z.string().trim().default(""),
   price: catalogPriceSchema,
@@ -131,7 +171,9 @@ export const newCatalogItemSchema = z.object({
 
 export const catalogItemPatchSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
-  category: z.enum(["Development", "Design", "Consulting", "Licensing"]).optional(),
+  category: z
+    .enum(["Development", "Design", "Consulting", "Licensing"])
+    .optional(),
   sku: z.string().trim().min(1).max(60).optional(),
   description: z.string().trim().optional(),
   price: catalogPriceSchema.optional(),
@@ -147,7 +189,10 @@ export const updateSettingsSchema = z.object({
     .string()
     .trim()
     .max(120)
-    .refine((val) => val === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), "Please provide a valid email address")
+    .refine(
+      (val) => val === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+      "Please provide a valid email address",
+    )
     .optional(),
   phone: z.string().trim().max(40).nullable().optional(),
   website: z.string().trim().max(120).nullable().optional(),
@@ -160,10 +205,20 @@ export const updateSettingsSchema = z.object({
   defaultDueDays: z.number().int().min(0).max(365).optional(),
   defaultTaxRate: z.number().min(0).max(100).optional(),
   defaultNotes: z.string().trim().max(1000).nullable().optional(),
-  defaultInvoiceTemplate: z.enum(["geometric-teal", "executive-wave"]).optional(),
+  defaultInvoiceTemplate: z
+    .enum(["geometric-teal", "executive-wave"])
+    .optional(),
   dateFormat: z.enum(["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"]).optional(),
   currencyDisplay: z.enum(["symbol", "code"]).optional(),
-  pdfExportDirectory: z.string().max(4096).refine(value => path.isAbsolute(value), "Choose an absolute export folder").nullable().optional(),
+  pdfExportDirectory: z
+    .string()
+    .max(4096)
+    .refine(
+      (value) => path.isAbsolute(value),
+      "Choose an absolute export folder",
+    )
+    .nullable()
+    .optional(),
 });
 
 export const newVendorSchema = z.object({
@@ -177,15 +232,23 @@ export const newVendorSchema = z.object({
     .trim()
     .min(1, "Service description cannot be blank or whitespace only")
     .max(160),
-  balanceCents: z.number().int().nonnegative("Balance must be positive").default(0),
+  balanceCents: z
+    .number()
+    .int()
+    .nonnegative("Balance must be positive")
+    .default(0),
   status: z.enum(["PENDING", "PAID"]).default("PENDING"),
-  iconType: z.enum(["design", "devops", "legal", "development"]).default("devops"),
+  iconType: z
+    .enum(["design", "devops", "legal", "development"])
+    .default("devops"),
   email: z
     .string()
     .trim()
     .max(120)
     .refine(
-      (val) => val === "" || (val.includes("@") && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)),
+      (val) =>
+        val === "" ||
+        (val.includes("@") && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)),
       "Email must contain an '@' sign and be a valid address",
     )
     .optional()
@@ -200,7 +263,7 @@ export const newVendorSchema = z.object({
 export const vendorPatchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   service: z.string().trim().min(1).max(160).optional(),
-  balanceCents: z.number().int().nonnegative().optional(),
+  balanceCents: minorAmount.optional(),
   status: z.enum(["PENDING", "PAID"]).optional(),
   iconType: z.enum(["design", "devops", "legal", "development"]).optional(),
   email: z
@@ -208,7 +271,9 @@ export const vendorPatchSchema = z.object({
     .trim()
     .max(120)
     .refine(
-      (val) => val === "" || (val.includes("@") && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)),
+      (val) =>
+        val === "" ||
+        (val.includes("@") && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)),
       "Email must contain an '@' sign and be a valid address",
     )
     .nullable()
@@ -254,11 +319,11 @@ export const newWorkOrderSchema = z.object({
   taskId: z.string().trim().min(1, "Task ID is required"),
   invoiceId: z.string().trim().min(1, "Invoice ID is required"),
   scope: z.string().trim().min(1, "Scope description cannot be blank").max(500),
-  feeCents: z.number().int().nonnegative("Contractor fee must be non-negative"),
+  feeCents: minorAmount,
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("LKR"),
   dueDate: z.string().trim().max(60).nullable().optional(),
   status: z.enum(["todo", "in-progress", "review", "done"]).default("todo"),
-  deliveryUrl: z.string().trim().url("Please provide a valid delivery URL").nullable().optional().or(z.literal("")),
+  deliveryUrl: deliveryLink,
   notes: z.string().trim().max(2000).nullable().optional(),
 });
 
@@ -268,11 +333,11 @@ export const newWorkOrderSchema = z.object({
 export const workOrderPatchSchema = z.object({
   vendorId: z.string().trim().min(1).optional(),
   scope: z.string().trim().min(1).max(500).optional(),
-  feeCents: z.number().int().nonnegative().optional(),
+  feeCents: minorAmount.optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
   dueDate: z.string().trim().max(60).nullable().optional(),
   status: z.enum(["todo", "in-progress", "review", "done"]).optional(),
-  deliveryUrl: z.string().trim().url("Please provide a valid delivery URL").nullable().optional().or(z.literal("")),
+  deliveryUrl: deliveryLink,
   notes: z.string().trim().max(2000).nullable().optional(),
   completedAt: z.string().nullable().optional(),
   payoutStatus: z.enum(["PENDING", "PAID"]).optional(),
@@ -286,7 +351,7 @@ export const workOrderPatchSchema = z.object({
 export const reviewWorkOrderSchema = z.object({
   workOrderId: z.string().trim().min(1, "Work order ID is required"),
   status: z.enum(["todo", "in-progress", "review", "done"]),
-  deliveryUrl: z.string().trim().url("Please provide a valid delivery URL").nullable().optional().or(z.literal("")),
+  deliveryUrl: deliveryLink,
   notes: z.string().trim().max(2000).nullable().optional(),
   updateTask: z.boolean().default(true),
 });
@@ -296,7 +361,11 @@ export const reviewWorkOrderSchema = z.object({
  */
 export const recordWorkOrderPayoutSchema = z.object({
   workOrderId: z.string().trim().min(1, "Work order ID is required"),
-  amountCents: z.number().int().positive("Payout amount must be positive").optional(),
+  amountCents: z
+    .number()
+    .int()
+    .positive("Payout amount must be positive")
+    .optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
   paidAt: z.string().trim().optional(),
 });
@@ -313,8 +382,12 @@ export const newCalendarEventSchema = z.object({
   startTime: z.string().trim().nullable().optional(),
   endTime: z.string().trim().nullable().optional(),
   isAllDay: z.boolean().optional().default(false),
-  category: z.enum(["meeting", "milestone", "review", "deadline", "reminder", "general"]).default("general"),
-  color: z.enum(["blue", "emerald", "amber", "purple", "rose", "cyan"]).default("blue"),
+  category: z
+    .enum(["meeting", "milestone", "review", "deadline", "reminder", "general"])
+    .default("general"),
+  color: z
+    .enum(["blue", "emerald", "amber", "purple", "rose", "cyan"])
+    .default("blue"),
   clientId: z.string().trim().nullable().optional(),
   clientName: z.string().trim().nullable().optional(),
   taskId: z.string().trim().nullable().optional(),
@@ -323,5 +396,3 @@ export const newCalendarEventSchema = z.object({
 });
 
 export const calendarEventPatchSchema = newCalendarEventSchema.partial();
-
-

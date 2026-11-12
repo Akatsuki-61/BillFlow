@@ -1,11 +1,6 @@
+import { ProfileWorkspace } from "@/components/profiles/ProfileWorkspace";
 import type { Metadata } from "next";
-import {
-  Geist,
-  Geist_Mono,
-  Playfair_Display,
-  Inter,
-  Newsreader,
-} from "next/font/google";
+import { Inter } from "next/font/google";
 import AdvanceTrackingPrompt from "@/components/tasks/AdvanceTrackingPrompt";
 import Sidebar from "@/components/layout/Sidebar";
 import TitleBar from "@/components/layout/TitleBar";
@@ -18,31 +13,9 @@ import { ProfileGateModal } from "@/components/profiles/ProfileGateModal";
 import { themeBootstrap } from "@/lib/theme";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
-  subsets: ["latin"],
-  display: "swap",
-});
-
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
-  display: "swap",
-});
-
-const newsreader = Newsreader({
-  subsets: ["latin"],
-  variable: "--font-newsreader",
   display: "swap",
 });
 
@@ -62,7 +35,7 @@ export default function RootLayout({
       lang="en"
       data-theme="light"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${inter.variable} ${newsreader.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
@@ -72,15 +45,17 @@ export default function RootLayout({
           <NavProvider>
             <DataProvider>
               <ProfileProvider>
-                <AdvanceTrackingPrompt />
                 <ProfileGateModal />
-                <WidgetProvider>
-                  <TitleBar />
-                  <Sidebar />
-                  <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
-                    {children}
-                  </main>
-                </WidgetProvider>
+                <ProfileWorkspace>
+                  <AdvanceTrackingPrompt />
+                  <WidgetProvider>
+                    <TitleBar />
+                    <Sidebar />
+                    <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
+                      {children}
+                    </main>
+                  </WidgetProvider>
+                </ProfileWorkspace>
               </ProfileProvider>
             </DataProvider>
           </NavProvider>

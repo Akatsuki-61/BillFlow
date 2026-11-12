@@ -34,6 +34,9 @@ export interface ClientRecentInvoice {
 }
 
 export interface ClientWithStats extends Client {
+  totalsByCurrency?: Partial<
+    Record<Currency, { billed: number; paid: number; outstanding: number }>
+  >;
   totalBilledCents: number;
   totalPaidCents: number;
   outstandingBalanceCents: number;
@@ -63,7 +66,8 @@ export interface ClientPatchInput {
   driveUrl?: string | null;
 }
 
-export type InvoiceStatus = "DRAFT" | "UNPAID" | "ADVANCE_PAID" | "PAID" | "OVERDUE";
+export type InvoiceStatus =
+  "DRAFT" | "UNPAID" | "ADVANCE_PAID" | "PAID" | "OVERDUE";
 
 export interface InvoiceItem {
   id: string;
@@ -188,7 +192,8 @@ export interface DashboardSummary {
   recentInvoices: InvoiceWithClient[];
 }
 
-export type CatalogCategory = "Development" | "Design" | "Consulting" | "Licensing";
+export type CatalogCategory =
+  "Development" | "Design" | "Consulting" | "Licensing";
 export type CatalogIconType = "code" | "design" | "cloud" | "consulting";
 
 export interface CatalogItem {

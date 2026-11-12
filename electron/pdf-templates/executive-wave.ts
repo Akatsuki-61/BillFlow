@@ -1,5 +1,10 @@
 import { InvoicePdfPayload } from "./types";
-import { escapeHtml, formatMoney, getBase64Logo } from "./helpers";
+import {
+  escapeHtml,
+  formatMoney,
+  getBase64Logo,
+  invoiceFontCss,
+} from "./helpers";
 
 export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
   const logoBase64 = getBase64Logo();
@@ -9,13 +14,20 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       : data.amountCents;
   const paidCents = data.paidCents || 0;
 
-  const itemsRows = (data.items && data.items.length > 0
-    ? data.items
-    : [{ description: "Professional Services & Development Sprint", quantity: 1, unitPriceCents: data.amountCents }]
+  const itemsRows = (
+    data.items && data.items.length > 0
+      ? data.items
+      : [
+          {
+            description: "Professional Services & Development Sprint",
+            quantity: 1,
+            unitPriceCents: data.amountCents,
+          },
+        ]
   )
     .map(
       (it, idx) => `
-      <tr class="${idx % 2 === 1 ? 'row-alt' : 'row-regular'}">
+      <tr class="${idx % 2 === 1 ? "row-alt" : "row-regular"}">
         <td class="td-num">${idx + 1}</td>
         <td class="td-desc">
           <div class="desc-main">${escapeHtml(it.description)}</div>
@@ -25,7 +37,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
         <td class="td-qty">${it.quantity}</td>
         <td class="td-total">${formatMoney(it.quantity * it.unitPriceCents, data.currency)}</td>
       </tr>
-    `
+    `,
     )
     .join("");
 
@@ -33,10 +45,8 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
 <html>
 <head>
   <meta charset="utf-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    ${invoiceFontCss()}
     @page { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; }
     body {
@@ -393,12 +403,16 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
         </div>
       </div>
       <div class="contact-side">
-        ${data.business.phone ? `
+        ${
+          data.business.phone
+            ? `
           <div class="contact-item">
             <span class="c-label">Phone:</span>
             <span class="c-val">${escapeHtml(data.business.phone)}</span>
           </div>
-        ` : ""}
+        `
+            : ""
+        }
         <div class="contact-item">
           <span class="c-label">Web / Email:</span>
           <span class="c-val">${escapeHtml(data.business.email || data.business.website || "chethaka.dev")}</span>
@@ -432,11 +446,15 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
           <span class="meta-label">Date:</span>
           <span class="meta-val">${escapeHtml(data.issueDate)}</span>
         </div>
-        ${data.dueDate ? `
+        ${
+          data.dueDate
+            ? `
         <div class="meta-row">
           <span class="meta-label">Due Date:</span>
           <span class="meta-val">${escapeHtml(data.dueDate)}</span>
-        </div>` : ""}
+        </div>`
+            : ""
+        }
         <div style="text-align: right; margin-top: 4px;">
           <span class="status-badge">${escapeHtml(data.status.replace("_", " "))}</span>
         </div>
@@ -466,30 +484,46 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
           <span>Sub Total:</span>
           <span>${formatMoney(subtotalCents, data.currency)}</span>
         </div>
-        ${data.discountCents ? `
+        ${
+          data.discountCents
+            ? `
           <div class="totals-line">
             <span>Discount:</span>
             <span>-${formatMoney(data.discountCents, data.currency)}</span>
           </div>
-        ` : ""}
-        ${data.taxCents ? `
+        `
+            : ""
+        }
+        ${
+          data.taxCents
+            ? `
           <div class="totals-line">
             <span>Tax / VAT:</span>
             <span>${formatMoney(data.taxCents, data.currency)}</span>
           </div>
-        ` : ""}
-        ${data.advanceCents ? `
+        `
+            : ""
+        }
+        ${
+          data.advanceCents
+            ? `
           <div class="totals-line">
             <span>Required Advance:</span>
             <span>${formatMoney(data.advanceCents, data.currency)}</span>
           </div>
-        ` : ""}
-        ${paidCents > 0 ? `
+        `
+            : ""
+        }
+        ${
+          paidCents > 0
+            ? `
           <div class="totals-line">
             <span>Amount Paid:</span>
             <span>${formatMoney(paidCents, data.currency)}</span>
           </div>
-        ` : ""}
+        `
+            : ""
+        }
         <div class="grand-total-banner">
           <span>GRAND TOTAL</span>
           <span class="gt-amount">${formatMoney(data.amountCents, data.currency)}</span>

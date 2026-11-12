@@ -8,11 +8,17 @@ files:
   - dist-electron/**/*
   - out/**/*
   - package.json
+  - "!dist-electron/**/*.map"
+  - "!node_modules/better-sqlite3/{deps,src,build}/**/*"
+  - "!node_modules/better-sqlite3/binding.gyp"
+  - "!node_modules/node-addon-api/**/*"
 asar: true
-npmRebuild: false
+npmRebuild: true
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
 extraResources:
+  - from: build/THIRD_PARTY_NOTICES.txt
+    to: THIRD_PARTY_NOTICES.txt
   - from: build/icon.png
     to: brand/icon.png
   - from: public/brand/logo-white.png
@@ -22,6 +28,15 @@ extraResources:
   - from: drizzle
     to: drizzle
 win:
+  files:
+    - dist-electron/**/*
+    - out/**/*
+    - package.json
+    - "!dist-electron/**/*.map"
+    - "!node_modules/better-sqlite3/{deps,src,build}/**/*"
+    - "!node_modules/better-sqlite3/binding.gyp"
+    - "!node_modules/node-addon-api/**/*"
+    - "!node_modules/better-sqlite3/prebuilds/!(win32-${arch}).node"
   icon: build/icon.ico
   target:
     - target: nsis
@@ -37,6 +52,15 @@ nsis:
   shortcutName: BillFlow
   include: build/installer.nsh
 mac:
+  files:
+    - dist-electron/**/*
+    - out/**/*
+    - package.json
+    - "!dist-electron/**/*.map"
+    - "!node_modules/better-sqlite3/{deps,src,build}/**/*"
+    - "!node_modules/better-sqlite3/binding.gyp"
+    - "!node_modules/node-addon-api/**/*"
+    - "!node_modules/better-sqlite3/prebuilds/!(darwin-${arch}).node"
   icon: build/icon.icns
   target:
     - target: dmg

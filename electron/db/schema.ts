@@ -1,4 +1,11 @@
-import { sqliteTable, text, integer, index, uniqueIndex, check } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  index,
+  uniqueIndex,
+  check,
+} from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const clients = sqliteTable("clients", {
@@ -9,11 +16,19 @@ export const clients = sqliteTable("clients", {
   contactRole: text("contact_role"),
   email: text("email").notNull(),
   phone: text("phone"),
-  currency: text("currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] }).notNull().default("USD"),
+  currency: text("currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
+    .notNull()
+    .default("USD"),
   driveUrl: text("drive_url"),
-  hasQuickBill: integer("has_quick_bill", { mode: "boolean" }).notNull().default(true),
-  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
-  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  hasQuickBill: integer("has_quick_bill", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
 });
 
 export const invoices = sqliteTable(
@@ -21,9 +36,12 @@ export const invoices = sqliteTable(
   {
     id: text("id").primaryKey(),
     code: text("code").notNull().unique(),
-    clientId: text("client_id")
-      .references(() => clients.id, { onDelete: "restrict" }),
-    catalogItemId: text("catalog_item_id").references(() => catalogItems.id, { onDelete: "set null" }),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "restrict",
+    }),
+    catalogItemId: text("catalog_item_id").references(() => catalogItems.id, {
+      onDelete: "set null",
+    }),
     requestHash: text("request_hash"),
     title: text("title"),
     clientSnapshot: text("client_snapshot"),
@@ -42,22 +60,28 @@ export const invoices = sqliteTable(
       .default("USD"),
     issueDate: text("issue_date").notNull(),
     dueDate: text("due_date"),
-    status: text("status", { enum: ["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"] })
+    status: text("status", {
+      enum: ["DRAFT", "UNPAID", "ADVANCE_PAID", "PAID", "OVERDUE"],
+    })
       .notNull()
       .default("UNPAID"),
     paidCents: integer("paid_cents").notNull().default(0),
-    createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
-    updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
   },
-  (table) => [
-    index("invoices_client_id_idx").on(table.clientId),
-  ]
+  (table) => [index("invoices_client_id_idx").on(table.clientId)],
 );
 
 export const catalogItems = sqliteTable("catalog_items", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
-  category: text("category", { enum: ["Development", "Design", "Consulting", "Licensing"] })
+  category: text("category", {
+    enum: ["Development", "Design", "Consulting", "Licensing"],
+  })
     .notNull()
     .default("Development"),
   sku: text("sku").notNull().unique(),
@@ -67,11 +91,17 @@ export const catalogItems = sqliteTable("catalog_items", {
     .notNull()
     .default("LKR"),
   unit: text("unit").notNull().default("/ Hourly"),
-  iconType: text("icon_type", { enum: ["code", "design", "cloud", "consulting"] })
+  iconType: text("icon_type", {
+    enum: ["code", "design", "cloud", "consulting"],
+  })
     .notNull()
     .default("code"),
-  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
-  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
 });
 
 export const settings = sqliteTable("settings", {
@@ -84,7 +114,9 @@ export const settings = sqliteTable("settings", {
   taxId: text("tax_id"),
   address: text("address"),
   paymentDetails: text("payment_details"),
-  defaultCurrency: text("default_currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
+  defaultCurrency: text("default_currency", {
+    enum: ["USD", "LKR", "EUR", "GBP", "CAD"],
+  })
     .notNull()
     .default("USD"),
   invoicePrefix: text("invoice_prefix").notNull().default("INV-"),
@@ -92,11 +124,15 @@ export const settings = sqliteTable("settings", {
   defaultDueDays: integer("default_due_days").notNull().default(14),
   defaultTaxRate: integer("default_tax_rate").notNull().default(0),
   defaultNotes: text("default_notes"),
-  defaultInvoiceTemplate: text("default_invoice_template").default("geometric-teal"),
+  defaultInvoiceTemplate: text("default_invoice_template").default(
+    "geometric-teal",
+  ),
   dateFormat: text("date_format").notNull().default("YYYY-MM-DD"),
   currencyDisplay: text("currency_display").notNull().default("symbol"),
   pdfExportDirectory: text("pdf_export_directory"),
-  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
 });
 
 export const vendors = sqliteTable(
@@ -106,22 +142,30 @@ export const vendors = sqliteTable(
     name: text("name").notNull(),
     service: text("service").notNull(),
     balanceCents: integer("balance_cents").notNull().default(0),
-    status: text("status", { enum: ["PENDING", "PAID"] }).notNull().default("PENDING"),
-    iconType: text("icon_type", { enum: ["design", "devops", "legal", "development"] })
+    status: text("status", { enum: ["PENDING", "PAID"] })
+      .notNull()
+      .default("PENDING"),
+    iconType: text("icon_type", {
+      enum: ["design", "devops", "legal", "development"],
+    })
       .notNull()
       .default("devops"),
     email: text("email"),
     phone: text("phone"),
-    linkedClientId: text("linked_client_id").references(() => clients.id, { onDelete: "set null" }),
+    linkedClientId: text("linked_client_id").references(() => clients.id, {
+      onDelete: "set null",
+    }),
     linkedClientName: text("linked_client_name"),
     payoutDueDate: text("payout_due_date"),
     notes: text("notes"),
-    createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
-    updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
   },
-  (table) => [
-    index("vendors_linked_client_id_idx").on(table.linkedClientId),
-  ]
+  (table) => [index("vendors_linked_client_id_idx").on(table.linkedClientId)],
 );
 
 export type ClientRow = typeof clients.$inferSelect;
@@ -135,7 +179,6 @@ export type InsertSettingRow = typeof settings.$inferInsert;
 export type VendorRow = typeof vendors.$inferSelect;
 export type InsertVendorRow = typeof vendors.$inferInsert;
 
-
 // Shared workflow contracts. Domain UI/API owners extend these same tables.
 export const catalogServices = sqliteTable("catalog_services", {
   id: text("id").primaryKey(),
@@ -146,42 +189,76 @@ export const catalogServices = sqliteTable("catalog_services", {
   category: text("category").notNull().default("Development"),
 });
 
-export const invoiceItems = sqliteTable("invoice_items", {
-  id: text("id").primaryKey(),
-  invoiceId: text("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
-  catalogId: text("catalog_id").references(() => catalogServices.id, { onDelete: "set null" }),
-  description: text("description").notNull(),
-  quantity: integer("quantity").notNull().default(1),
-  unitPriceCents: integer("unit_price_cents").notNull(),
-  position: integer("position").notNull().default(0),
-}, t => [uniqueIndex("invoice_items_order").on(t.invoiceId, t.position), check("item_amount", sql`${t.quantity} > 0 AND ${t.unitPriceCents} >= 0`)]);
+export const invoiceItems = sqliteTable(
+  "invoice_items",
+  {
+    id: text("id").primaryKey(),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    catalogId: text("catalog_id").references(() => catalogServices.id, {
+      onDelete: "set null",
+    }),
+    description: text("description").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex("invoice_items_order").on(t.invoiceId, t.position),
+    check("item_amount", sql`${t.quantity} > 0 AND ${t.unitPriceCents} >= 0`),
+  ],
+);
 
-export const invoicePayments = sqliteTable("invoice_payments", {
-  id: text("id").primaryKey(),
-  invoiceId: text("invoice_id").notNull().references(() => invoices.id, { onDelete: "restrict" }),
-  amountCents: integer("amount_cents").notNull(),
-  currency: text("currency").notNull(),
-  receivedAt: text("received_at").notNull(),
-  reference: text("reference").notNull().default(""),
-  requestId: text("request_id").notNull().unique(),
-}, t => [check("payment_amount", sql`${t.amountCents} > 0`)]);
+export const invoicePayments = sqliteTable(
+  "invoice_payments",
+  {
+    id: text("id").primaryKey(),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "restrict" }),
+    amountCents: integer("amount_cents").notNull(),
+    currency: text("currency").notNull(),
+    receivedAt: text("received_at").notNull(),
+    reference: text("reference").notNull().default(""),
+    requestId: text("request_id").notNull().unique(),
+  },
+  (t) => [
+    check("payment_amount", sql`${t.amountCents} > 0`),
+    index("invoice_payments_invoice_idx").on(t.invoiceId),
+  ],
+);
 
 export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
   requestHash: text("request_hash"),
-  invoiceItemId: text("invoice_item_id").references(() => invoiceItems.id, { onDelete: "restrict" }).unique(),
-  invoiceId: text("invoice_id").references(() => invoices.id, { onDelete: "restrict" }),
-  clientId: text("client_id").references(() => clients.id, { onDelete: "restrict" }),
+  invoiceItemId: text("invoice_item_id")
+    .references(() => invoiceItems.id, { onDelete: "restrict" })
+    .unique(),
+  invoiceId: text("invoice_id").references(() => invoices.id, {
+    onDelete: "restrict",
+  }),
+  clientId: text("client_id").references(() => clients.id, {
+    onDelete: "restrict",
+  }),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
-  status: text("status", { enum: ["todo", "in-progress", "review", "done"] }).notNull().default("todo"),
-  priority: text("priority", { enum: ["low", "medium", "high", "urgent"] }).notNull().default("medium"),
+  status: text("status", { enum: ["todo", "in-progress", "review", "done"] })
+    .notNull()
+    .default("todo"),
+  priority: text("priority", { enum: ["low", "medium", "high", "urgent"] })
+    .notNull()
+    .default("medium"),
   category: text("category").notNull().default("Development"),
-  assignee: text("assignee", { mode: "json" }).$type<import("../../src/types/tasks").TaskAssignee>().notNull(),
+  assignee: text("assignee", { mode: "json" })
+    .$type<import("../../src/types/tasks").TaskAssignee>()
+    .notNull(),
   dueDate: text("due_date").notNull().default(""),
   clientName: text("client_name"),
   deliveryUrl: text("delivery_url"),
-  isOutsourced: integer("is_outsourced", { mode: "boolean" }).notNull().default(false),
+  isOutsourced: integer("is_outsourced", { mode: "boolean" })
+    .notNull()
+    .default(false),
   outsourcedVendor: text("outsourced_vendor"),
   outsourceBudgetCents: integer("outsource_budget"), // contractor amount in minor units
   currency: text("currency").notNull().default("LKR"),
@@ -194,73 +271,131 @@ export const tasks = sqliteTable("tasks", {
   deletedAt: text("deleted_at"), // retain generated-item uniqueness after deletion
 });
 
-export const subtasks = sqliteTable("subtasks", {
-  id: text("id").primaryKey(),
-  taskId: text("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  completed: integer("completed", { mode: "boolean" }).notNull().default(false),
-});
+export const subtasks = sqliteTable(
+  "subtasks",
+  {
+    id: text("id").primaryKey(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    completed: integer("completed", { mode: "boolean" })
+      .notNull()
+      .default(false),
+  },
+  (t) => [index("subtasks_task_idx").on(t.taskId)],
+);
 
 export const taskHistory = sqliteTable("task_history", {
   id: text("id").primaryKey(),
-  taskId: text("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
   fromStatus: text("from_status"),
   toStatus: text("to_status").notNull(),
   occurredAt: text("occurred_at").notNull(),
 });
 
-export const expenses = sqliteTable("expenses", {
-  id: text("id").primaryKey(),
-  invoiceId: text("invoice_id").references(() => invoices.id, { onDelete: "restrict" }),
-  merchant: text("merchant").notNull().default(""),
-  description: text("description").notNull().default(""),
-  category: text("category").notNull(),
-  amountCents: integer("amount_cents").notNull(),
-  currency: text("currency").notNull().default("USD"),
-  incurredAt: text("incurred_at").notNull(),
-  deductible: integer("deductible", { mode: "boolean" }).notNull().default(true),
-  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
-}, t => [check("expense_amount", sql`${t.amountCents} >= 0`)]);
+export const expenses = sqliteTable(
+  "expenses",
+  {
+    id: text("id").primaryKey(),
+    invoiceId: text("invoice_id").references(() => invoices.id, {
+      onDelete: "restrict",
+    }),
+    merchant: text("merchant").notNull().default(""),
+    description: text("description").notNull().default(""),
+    category: text("category").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    currency: text("currency").notNull().default("USD"),
+    incurredAt: text("incurred_at").notNull(),
+    deductible: integer("deductible", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (t) => [check("expense_amount", sql`${t.amountCents} >= 0`)],
+);
 
-export const workOrders = sqliteTable("work_orders", {
-  id: text("id").primaryKey(),
-  vendorId: text("vendor_id").notNull().references(() => vendors.id, { onDelete: "restrict" }),
-  taskId: text("task_id").notNull().references(() => tasks.id, { onDelete: "restrict" }),
-  invoiceId: text("invoice_id").notNull().references(() => invoices.id, { onDelete: "restrict" }),
-  scope: text("scope").notNull(),
-  feeCents: integer("fee_cents").notNull(),
-  currency: text("currency").notNull(),
-  dueDate: text("due_date"),
-  status: text("status").notNull().default("todo"),
-  completedAt: text("completed_at"),
-  deliveryUrl: text("delivery_url"),
-  notes: text("notes"),
-}, t => [check("work_order_amount", sql`${t.feeCents} >= 0`)]);
+export const workOrders = sqliteTable(
+  "work_orders",
+  {
+    id: text("id").primaryKey(),
+    vendorId: text("vendor_id")
+      .notNull()
+      .references(() => vendors.id, { onDelete: "restrict" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "restrict" }),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "restrict" }),
+    scope: text("scope").notNull(),
+    feeCents: integer("fee_cents").notNull(),
+    currency: text("currency").notNull(),
+    dueDate: text("due_date"),
+    status: text("status").notNull().default("todo"),
+    completedAt: text("completed_at"),
+    deliveryUrl: text("delivery_url"),
+    notes: text("notes"),
+  },
+  (t) => [
+    check("work_order_amount", sql`${t.feeCents} >= 0`),
+    index("work_orders_invoice_idx").on(t.invoiceId),
+  ],
+);
 
-export const vendorPayouts = sqliteTable("vendor_payouts", {
-  id: text("id").primaryKey(),
-  workOrderId: text("work_order_id").notNull().references(() => workOrders.id, { onDelete: "restrict" }),
-  amountCents: integer("amount_cents").notNull(),
-  currency: text("currency").notNull(),
-  paidAt: text("paid_at").notNull(),
-  requestId: text("request_id").notNull().unique(),
-}, t => [check("payout_amount", sql`${t.amountCents} > 0`)]);
+export const vendorPayouts = sqliteTable(
+  "vendor_payouts",
+  {
+    id: text("id").primaryKey(),
+    workOrderId: text("work_order_id")
+      .notNull()
+      .references(() => workOrders.id, { onDelete: "restrict" }),
+    amountCents: integer("amount_cents").notNull(),
+    currency: text("currency").notNull(),
+    paidAt: text("paid_at").notNull(),
+    voidedAt: text("voided_at"),
+    requestId: text("request_id").notNull().unique(),
+  },
+  (t) => [check("payout_amount", sql`${t.amountCents} > 0`)],
+);
 
-export const attachments = sqliteTable("attachments", {
-  id: text("id").primaryKey(),
-  paymentId: text("payment_id").references(() => invoicePayments.id, { onDelete: "restrict" }),
-  expenseId: text("expense_id").references(() => expenses.id, { onDelete: "restrict" }),
-  payoutId: text("payout_id").references(() => vendorPayouts.id, { onDelete: "restrict" }),
-  originalName: text("original_name").notNull(),
-  storedName: text("stored_name").notNull(),
-  mimeType: text("mime_type").notNull(),
-  sizeBytes: integer("size_bytes").notNull(),
-  sha256: text("sha256").notNull(),
-  createdAt: text("created_at").notNull(),
-}, t => [check("attachment_one_owner", sql`(${t.paymentId} IS NOT NULL) + (${t.expenseId} IS NOT NULL) + (${t.payoutId} IS NOT NULL) = 1`)]);
+export const attachments = sqliteTable(
+  "attachments",
+  {
+    id: text("id").primaryKey(),
+    paymentId: text("payment_id").references(() => invoicePayments.id, {
+      onDelete: "restrict",
+    }),
+    expenseId: text("expense_id").references(() => expenses.id, {
+      onDelete: "restrict",
+    }),
+    payoutId: text("payout_id").references(() => vendorPayouts.id, {
+      onDelete: "restrict",
+    }),
+    originalName: text("original_name").notNull(),
+    storedName: text("stored_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: text("sha256").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    check(
+      "attachment_one_owner",
+      sql`(${t.paymentId} IS NOT NULL) + (${t.expenseId} IS NOT NULL) + (${t.payoutId} IS NOT NULL) = 1`,
+    ),
+    index("attachments_expense_idx").on(t.expenseId),
+  ],
+);
 
 export const invoicePdfExports = sqliteTable("invoice_pdf_exports", {
-  invoiceId: text("invoice_id").primaryKey().references(() => invoices.id, { onDelete: "cascade" }),
+  invoiceId: text("invoice_id")
+    .primaryKey()
+    .references(() => invoices.id, { onDelete: "cascade" }),
   filePath: text("file_path").notNull(),
   exportedAt: text("exported_at").notNull(),
 });
@@ -273,7 +408,9 @@ export const userProfiles = sqliteTable("user_profiles", {
   avatar: text("avatar").notNull().default("code"),
   accent: text("accent").notNull().default("blue"),
   themePreference: text("theme_preference").notNull().default("system"),
-  defaultCurrency: text("default_currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
+  defaultCurrency: text("default_currency", {
+    enum: ["USD", "LKR", "EUR", "GBP", "CAD"],
+  })
     .notNull()
     .default("USD"),
   invoicePrefix: text("invoice_prefix").notNull().default("SE-"),
@@ -281,11 +418,19 @@ export const userProfiles = sqliteTable("user_profiles", {
   passwordSalt: text("password_salt"),
   passwordHint: text("password_hint"),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
-  isOnboarded: integer("is_onboarded", { mode: "boolean" }).notNull().default(false),
+  isOnboarded: integer("is_onboarded", { mode: "boolean" })
+    .notNull()
+    .default(false),
   position: integer("position").notNull().default(0),
-  lastActiveAt: text("last_active_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
-  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
-  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  lastActiveAt: text("last_active_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
 });
 
 export type UserProfileRow = typeof userProfiles.$inferSelect;
@@ -301,11 +446,33 @@ export const calendarEvents = sqliteTable("calendar_events", {
   isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
   category: text("category").notNull().default("general"),
   color: text("color").notNull().default("blue"),
-  clientId: text("client_id").references(() => clients.id, { onDelete: "set null" }),
+  clientId: text("client_id").references(() => clients.id, {
+    onDelete: "set null",
+  }),
   clientName: text("client_name"),
   taskId: text("task_id").references(() => tasks.id, { onDelete: "set null" }),
   taskTitle: text("task_title"),
   location: text("location"),
-  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
-  updatedAt: text("updated_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+export const workOrderPdfExports = sqliteTable("work_order_pdf_exports", {
+  workOrderId: text("work_order_id")
+    .primaryKey()
+    .references(() => workOrders.id, { onDelete: "cascade" }),
+  filePath: text("file_path").notNull(),
+  exportedAt: text("exported_at").notNull(),
+});
+export const taskTimeSlots = sqliteTable("task_time_slots", {
+  taskId: text("task_id")
+    .primaryKey()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  updatedAt: text("updated_at").notNull(),
 });

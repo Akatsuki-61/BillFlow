@@ -2,7 +2,7 @@
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { Dialog } from "@/components/ui/Dialog";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { SPRING_NAV_GLIDE, SPRING_LIQUID_BUTTON } from "@/lib/motion";
 
 import { formatCents } from "@/lib/format";
