@@ -1481,7 +1481,9 @@ function SettingsContent() {
                         type="button"
                         key={value}
                         aria-pressed={preference === value}
-                        onClick={() => setPreference(value)}
+                        onClick={(e) =>
+                          setPreference(value, { trigger: e.currentTarget })
+                        }
                       >
                         <div
                           className={`theme-preview theme-preview--${value}`}
@@ -1542,7 +1544,9 @@ function SettingsContent() {
                         role="radio"
                         aria-checked={isSelected}
                         aria-label={`${option.name} accent color (${option.description})`}
-                        onClick={() => setAccent(option.id)}
+                        onClick={(e) =>
+                          setAccent(option.id, { trigger: e.currentTarget })
+                        }
                         className={`group relative flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                           isSelected
                             ? "bg-accent-soft/40 border-accent shadow-xs ring-1 ring-accent/40"

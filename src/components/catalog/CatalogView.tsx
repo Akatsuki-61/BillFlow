@@ -669,7 +669,7 @@ export default function CatalogView() {
             className="ui-field ui-search-input w-full pl-10 pr-9 !rounded-full border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-xs"
             style={{ paddingLeft: "40px" }}
           />
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {searchQuery && (
               <motion.div
                 key="clear-catalog-search"

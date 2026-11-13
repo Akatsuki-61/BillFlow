@@ -4,6 +4,10 @@ import { createContext, useContext, useEffect, useSyncExternalStore } from "reac
 import { flushSync } from "react-dom";
 import { LayoutGroup, MotionConfig } from "motion/react";
 import {
+  ensureTriggerTracker,
+  ensureViewTransitionOrigin,
+} from "@/lib/motion";
+import {
   isThemePreference,
   isAccentPreference,
   resolveTheme,
@@ -14,11 +18,22 @@ import {
   type AccentPreference,
 } from "@/lib/theme";
 
+export interface ThemeTransitionOptions {
+  transition?: boolean;
+  trigger?: EventTarget | null;
+}
+
 const ThemeContext = createContext<{
   preference: ThemePreference;
-  setPreference: (preference: ThemePreference) => void;
+  setPreference: (
+    preference: ThemePreference,
+    options?: ThemeTransitionOptions,
+  ) => void;
   accent: AccentPreference;
-  setAccent: (accent: AccentPreference) => void;
+  setAccent: (
+    accent: AccentPreference,
+    options?: ThemeTransitionOptions,
+  ) => void;
   ready: boolean;
 } | null>(null);
 
@@ -70,8 +85,15 @@ type ViewTransitionLike = {
   updateCallbackDone?: Promise<unknown>;
 };
 
-function runMaskedColorChange(commitChange: () => void) {
+function runMaskedColorChange(
+  commitChange: () => void,
+  options?: ThemeTransitionOptions,
+) {
   if (typeof document === "undefined" || typeof window === "undefined") {
+    commitChange();
+    return;
+  }
+  if (options?.transition === false) {
     commitChange();
     return;
   }
@@ -84,6 +106,8 @@ function runMaskedColorChange(commitChange: () => void) {
     commitChange();
     return;
   }
+
+  ensureViewTransitionOrigin(options?.trigger);
 
   try {
     const transition = startVT.call(document, () => {
@@ -98,7 +122,10 @@ function runMaskedColorChange(commitChange: () => void) {
   }
 }
 
-function setPreference(value: ThemePreference) {
+function setPreference(
+  value: ThemePreference,
+  options?: ThemeTransitionOptions,
+) {
   if (!isThemePreference(value)) return;
   const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
   const nextTheme = resolveTheme(value, prefersDark);
@@ -114,10 +141,13 @@ function setPreference(value: ThemePreference) {
     applyPreference();
     return;
   }
-  runMaskedColorChange(applyPreference);
+  runMaskedColorChange(applyPreference, options);
 }
 
-function setAccent(value: AccentPreference) {
+function setAccent(
+  value: AccentPreference,
+  options?: ThemeTransitionOptions,
+) {
   if (!isAccentPreference(value)) return;
   const applyAccent = () => {
     sessionAccent = value;
@@ -129,7 +159,7 @@ function setAccent(value: AccentPreference) {
     applyAccent();
     return;
   }
-  runMaskedColorChange(applyAccent);
+  runMaskedColorChange(applyAccent, options);
 }
 
 const serverSnapshot = () => null;
@@ -154,6 +184,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
   }, [preference, saved]);
+
+  useEffect(() => {
+    ensureTriggerTracker();
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.accent = accent;

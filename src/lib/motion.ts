@@ -147,17 +147,46 @@ interface CapturedRect {
   capturedAt: number;
 }
 
+const TRIGGER_SELECTOR =
+  'button, a, summary, [role="button"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"], [role="radio"], [role="switch"], [role="tab"], [data-trigger], [tabindex]:not([tabindex="-1"])';
+
+const NON_TRIGGER_CONTAINER_SELECTOR =
+  '[data-motion-surface], [role="dialog"], [role="menu"], [role="listbox"], .app-dialog, .app-dialog-backdrop';
+
 let lastTriggerRect: CapturedRect | null = null;
 let listenersBound = false;
 
-function recordElementTrigger(el: EventTarget | null) {
-  if (!(el instanceof Element)) return;
-  const trigger = el.closest(
-    'button, a, [role="button"], [role="menuitem"], [role="option"], [data-trigger], [tabindex]',
-  );
-  if (!trigger || trigger.matches('[data-motion-surface="panel"]')) return;
+function writeViewTransitionOrigin(x: string, y: string) {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty("--vt-x", x);
+  document.documentElement.style.setProperty("--vt-y", y);
+}
+
+function resolveTriggerElement(target: EventTarget | null): Element | null {
+  const el =
+    target instanceof Element
+      ? target
+      : target instanceof Node
+        ? target.parentElement
+        : null;
+  if (!el) return null;
+  const trigger = el.closest(TRIGGER_SELECTOR);
+  if (!trigger) return null;
+  if (trigger.matches(NON_TRIGGER_CONTAINER_SELECTOR)) return null;
+  if (
+    trigger.matches(':disabled, [aria-disabled="true"]') ||
+    (trigger instanceof HTMLButtonElement && trigger.disabled)
+  ) {
+    return null;
+  }
+  return trigger;
+}
+
+function recordElementTrigger(target: EventTarget | null): boolean {
+  const trigger = resolveTriggerElement(target);
+  if (!trigger) return false;
   const rect = trigger.getBoundingClientRect();
-  if (rect.width === 0 && rect.height === 0) return;
+  if (rect.width === 0 && rect.height === 0) return false;
   lastTriggerRect = {
     left: rect.left,
     top: rect.top,
@@ -165,14 +194,38 @@ function recordElementTrigger(el: EventTarget | null) {
     height: rect.height,
     capturedAt: Date.now(),
   };
-  document.documentElement.style.setProperty(
-    "--vt-x",
+  writeViewTransitionOrigin(
     `${Math.round(rect.left + rect.width / 2)}px`,
-  );
-  document.documentElement.style.setProperty(
-    "--vt-y",
     `${Math.round(rect.top + rect.height / 2)}px`,
   );
+  return true;
+}
+
+export function hasRecentUserTrigger(maxAgeMs = 1800): boolean {
+  return (
+    lastTriggerRect !== null &&
+    Date.now() - lastTriggerRect.capturedAt < maxAgeMs
+  );
+}
+
+export function ensureViewTransitionOrigin(
+  explicitTrigger?: EventTarget | null,
+) {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  if (explicitTrigger && recordElementTrigger(explicitTrigger)) {
+    return;
+  }
+  if (lastTriggerRect && Date.now() - lastTriggerRect.capturedAt < 1800) {
+    writeViewTransitionOrigin(
+      `${Math.round(lastTriggerRect.left + lastTriggerRect.width / 2)}px`,
+      `${Math.round(lastTriggerRect.top + lastTriggerRect.height / 2)}px`,
+    );
+    return;
+  }
+  if (document.activeElement && recordElementTrigger(document.activeElement)) {
+    return;
+  }
+  writeViewTransitionOrigin("50%", "50%");
 }
 
 export function ensureTriggerTracker() {
@@ -180,7 +233,16 @@ export function ensureTriggerTracker() {
   listenersBound = true;
   window.addEventListener(
     "pointerdown",
-    (e) => recordElementTrigger(e.target),
+    (e) => {
+      recordElementTrigger(e.target);
+    },
+    { capture: true, passive: true },
+  );
+  window.addEventListener(
+    "click",
+    (e) => {
+      recordElementTrigger(e.target);
+    },
     { capture: true, passive: true },
   );
   window.addEventListener(
@@ -194,18 +256,22 @@ export function ensureTriggerTracker() {
   );
 }
 
+if (typeof window !== "undefined") {
+  ensureTriggerTracker();
+}
+
 export function captureTriggerOriginVector(
   targetRect?: { left: number; top: number; width: number; height: number },
 ): TriggerOriginVector {
   if (typeof window === "undefined") {
-    return { x: 0, y: -10, originX: "center", originY: "top" };
+    return { x: 0, y: 10, originX: "center", originY: "center" };
   }
   const rect =
     lastTriggerRect && Date.now() - lastTriggerRect.capturedAt < 1800
       ? lastTriggerRect
       : null;
   if (!rect) {
-    return { x: 0, y: -10, originX: "center", originY: "top" };
+    return { x: 0, y: 10, originX: "center", originY: "center" };
   }
   const triggerCenterX = rect.left + rect.width / 2;
   const triggerCenterY = rect.top + rect.height / 2;

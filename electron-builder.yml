@@ -63,8 +63,18 @@ mac:
     - "!node_modules/better-sqlite3/prebuilds/!(darwin-${arch}).node"
   icon: build/icon.icns
   target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
+    - dmg
   category: public.app-category.finance
+dmg:
+  title: "BillFlow ${version}"
+  icon: build/icon.icns
+  background: build/dmg-background.png
+  iconSize: 104
+  iconTextSize: 12
+  contents:
+    - x: 175
+      y: 232
+    - x: 485
+      y: 232
+      type: link
+      path: /Applications

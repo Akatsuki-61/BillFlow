@@ -710,7 +710,7 @@ function ClientsContent() {
                       </button>
 
                       {/* Dropdown Menu */}
-                      <AnimatePresence>
+                      <AnimatePresence initial={false}>
                         {activeMenuId === client.id && (
                           <motion.div
                             key={`client-menu-${client.id}`}

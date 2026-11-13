@@ -163,10 +163,10 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 
 @keyframes vt-mask-reveal {
   from {
-    clip-path: circle(0% at var(--vt-x, 50%) var(--vt-y, 24px));
+    clip-path: circle(0% at var(--vt-x, 50%) var(--vt-y, 50%));
   }
   to {
-    clip-path: circle(150% at var(--vt-x, 50%) var(--vt-y, 24px));
+    clip-path: circle(150% at var(--vt-x, 50%) var(--vt-y, 50%));
   }
 }
 

@@ -107,7 +107,9 @@ export function MotionSurface({
   const isPresent = useIsPresent();
   const [triggerOrigin] = useState(() => {
     ensureTriggerTracker();
-    return kind === "panel" ? captureTriggerOriginVector() : null;
+    return kind === "panel" || kind === "menu"
+      ? captureTriggerOriginVector()
+      : null;
   });
 
   useEffect(() => {
@@ -226,7 +228,7 @@ export function MotionSurface({
                 opacity: 0,
                 scale: POPOVER_INITIAL_SCALE,
                 x: triggerOrigin?.x ?? 0,
-                y: triggerOrigin?.y ?? -10,
+                y: triggerOrigin?.y ?? 10,
               },
               visible: {
                 opacity: 1,
@@ -264,7 +266,7 @@ export function MotionSurface({
       exit="exit"
       variants={variants}
       style={{
-        ...(kind === "panel" && triggerOrigin
+        ...((kind === "panel" || kind === "menu") && triggerOrigin
           ? {
               transformOrigin: `${triggerOrigin.originY} ${triggerOrigin.originX}`,
             }

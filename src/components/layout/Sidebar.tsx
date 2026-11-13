@@ -794,7 +794,11 @@ export default function Sidebar() {
                             <button
                               key={mode.id}
                               type="button"
-                              onClick={() => setPreference(mode.id)}
+                              onClick={(e) =>
+                                setPreference(mode.id, {
+                                  trigger: e.currentTarget,
+                                })
+                              }
                               className={`relative isolate flex items-center justify-center gap-1.5 py-1.5 rounded-[8px] text-[11.5px] font-medium cursor-pointer transition-colors ${
                                 active
                                   ? "text-content-neutral-950"

@@ -20,7 +20,7 @@
     "db:generate": "drizzle-kit generate",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac": "npm run build && electron-builder --mac --arm64 --x64",
     "dist:mac:arm64": "npm run build && electron-builder --mac --arm64",
     "prepare:native": "electron-builder install-app-deps",
     "postinstall": "electron-builder install-app-deps",

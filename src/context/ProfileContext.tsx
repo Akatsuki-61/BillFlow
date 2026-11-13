@@ -160,10 +160,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const initialBootHandledRef = useRef(false);
 
   const applyProfileVisuals = useCallback(
-    (profile: UserProfile) => {
-      setAccent(profile.accent);
+    (profile: UserProfile, transition = false) => {
+      setAccent(profile.accent, { transition });
       if (profile.themePreference) {
-        setPreference(profile.themePreference);
+        setPreference(profile.themePreference, { transition });
       }
       if (typeof window !== "undefined") {
         sessionStorage.setItem("billflow_active_profile_scope", profile.id);
@@ -189,7 +189,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         res.profiles[0] ??
         FALLBACK_DEFAULT_PROFILE;
 
-      applyProfileVisuals(active);
+      applyProfileVisuals(active, !isInitialBoot);
       if (res.isLocked) {
         setIsLocked(true);
         setIsGateOpen(true);
