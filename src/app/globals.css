@@ -9,12 +9,11 @@
 }
 
 :root {
-  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-liquid-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-press-in: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-on-screen: cubic-bezier(0.42, 0, 0.58, 1);
+  --ease-press-in: cubic-bezier(0.42, 0, 0.58, 1);
   --motion-fast: 150ms;
-  --motion-normal: 240ms;
-  --motion-bounce: 310ms;
+  --motion-normal: 220ms;
 }
 
 body {
@@ -72,23 +71,23 @@ body {
   letter-spacing: -0.03em;
 }
 
-/* Shared interaction rhythm: tactile Liquid Glass press + spring rebound on release, Windows ClearType safe (scale: 1 at rest & hover). */
+/* Shared interaction rhythm: crisp tactile press without underdamped bounce (scale: 1 at rest & hover). */
 :where(button, a, input, select, textarea, [role="button"]) {
   transition:
-    color var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease),
-    border-color var(--motion-fast) var(--motion-ease),
-    box-shadow var(--motion-normal) var(--motion-ease),
-    opacity var(--motion-fast) var(--motion-ease),
-    transform var(--motion-bounce) var(--ease-liquid-bounce),
-    translate var(--motion-bounce) var(--ease-liquid-bounce),
-    scale var(--motion-bounce) var(--ease-liquid-bounce);
+    color var(--motion-fast) var(--ease-on-screen),
+    background-color var(--motion-fast) var(--ease-on-screen),
+    border-color var(--motion-fast) var(--ease-on-screen),
+    box-shadow var(--motion-normal) var(--ease-on-screen),
+    opacity var(--motion-fast) var(--ease-on-screen),
+    transform var(--motion-fast) var(--ease-on-screen),
+    translate var(--motion-fast) var(--ease-on-screen),
+    scale var(--motion-fast) var(--ease-on-screen);
 }
 
 :where(button, [role="button"]):not(:disabled):not(
     [aria-disabled="true"]
   ):active {
-  scale: 0.96;
+  scale: 0.97;
   translate: 0 0.5px;
   transition-duration: 75ms;
   transition-timing-function: var(--ease-press-in);
@@ -128,15 +127,62 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
     translate var(--motion-normal) var(--motion-ease);
 }
 
-@keyframes nav-arrive {
+@keyframes success-confirm-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.42);
+    transform: scale(1);
+  }
+  45% {
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+    transform: scale(1.06);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+    transform: scale(1);
+  }
+}
+
+.success-confirm-pulse {
+  animation: success-confirm-pulse 420ms var(--ease-on-screen) both;
+}
+
+@keyframes mask-reveal-down {
   from {
+    clip-path: inset(0 0 100% 0 round 12px);
     opacity: 0.7;
-    scale: 0.96;
   }
   to {
+    clip-path: inset(0 0 0 0 round 12px);
     opacity: 1;
-    scale: 1;
   }
+}
+
+.mask-reveal-down {
+  animation: mask-reveal-down 210ms var(--ease-on-screen) both;
+}
+
+@keyframes vt-mask-reveal {
+  from {
+    clip-path: circle(0% at var(--vt-x, 50%) var(--vt-y, 24px));
+  }
+  to {
+    clip-path: circle(150% at var(--vt-x, 50%) var(--vt-y, 24px));
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+  animation: vt-mask-reveal 360ms var(--ease-on-screen) both;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -158,7 +204,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 
 /* Opacity only on page containers keeps fixed dialogs anchored to the viewport. */
 .motion-page {
-  animation: page-arrive 260ms var(--motion-ease);
+  animation: page-arrive 240ms var(--motion-ease);
 }
 
 [data-motion-surface="panel"] {
@@ -170,10 +216,6 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 /* Motion owns these properties; CSS transitions would trail its animation frames. */
 [data-motion-surface] {
   transition: none;
-}
-
-[data-motion-surface="menu"] {
-  transform-origin: top right;
 }
 
 /* Toast feedback notifications always appear on the topmost layer above all modals, overlays, and drawers. */
@@ -533,14 +575,14 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   translate: 0 0;
   scale: 1;
   transition:
-    color var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease),
-    border-color var(--motion-fast) var(--motion-ease),
-    box-shadow var(--motion-normal) var(--motion-ease),
-    opacity var(--motion-fast) var(--motion-ease),
-    transform var(--motion-bounce) var(--ease-liquid-bounce),
-    translate var(--motion-bounce) var(--ease-liquid-bounce),
-    scale var(--motion-bounce) var(--ease-liquid-bounce);
+    color var(--motion-fast) var(--ease-on-screen),
+    background-color var(--motion-fast) var(--ease-on-screen),
+    border-color var(--motion-fast) var(--ease-on-screen),
+    box-shadow var(--motion-normal) var(--ease-on-screen),
+    opacity var(--motion-fast) var(--ease-on-screen),
+    transform var(--motion-fast) var(--ease-on-screen),
+    translate var(--motion-fast) var(--ease-on-screen),
+    scale var(--motion-fast) var(--ease-on-screen);
 }
 .ui-button:hover:not(:disabled) {
   translate: 0 -1px;
@@ -548,7 +590,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 }
 .ui-button:active:not(:disabled) {
   translate: 0 0.5px;
-  scale: 0.955;
+  scale: 0.97;
   transition-duration: 70ms;
   transition-timing-function: var(--ease-press-in);
 }
@@ -559,8 +601,8 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   flex-shrink: 0;
   scale: 1;
   transition:
-    transform var(--motion-bounce) var(--ease-liquid-bounce),
-    scale var(--motion-bounce) var(--ease-liquid-bounce);
+    transform var(--motion-fast) var(--ease-on-screen),
+    scale var(--motion-fast) var(--ease-on-screen);
 }
 .ui-button:active:not(:disabled) > svg {
   scale: 0.92;
@@ -835,8 +877,8 @@ input[type="checkbox"] {
   cursor: pointer;
   scale: 1;
   transition:
-    color var(--motion-fast) var(--motion-ease),
-    scale var(--motion-bounce) var(--ease-liquid-bounce);
+    color var(--motion-fast) var(--ease-on-screen),
+    scale var(--motion-fast) var(--ease-on-screen);
 }
 .ui-segmented button:hover {
   translate: none;
@@ -844,7 +886,7 @@ input[type="checkbox"] {
   color: var(--ui-text);
 }
 .ui-segmented button:active:not(:disabled) {
-  scale: 0.96;
+  scale: 0.97;
   transition-duration: 70ms;
   transition-timing-function: var(--ease-press-in);
 }
@@ -1046,10 +1088,7 @@ input[type="checkbox"] {
   border-radius: 50%;
   background: white;
   box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
-  transition: transform var(--motion-fast) var(--motion-ease);
-}
-.ui-switch[aria-checked="true"] span {
-  transform: translateX(16px);
+  will-change: transform;
 }
 .ui-switch:hover,
 .ui-switch:active {
@@ -1395,12 +1434,12 @@ input[type="checkbox"] {
   color: var(--ui-muted);
   cursor: pointer;
   transition:
-    color var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease),
-    scale 260ms var(--ease-liquid-bounce);
+    color var(--motion-fast) var(--ease-on-screen),
+    background-color var(--motion-fast) var(--ease-on-screen),
+    scale var(--motion-fast) var(--ease-on-screen);
 }
 .settings-sidebar nav button:active {
-  scale: 0.975;
+  scale: 0.97;
   transition-duration: 75ms;
   transition-timing-function: var(--ease-press-in);
 }
@@ -2829,14 +2868,7 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
 @keyframes bf-toast-pop-in {
   0% {
     opacity: 0;
-    transform: translate3d(0, 22px, 0) scale(0.92);
-  }
-  60% {
-    opacity: 1;
-    transform: translate3d(0, -4px, 0) scale(1.02);
-  }
-  82% {
-    transform: translate3d(0, 2px, 0) scale(0.995);
+    transform: translate3d(0, 14px, 0) scale(0.95);
   }
   100% {
     opacity: 1;
@@ -2854,7 +2886,7 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
 }
 
 .bf-toast-popup {
-  animation: bf-toast-pop-in 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: bf-toast-pop-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
   overflow: hidden;
 }
 
@@ -2964,7 +2996,10 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
   .bf-toast-update-badge i.fa-solid.fa-pen,
   .bf-toast-update-badge i.fa-solid.fa-arrows-rotate,
   .bf-toast-update-badge i.fa-solid.fa-rotate,
-  .bf-toast-progress-bar {
+  .bf-toast-progress-bar,
+  .success-confirm-pulse,
+  .mask-reveal-down,
+  ::view-transition-new(root) {
     animation: none;
     transform: none;
   }

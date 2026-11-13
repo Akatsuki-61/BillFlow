@@ -20,7 +20,11 @@ import {
 import { Button } from "@/components/ui/Workspace";
 import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import {
+  IconCrossfade,
+  MotionPresence,
+  MotionSurface,
+} from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { useWidgetContext } from "@/context/WidgetContext";
@@ -242,7 +246,7 @@ export default function DashboardPage() {
             className="fixed bottom-6 right-6 z-[9999] flex items-center justify-between gap-3 px-4 py-2.5 bg-toast text-white rounded-2xl shadow-xl text-[12.5px] font-medium min-w-[280px]"
           >
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="text-success-bright text-[14px] shrink-0" />
+              <CheckCircle2 className="success-confirm-pulse rounded-full text-success-bright text-[14px] shrink-0" />
               <span>{toastMessage}</span>
             </div>
             {toastAction && (
@@ -298,11 +302,16 @@ export default function DashboardPage() {
             }`}
           >
             <span>{isDashboardEditing ? "Done editing" : "Manage Widget"}</span>
-            {isDashboardEditing ? (
-              <Check className="w-3.5 h-3.5" />
-            ) : (
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-            )}
+            <IconCrossfade
+              iconKey={isDashboardEditing ? "done" : "manage"}
+              className="w-3.5 h-3.5"
+            >
+              {isDashboardEditing ? (
+                <Check className="w-3.5 h-3.5" />
+              ) : (
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+              )}
+            </IconCrossfade>
           </button>
         </div>
       </header>

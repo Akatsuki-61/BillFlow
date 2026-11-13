@@ -26,6 +26,7 @@ import {
   managedAttachmentPath,
   receiptFormat,
   publishManagedAttachment,
+  atomicWrite,
 } from "../managed-files";
 export { managedAttachmentPath } from "../managed-files";
 
@@ -162,6 +163,9 @@ export async function openAttachment(id: string) {
     throw new Error(
       "Receipt file is missing. Restore it from a complete backup.",
     );
+  const stat = fs.lstatSync(file);
+  if (stat.isSymbolicLink() || !stat.isFile())
+    throw new Error("Receipt integrity check failed.");
   if (
     createHash("sha256").update(fs.readFileSync(file)).digest("hex") !==
     row.sha256
@@ -175,12 +179,21 @@ export function pdfOutputDirectory() {
     getOrCreateSettings().pdfExportDirectory || app.getPath("downloads");
   if (!path.isAbsolute(value))
     throw new Error("Choose an absolute PDF export directory in Settings.");
-  if (!fs.existsSync(value) || !fs.statSync(value).isDirectory())
+  if (!fs.existsSync(value))
     throw new Error(
       "PDF export folder is missing. Choose another folder in Settings.",
     );
+  const stat = fs.lstatSync(value);
+  if (stat.isSymbolicLink() || !stat.isDirectory())
+    throw new Error(
+      "PDF export folder must be a real directory, not a symbolic link.",
+    );
   fs.accessSync(value, fs.constants.W_OK);
   return value;
+}
+function assertNonSymlinkFile(filePath: string, message: string) {
+  const stat = fs.lstatSync(filePath);
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(message);
 }
 // The PDF generator calls this in the main process after saving its invoice.
 export function saveInvoicePdf(invoiceId: string, bytes: Buffer) {
@@ -194,21 +207,17 @@ export function saveInvoicePdf(invoiceId: string, bytes: Buffer) {
     throw new Error("Invoice exporter did not produce a PDF.");
   const name = `${invoice.code.replace(/[^a-zA-Z0-9_-]/g, "_")}-${createHash("sha256").update(`${getActiveProfileId()}:${invoiceId}`).digest("hex").slice(0, 12)}.pdf`;
   const filePath = path.join(pdfOutputDirectory(), name);
-  const temporary = `${filePath}.${randomUUID()}.tmp`;
-  try {
-    fs.writeFileSync(temporary, bytes, { flag: "wx" });
-    fs.renameSync(temporary, filePath);
-    getDb()
-      .insert(invoicePdfExports)
-      .values({ invoiceId, filePath, exportedAt: new Date().toISOString() })
-      .onConflictDoUpdate({
-        target: invoicePdfExports.invoiceId,
-        set: { filePath, exportedAt: new Date().toISOString() },
-      })
-      .run();
-  } finally {
-    fs.rmSync(temporary, { force: true });
-  }
+  if (fs.existsSync(filePath) && fs.lstatSync(filePath).isSymbolicLink())
+    throw new Error("Cannot overwrite a symbolic link when exporting PDF.");
+  atomicWrite(filePath, bytes);
+  getDb()
+    .insert(invoicePdfExports)
+    .values({ invoiceId, filePath, exportedAt: new Date().toISOString() })
+    .onConflictDoUpdate({
+      target: invoicePdfExports.invoiceId,
+      set: { filePath, exportedAt: new Date().toISOString() },
+    })
+    .run();
   return filePath;
 }
 
@@ -226,21 +235,17 @@ export function saveWorkOrderPdf(workOrderId: string, bytes: Buffer): string {
   const safeId = workOrderId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(-12);
   const name = `VOUCHER-${safeId}-${createHash("sha256").update(`${getActiveProfileId()}:${workOrderId}`).digest("hex").slice(0, 8)}.pdf`;
   const filePath = path.join(pdfOutputDirectory(), name);
-  const temporary = `${filePath}.${randomUUID()}.tmp`;
-  try {
-    fs.writeFileSync(temporary, bytes, { flag: "wx" });
-    fs.renameSync(temporary, filePath);
-    getDb()
-      .insert(workOrderPdfExports)
-      .values({ workOrderId, filePath, exportedAt: new Date().toISOString() })
-      .onConflictDoUpdate({
-        target: workOrderPdfExports.workOrderId,
-        set: { filePath, exportedAt: new Date().toISOString() },
-      })
-      .run();
-  } finally {
-    fs.rmSync(temporary, { force: true });
-  }
+  if (fs.existsSync(filePath) && fs.lstatSync(filePath).isSymbolicLink())
+    throw new Error("Cannot overwrite a symbolic link when exporting PDF.");
+  atomicWrite(filePath, bytes);
+  getDb()
+    .insert(workOrderPdfExports)
+    .values({ workOrderId, filePath, exportedAt: new Date().toISOString() })
+    .onConflictDoUpdate({
+      target: workOrderPdfExports.workOrderId,
+      set: { filePath, exportedAt: new Date().toISOString() },
+    })
+    .run();
   return filePath;
 }
 
@@ -257,6 +262,7 @@ export async function openWorkOrderPdf(
   if (!filePath) throw new Error("Export the voucher PDF first.");
   if (!fs.existsSync(filePath))
     throw new Error("Voucher PDF file not found. Export it again.");
+  assertNonSymlinkFile(filePath, "Invalid voucher PDF file.");
   if (path.extname(filePath).toLowerCase() !== ".pdf")
     throw new Error("Invalid voucher PDF path.");
   if (reveal) shell.showItemInFolder(filePath);
@@ -275,6 +281,7 @@ export async function openInvoicePdf(invoiceId: string, reveal = false) {
     .get();
   if (!record || !fs.existsSync(record.filePath))
     throw new Error("No saved PDF is available. Export this invoice again.");
+  assertNonSymlinkFile(record.filePath, "Invalid invoice PDF file.");
   if (path.extname(record.filePath).toLowerCase() !== ".pdf")
     throw new Error("Invalid invoice PDF path.");
   if (reveal) shell.showItemInFolder(record.filePath);

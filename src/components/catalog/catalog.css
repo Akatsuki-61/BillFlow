@@ -36,38 +36,6 @@
   box-shadow: var(--ui-shadow);
 }
 
-/* Category Filter Pills */
-.catalog-category-btn {
-  padding: 0.425rem 0.85rem;
-  border-radius: 10px;
-  font-size: 12.5px;
-  transition: all 150ms ease-in-out;
-  cursor: pointer;
-  background-color: var(--ui-subtle);
-  border: 1px solid var(--ui-border);
-  color: var(--foreground);
-  font-weight: 500;
-}
-
-.catalog-category-btn:hover {
-  background-color: var(--ui-hover);
-  color: var(--foreground);
-}
-
-.catalog-category-btn-active {
-  background-color: #1c1c1f;
-  color: #ffffff;
-  font-weight: 500;
-  border-color: #1c1c1f;
-  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.18);
-}
-
-:root[data-theme="dark"] .catalog-category-btn-active {
-  background-color: #f4f4f6;
-  color: #111115;
-  border-color: #f4f4f6;
-}
-
 /* Right Main List Container */
 .catalog-items-container {
   background-color: var(--ui-surface);

@@ -434,10 +434,18 @@ export function importWorkspace(input: ExportDataPayload) {
       .all();
     if (mismatch.length)
       throw new Error("Payment currencies do not match their owner.");
+    const itemsByInvoice = new Map<
+      string,
+      (typeof payload.records.invoice_items)[number][]
+    >();
+    for (const item of payload.records.invoice_items) {
+      const key = String(item.invoice_id || "");
+      const list = itemsByInvoice.get(key) || [];
+      list.push(item);
+      itemsByInvoice.set(key, list);
+    }
     for (const invoice of payload.records.invoices) {
-      const items = payload.records.invoice_items.filter(
-        (item) => item.invoice_id === invoice.id,
-      );
+      const items = itemsByInvoice.get(String(invoice.id || "")) || [];
       // Historical backups can predate itemized invoices; validate totals when itemization exists.
       validateInvoiceAmounts({
         amountCents: Number(invoice.amount_cents),

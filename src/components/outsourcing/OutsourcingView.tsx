@@ -41,7 +41,11 @@ import {
   useData,
 } from "@/lib/data/DataProvider";
 import { formatCents, formatCurrencyAmount } from "@/lib/format";
-import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
+import {
+  resolveDeliveryUrl,
+  formatExternalUrl,
+  openExternalLink,
+} from "@/lib/deliveryUrl";
 import type { VendorItem, WorkOrderItem } from "@/types/outsourcing";
 import type { Currency } from "@/types/billing";
 import type { AttachmentItem } from "@/types/workflow";
@@ -816,7 +820,7 @@ export default function OutsourcingView() {
             {toastNotification.type === "error" ? (
               <AlertCircle className="text-content-rose-400 text-[14px] shrink-0" />
             ) : (
-              <CheckCircle2 className="text-success-bright text-[14px] shrink-0" />
+              <CheckCircle2 className="success-confirm-pulse rounded-full text-success-bright text-[14px] shrink-0" />
             )}
             <span>{toastNotification.message}</span>
           </MotionSurface>
@@ -1012,7 +1016,7 @@ export default function OutsourcingView() {
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
                     aria-pressed={isActive}
-                    className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:scale-[0.96] ${
+                    className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:scale-[0.97] ${
                       isActive
                         ? "text-content-neutral-900"
                         : "text-content-neutral-600 hover:text-content-neutral-900"
@@ -1069,7 +1073,7 @@ export default function OutsourcingView() {
                     type="button"
                     onClick={() => setStatusFilter(item.id)}
                     aria-pressed={isActive}
-                    className={`vendor-filter-btn relative active:scale-[0.955] ${isActive ? "active !bg-transparent !shadow-none" : ""}`}
+                    className={`vendor-filter-btn relative active:scale-[0.97] ${isActive ? "active !bg-transparent !shadow-none" : ""}`}
                   >
                     {isActive && (
                       <motion.span
@@ -1893,7 +1897,7 @@ export default function OutsourcingView() {
                                 "todo" | "in-progress" | "review" | "done",
                             )
                           }
-                          className={`relative px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors text-center active:scale-[0.955] ${
+                          className={`relative px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors text-center active:scale-[0.97] ${
                             isActive
                               ? "text-white border-accent"
                               : "bg-surface-neutral-50 border-line-neutral-200 text-content-neutral-700 hover:bg-surface-neutral-100"
@@ -1919,17 +1923,21 @@ export default function OutsourcingView() {
                     <label className="outsourcing-label">
                       Deliverable URL / Repository / Staging
                     </label>
-                    {reviewDeliveryUrl && (
-                      <a
-                        href={reviewDeliveryUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-accent hover:underline inline-flex items-center gap-1"
-                      >
-                        <span>Open Link</span>
-                        <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                    )}
+                    {reviewDeliveryUrl &&
+                      formatExternalUrl(reviewDeliveryUrl) && (
+                        <a
+                          href={formatExternalUrl(reviewDeliveryUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) =>
+                            openExternalLink(reviewDeliveryUrl, e)
+                          }
+                          className="text-xs text-accent hover:underline inline-flex items-center gap-1"
+                        >
+                          <span>Open Link</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
                   </div>
                   <input
                     type="url"

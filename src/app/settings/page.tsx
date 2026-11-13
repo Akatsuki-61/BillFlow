@@ -12,7 +12,7 @@ import React, {
   useMemo,
   Suspense,
 } from "react";
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { IconCrossfade, MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
@@ -2445,11 +2445,16 @@ function SettingsContent() {
                           disabled={!isElectron}
                           onClick={handleCopyPath}
                         >
-                          {copiedPath ? (
-                            <Check className="w-3.5 h-3.5 text-content-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5 text-content-neutral-500" />
-                          )}
+                          <IconCrossfade
+                            iconKey={copiedPath ? "copied" : "copy"}
+                            className="w-3.5 h-3.5"
+                          >
+                            {copiedPath ? (
+                              <Check className="w-3.5 h-3.5 text-content-emerald-600 success-confirm-pulse rounded-full" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5 text-content-neutral-500" />
+                            )}
+                          </IconCrossfade>
                           {copiedPath ? "Copied" : "Copy Path"}
                         </Button>
 

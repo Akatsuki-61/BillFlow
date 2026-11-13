@@ -2204,7 +2204,7 @@ export function WidgetRenderer({
           onContextMenu(e, widgetId);
         }
       }}
-      className={`group relative h-full transition-all duration-200 ${
+      className={`group relative h-full transition-[opacity,box-shadow,translate] duration-200 ${
         isDraggable
           ? "cursor-grab active:cursor-grabbing hover:-translate-y-0.5"
           : ""

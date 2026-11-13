@@ -28,6 +28,8 @@ import {
   BookOpen,
 } from "lucide-react";
 import { PageHeader, Button } from "@/components/ui/Workspace";
+import { IconCrossfade } from "@/components/ui/MotionSurface";
+import { detailSettleTransition } from "@/lib/motion";
 import { useData } from "@/lib/data/DataProvider";
 
 interface FAQItem {
@@ -287,17 +289,17 @@ export default function SupportPage() {
             className="flex items-center gap-2 text-xs font-medium"
             title="Copy technical details for reporting issues"
           >
-            {copiedDiag ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-content-emerald-600" />
-                <span>Copied Details</span>
-              </>
-            ) : (
-              <>
+            <IconCrossfade
+              iconKey={copiedDiag ? "copied" : "copy"}
+              className="w-3.5 h-3.5"
+            >
+              {copiedDiag ? (
+                <Check className="w-3.5 h-3.5 text-content-emerald-600 success-confirm-pulse rounded-full" />
+              ) : (
                 <Copy className="w-3.5 h-3.5 text-content-neutral-500" />
-                <span>Copy Diagnostics</span>
-              </>
-            )}
+              )}
+            </IconCrossfade>
+            <span>{copiedDiag ? "Copied Details" : "Copy Diagnostics"}</span>
           </Button>
 
           <a
@@ -566,17 +568,17 @@ export default function SupportPage() {
               onClick={handleCopyDiagnostics}
               className="text-xs flex items-center gap-1.5"
             >
-              {copiedDiag ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-content-emerald-600" />
-                  <span>Copied</span>
-                </>
-              ) : (
-                <>
+              <IconCrossfade
+                iconKey={copiedDiag ? "copied" : "copy"}
+                className="w-3.5 h-3.5"
+              >
+                {copiedDiag ? (
+                  <Check className="w-3.5 h-3.5 text-content-emerald-600 success-confirm-pulse rounded-full" />
+                ) : (
                   <Copy className="w-3.5 h-3.5 text-content-neutral-500" />
-                  <span>Copy Report</span>
-                </>
-              )}
+                )}
+              </IconCrossfade>
+              <span>{copiedDiag ? "Copied" : "Copy Report"}</span>
             </Button>
           </div>
         </div>
@@ -663,7 +665,7 @@ export default function SupportPage() {
                   key={cat.id}
                   type="button"
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer active:scale-[0.955] ${
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer active:scale-[0.97] ${
                     active
                       ? "text-white"
                       : "bg-surface-tinted text-content-neutral-600 hover:text-content-neutral-900 hover:bg-surface-tinted/80"
@@ -752,10 +754,20 @@ export default function SupportPage() {
                         }}
                         className="overflow-hidden"
                       >
-                        <div className="px-4.5 pb-4.5 pt-1 border-t border-line-neutral-100/70 text-xs text-content-neutral-600 leading-relaxed space-y-3">
+                        <motion.div
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={detailSettleTransition(0)}
+                          className="px-4.5 pb-4.5 pt-1 border-t border-line-neutral-100/70 text-xs text-content-neutral-600 leading-relaxed space-y-3"
+                        >
                           <p>{faq.answer}</p>
                           {faq.actionHref && (
-                            <div className="pt-2">
+                            <motion.div
+                              initial={{ opacity: 0, y: 4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={detailSettleTransition(1)}
+                              className="pt-2"
+                            >
                               <Link
                                 href={faq.actionHref}
                                 className="inline-flex items-center gap-1.5 font-semibold text-accent hover:underline"
@@ -763,9 +775,9 @@ export default function SupportPage() {
                                 <span>{faq.actionText || "Learn more"}</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
                               </Link>
-                            </div>
+                            </motion.div>
                           )}
-                        </div>
+                        </motion.div>
                       </motion.div>
                     )}
                   </AnimatePresence>

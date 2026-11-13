@@ -2,7 +2,12 @@
 
 import React, { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
+import {
+  SPRING_MENU_POPOVER,
+  EXIT_MENU_POPOVER,
+  POPOVER_INITIAL_SCALE,
+  listRowTransition,
+} from "@/lib/motion";
 
 export interface ContextMenuItem {
   label: string;
@@ -86,15 +91,18 @@ export function ContextMenu({
             initial={
               reducedMotion
                 ? { opacity: 0 }
-                : { opacity: 0, scaleX: 0.94, scaleY: 0.86, y: -4 }
+                : {
+                    opacity: 0,
+                    scale: POPOVER_INITIAL_SCALE,
+                    y: originY === "bottom" ? 6 : -6,
+                  }
             }
             animate={
               reducedMotion
                 ? { opacity: 1, transition: { duration: 0 } }
                 : {
                     opacity: 1,
-                    scaleX: 1,
-                    scaleY: 1,
+                    scale: 1,
                     y: 0,
                     transition: SPRING_MENU_POPOVER,
                   }
@@ -104,9 +112,8 @@ export function ContextMenu({
                 ? { opacity: 0, transition: { duration: 0 } }
                 : {
                     opacity: 0,
-                    scaleX: 0.95,
-                    scaleY: 0.9,
-                    y: -2,
+                    scale: POPOVER_INITIAL_SCALE,
+                    y: originY === "bottom" ? 6 : -6,
                     transition: EXIT_MENU_POPOVER,
                   }
             }
@@ -119,9 +126,12 @@ export function ContextMenu({
           >
             <div className="flex flex-col gap-0.5">
               {items.map((item, index) => (
-                <button
+                <motion.button
                   key={index}
                   type="button"
+                  initial={reducedMotion ? false : { opacity: 0, y: -3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={listRowTransition(index, Boolean(reducedMotion))}
                   onClick={(e) => {
                     e.stopPropagation();
                     item.onClick();
@@ -139,7 +149,7 @@ export function ContextMenu({
                     </span>
                   )}
                   <span className="truncate">{item.label}</span>
-                </button>
+                </motion.button>
               ))}
             </div>
           </motion.div>

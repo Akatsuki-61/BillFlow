@@ -22,6 +22,7 @@ import {
   loadWidgetPreferences,
   getScopedWidgetStorageKeys,
 } from "@/lib/widgets/widgetStorage";
+import { rubberbandOffset } from "@/lib/motion";
 
 // Action descriptor for interactive toast notifications (e.g., clickable "Undo" button)
 export interface ToastAction {
@@ -490,8 +491,29 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
       const anchorX = grabX * (1 - eased) + navX * eased;
       const anchorY = grabY * (1 - eased) + navY * eased;
 
-      const x = Math.round(clientX - anchorX);
-      const y = Math.round(clientY - anchorY);
+      const rawX = clientX - anchorX;
+      const rawY = clientY - anchorY;
+      const pad = 12;
+      const maxX =
+        typeof window !== "undefined"
+          ? Math.max(pad, window.innerWidth - metrics.width * scale - pad)
+          : rawX;
+      const maxY =
+        typeof window !== "undefined"
+          ? Math.max(pad, window.innerHeight - metrics.height * scale - pad)
+          : rawY;
+      const x =
+        rawX < pad
+          ? Math.round(pad + rubberbandOffset(rawX - pad, 140))
+          : rawX > maxX
+            ? Math.round(maxX + rubberbandOffset(rawX - maxX, 140))
+            : Math.round(rawX);
+      const y =
+        rawY < pad
+          ? Math.round(pad + rubberbandOffset(rawY - pad, 140))
+          : rawY > maxY
+            ? Math.round(maxY + rubberbandOffset(rawY - maxY, 140))
+            : Math.round(rawY);
 
       overlay.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale.toFixed(4)})`;
       overlay.style.opacity = overHome ? "0.98" : eased > 0.2 ? "0.95" : "0.92";

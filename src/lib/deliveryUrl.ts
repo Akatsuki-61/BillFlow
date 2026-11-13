@@ -11,6 +11,10 @@ export function formatExternalUrl(url?: string | null): string {
   const trimmed = url.trim();
   if (!trimmed) return "";
 
+  if (/^(javascript|vbscript|data):/i.test(trimmed)) {
+    return "";
+  }
+
   if (/^(https?:\/\/|mailto:|file:\/\/)/i.test(trimmed)) {
     return trimmed;
   }

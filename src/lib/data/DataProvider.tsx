@@ -1846,11 +1846,6 @@ export function useInvoices(filter?: { clientId?: string }) {
   };
 }
 
-export function useDashboardSummary() {
-  const { dashboard, isLoading, error, refresh } = useData();
-  return { dashboard, isLoading, error, refresh };
-}
-
 export function useSettings() {
   const {
     settings,

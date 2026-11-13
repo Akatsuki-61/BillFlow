@@ -22,6 +22,13 @@ describe("deliveryUrl utility", () => {
       expect(formatExternalUrl("github.com/Chethaka/project")).toBe("https://github.com/Chethaka/project");
       expect(formatExternalUrl("drive.google.com/drive/folders/123")).toBe("https://drive.google.com/drive/folders/123");
     });
+
+    it("blocks dangerous javascript, vbscript, and data URLs", () => {
+      expect(formatExternalUrl("javascript:alert(1)")).toBe("");
+      expect(formatExternalUrl("  JaVaScRiPt:alert(document.cookie)")).toBe("");
+      expect(formatExternalUrl("vbscript:msgbox(1)")).toBe("");
+      expect(formatExternalUrl("data:text/html,<script>alert(1)</script>")).toBe("");
+    });
   });
 
   describe("resolveDeliveryUrl", () => {

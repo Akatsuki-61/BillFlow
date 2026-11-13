@@ -33,49 +33,6 @@
   letter-spacing: 0.01em;
 }
 
-/* Timeframe Dropdown Group */
-.analytics-dropdown-relative {
-  position: relative;
-}
-
-.analytics-dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 0.25rem;
-  background-color: var(--theme-surface);
-  border: 1px solid var(--theme-line-neutral-200);
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  padding: 0.25rem;
-  z-index: 40;
-  min-width: 8rem;
-}
-
-.analytics-dropdown-item {
-  width: 100%;
-  text-align: left;
-  padding: 0.375rem 0.75rem;
-  font-size: 12px;
-  color: var(--theme-text-secondary);
-  border-radius: 0.5rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
-}
-
-.analytics-dropdown-item:hover {
-  background-color: var(--theme-surface-neutral-100);
-  color: var(--theme-text-primary);
-}
-
-.analytics-dropdown-item.active {
-  background-color: var(--theme-accent-pale);
-  color: var(--theme-accent);
-  font-weight: 600;
-}
-
 /* Metrics Section Layout */
 .analytics-metrics-grid {
   display: grid;

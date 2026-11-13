@@ -14,7 +14,7 @@ import {
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { motion } from "motion/react";
-import { SPRING_NAV_GLIDE } from "@/lib/motion";
+import { SPRING_NAV_GLIDE, listRowTransition } from "@/lib/motion";
 
 import React, { useState, useMemo } from "react";
 import {
@@ -379,7 +379,7 @@ export default function ExpensesPage() {
             kind="toast"
             className="fixed top-14 right-6 z-[9999] bg-surface-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-line-neutral-700"
           >
-            <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
+            <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
             <span>{notification}</span>
           </MotionSurface>
         )}
@@ -590,7 +590,7 @@ export default function ExpensesPage() {
                   </td>
                 </tr>
               ) : (
-                paginatedExpenses.map((item) => {
+                paginatedExpenses.map((item, idx) => {
                   const hasReceipt = Boolean(
                     item.attachments && item.attachments.length > 0,
                   );
@@ -599,8 +599,11 @@ export default function ExpensesPage() {
                     : null;
 
                   return (
-                    <tr
+                    <motion.tr
                       key={item.id}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={listRowTransition(idx)}
                       className="hover:bg-surface-neutral-50/70 transition-colors group"
                     >
                       {/* Icon */}
@@ -682,7 +685,7 @@ export default function ExpensesPage() {
                           <Trash2 className="w-4 h-4 text-content-neutral-400 hover:text-red-600 transition-colors" />
                         </Button>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })
               )}
@@ -723,7 +726,7 @@ export default function ExpensesPage() {
                 <button
                   key={pageNumber}
                   onClick={() => setCurrentPage(pageNumber)}
-                  className={`relative w-7 h-7 rounded flex items-center justify-center text-xs font-semibold transition-colors cursor-pointer active:scale-[0.94] ${
+                  className={`relative w-7 h-7 rounded flex items-center justify-center text-xs font-semibold transition-colors cursor-pointer active:scale-[0.97] ${
                     isActive
                       ? "text-white"
                       : "text-content-neutral-600 hover:bg-surface-neutral-100"

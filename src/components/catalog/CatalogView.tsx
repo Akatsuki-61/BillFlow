@@ -1,6 +1,6 @@
 "use client";
 
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { IconCrossfade, MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { Dialog } from "@/components/ui/Dialog";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_NAV_GLIDE, SPRING_LIQUID_BUTTON } from "@/lib/motion";
@@ -532,7 +532,7 @@ export default function CatalogView() {
             {notification.type === "error" ? (
               <span className="w-2 h-2 rounded-full bg-rose-400" />
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
+              <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
             )}
             <span>{notification.message}</span>
           </MotionSurface>
@@ -703,7 +703,7 @@ export default function CatalogView() {
                 type="button"
                 onClick={() => setSelectedCategory(category)}
                 aria-pressed={isActive}
-                className={`relative px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer active:scale-[0.955] ${
+                className={`relative px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer active:scale-[0.97] ${
                   isActive
                     ? "text-white dark:text-[#111115]"
                     : "bg-surface-neutral-50 text-content-neutral-600 hover:bg-surface-neutral-100 hover:text-content-neutral-900 border border-line-neutral-200/80"
@@ -1476,7 +1476,7 @@ export default function CatalogView() {
                         key={tab.id}
                         type="button"
                         onClick={() => setActiveGuideTab(tab.id)}
-                        className={`import-guide-tab relative active:scale-[0.96] ${isActive ? "import-guide-tab-active" : ""}`}
+                        className={`import-guide-tab relative active:scale-[0.97] ${isActive ? "import-guide-tab-active" : ""}`}
                       >
                         {isActive && (
                           <motion.span
@@ -1716,18 +1716,22 @@ export default function CatalogView() {
                         onClick={copySampleCSV}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line-neutral-200 text-xs font-medium text-content-neutral-700 hover:bg-surface-neutral-50 transition-colors cursor-pointer"
                       >
-                        {copied ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-content-emerald-600" />
-                            <span className="text-content-emerald-700 font-semibold">
-                              Copied!
-                            </span>
-                          </>
-                        ) : (
-                          <>
+                        <IconCrossfade
+                          iconKey={copied ? "copied" : "copy"}
+                          className="w-3.5 h-3.5"
+                        >
+                          {copied ? (
+                            <Check className="w-3.5 h-3.5 text-content-emerald-600 success-confirm-pulse rounded-full" />
+                          ) : (
                             <Copy className="w-3.5 h-3.5 text-content-neutral-500" />
-                            <span>Copy CSV</span>
-                          </>
+                          )}
+                        </IconCrossfade>
+                        {copied ? (
+                          <span className="text-content-emerald-700 font-semibold">
+                            Copied!
+                          </span>
+                        ) : (
+                          <span>Copy CSV</span>
                         )}
                       </button>
                       <button

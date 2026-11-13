@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
+import { IconCrossfade } from "@/components/ui/MotionSurface";
 import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import type { InvoiceWithClient } from "@/types/billing";
@@ -991,28 +992,46 @@ export function OverdueSummaryDialog({
                     <span className="text-xs font-bold uppercase tracking-wider text-content-neutral-500">
                       2. Template Structure:
                     </span>
-                    <div className="inline-flex p-0.5 rounded-lg bg-surface border border-line-neutral-200">
+                    <div className="inline-flex p-0.5 rounded-lg bg-surface border border-line-neutral-200 relative">
                       <button
                         type="button"
                         onClick={() => setCsvTemplateMode("executive")}
-                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                        className={`relative px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                           csvTemplateMode === "executive"
-                            ? "bg-accent text-white"
+                            ? "text-white"
                             : "text-content-neutral-600 hover:text-content-neutral-900"
                         }`}
                       >
-                        Executive Multi-Block
+                        {csvTemplateMode === "executive" && (
+                          <motion.span
+                            layoutId="overdue-template-mode-pill"
+                            transition={SPRING_NAV_GLIDE}
+                            className="absolute inset-0 rounded-md bg-accent"
+                          />
+                        )}
+                        <span className="relative z-10">
+                          Executive Multi-Block
+                        </span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setCsvTemplateMode("flat")}
-                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                        className={`relative px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                           csvTemplateMode === "flat"
-                            ? "bg-accent text-white"
+                            ? "text-white"
                             : "text-content-neutral-600 hover:text-content-neutral-900"
                         }`}
                       >
-                        Standard Flat Register
+                        {csvTemplateMode === "flat" && (
+                          <motion.span
+                            layoutId="overdue-template-mode-pill"
+                            transition={SPRING_NAV_GLIDE}
+                            className="absolute inset-0 rounded-md bg-accent"
+                          />
+                        )}
+                        <span className="relative z-10">
+                          Standard Flat Register
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -1027,11 +1046,16 @@ export function OverdueSummaryDialog({
                     onClick={() => handleCopyClipboard("tsv")}
                     title="Copy tab-separated cells to paste directly into Excel or Google Sheets"
                   >
-                    {copiedType === "tsv" ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
+                    <IconCrossfade
+                      iconKey={copiedType === "tsv" ? "copied" : "copy"}
+                      className="w-3.5 h-3.5"
+                    >
+                      {copiedType === "tsv" ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600 success-confirm-pulse rounded-full" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </IconCrossfade>
                     <span>
                       {copiedType === "tsv"
                         ? "Copied Cells!"

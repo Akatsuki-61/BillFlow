@@ -1,10 +1,15 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useId } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, MotionConfig } from "motion/react";
+import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "motion/react";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { SPRING_NAV_GLIDE, SPRING_LIQUID_BUTTON } from "@/lib/motion";
+import {
+  SPRING_NAV_GLIDE,
+  SPRING_LIQUID_BUTTON,
+  POPOVER_INITIAL_SCALE,
+  listRowTransition,
+} from "@/lib/motion";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -99,6 +104,8 @@ export default function Sidebar() {
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const sheenId = useId();
+  const reducedMotion = Boolean(useReducedMotion());
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -296,7 +303,7 @@ export default function Sidebar() {
                         }
                       : undefined
                   }
-                  className={`workspace-nav-link relative isolate px-4 py-2 rounded-[12px] text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors duration-150 active:scale-[0.955] ${
+                  className={`workspace-nav-link relative isolate px-4 py-2 rounded-[12px] text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors duration-150 active:scale-[0.97] ${
                     isHome && isHomeDropOver
                       ? "bg-accent/25 dark:bg-accent/35 text-accent"
                       : isHomeDropCandidate
@@ -352,6 +359,7 @@ export default function Sidebar() {
                     key="search"
                     kind="menu"
                     id="search-popover"
+                    style={{ transformOrigin: "top right" }}
                     className="workspace-popover absolute right-0 mt-2.5 w-[360px] rounded-[20px] bg-surface border border-line-neutral-200 shadow-[0_18px_40px_-10px_rgba(0,0,0,0.14)] p-3 z-50"
                   >
                     <div className="relative flex items-center">
@@ -369,9 +377,9 @@ export default function Sidebar() {
                           <motion.button
                             key="clear-search"
                             type="button"
-                            initial={{ opacity: 0, scale: 0.5 }}
+                            initial={{ opacity: 0, scale: POPOVER_INITIAL_SCALE }}
                             animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.5 }}
+                            exit={{ opacity: 0, scale: POPOVER_INITIAL_SCALE }}
                             transition={SPRING_LIQUID_BUTTON}
                             onClick={() => setSearchQuery("")}
                             className="absolute right-2.5 text-content-neutral-400 hover:text-content-neutral-700 cursor-pointer"
@@ -399,12 +407,15 @@ export default function Sidebar() {
                             Pages
                           </div>
                           <div className="space-y-0.5">
-                            {searchResults.pages.map((p) => {
+                            {searchResults.pages.map((p, idx) => {
                               const Icon = p.icon;
                               return (
-                                <button
+                                <motion.button
                                   key={p.id}
                                   type="button"
+                                  initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={listRowTransition(idx, reducedMotion)}
                                   onClick={() => {
                                     setSearchOpen(false);
                                     router.push(p.href);
@@ -416,7 +427,7 @@ export default function Sidebar() {
                                     {p.name}
                                   </span>
                                   <ArrowUpRight className="w-3.5 h-3.5 text-content-neutral-400" />
-                                </button>
+                                </motion.button>
                               );
                             })}
                           </div>
@@ -429,10 +440,13 @@ export default function Sidebar() {
                             Invoices
                           </div>
                           <div className="space-y-0.5">
-                            {searchResults.invoices.map((inv) => (
-                              <button
+                            {searchResults.invoices.map((inv, idx) => (
+                              <motion.button
                                 key={inv.id}
                                 type="button"
+                                initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={listRowTransition(idx, reducedMotion)}
                                 onClick={() => {
                                   setSearchOpen(false);
                                   router.push(
@@ -452,7 +466,7 @@ export default function Sidebar() {
                                 <span className="text-xs font-medium tabular-nums text-content-neutral-700 shrink-0 ml-2">
                                   {formatCents(inv.amountCents, inv.currency)}
                                 </span>
-                              </button>
+                              </motion.button>
                             ))}
                           </div>
                         </div>
@@ -464,10 +478,13 @@ export default function Sidebar() {
                             Clients
                           </div>
                           <div className="space-y-0.5">
-                            {searchResults.clients.map((client) => (
-                              <button
+                            {searchResults.clients.map((client, idx) => (
+                              <motion.button
                                 key={client.id}
                                 type="button"
+                                initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={listRowTransition(idx, reducedMotion)}
                                 onClick={() => {
                                   setSearchOpen(false);
                                   router.push(
@@ -482,7 +499,7 @@ export default function Sidebar() {
                                 <span className="text-xs text-content-neutral-400 truncate ml-2">
                                   {client.category || client.contactPerson}
                                 </span>
-                              </button>
+                              </motion.button>
                             ))}
                           </div>
                         </div>
@@ -520,6 +537,7 @@ export default function Sidebar() {
                     key="notifications"
                     kind="menu"
                     id="notifications-popover"
+                    style={{ transformOrigin: "top right" }}
                     className="workspace-popover absolute right-0 mt-2.5 w-[340px] rounded-[20px] bg-surface border border-line-neutral-200 shadow-[0_18px_40px_-10px_rgba(0,0,0,0.14)] p-3.5 z-50"
                   >
                     <div className="flex items-center justify-between pb-2.5 border-b border-line-neutral-100">
@@ -532,15 +550,18 @@ export default function Sidebar() {
                     </div>
 
                     <div className="py-2.5 space-y-2 max-h-[260px] overflow-y-auto">
-                      {activeAlerts.unpaid.slice(0, 3).map((inv) => {
+                      {activeAlerts.unpaid.slice(0, 3).map((inv, idx) => {
                         const remaining = Math.max(
                           0,
                           inv.amountCents - (inv.paidCents || 0),
                         );
                         return (
-                          <button
+                          <motion.button
                             key={inv.id}
                             type="button"
+                            initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={listRowTransition(idx, reducedMotion)}
                             onClick={() => {
                               setNotificationsOpen(false);
                               router.push(
@@ -560,14 +581,20 @@ export default function Sidebar() {
                             <span className="text-[12.5px] font-medium tabular-nums text-content-neutral-900 ml-2 shrink-0">
                               {formatCents(remaining, inv.currency)}
                             </span>
-                          </button>
+                          </motion.button>
                         );
                       })}
 
-                      {activeAlerts.activeTasks.slice(0, 2).map((task) => (
-                        <button
+                      {activeAlerts.activeTasks.slice(0, 2).map((task, idx) => (
+                        <motion.button
                           key={task.id}
                           type="button"
+                          initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={listRowTransition(
+                            Math.min(activeAlerts.unpaid.length, 3) + idx,
+                            reducedMotion,
+                          )}
                           onClick={() => {
                             setNotificationsOpen(false);
                             router.push("/tasks");
@@ -583,7 +610,7 @@ export default function Sidebar() {
                             </div>
                           </div>
                           <ArrowUpRight className="w-3.5 h-3.5 text-content-neutral-400 shrink-0 ml-2" />
-                        </button>
+                        </motion.button>
                       ))}
 
                       {activeAlerts.totalCount === 0 && (
@@ -640,7 +667,7 @@ export default function Sidebar() {
                     ? `0 0 0 3px ${activeProfileStyle.ring}, 0 8px 18px -4px ${activeProfileStyle.glow}`
                     : `0 4px 12px -3px ${activeProfileStyle.glow}`,
                 }}
-                className="relative w-10 h-10 p-[2px] rounded-full border-2 bg-surface flex items-center justify-center cursor-pointer group transition-all duration-200 hover:scale-105"
+                className="relative w-10 h-10 p-[2px] rounded-full border-2 bg-surface flex items-center justify-center cursor-pointer group transition-[transform,border-color,box-shadow] duration-200 hover:scale-105"
               >
                 <span
                   className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.22)_inset]"
@@ -680,12 +707,12 @@ export default function Sidebar() {
                       y="0"
                       width="100"
                       height="48"
-                      fill="url(#navbar-profile-avatar-sheen)"
+                      fill={`url(#${sheenId})`}
                       opacity="0.22"
                     />
                     <defs>
                       <linearGradient
-                        id="navbar-profile-avatar-sheen"
+                        id={sheenId}
                         x1="0"
                         y1="0"
                         x2="0"
@@ -728,6 +755,7 @@ export default function Sidebar() {
                     key="profile"
                     kind="menu"
                     id="profile-popover"
+                    style={{ transformOrigin: "top right" }}
                     className="workspace-popover absolute right-0 mt-2.5 w-[272px] rounded-[20px] bg-surface border border-line-neutral-200 shadow-[0_18px_40px_-10px_rgba(0,0,0,0.14)] p-3 z-50"
                   >
                     <div className="px-2 py-2 border-b border-line-neutral-100 flex items-center gap-3">

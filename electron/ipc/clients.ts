@@ -4,6 +4,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { clients, invoices, tasks, vendors } from "../db/schema";
 import { newClientSchema, clientPatchSchema } from "../validation";
+import { recordId } from "../workflow-validation";
 import { AppError, formatError } from "./errors";
 import {
   ClientWithStats,
@@ -74,7 +75,8 @@ export function listClientsWithStats(): ClientWithStats[] {
   });
 }
 
-export function removeClient(id: string): { success: boolean } {
+export function removeClient(idInput: string): { success: boolean } {
+  const id = recordId.parse(idInput);
   const db = getDb();
   const countRes = db
     .select({ count: sql<number>`count(*)` })
@@ -113,8 +115,9 @@ export function registerClientHandlers(broadcastDataChanged: () => void) {
     }
   });
 
-  ipcMain.handle("clients:get", async (_event, id: string) => {
+  ipcMain.handle("clients:get", async (_event, idInput: string) => {
     try {
+      const id = recordId.parse(idInput);
       const all = listClientsWithStats();
       const found = all.find((c) => c.id === id);
       if (!found) throw new AppError("NOT_FOUND", "Client not found");
@@ -155,8 +158,9 @@ export function registerClientHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle(
     "clients:update",
-    async (_event, id: string, patch: ClientPatchInput) => {
+    async (_event, idInput: string, patch: ClientPatchInput) => {
       try {
+        const id = recordId.parse(idInput);
         const validated = clientPatchSchema.parse(patch);
         const db = getDb();
 
