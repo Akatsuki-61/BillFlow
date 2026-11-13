@@ -13,12 +13,16 @@ export function resolveBrandIcon(): string | undefined {
   return candidates.find((c) => Boolean(c && fs.existsSync(c)));
 }
 
+let cachedLogoBase64: string | undefined;
 export function getBase64Logo(): string {
+  if (cachedLogoBase64 !== undefined) return cachedLogoBase64;
   const icon = resolveBrandIcon();
   if (icon && fs.existsSync(icon)) {
-    return fs.readFileSync(icon).toString("base64");
+    cachedLogoBase64 = fs.readFileSync(icon).toString("base64");
+    return cachedLogoBase64;
   }
-  return "";
+  cachedLogoBase64 = "";
+  return cachedLogoBase64;
 }
 
 export function escapeHtml(str: string): string {

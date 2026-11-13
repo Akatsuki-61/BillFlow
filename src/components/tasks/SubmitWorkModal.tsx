@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { Dialog } from "@/components/ui/Dialog";
+import { IconCrossfade } from "@/components/ui/MotionSurface";
 import { Button } from "@/components/ui/Workspace";
 import {
   CheckCircle2,
@@ -278,17 +279,17 @@ export default function SubmitWorkModal({
                     title="Copy delivery link to clipboard"
                     className="shrink-0 text-xs gap-1"
                   >
-                    {copiedLink ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-accent" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
+                    <IconCrossfade
+                      iconKey={copiedLink ? "copied" : "copy"}
+                      className="w-3.5 h-3.5"
+                    >
+                      {copiedLink ? (
+                        <Check className="w-3.5 h-3.5 text-accent success-confirm-pulse rounded-full" />
+                      ) : (
                         <Copy className="w-3.5 h-3.5" />
-                        <span>Copy</span>
-                      </>
-                    )}
+                      )}
+                    </IconCrossfade>
+                    <span>{copiedLink ? "Copied" : "Copy"}</span>
                   </Button>
 
                   <Button
@@ -397,17 +398,17 @@ export default function SubmitWorkModal({
                 className="text-xs gap-1 text-accent hover:bg-accent-faint"
                 title="Copy client handover message to clipboard"
               >
-                {copiedMessage ? (
-                  <>
-                    <Check className="w-3 h-3 text-accent" />
-                    <span>Copied Message</span>
-                  </>
-                ) : (
-                  <>
+                <IconCrossfade
+                  iconKey={copiedMessage ? "copied" : "copy"}
+                  className="w-3 h-3"
+                >
+                  {copiedMessage ? (
+                    <Check className="w-3 h-3 text-accent success-confirm-pulse rounded-full" />
+                  ) : (
                     <Copy className="w-3 h-3" />
-                    <span>Copy Message</span>
-                  </>
-                )}
+                  )}
+                </IconCrossfade>
+                <span>{copiedMessage ? "Copied Message" : "Copy Message"}</span>
               </Button>
             </div>
 

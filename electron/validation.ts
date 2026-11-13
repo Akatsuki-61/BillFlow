@@ -206,7 +206,13 @@ export const updateSettingsSchema = z.object({
   defaultTaxRate: z.number().min(0).max(100).optional(),
   defaultNotes: z.string().trim().max(1000).nullable().optional(),
   defaultInvoiceTemplate: z
-    .enum(["geometric-teal", "executive-wave"])
+    .enum([
+      "geometric-teal",
+      "executive-wave",
+      "scarlet-modern",
+      "apex-orange",
+      "noir-crimson",
+    ])
     .optional(),
   dateFormat: z.enum(["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"]).optional(),
   currencyDisplay: z.enum(["symbol", "code"]).optional(),

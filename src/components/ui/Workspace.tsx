@@ -1,8 +1,13 @@
 "use client";
 
-import { useId, type ButtonHTMLAttributes, type ReactNode } from "react";
+import {
+  useId,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { SPRING_NAV_GLIDE } from "@/lib/motion";
+import { SPRING_NAV_GLIDE, SWITCH_KNOB_TRANSITION } from "@/lib/motion";
 
 export function Button({
   variant = "secondary",
@@ -94,41 +99,6 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-export function MetricCard({
-  label,
-  value,
-  footer,
-  action,
-  tone = "default",
-  className = "",
-  compact = false,
-}: {
-  label: string;
-  value: ReactNode;
-  footer?: ReactNode;
-  action?: ReactNode;
-  tone?: "default" | "accent" | "warning" | "success";
-  className?: string;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      className={`ui-card ui-metric ui-metric--${tone} ${
-        compact ? "ui-metric--compact" : ""
-      } ${className}`}
-    >
-      <div className="ui-metric-heading">
-        <span>{label}</span>
-        {action}
-      </div>
-      <div className="ui-metric-value">{value}</div>
-      <div className="mt-1 flex items-center justify-between gap-3">
-        {footer && <div className="ui-metric-footer">{footer}</div>}
-      </div>
-    </div>
-  );
-}
-
 export function Switch({
   checked,
   onChange,
@@ -138,6 +108,9 @@ export function Switch({
   onChange: (checked: boolean) => void;
   label: string;
 }) {
+  const reducedMotion = useReducedMotion();
+  const [hasToggled, setHasToggled] = useState(false);
+
   return (
     <button
       type="button"
@@ -145,9 +118,23 @@ export function Switch({
       aria-checked={checked}
       aria-label={label}
       className="ui-switch"
-      onClick={() => onChange(!checked)}
+      onClick={() => {
+        setHasToggled(true);
+        onChange(!checked);
+      }}
     >
-      <span />
+      <motion.span
+        initial={false}
+        animate={
+          reducedMotion
+            ? { x: checked ? 16 : 0, scaleX: 1 }
+            : hasToggled
+              ? { x: checked ? 16 : 0, scaleX: [1, 1.12, 1] }
+              : { x: checked ? 16 : 0, scaleX: 1 }
+        }
+        whileTap={reducedMotion ? undefined : { scaleX: 1.12 }}
+        transition={reducedMotion ? { duration: 0 } : SWITCH_KNOB_TRANSITION}
+      />
     </button>
   );
 }

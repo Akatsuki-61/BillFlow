@@ -9,7 +9,7 @@ import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { AnimatePresence, motion } from "motion/react";
-import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
+import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER, POPOVER_INITIAL_SCALE } from "@/lib/motion";
 import React, { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -421,7 +421,7 @@ function ClientsContent() {
             {notification.type === "error" ? (
               <AlertCircle className="w-5 h-5 text-content-rose-400 shrink-0" />
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
+              <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
             )}
             <span>{notification.message}</span>
           </MotionSurface>
@@ -714,7 +714,7 @@ function ClientsContent() {
                         {activeMenuId === client.id && (
                           <motion.div
                             key={`client-menu-${client.id}`}
-                            initial={{ opacity: 0, scale: 0.92, y: -6 }}
+                            initial={{ opacity: 0, scale: POPOVER_INITIAL_SCALE, y: -6 }}
                             animate={{
                               opacity: 1,
                               scale: 1,
@@ -723,8 +723,8 @@ function ClientsContent() {
                             }}
                             exit={{
                               opacity: 0,
-                              scale: 0.95,
-                              y: -4,
+                              scale: POPOVER_INITIAL_SCALE,
+                              y: -6,
                               transition: EXIT_MENU_POPOVER,
                             }}
                             style={{ transformOrigin: "top right" }}
@@ -805,10 +805,12 @@ function ClientsContent() {
                         {clientPaidPct}% settled
                       </span>
                     </div>
-                    <div className="w-full h-[18px] rounded-[6px] bg-surface-neutral-100 p-[2.5px] flex items-center">
+                    <div className="w-full h-[18px] rounded-[6px] bg-surface-neutral-100 p-[2.5px] flex items-center overflow-hidden">
                       <div
-                        style={{ width: `${clientPaidPct}%` }}
-                        className={`h-full rounded-[4px] ${clientStripe} transition-all duration-500`}
+                        style={{
+                          clipPath: `inset(0 ${Math.max(0, 100 - clientPaidPct)}% 0 0 round 4px)`,
+                        }}
+                        className={`w-full h-full rounded-[4px] ${clientStripe} transition-[clip-path] duration-300 ease-[cubic-bezier(0.42,0,0.58,1)]`}
                       />
                     </div>
                   </div>

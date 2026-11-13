@@ -4,6 +4,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { vendors, clients, workOrders } from "../db/schema";
 import { newVendorSchema, vendorPatchSchema } from "../validation";
+import { recordId } from "../workflow-validation";
 import { AppError, formatError } from "./errors";
 import {
   VendorItem,
@@ -48,7 +49,8 @@ export function listVendors(): VendorItem[] {
   }));
 }
 
-export function removeVendor(id: string): { success: boolean } {
+export function removeVendor(idInput: string): { success: boolean } {
+  const id = recordId.parse(idInput);
   const db = getDb();
   const existing = db.select().from(vendors).where(eq(vendors.id, id)).get();
   if (!existing) throw new AppError("NOT_FOUND", "Vendor not found");
@@ -82,15 +84,19 @@ export function registerVendorHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("vendors:create", async (_event, input: NewVendorInput) => {
     try {
+      const safeInput =
+        input && typeof input === "object"
+          ? input
+          : ({} as Partial<NewVendorInput>);
       const balanceCents =
-        typeof input.balanceCents === "number"
-          ? input.balanceCents
-          : typeof input.currentBalance === "number"
-            ? Math.round(input.currentBalance * 100)
+        typeof safeInput.balanceCents === "number"
+          ? safeInput.balanceCents
+          : typeof safeInput.currentBalance === "number"
+            ? Math.round(safeInput.currentBalance * 100)
             : 0;
 
       const validated = newVendorSchema.parse({
-        ...input,
+        ...safeInput,
         balanceCents,
       });
 
@@ -124,17 +130,22 @@ export function registerVendorHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle(
     "vendors:update",
-    async (_event, id: string, patch: VendorPatchInput) => {
+    async (_event, idInput: string, patch: VendorPatchInput) => {
       try {
+        const id = recordId.parse(idInput);
+        const safePatch =
+          patch && typeof patch === "object"
+            ? patch
+            : ({} as Partial<VendorPatchInput>);
         const balanceCents =
-          typeof patch.balanceCents === "number"
-            ? patch.balanceCents
-            : typeof patch.currentBalance === "number"
-              ? Math.round(patch.currentBalance * 100)
+          typeof safePatch.balanceCents === "number"
+            ? safePatch.balanceCents
+            : typeof safePatch.currentBalance === "number"
+              ? Math.round(safePatch.currentBalance * 100)
               : undefined;
 
         const validated = vendorPatchSchema.parse({
-          ...patch,
+          ...safePatch,
           balanceCents,
         });
 
@@ -180,8 +191,9 @@ export function registerVendorHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle(
     "vendors:setStatus",
-    async (_event, id: string, status: "PENDING" | "PAID") => {
+    async (_event, idInput: string, status: "PENDING" | "PAID") => {
       try {
+        const id = recordId.parse(idInput);
         if (status !== "PENDING" && status !== "PAID") {
           throw new AppError("VALIDATION_ERROR", "Invalid vendor status");
         }

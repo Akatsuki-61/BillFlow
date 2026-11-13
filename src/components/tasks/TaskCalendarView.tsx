@@ -1052,7 +1052,7 @@ export default function TaskCalendarView({
                   key={tab.id}
                   type="button"
                   onClick={() => setScopeFilter(tab.id)}
-                  className={`relative px-3 py-1.5 rounded-lg transition-colors active:scale-[0.96] ${
+                  className={`relative px-3 py-1.5 rounded-lg transition-colors active:scale-[0.97] ${
                     isActive
                       ? "text-content-neutral-900 font-bold"
                       : "text-content-neutral-600 hover:text-content-neutral-900"
@@ -1116,7 +1116,7 @@ export default function TaskCalendarView({
                   type="button"
                   title={title}
                   onClick={() => setViewType(id)}
-                  className={`relative p-1.5 rounded-lg transition-colors active:scale-[0.94] ${
+                  className={`relative p-1.5 rounded-lg transition-colors active:scale-[0.97] ${
                     isActive
                       ? "text-accent"
                       : "text-content-neutral-500 hover:text-content-neutral-800"
@@ -1365,7 +1365,7 @@ export default function TaskCalendarView({
                                 onSelectTask(t);
                               }}
                               title={`[${statusBadge.label}] ${t.title}${t.startTime ? ` (${t.startTime}${t.endTime ? ` - ${t.endTime}` : ""})` : ""} (${t.priority} priority) - Click to view/edit or drag to reschedule`}
-                              className={`px-1.5 py-0.5 rounded text-[11px] border border-line-neutral-200/90 bg-surface hover:bg-surface-neutral-100/80 cursor-grab active:cursor-grabbing truncate transition-all shadow-2xs flex items-center gap-1 ${
+                              className={`px-1.5 py-0.5 rounded text-[11px] border border-line-neutral-200/90 bg-surface hover:bg-surface-neutral-100/80 cursor-grab active:cursor-grabbing truncate transition-[background-color,border-color,opacity] shadow-2xs flex items-center gap-1 ${
                                 t.status === "done"
                                   ? "opacity-60 line-through"
                                   : ""

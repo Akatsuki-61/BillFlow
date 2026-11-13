@@ -1,6 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useId } from "react";
+import { motion } from "motion/react";
+import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   Code2,
   Terminal,
@@ -128,6 +130,7 @@ interface ProfileAvatarTileProps {
   isActive?: boolean;
   isManageMode?: boolean;
   interactiveHover?: boolean;
+  layoutId?: string;
   className?: string;
 }
 
@@ -182,8 +185,10 @@ export function ProfileAvatarTile({
   isActive = false,
   isManageMode = false,
   interactiveHover = false,
+  layoutId,
   className = "",
 }: ProfileAvatarTileProps) {
+  const sheenId = useId();
   const style = PROFILE_ACCENT_STYLES[accent] ?? PROFILE_ACCENT_STYLES.blue;
   const Icon = PROFILE_AVATAR_ICONS[avatar] ?? Code2;
   const sizeSpec = SIZE_MAP[size];
@@ -192,8 +197,10 @@ export function ProfileAvatarTile({
     <div
       className={`relative inline-flex items-center justify-center shrink-0 select-none ${className}`}
     >
-      <div
-        className={`${sizeSpec.box} relative overflow-hidden flex items-center justify-center transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[0_12px_28px_-8px_rgba(0,0,0,0.55),0_0_0_1px_rgba(255,255,255,0.12)_inset] ${
+      <motion.div
+        layoutId={layoutId}
+        transition={layoutId ? SPRING_NAV_GLIDE : undefined}
+        className={`${sizeSpec.box} relative overflow-hidden flex items-center justify-center transition-[box-shadow,border-color,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] shadow-[0_12px_28px_-8px_rgba(0,0,0,0.55),0_0_0_1px_rgba(255,255,255,0.12)_inset] ${
           interactiveHover
             ? "group-hover:ring-[3px] group-hover:ring-white group-focus-visible:ring-[3px] group-focus-visible:ring-white"
             : ""
@@ -236,11 +243,11 @@ export function ProfileAvatarTile({
             y="0"
             width="100"
             height="46"
-            fill="url(#netflix-tile-sheen)"
+            fill={`url(#${sheenId})`}
             opacity="0.16"
           />
           <defs>
-            <linearGradient id="netflix-tile-sheen" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={sheenId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#FFFFFF" />
               <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
             </linearGradient>
@@ -264,7 +271,7 @@ export function ProfileAvatarTile({
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {hasPassword && !isManageMode && (size === "xs" || size === "sm") && (
         <span

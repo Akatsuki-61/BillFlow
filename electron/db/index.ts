@@ -542,12 +542,6 @@ export function getRootDb() {
   return rootDbInstance!;
 }
 
-export function getRootSqlite() {
-  if (startupError) throw startupError;
-  if (!rootSqliteInstance) initDatabase();
-  return rootSqliteInstance!;
-}
-
 export function switchWorkspaceDatabase(profileId: string) {
   workspaceGeneration++;
   if (startupError) throw startupError;

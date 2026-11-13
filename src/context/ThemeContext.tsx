@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
+import { LayoutGroup, MotionConfig } from "motion/react";
 import {
   isThemePreference,
   isAccentPreference,
@@ -62,19 +64,72 @@ function subscribe(callback: () => void) {
   };
 }
 
+type ViewTransitionLike = {
+  ready?: Promise<unknown>;
+  finished?: Promise<unknown>;
+  updateCallbackDone?: Promise<unknown>;
+};
+
+function runMaskedColorChange(commitChange: () => void) {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    commitChange();
+    return;
+  }
+  const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const startVT = (document as Document & {
+    startViewTransition?: (cb: () => void) => ViewTransitionLike | undefined;
+  }).startViewTransition;
+
+  if (prefersReduced || typeof startVT !== "function") {
+    commitChange();
+    return;
+  }
+
+  try {
+    const transition = startVT.call(document, () => {
+      flushSync(commitChange);
+    });
+    // Interrupted or rapid theme toggles reject ViewTransition promises with AbortError.
+    void transition?.ready?.catch(() => {});
+    void transition?.finished?.catch(() => {});
+    void transition?.updateCallbackDone?.catch(() => {});
+  } catch {
+    commitChange();
+  }
+}
+
 function setPreference(value: ThemePreference) {
   if (!isThemePreference(value)) return;
-  sessionPreference = value;
-  try { localStorage.setItem(THEME_STORAGE_KEY, value); } catch { /* Keep the current session usable. */ }
-  window.dispatchEvent(new Event("billflow:theme"));
+  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  const nextTheme = resolveTheme(value, prefersDark);
+  const currentTheme = document.documentElement.dataset.theme;
+  const applyPreference = () => {
+    sessionPreference = value;
+    try { localStorage.setItem(THEME_STORAGE_KEY, value); } catch { /* Keep the current session usable. */ }
+    document.documentElement.dataset.theme = nextTheme;
+    document.documentElement.style.colorScheme = nextTheme;
+    window.dispatchEvent(new Event("billflow:theme"));
+  };
+  if (currentTheme === nextTheme) {
+    applyPreference();
+    return;
+  }
+  runMaskedColorChange(applyPreference);
 }
 
 function setAccent(value: AccentPreference) {
   if (!isAccentPreference(value)) return;
-  sessionAccent = value;
-  try { localStorage.setItem(ACCENT_STORAGE_KEY, value); } catch { /* Keep current session usable. */ }
-  document.documentElement.dataset.accent = value;
-  window.dispatchEvent(new Event("billflow:accent"));
+  const applyAccent = () => {
+    sessionAccent = value;
+    try { localStorage.setItem(ACCENT_STORAGE_KEY, value); } catch { /* Keep current session usable. */ }
+    document.documentElement.dataset.accent = value;
+    window.dispatchEvent(new Event("billflow:accent"));
+  };
+  if (document.documentElement.dataset.accent === value) {
+    applyAccent();
+    return;
+  }
+  runMaskedColorChange(applyAccent);
 }
 
 const serverSnapshot = () => null;
@@ -114,7 +169,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         ready: saved !== null,
       }}
     >
-      {children}
+      <MotionConfig reducedMotion="user">
+        <LayoutGroup>{children}</LayoutGroup>
+      </MotionConfig>
     </ThemeContext.Provider>
   );
 }

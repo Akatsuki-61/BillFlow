@@ -732,3 +732,39 @@ it("loads only requested workspace datasets", async () => {
   expect(snapshot.invoices).toBeUndefined();
   expect(snapshot.clients).toBeUndefined();
 });
+
+it("accepts all 5 invoice templates in settings validation", async () => {
+  const { updateSettingsSchema } = await import("../validation");
+  for (const template of [
+    "geometric-teal",
+    "executive-wave",
+    "scarlet-modern",
+    "apex-orange",
+    "noir-crimson",
+  ] as const) {
+    const parsed = updateSettingsSchema.safeParse({
+      defaultInvoiceTemplate: template,
+    });
+    expect(parsed.success).toBe(true);
+  }
+});
+
+it("falls back safely when legacy invoice snapshots contain invalid JSON", async () => {
+  client();
+  const inv = createInvoice({
+    clientId: "a",
+    issueDate: "2026-11-12",
+    dueDate: "2026-11-19",
+    currency: "USD",
+    amountCents: 10000,
+    items: [{ description: "Work", quantity: 1, unitPriceCents: 10000 }],
+  });
+  getSqlite()
+    .prepare(
+      "UPDATE invoices SET client_snapshot = '{broken', business_snapshot = '{broken' WHERE id = ?",
+    )
+    .run(inv.id);
+
+  const built = await buildInvoicePdfPayloadAndBuffer(inv.id);
+  expect(built.invoice.code).toBe(inv.code);
+});

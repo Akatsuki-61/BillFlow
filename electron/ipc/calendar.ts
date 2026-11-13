@@ -2,7 +2,7 @@ import { shell } from "electron";
 import { ipcMain } from "../security";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
-import { execFile, execSync } from "child_process";
+import { execFile, execFileSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -786,7 +786,7 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
 function isMacCalendarAppRunning(): boolean {
   if (process.platform !== "darwin") return false;
   try {
-    const stdout = execSync("pgrep -x Calendar", {
+    const stdout = execFileSync("pgrep", ["-x", "Calendar"], {
       encoding: "utf-8",
       timeout: 300,
     });

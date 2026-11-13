@@ -3,7 +3,13 @@
 import React, { useState, useRef, useEffect, useId } from "react";
 import { ChevronDown, Check } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER, SPRING_LIQUID_BUTTON } from "@/lib/motion";
+import {
+  SPRING_MENU_POPOVER,
+  EXIT_MENU_POPOVER,
+  SPRING_LIQUID_BUTTON,
+  POPOVER_INITIAL_SCALE,
+  listRowTransition,
+} from "@/lib/motion";
 
 export interface SelectOption<T extends string = string> {
   value: T;
@@ -166,15 +172,14 @@ export function SelectDropdown<T extends string = string>({
             initial={
               reducedMotion
                 ? { opacity: 0 }
-                : { opacity: 0, scaleX: 0.95, scaleY: 0.86, y: -6 }
+                : { opacity: 0, scale: POPOVER_INITIAL_SCALE, y: -6 }
             }
             animate={
               reducedMotion
                 ? { opacity: 1, transition: { duration: 0 } }
                 : {
                     opacity: 1,
-                    scaleX: 1,
-                    scaleY: 1,
+                    scale: 1,
                     y: 0,
                     transition: SPRING_MENU_POPOVER,
                   }
@@ -184,9 +189,8 @@ export function SelectDropdown<T extends string = string>({
                 ? { opacity: 0, transition: { duration: 0 } }
                 : {
                     opacity: 0,
-                    scaleX: 0.96,
-                    scaleY: 0.9,
-                    y: -4,
+                    scale: POPOVER_INITIAL_SCALE,
+                    y: -6,
                     transition: EXIT_MENU_POPOVER,
                   }
             }
@@ -203,11 +207,14 @@ export function SelectDropdown<T extends string = string>({
                 const isHighlighted = index === highlightedIndex;
 
                 return (
-                  <button
+                  <motion.button
                     key={option.value}
                     type="button"
                     role="option"
                     aria-selected={isSelected}
+                    initial={reducedMotion ? false : { opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={listRowTransition(index, Boolean(reducedMotion))}
                     onClick={() => {
                       onChange(option.value);
                       setIsOpen(false);
@@ -232,8 +239,8 @@ export function SelectDropdown<T extends string = string>({
                     </div>
                     {isSelected && (
                       <motion.span
-                        initial={reducedMotion ? false : { scale: 0 }}
-                        animate={{ scale: 1 }}
+                        initial={reducedMotion ? false : { opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
                         transition={SPRING_LIQUID_BUTTON}
                         className="shrink-0 ml-2 inline-flex"
                       >
@@ -244,7 +251,7 @@ export function SelectDropdown<T extends string = string>({
                         />
                       </motion.span>
                     )}
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>

@@ -16,7 +16,14 @@ import {
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
 import { AnimatePresence, motion } from "motion/react";
-import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
+import {
+  SPRING_MENU_POPOVER,
+  EXIT_MENU_POPOVER,
+  POPOVER_INITIAL_SCALE,
+  ENTER_DETAILS,
+  EXIT_DETAILS,
+  listRowTransition,
+} from "@/lib/motion";
 import { formatCents, formatDateDisplay } from "@/lib/format";
 import type {
   InvoiceWithClient,
@@ -440,52 +447,74 @@ export default function InvoiceDocumentSheet({
           </button>
 
           {/* Dropdown Popover */}
-          {isTemplateDropdownOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-64 rounded-xl bg-surface border border-line-neutral-200 dark:border-white/10 shadow-2xl p-1.5 z-[150] text-content-neutral-900 dark:text-white animate-in fade-in-50 zoom-in-95">
-              <div className="px-2.5 py-1 text-[10px] font-bold text-content-neutral-400 uppercase tracking-wider">
-                Invoice Template
-              </div>
-              {TEMPLATES.map((tmpl) => {
-                const isSelected = selectedTemplate === tmpl.id;
-                return (
-                  <button
-                    key={tmpl.id}
-                    type="button"
-                    onClick={() => {
-                      handleSelectTemplate(tmpl.id);
-                      setIsTemplateDropdownOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
-                      isSelected
-                        ? "bg-accent/10 text-accent font-bold"
-                        : "hover:bg-surface-neutral-50 dark:hover:bg-white/10 text-content-neutral-800 dark:text-neutral-200 font-medium"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span
-                        className="w-3 h-3 rounded-full shrink-0 shadow-sm"
-                        style={{ backgroundColor: tmpl.color }}
-                      />
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold truncate flex items-center gap-1.5">
-                          <span>{tmpl.name}</span>
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-content-neutral-500 dark:text-neutral-400">
-                            {tmpl.surface}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-content-neutral-400 font-normal truncate mt-0.5">
-                          {tmpl.description}
+          <AnimatePresence initial={false}>
+            {isTemplateDropdownOpen && (
+              <motion.div
+                key="invoice-template-dropdown"
+                initial={{ opacity: 0, scale: POPOVER_INITIAL_SCALE, y: -6 }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                  y: 0,
+                  transition: SPRING_MENU_POPOVER,
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: POPOVER_INITIAL_SCALE,
+                  y: -6,
+                  transition: EXIT_MENU_POPOVER,
+                }}
+                style={{ transformOrigin: "top right" }}
+                className="absolute right-0 top-full mt-1.5 w-64 rounded-xl bg-surface border border-line-neutral-200 dark:border-white/10 shadow-2xl p-1.5 z-[150] text-content-neutral-900 dark:text-white"
+              >
+                <div className="px-2.5 py-1 text-[10px] font-bold text-content-neutral-400 uppercase tracking-wider">
+                  Invoice Template
+                </div>
+                {TEMPLATES.map((tmpl, idx) => {
+                  const isSelected = selectedTemplate === tmpl.id;
+                  return (
+                    <motion.button
+                      key={tmpl.id}
+                      type="button"
+                      initial={{ opacity: 0, y: -3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={listRowTransition(idx)}
+                      onClick={() => {
+                        handleSelectTemplate(tmpl.id);
+                        setIsTemplateDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                        isSelected
+                          ? "bg-accent/10 text-accent font-bold"
+                          : "hover:bg-surface-neutral-50 dark:hover:bg-white/10 text-content-neutral-800 dark:text-neutral-200 font-medium"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                          style={{ backgroundColor: tmpl.color }}
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold truncate flex items-center gap-1.5">
+                            <span>{tmpl.name}</span>
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-content-neutral-500 dark:text-neutral-400">
+                              {tmpl.surface}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-content-neutral-400 font-normal truncate mt-0.5">
+                            {tmpl.description}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    {isSelected && (
-                      <Check className="w-3.5 h-3.5 text-accent shrink-0 ml-1" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                      {isSelected && (
+                        <Check className="w-3.5 h-3.5 text-accent shrink-0 ml-1" />
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -572,12 +601,20 @@ export default function InvoiceDocumentSheet({
       {/* 3. DIALOG FOOTER */}
       <div className="app-dialog-footer">
         <div className="mr-auto flex items-center gap-2">
-          {savedNotice && (
-            <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold animate-fadeIn">
-              <Check className="w-4 h-4" />
-              <span>{savedNotice}</span>
-            </span>
-          )}
+          <AnimatePresence initial={false}>
+            {savedNotice && (
+              <motion.span
+                key={savedNotice}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0, transition: ENTER_DETAILS }}
+                exit={{ opacity: 0, y: 2, transition: EXIT_DETAILS }}
+                className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold"
+              >
+                <Check className="w-4 h-4 success-confirm-pulse rounded-full" />
+                <span>{savedNotice}</span>
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
 
         <Button
@@ -612,19 +649,17 @@ export default function InvoiceDocumentSheet({
             {isShareOpen && (
               <motion.div
                 key="invoice-share-dropdown"
-                initial={{ opacity: 0, scaleX: 0.95, scaleY: 0.86, y: 6 }}
+                initial={{ opacity: 0, scale: POPOVER_INITIAL_SCALE, y: 6 }}
                 animate={{
                   opacity: 1,
-                  scaleX: 1,
-                  scaleY: 1,
+                  scale: 1,
                   y: 0,
                   transition: SPRING_MENU_POPOVER,
                 }}
                 exit={{
                   opacity: 0,
-                  scaleX: 0.96,
-                  scaleY: 0.9,
-                  y: 4,
+                  scale: POPOVER_INITIAL_SCALE,
+                  y: 6,
                   transition: EXIT_MENU_POPOVER,
                 }}
                 style={{ transformOrigin: "bottom right" }}

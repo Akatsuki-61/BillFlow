@@ -1286,7 +1286,7 @@ export default function TasksView({
                           data-invoice-highlighted={
                             isInvoiceHoverLinked ? "true" : undefined
                           }
-                          className={`motion-card group relative bg-surface-neutral-50/75 dark:bg-surface-secondary rounded-[18px] p-4 border transition-all duration-150 ease-out cursor-grab active:cursor-grabbing ${
+                          className={`motion-card group relative bg-surface-neutral-50/75 dark:bg-surface-secondary rounded-[18px] p-4 border transition-[border-color,box-shadow,background-color,opacity,translate] duration-150 ease-out cursor-grab active:cursor-grabbing ${
                             isDragging
                               ? "opacity-40 scale-98"
                               : isInvoiceHoverLinked && invoicePalette

@@ -14,9 +14,19 @@ import {
   EmptyState,
 } from "@/components/ui/Workspace";
 
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import {
+  IconCrossfade,
+  MotionPresence,
+  MotionSurface,
+} from "@/components/ui/MotionSurface";
 import { AnimatePresence, motion } from "motion/react";
-import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER } from "@/lib/motion";
+import {
+  SPRING_MENU_POPOVER,
+  EXIT_MENU_POPOVER,
+  SPRING_NAV_GLIDE,
+  POPOVER_INITIAL_SCALE,
+  listRowTransition,
+} from "@/lib/motion";
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -1789,7 +1799,7 @@ export default function InvoicesView() {
             {notification.type === "error" ? (
               <AlertCircle className="w-5 h-5 text-content-rose-400 shrink-0" />
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-content-emerald-400 shrink-0" />
+              <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
             )}
             <span>{notification.message}</span>
           </MotionSurface>
@@ -2069,30 +2079,44 @@ export default function InvoicesView() {
             )}
           </div>
 
-          <div className="inline-flex items-center rounded-full border border-border-subtle bg-surface-neutral-100/80 dark:bg-surface-neutral-900 p-0.5 shrink-0">
+          <div className="relative inline-flex items-center rounded-full border border-border-subtle bg-surface-neutral-100/80 dark:bg-surface-neutral-900 p-0.5 shrink-0">
             <button
               type="button"
               onClick={() => setExportFormat("csv")}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`relative px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                 exportFormat === "csv"
-                  ? "bg-surface-card text-content-neutral-950 shadow-xs"
+                  ? "text-content-neutral-950"
                   : "text-content-neutral-500 hover:text-content-neutral-800"
               }`}
               title="Set export format to RFC 4180 CSV (.csv)"
             >
-              CSV
+              {exportFormat === "csv" && (
+                <motion.span
+                  layoutId="invoices-export-format-pill"
+                  transition={SPRING_NAV_GLIDE}
+                  className="absolute inset-0 rounded-full bg-surface-card shadow-xs"
+                />
+              )}
+              <span className="relative z-10">CSV</span>
             </button>
             <button
               type="button"
               onClick={() => setExportFormat("excel")}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`relative px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                 exportFormat === "excel"
-                  ? "bg-emerald-600 text-white shadow-xs"
+                  ? "text-white"
                   : "text-content-neutral-500 hover:text-content-neutral-800"
               }`}
               title="Set export format to Microsoft Excel Workbook (.xls) via Convert Engine"
             >
-              Excel
+              {exportFormat === "excel" && (
+                <motion.span
+                  layoutId="invoices-export-format-pill"
+                  transition={SPRING_NAV_GLIDE}
+                  className="absolute inset-0 rounded-full bg-emerald-600 shadow-xs"
+                />
+              )}
+              <span className="relative z-10">Excel</span>
             </button>
           </div>
 
@@ -2116,11 +2140,16 @@ export default function InvoicesView() {
                 : ""
             }`}
           >
-            {exportFormat === "excel" ? (
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
-            )}
+            <IconCrossfade
+              iconKey={exportFormat}
+              className="w-3.5 h-3.5"
+            >
+              {exportFormat === "excel" ? (
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+            </IconCrossfade>
             <span>
               {activeTab === "Overdue"
                 ? exportFormat === "excel"
@@ -2243,7 +2272,7 @@ export default function InvoicesView() {
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((inv) => {
+                filteredInvoices.map((inv, idx) => {
                   const isSelected = selectedIds.includes(inv.id);
                   const isHighlighted = highlightedInvoiceId === inv.id;
                   const paidCents =
@@ -2263,8 +2292,11 @@ export default function InvoicesView() {
                         ? 100
                         : 0;
                   return (
-                    <tr
+                    <motion.tr
                       key={inv.id}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={listRowTransition(idx)}
                       data-selected={isSelected || isHighlighted}
                     >
                       <td className="record-selection">
@@ -2452,7 +2484,7 @@ export default function InvoicesView() {
                           </Button>
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })
               )}
@@ -4230,22 +4262,19 @@ export default function InvoicesView() {
             key={`status-menu-${statusMenu.invoice.id}`}
             initial={{
               opacity: 0,
-              scaleX: 0.95,
-              scaleY: 0.86,
+              scale: POPOVER_INITIAL_SCALE,
               y: statusMenu.bottom !== undefined ? 6 : -6,
             }}
             animate={{
               opacity: 1,
-              scaleX: 1,
-              scaleY: 1,
+              scale: 1,
               y: 0,
               transition: SPRING_MENU_POPOVER,
             }}
             exit={{
               opacity: 0,
-              scaleX: 0.96,
-              scaleY: 0.9,
-              y: statusMenu.bottom !== undefined ? 4 : -4,
+              scale: POPOVER_INITIAL_SCALE,
+              y: statusMenu.bottom !== undefined ? 6 : -6,
               transition: EXIT_MENU_POPOVER,
             }}
             style={{
@@ -4299,13 +4328,16 @@ export default function InvoicesView() {
                 desc: "Estimate or unfinalized invoice",
                 dot: "bg-neutral-400",
               },
-            ].map((opt) => {
+            ].map((opt, idx) => {
               const isCurrent = statusMenu.invoice.status === opt.value;
               return (
-                <button
+                <motion.button
                   key={opt.value}
                   type="button"
                   role="menuitem"
+                  initial={{ opacity: 0, y: -3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={listRowTransition(idx)}
                   onClick={() =>
                     void handleChangeStatus(
                       statusMenu.invoice.id,
@@ -4332,7 +4364,7 @@ export default function InvoicesView() {
                   {isCurrent && (
                     <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 ml-2" />
                   )}
-                </button>
+                </motion.button>
               );
             })}
           </motion.div>
@@ -4346,22 +4378,19 @@ export default function InvoicesView() {
             key={`action-menu-${actionMenu.invoice.id}`}
             initial={{
               opacity: 0,
-              scaleX: 0.95,
-              scaleY: 0.86,
+              scale: POPOVER_INITIAL_SCALE,
               y: actionMenu.bottom !== undefined ? 6 : -6,
             }}
             animate={{
               opacity: 1,
-              scaleX: 1,
-              scaleY: 1,
+              scale: 1,
               y: 0,
               transition: SPRING_MENU_POPOVER,
             }}
             exit={{
               opacity: 0,
-              scaleX: 0.96,
-              scaleY: 0.9,
-              y: actionMenu.bottom !== undefined ? 4 : -4,
+              scale: POPOVER_INITIAL_SCALE,
+              y: actionMenu.bottom !== undefined ? 6 : -6,
               transition: EXIT_MENU_POPOVER,
             }}
             style={{

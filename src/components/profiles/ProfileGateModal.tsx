@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { IconCrossfade } from "@/components/ui/MotionSurface";
 import {
   SPRING_MODAL_SHEET,
   EXIT_MODAL_SHEET,
   SPRING_NAV_GLIDE,
   SPRING_LIQUID_BUTTON,
   KEYFRAME_ERROR_SHAKE,
+  listRowTransition,
+  detailSettleTransition,
 } from "@/lib/motion";
 import {
   Plus,
@@ -693,14 +696,15 @@ export function ProfileGateModal() {
       {/* =====================================================================
           VIEW 1: AUTHENTIC NETFLIX PROFILE SWITCHER
          ===================================================================== */}
-      <AnimatePresence mode="wait" initial={false}>
+      <div className="relative z-10 flex-1 w-full overflow-y-auto">
+      <AnimatePresence initial={false}>
       {view === "select" && (
         <motion.div
           key="view-select"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
-          exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.13 } }}
-          className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8 text-center"
+          exit={{ opacity: 0, y: -8, scale: 0.98, transition: EXIT_MODAL_SHEET }}
+          className="absolute inset-0 min-h-full flex flex-col items-center justify-center px-6 py-8 text-center"
         >
           <h1 className="text-3xl sm:text-5xl font-medium tracking-tight text-white mb-3">
             {isManageMode ? "Manage Profiles:" : "Who’s working?"}
@@ -719,19 +723,22 @@ export function ProfileGateModal() {
 
           {/* Netflix Horizontal Profile Row */}
           <div className="flex flex-wrap items-start justify-center gap-6 sm:gap-9 max-w-5xl mb-12 sm:mb-16">
-            {profiles.map((profile) => {
+            {profiles.map((profile, idx) => {
               const isCurrent = profile.id === activeProfile.id;
               return (
-                <button
+                <motion.button
                   key={profile.id}
                   type="button"
                   disabled={busy}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={listRowTransition(idx)}
                   onMouseEnter={() => setHoveredAccent(profile.accent)}
                   onMouseLeave={() => setHoveredAccent(null)}
                   onClick={() => void handleTileClick(profile)}
                   className="group flex flex-col items-center w-32 sm:w-36 focus:outline-none cursor-pointer"
                 >
-                  <div className="transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.04]">
+                  <div className="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04]">
                     <ProfileAvatarTile
                       avatar={profile.avatar}
                       accent={profile.accent}
@@ -740,6 +747,7 @@ export function ProfileGateModal() {
                       isActive={isCurrent && !isLocked && !isManageMode}
                       isManageMode={isManageMode}
                       interactiveHover
+                      layoutId={`profile-avatar-${profile.id}`}
                     />
                   </div>
 
@@ -764,7 +772,7 @@ export function ProfileGateModal() {
                       </span>
                     ) : null}
                   </div>
-                </button>
+                </motion.button>
               );
             })}
 
@@ -819,28 +827,40 @@ export function ProfileGateModal() {
           key="view-unlock"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
-          exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.13 } }}
-          className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8 text-center max-w-lg mx-auto w-full"
+          exit={{ opacity: 0, y: -8, scale: 0.98, transition: EXIT_MODAL_SHEET }}
+          className="absolute inset-0 min-h-full flex flex-col items-center justify-center px-6 py-8 text-center max-w-lg mx-auto w-full"
         >
           <ProfileAvatarTile
             avatar={unlockTarget.avatar}
             accent={unlockTarget.accent}
             size="lg"
             hasPassword
+            layoutId={`profile-avatar-${unlockTarget.id}`}
           />
 
-          <div className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={detailSettleTransition(0)}
+            className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-zinc-400"
+          >
             {unlockTarget.name} · {unlockTarget.subtitle}
-          </div>
+          </motion.div>
 
-          <h2 className="text-2xl sm:text-3xl font-medium text-white mt-3 mb-2">
-            Profile Lock is currently on.
-          </h2>
-          <p className="text-sm text-zinc-400 mb-8">
-            {unlockMode === "pin"
-              ? "Enter your 4-digit PIN to access this workspace."
-              : "Enter your passcode to access this workspace."}
-          </p>
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={detailSettleTransition(1)}
+          >
+            <h2 className="text-2xl sm:text-3xl font-medium text-white mt-3 mb-2">
+              Profile Lock is currently on.
+            </h2>
+            <p className="text-sm text-zinc-400 mb-8">
+              {unlockMode === "pin"
+                ? "Enter your 4-digit PIN to access this workspace."
+                : "Enter your passcode to access this workspace."}
+            </p>
+          </motion.div>
 
           <form onSubmit={handleUnlockFormSubmit} className="w-full space-y-6">
             <motion.div
@@ -872,7 +892,7 @@ export function ProfileGateModal() {
                           }
                           onKeyDown={(e) => handleUnlockPinKeyDown(idx, e)}
                           aria-label={`PIN digit ${idx + 1}`}
-                          className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-white/[0.05] border-2 border-white/20 focus:border-white focus:bg-white/[0.09] focus:shadow-[0_0_0_4px_rgba(255,255,255,0.14)] text-center text-2xl font-mono text-white outline-none transition-all"
+                          className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-white/[0.05] border-2 border-white/20 focus:border-white focus:bg-white/[0.09] focus:shadow-[0_0_0_4px_rgba(255,255,255,0.14)] text-center text-2xl font-mono text-white outline-none transition-[border-color,background-color,box-shadow]"
                         />
                       </motion.div>
                     );
@@ -889,18 +909,23 @@ export function ProfileGateModal() {
                       if (errorMsg) setErrorMsg(null);
                     }}
                     placeholder="Enter letters or numbers"
-                    className="w-full h-12 pl-4 pr-11 rounded-xl bg-white/[0.06] border border-white/20 focus:border-white focus:shadow-[0_0_0_3.5px_rgba(255,255,255,0.14)] text-sm text-white placeholder:text-zinc-500 outline-none transition-all"
+                    className="w-full h-12 pl-4 pr-11 rounded-xl bg-white/[0.06] border border-white/20 focus:border-white focus:shadow-[0_0_0_3.5px_rgba(255,255,255,0.14)] text-sm text-white placeholder:text-zinc-500 outline-none transition-[border-color,background-color,box-shadow]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowUnlockPassword((prev) => !prev)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
                   >
-                    {showUnlockPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
+                    <IconCrossfade
+                      iconKey={showUnlockPassword ? "hide" : "show"}
+                      className="w-4 h-4"
+                    >
+                      {showUnlockPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </IconCrossfade>
                   </button>
                 </div>
               )}
@@ -958,8 +983,8 @@ export function ProfileGateModal() {
           key="view-form"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
-          exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.13 } }}
-          className="relative z-10 flex-1 flex items-center justify-center px-6 py-6"
+          exit={{ opacity: 0, y: -8, scale: 0.98, transition: EXIT_MODAL_SHEET }}
+          className="absolute inset-0 min-h-full flex items-center justify-center px-6 py-6"
         >
           <div className="w-full max-w-3xl">
             <div className="border-b border-white/10 pb-5 mb-7">
@@ -982,6 +1007,9 @@ export function ProfileGateModal() {
                       accent={formAccent}
                       size="xl"
                       hasPassword={formEnablePassword}
+                      layoutId={
+                        formTargetId ? `profile-avatar-${formTargetId}` : undefined
+                      }
                     />
                     <span className="mt-3 text-sm font-medium text-white truncate max-w-[160px]">
                       {formName.trim() || "Profile Name"}
@@ -1289,11 +1317,16 @@ export function ProfileGateModal() {
                               }
                               className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
                             >
-                              {showFormPassword ? (
-                                <EyeOff className="w-3.5 h-3.5" />
-                              ) : (
-                                <Eye className="w-3.5 h-3.5" />
-                              )}
+                              <IconCrossfade
+                                iconKey={showFormPassword ? "hide" : "show"}
+                                className="w-3.5 h-3.5"
+                              >
+                                {showFormPassword ? (
+                                  <EyeOff className="w-3.5 h-3.5" />
+                                ) : (
+                                  <Eye className="w-3.5 h-3.5" />
+                                )}
+                              </IconCrossfade>
                             </button>
                           </div>
                         )}
@@ -1380,8 +1413,8 @@ export function ProfileGateModal() {
           key="view-onboarding"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
-          exit={{ opacity: 0, y: -8, scale: 0.98, transition: { duration: 0.13 } }}
-          className="relative z-10 flex-1 flex items-center justify-center px-6 py-6"
+          exit={{ opacity: 0, y: -8, scale: 0.98, transition: EXIT_MODAL_SHEET }}
+          className="absolute inset-0 min-h-full flex items-center justify-center px-6 py-6"
         >
           <div className="w-full max-w-2xl">
             <div className="border-b border-white/10 pb-5 mb-6">
@@ -1440,8 +1473,11 @@ export function ProfileGateModal() {
 
               <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
                 {onboardingSlots.map((slot, idx) => (
-                  <div
+                  <motion.div
                     key={slot.role}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={listRowTransition(idx)}
                     className={`p-3.5 rounded-2xl border transition-colors ${
                       slot.enabled
                         ? "bg-white/[0.05] border-white/20"
@@ -1523,7 +1559,7 @@ export function ProfileGateModal() {
                         />
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
 
@@ -1553,6 +1589,7 @@ export function ProfileGateModal() {
         </motion.div>
       )}
       </AnimatePresence>
+      </div>
         </motion.div>
       )}
     </AnimatePresence>

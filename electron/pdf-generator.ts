@@ -105,7 +105,7 @@ export async function generateInvoiceHtmlPdfBuffer(
       `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
     );
     await win.webContents.executeJavaScript(
-      `Promise.all([document.fonts.ready, ...Array.from(document.images, image => image.complete ? Promise.resolve() : new Promise((resolve,reject) => { image.onload=resolve; image.onerror=reject; }))]).then(() => true)`,
+      `Promise.all([document.fonts.ready, ...Array.from(document.images, image => image.complete ? Promise.resolve() : new Promise((resolve) => { image.onload=resolve; image.onerror=resolve; }))]).then(() => true)`,
     );
     const pdfBytes = await win.webContents.printToPDF({
       printBackground: true,

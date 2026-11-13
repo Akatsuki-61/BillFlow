@@ -275,9 +275,47 @@ export async function buildInvoicePdfPayloadAndBuffer(
   const client = invoice.clientId
     ? db.select().from(clients).where(eq(clients.id, invoice.clientId)).get()
     : undefined;
-  const clientSnapshot = invoice.clientSnapshot
-    ? JSON.parse(invoice.clientSnapshot)
-    : { name: client?.name || "Client", email: client?.email };
+  let clientSnapshot: {
+    name: string;
+    email?: string;
+    contactPerson?: string;
+    phone?: string;
+    driveUrl?: string | null;
+  } = {
+    name: client?.name || "Client",
+    email: client?.email,
+  };
+  if (invoice.clientSnapshot) {
+    try {
+      const parsed = JSON.parse(invoice.clientSnapshot) as Record<
+        string,
+        unknown
+      >;
+      if (parsed && typeof parsed === "object") {
+        clientSnapshot = {
+          ...(parsed as Partial<typeof clientSnapshot>),
+          name:
+            typeof parsed.name === "string" && parsed.name.trim()
+              ? parsed.name
+              : clientSnapshot.name,
+        };
+      }
+    } catch {
+      // Fall back to live client record if legacy snapshot JSON is malformed.
+    }
+  }
+
+  let businessSnapshot = profile;
+  if (invoice.businessSnapshot) {
+    try {
+      const parsed = JSON.parse(invoice.businessSnapshot);
+      if (parsed && typeof parsed === "object") {
+        businessSnapshot = parsed;
+      }
+    } catch {
+      // Fall back to live profile if legacy business snapshot JSON is malformed.
+    }
+  }
 
   const items = db
     .select()
@@ -306,9 +344,7 @@ export async function buildInvoicePdfPayloadAndBuffer(
     deliveryUrl: invoice.deliveryUrl,
     notes: invoice.notes,
     client: clientSnapshot,
-    business: invoice.businessSnapshot
-      ? JSON.parse(invoice.businessSnapshot)
-      : profile,
+    business: businessSnapshot,
   });
 
   return { invoice, pdfBuffer };
