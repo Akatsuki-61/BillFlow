@@ -1,139 +1,89 @@
-# BillFlow
+<div align="center">
+  <img src="build/icon.png" alt="BillFlow" width="88" />
+  <h1>BillFlow</h1>
+  <p>Local-first desktop workspace for client billing, task execution, subcontractor payouts, and profit tracking.</p>
+  <p>
+    <a href="package.json"><img src="https://img.shields.io/badge/Version-0.2.0-111827.svg" alt="Version 0.2.0" /></a>
+    <a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/Electron-44.11-47848F.svg" alt="Electron 44.11" /></a>
+    <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16.4-000000.svg" alt="Next.js 16.4" /></a>
+    <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-WAL-003B57.svg" alt="SQLite WAL" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178C6.svg" alt="TypeScript 5" /></a>
+  </p>
+</div>
 
-> Local-first invoicing, project execution, and profit management for software freelancers, independent developers, and technical consultants.
+Independent software developers and technical consultants often manage client agreements in docs, tasks on a Kanban board, payments in spreadsheets, and contractor briefs in chat. BillFlow keeps clients, itemized invoices, deliverables, vendor payouts, receipts, and per-currency cashflow inside one desktop application on macOS and Windows.
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-16.4-black.svg)](https://nextjs.org/)
-[![Electron](https://img.shields.io/badge/Electron-44.11-47848F.svg)](https://www.electronjs.org/)
-[![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57.svg)](https://www.sqlite.org/)
-[![Drizzle ORM](https://img.shields.io/badge/Drizzle-ORM-C5F74F.svg)](https://orm.drizzle.team/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38B2AC.svg)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Tests-Vitest%20%2B%20Playwright-success.svg)](https://vitest.dev/)
+All records, payment receipts, and backups live on disk in a local SQLite database without cloud accounts, telemetry, or remote servers.
 
----
+## How the billing and delivery loop works
 
-> [!NOTE]
-> **Academic Project Notice**: BillFlow was created as academic coursework for **EER4189 Software Design in Group** at The Open University of Sri Lanka (Group 61). While fulfilling academic requirements, the application is engineered as a production desktop tool for freelance software engineering practice.
-
----
-
-## What is BillFlow?
-
-Freelancers often split work across disconnected tools: chat apps for client messages, spreadsheets for billing, generic Kanban boards for development, and personal banking apps for expenses. Important details slip through the cracks—delivery links get lost, deposits remain untracked, and real job margins stay hidden.
-
-BillFlow unifies this entire operational lifecycle in one native desktop app. All business data stays on your machine in a local SQLite database with zero cloud lock-in.
-
-```
-Client Request ──> Itemized Invoice ──> Vector PDF ──> Advance Payment
-       │
-       └──> Automated Task Board ──> Outsource Work ──> Delivery URL ──> Final Settlement
-```
-
----
-
-## The 10-Step Freelance Lifecycle
-
-BillFlow models the real-world flow of independent software consulting and development:
-
-### 1. Client Management & Delivery Endpoints
-
-Create permanent client profiles or enter temporary clients directly during invoicing without cluttering your address book. Store repository URLs, staging links, or Google Drive folder targets per client or per job.
-
-### 2. Itemized Invoicing & Reusable Catalog
-
-Build invoices with line items, quantities, and rates. Pull standard rates from your service Catalog (e.g., _Business Website Development_, _AI Consulting Session_), apply client discounts, and require custom deposits (such as a 50% advance).
-
-### 3. Vector PDF Generation
-
-Generate and export clean, branded invoice PDFs locally. Exports include line items, discounts, tax rates, required deposits, bank payment instructions, job notes, and deliverable links. Configurable save paths default to your Downloads folder.
-
-### 4. Advance Tracking & Digital Receipts
-
-Record deposit collections against an invoice. Attach client payment receipts (PNG, JPG, PDF) directly to the payment record. Files are copied into managed application storage and reopen through your system viewer.
-
-### 5. Automatic Task Generation
-
-When an invoice status switches to `ADVANCE_PAID`, BillFlow displays an automatic tracking prompt with a 5-second countdown. Confirming converts invoice deliverables directly into linked Kanban tasks—no manual re-entry required.
-
-### 6. Focused Kanban Execution & Local Calendar Integration
-
-- **Tri-View Task Management**: Seamlessly switch between **Kanban Board**, **List View**, and **Calendar View** on `/tasks` or via `/calendar`.
-- **Sprint Kanban & Background Timing**: Move tasks through `To Do`, `In Progress`, `Review`, and `Done`. Active working duration tracks in the background, keeping cards clean while recording delivery velocity.
-- **Local Calendar & User Events Engine**: Track sprint task due dates alongside user local events (client meetings, AI consulting sessions, project milestones, deliverable reviews, and deadlines) with local SQLite persistence.
-- **Interactive Drag-and-Drop Rescheduling**: Drag tasks between calendar dates to reschedule deadlines on the fly.
-- **Direct Relational Linking**: Link calendar events directly to client accounts and sprint Kanban deliverables, with location/meeting link shortcuts.
-- **Quick Day Scheduling**: Click any day cell or hover to quickly schedule a task or event for that specific day.
-
-### 7. Deliverable Handoff
-
-Access code repositories, staging URLs, or documentation folders directly from client cards, invoices, and sprint tasks. Deliver work to clients through your chosen channel without re-entering URLs.
-
-### 8. Subcontractor Outsourcing
-
-Delegate tasks directly from Kanban cards. BillFlow prefills a work order with the task scope, linked client, invoice, and deliverable repository. Subcontractor deliverable reviews and financial payouts stay strictly separate so you never pay a vendor before approving the build.
-
-- **Offline Vector PDF Vouchers**: Export formal work order vouchers directly to your configured directory via `pdf-lib` and Electron IPC.
-- **Direct WhatsApp Task Dispatch**: Send clean, structured task delegation briefs to subcontractors directly via WhatsApp web/desktop intent links (`wa.me`) with automatic phone number normalization.
-
-### 9. Final Payment Settlement & Accounts Receivable Aging
-
-Log the remaining milestone payment and attach final receipts. An invoice is marked fully paid only when total collections cover the complete balance.
-
-- **Overdue Summary & Aging Analysis**: Access actionable past-due breakdowns categorized into aging tiers (`1-15`, `16-30`, `31-60`, `60+` days) with delinquency statistics, affected client accounts, and 1-click WhatsApp or Email payment reminder dispatches.
-- **RFC 4180 CSV Data Export**: Export active register views, selected invoice sets, or dedicated accounts receivable delinquency reports to RFC 4180-compliant CSV format with automated balance totals.
-
-### 10. Financial Truth & Net Profit
-
-Review accurate financial summaries with no artificial zero-clamping or synthetic data. Compare accrual billing against realized cashflow, isolate numbers by currency (`USD`, `LKR`, `EUR`), and subtract subcontractor costs and recorded business expenses to view true net margins.
-
----
-
-## Tech Stack & Architecture
-
-| Layer                  | Technology                                 | Details                                                                      |
-| :--------------------- | :----------------------------------------- | :--------------------------------------------------------------------------- |
-| **Desktop Shell**      | Electron 44                                | Context-isolated preload bridge, native window framing, tray controls.       |
-| **Frontend Framework** | Next.js 16 (App Router)                    | React 19, Turbopack, static exports (`output: 'export'`).                    |
-| **Styling & Motion**   | Tailwind CSS v4, Motion                    | Newsreader serif + Inter typography, layered neutral shadows.                |
-| **Database & ORM**     | SQLite 3 via `better-sqlite3`, Drizzle ORM | WAL mode, foreign key cascades, versioned schema migrations.                 |
-| **Analytics & Charts** | Apache ECharts 6                           | Freelance turnaround velocity, retainer yields, capacity benchmarks.         |
-| **Document Engine**    | Electron `printToPDF` + `pdf-lib`          | Offline invoice templates with bundled fonts and vector contractor vouchers. |
-| **Test Suite**         | Vitest + Playwright                        | Unit, database, security, and packaged Electron workflow coverage.           |
-
-### Architecture Overview
-
-```
-┌────────────────────────────────────────────────────────┐
-│             Next.js 16 Frontend (React 19)             │
-│   Dashboard │ Clients │ Invoices │ Tasks │ Outsourcing  │
-└───────────────────────────┬────────────────────────────┘
-                            │ window.billflow
-┌───────────────────────────▼────────────────────────────┐
-│         Electron Context Bridge (electron/preload.ts)   │
-└───────────────────────────┬────────────────────────────┘
-                            │ Validated IPC
-┌───────────────────────────▼────────────────────────────┐
-│            Electron Main Process (electron/main.ts)    │
-│  IPC Handlers │ PDF Generator │ File Attachment Store   │
-└───────────────────────────┬────────────────────────────┘
-                            │ Drizzle ORM
-┌───────────────────────────▼────────────────────────────┐
-│      SQLite Database (billflow.db in App userData)     │
-│   WAL Mode │ Strict Foreign Keys │ Versioned Migrations│
-└────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+  Client["Client & Service Catalog"] --> Invoice["Itemized Invoice & Offline PDF"]
+  Invoice -->|"Deposit recorded"| Tasks["Linked Kanban, List & Calendar"]
+  Tasks -->|"Completed unbilled work"| Invoice
+  Tasks -->|"Subcontractor delegation"| Vendor["Payable Voucher (VND-INV) & Payout"]
+  Tasks --> Handoff["Deliverable Handoff & Balance Collection"]
+  Vendor --> Ledger["Per-Currency Profit Ledger"]
+  Handoff --> Ledger
 ```
 
----
+Recording a client deposit (`ADVANCE_PAID`) opens a 5-second prompt to turn invoice line items into Kanban cards without retyping scope. Unbilled tasks marked `Done` also import directly into a new invoice individually or in batches, and sibling cards from the same invoice highlight together on hover.
 
-## Installation & Running Locally
+## Product capabilities
+
+### Client directory and reusable service catalog
+
+Save permanent clients with default currencies (`USD`, `LKR`, `EUR`, `GBP`, `CAD`), contact details, and delivery destinations such as Google Drive folders or code repositories. For one-off work, enter temporary client details straight into the invoice editor without polluting the directory. Maintain fixed-fee or hourly rate cards in the service catalog and import or export rows via CSV or Excel workbooks.
+
+### Itemized invoicing and five offline PDF templates
+
+Build multi-currency invoices with catalog items, custom discounts, taxes, and upfront deposit rules. Generate and save PDF files locally via Electron `printToPDF` and `pdf-lib` with bundled typography and an optional uploaded business logo. Five selectable invoice layouts are included offline:
+
+- `Geometric Teal`: teal and slate angled header on a white sheet
+- `Executive Wave`: charcoal curved ribbon header with amber summary styling
+- `Scarlet Modern`: split red header and dotted item rows
+- `Apex Orange`: orange diagonal header and bordered table grid
+- `Noir Crimson`: dark invoice sheet with crimson capsule rows
+
+Dispatch invoices or overdue reminders through prefilled `wa.me` WhatsApp links or email drafts, inspect past-due accounts receivable aging (`1-15`, `16-30`, `31-60`, `60+` days), and export active registers or aging reports to RFC 4180 CSV or Excel formats.
+
+### Task board, local calendar, and deliverable handoff
+
+Switch between Kanban (`To Do`, `In Progress`, `Under Review`, `Done`), List, and Calendar views. Active work time accumulates in the background on cards, and Calendar view supports drag-and-drop rescheduling alongside two-way local macOS Calendar `.ics` synchronization on desktop. Dragging a deliverable card to `Done` opens the Submit Work modal with direct links to that client's repository, staging URL, or Drive folder.
+
+### Subcontractor outsourcing and automated payout ledger
+
+Delegate any Kanban card to an external vendor with prefilled scope, client references, delivery URLs, payout fees, and deadlines. Export payable work orders (`VND-INV-xxxx`) offline via `pdf-lib` and send formatted briefs over WhatsApp. Deliverable approval and vendor settlement remain separate states; marking a voucher `Paid` records an operational payout entry in the expense ledger automatically.
+
+### Operational expenses, receipt vault, and net profit
+
+Log business expenses with custom merchant icons, recurring flags, and SHA-256 content-addressed receipt attachments (`PNG`, `JPG`, `PDF`) opened through the OS viewer. Financial summaries and Apache ECharts visualizations separate totals strictly by currency (`gross invoiced revenue - operational expenses - settled vendor payouts`). Losses and negative margins remain visible as entered, without zero-clamping or synthetic sample records.
+
+### Multi-profile workspaces and backups
+
+Run up to 5 isolated local workspaces in one installation, starting from role presets for Software Engineering, AI Development, or Consulting. Each profile keeps its own database, receipts directory, catalog defaults, appearance settings (`Light`, `Dark`, or `System` with accent themes), and optional 4-digit PIN or alphanumeric passcode enforced in Electron's main process. Export or restore version 2 JSON backups that bundle tasks, schedules, and receipt bytes (`150 MiB` maximum backup size, `100 MiB` maximum per attachment, `50,000` rows per table).
+
+## System architecture
+
+| Layer | Stack | Role |
+| :--- | :--- | :--- |
+| Desktop shell | Electron 44 | Context-isolated `window.billflow` preload bridge, single-instance window management, local tray controls |
+| Interface | Next.js 16 (App Router), React 19 | Static bundle (`output: 'export'`) loaded from loopback static protocol in packaged builds |
+| Styling and motion | Tailwind CSS v4, Motion | Custom surface tokens, Newsreader and Inter typography, reduced-motion support |
+| Database and validation | SQLite (`better-sqlite3`), Drizzle ORM, Zod | WAL journal mode, foreign-key cascades, versioned schema migrations, schema-checked IPC payloads |
+| Documents and analytics | `pdf-lib`, Electron `printToPDF`, Apache ECharts 6 | Local PDF invoices and contractor vouchers, multi-currency financial and turnaround charts |
+| Testing | Vitest, Playwright | Database integrity, security, offline PDF generation, and packaged Electron end-to-end tests |
+
+## Running from source
 
 ### Prerequisites
 
-- **Node.js**: v22 LTS (specified in `.nvmrc`)
-- **npm**: v10 or newer
-- **Operating System**: macOS (Apple Silicon or Intel) or Windows 10/11
+- Node.js `v22` LTS (`.nvmrc` specifies `22`; `package.json` supports `>=22 <27`)
+- npm `v10` or newer
+- macOS (Apple Silicon or Intel) or Windows 10/11
 
-### 1. Clone & Install Dependencies
+### Setup and launch
 
 ```bash
 git clone https://github.com/Akatsuki-61/BillFlow.git
@@ -141,165 +91,69 @@ cd BillFlow
 npm install
 ```
 
-> **Note**: `npm install` automatically compiles native `better-sqlite3` bindings for Electron via `electron-builder install-app-deps`.
+`npm install` runs `electron-builder install-app-deps` automatically to align native `better-sqlite3` bindings with Electron 44.
 
-### 2. Run Desktop Application (Recommended)
+Launch the desktop app in development mode (Next.js dev server bound to `127.0.0.1` plus Electron shell with live watch):
 
 ```bash
 npm run dev:electron
 ```
 
-Starts the Next.js development server on loopback and the Electron shell with hot-reload. `npm start` launches the built static desktop app after `npm run build`; it does not run a Next.js production server.
+Build the static renderer and main-process bundle, then start the packaged local desktop entrypoint without a Next.js server:
 
-### 3. Run Web Preview (Frontend Only)
+```bash
+npm run build
+npm start
+```
+
+If you only want the browser preview using the in-memory fallback provider at `http://127.0.0.1:3000`:
 
 ```bash
 npm run dev
 ```
 
-Opens at `http://127.0.0.1:3000`. Uses an in-memory data provider fallback.
+## Verification and packaging
 
-### 4. Run Test Suite & Linting
+Run type checks, ESLint, and the Vitest suite (`210` tests across `27` files):
 
 ```bash
-# Run unit and integration tests
-npm test
-
-# Type checking
 npx tsc --noEmit
-
-# Linting
 npm run lint
+npm test
 ```
 
----
-
-## Local macOS test build
+Build an ad-hoc signed local macOS Apple Silicon `.app` preview under `release/preview-0.2.0/mac-arm64/BillFlow.app` and run the Playwright desktop suite against it:
 
 ```bash
 npm run pack:mac
+npm run test:desktop
 ```
 
-Open `release/preview-0.2.0/mac-arm64/BillFlow.app` locally. This creates an ad-hoc signed Apple Silicon application without publishing a release or creating a DMG. The app bundles its renderer, fonts, and native runtime; recipients do not need npm or a dev server. Developer ID signing, notarization and installer testing remain separate distribution steps.
+Create distributable installers into `release/`:
 
 ```bash
-BILLFLOW_APP_PATH="$PWD/release/preview-0.2.0/mac-arm64/BillFlow.app/Contents/MacOS/BillFlow" npm run test:desktop
+npm run dist:mac:arm64   # macOS Apple Silicon (.dmg)
+npm run dist:mac         # macOS arm64 + x64 (.dmg)
+npm run dist:win         # Windows x64 NSIS setup (.exe)
 ```
 
-The desktop suite creates temporary profiles, disables native Calendar synchronization, exercises the real packaged bridge and PDF engine, and removes its fixtures. Keep real Calendar integration as an explicit manual OS test.
+## Local data storage
 
-Renderer libraries are build dependencies. Drizzle, Zod and pdf-lib are bundled into the main process; only native SQLite and its runtime dependency closure are shipped as npm modules. The scoped tool overrides in `package.json` patch esbuild/minimatch advisories and are covered by tests, lint, the production build, and local app packaging. Recheck `npm audit` when updating them.
+| Environment | Database location |
+| :--- | :--- |
+| macOS packaged app | `~/Library/Application Support/BillFlow/billflow.db` |
+| Windows packaged app | `%APPDATA%\BillFlow\billflow.db` |
+| Development (`npm run dev:electron`) | `./.billflow-dev/billflow.db` |
 
-## Packaging Desktop Installers
+Additional local files stay in the same `userData` directory: SHA-256 receipt attachments under `attachments/`, isolated secondary workspaces under `profiles/<profile-id>/`, theme state in `appearance.json`, and automatic `billflow.db.before-upgrade-*.bak` recovery copies created ahead of pending Drizzle migrations. Generated PDFs export to the folder configured in Settings (defaulting to Downloads).
 
-Create standalone desktop packages using `electron-builder`:
+## Project background and credits
 
-### macOS (Apple Silicon / M1, M2, M3, M4)
+BillFlow was originally developed for **EER4189 Software Design in Group** (Group 61) at The Open University of Sri Lanka and is maintained by team Akatsuki-61. See [CONTRIBUTIONS.md](CONTRIBUTIONS.md) for the full module breakdown and development history.
 
-```bash
-npm run dist:mac:arm64
-```
-
-Outputs: `release/BillFlow-0.2.0-arm64.dmg`
-
-### macOS (Universal / All Architectures)
-
-```bash
-npm run dist:mac
-```
-
-Outputs: `release/BillFlow-0.2.0-arm64.dmg` and `release/BillFlow-0.1.0.dmg`
-
-### Windows (NSIS Installer)
-
-```bash
-npm run dist:win
-```
-
-Outputs: `release/BillFlow Setup 0.2.0.exe`
-
----
-
-## Database & File Storage
-
-All application data is stored locally:
-
-| OS              | Database File Path                                   |
-| :-------------- | :--------------------------------------------------- |
-| **macOS**       | `~/Library/Application Support/BillFlow/billflow.db` |
-| **Windows**     | `%APPDATA%\BillFlow\billflow.db`                     |
-| **Development** | `./.billflow-dev/billflow.db`                        |
-
-- **Receipt Attachments**: Copied into `userData/attachments/` with content-addressed SHA-256 naming.
-- **Profiles**: Secondary workspaces live in `userData/profiles/<profile-id>/` with isolated databases, receipts and task schedules. Password unlock state is enforced by the main process.
-- **Upgrades**: Pending schema upgrades create a consistent `billflow.db.before-upgrade-*.bak` recovery snapshot.
-- **Backups**: Version 2 backups include scheduled task times and receipt bytes. Export and restore share 150 MiB file and 100 MiB receipt limits; generated PDF paths are regenerated locally.
-- **Invoice PDFs**: Automatically exported to your configured folder (defaults to Downloads).
-- **Appearance Settings**: Persisted in `appearance.json` (`Light`, `Dark`, or `System`).
-
----
-
-## Development & Contributing
-
-Guidelines for team members and contributors collaborating on BillFlow:
-
-### Branching Strategy
-
-| Branch    | Focus Area & Primary Contributor                                                                       |
-| :-------- | :----------------------------------------------------------------------------------------------------- |
-| `main`    | Production-ready releases. Protected branch.                                                           |
-| `Nipun`   | Architecture, Electron shell, database, invoicing, PDF export, analytics, tasks.                       |
-| `Lahiru`  | Navigation shell, clients directory, delivery link resolution, expenses ledger, lead QA & bug hunting. |
-| `Binuka`  | Outsourcing work orders, contractor payouts, currency synchronization.                                 |
-| `Sandika` | Service catalog, CSV/Excel import, invoice styling reconciliation.                                     |
-
-> **Rule**: Never push directly to `main`. Always work on your assigned branch or a dedicated feature branch and test thoroughly before merging.
-
-### Commit Conventions
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-- `feat:` new feature or user-facing capability
-- `fix:` bug fix or calculation correction
-- `refactor:` internal restructuring with no functional change
-- `docs:` documentation updates
-- `test:` test coverage additions
-
-### Core Engineering Principles
-
-1. **Local-First SQLite Persistence**: All business data (clients, invoices, line items, payments, tasks, vendors, work orders, expenses) persists to `billflow.db` via Electron IPC and Drizzle ORM. Never store core business data in `localStorage` or component state alone.
-2. **Financial Integrity**: Store currency amounts as integer minor units (`amountCents`) with an explicit currency code (`USD`, `LKR`, `EUR`). Never sum across differing currencies. Fully preserve business losses and negative margins.
-3. **Zero Synthetic Seeding**: The database launches clean. Test fixtures are created only in disposable test workspaces; normal startup never seeds fake business records.
-
-### Pre-Commit Checklist
-
-Run the verification suite before committing:
-
-```bash
-npx tsc --noEmit    # Type checking
-npm run lint        # Code style & linting
-npm test            # 168 unit and integration tests (26 suites)
-```
-
-For the complete module ownership breakdown, detailed sprint timeline, and development history, see **[CONTRIBUTIONS.md](CONTRIBUTIONS.md)**.
-
----
-
-## Team & Project Credits
-
-BillFlow is designed and built by the **Akatsuki** engineering team:
-
-| Contributor        | GitHub                                                     | Primary Modules                                                                                                                                                           |
-| :----------------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Nipun Yatawara** | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron runtime, SQLite/Drizzle layer, Multi-profile workspaces & password locks, Task-to-Invoice workflow, synchronized card highlighting, spring motion. |
-| **GVSL-Lahiru**    | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru)             | Lead QA & bug hunting, Deliverable handoff workflow (Submit Work modal), Overdue invoices summary engine (AR aging), CSV data export.                                     |
-| **Binuka Reshan**  | [@Binukareshane](https://github.com/Binukareshane)         | Task outsourcing engine & payable vouchers (`VND-INV-xxxx`), WhatsApp contractor dispatch, automated ledger expense posting, Excel workbook export.                       |
-| **Sandika**        | [@Sandika-2003](https://github.com/Sandika-2003)           | Service Catalog management, bulk CSV/Excel import, UI Rework integration, invoice preview sheet (`InvoiceDocumentSheet.tsx`), macOS Calendar two-way `.ics` sync.         |
-
-For the complete module ownership breakdown, detailed sprint timeline, and git history, see **[CONTRIBUTIONS.md](CONTRIBUTIONS.md)**.
-
----
-
-## License
-
-This project is developed for educational and professional demonstration purposes under the coursework curriculum of The Open University of Sri Lanka.
+| Contributor | GitHub | Area |
+| :--- | :--- | :--- |
+| Nipun Yatawara | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron shell, SQLite/Drizzle schema, multi-profile workspaces, task-to-invoice flow, motion tokens |
+| GVSL-Lahiru | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Lead QA, deliverable handoff workflow, overdue aging summaries, CSV exports, navigation polish |
+| Binuka Reshan | [@Binukareshane](https://github.com/Binukareshane) | Subcontractor outsourcing engine, payable vouchers (`VND-INV-xxxx`), WhatsApp dispatch, ledger expense posting, Excel exports |
+| Sandika | [@Sandika-2003](https://github.com/Sandika-2003) | Service catalog, bulk CSV/Excel imports, UI integration, invoice sheet preview, macOS Calendar `.ics` sync |
