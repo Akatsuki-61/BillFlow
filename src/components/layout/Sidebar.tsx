@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useId } from "react";
+import React, { useState, useRef, useEffect, useMemo, useId, useCallback } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "motion/react";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
@@ -96,6 +96,7 @@ export default function Sidebar() {
   } = useWidgetContext();
 
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -108,11 +109,31 @@ export default function Sidebar() {
   const sheenId = useId();
   const reducedMotion = Boolean(useReducedMotion());
 
+  const openSearch = useCallback(() => {
+    setSearchFocused(true);
+    setSearchOpen(true);
+    setNotificationsOpen(false);
+    setProfileOpen(false);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchFocused(false);
+  }, []);
+
+  const toggleSearch = useCallback(() => {
+    if (searchOpen) {
+      closeSearch();
+    } else {
+      openSearch();
+    }
+  }, [searchOpen, closeSearch, openSearch]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (searchRef.current && !searchRef.current.contains(target)) {
-        setSearchOpen(false);
+        closeSearch();
       }
       if (
         notificationsRef.current &&
@@ -126,7 +147,7 @@ export default function Sidebar() {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [closeSearch]);
 
   useEffect(() => {
     if (searchOpen) {
@@ -139,9 +160,7 @@ export default function Sidebar() {
     const handleEscape = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setSearchOpen((open) => !open);
-        setNotificationsOpen(false);
-        setProfileOpen(false);
+        toggleSearch();
         return;
       }
       if (event.key !== "Escape") return;
@@ -152,14 +171,14 @@ export default function Sidebar() {
           : profileOpen
             ? profileRef
             : null;
-      setSearchOpen(false);
+      closeSearch();
       setNotificationsOpen(false);
       setProfileOpen(false);
       openRef?.current?.querySelector<HTMLButtonElement>("button")?.focus();
     };
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [searchOpen, notificationsOpen, profileOpen]);
+  }, [searchOpen, notificationsOpen, profileOpen, toggleSearch, closeSearch]);
 
   const activeAlerts = useMemo(() => {
     const unpaid = invoices.filter(
@@ -342,11 +361,7 @@ export default function Sidebar() {
             <div className="relative" ref={searchRef}>
               <button
                 type="button"
-                onClick={() => {
-                  setSearchOpen((prev) => !prev);
-                  setNotificationsOpen(false);
-                  setProfileOpen(false);
-                }}
+                onClick={toggleSearch}
                 aria-expanded={searchOpen}
                 aria-controls="search-popover"
                 aria-label="Search workspace"
@@ -366,14 +381,28 @@ export default function Sidebar() {
                     className="workspace-popover absolute right-0 mt-2.5 w-[360px] rounded-[20px] bg-surface border border-line-neutral-200 shadow-[0_18px_40px_-10px_rgba(0,0,0,0.14)] p-3 z-50"
                   >
                     <div className="relative flex items-center">
-                      <Search className="w-4 h-4 text-content-neutral-400 absolute left-3.5 pointer-events-none transition-transform duration-200" />
+                      {!searchFocused && searchQuery.length === 0 && (
+                        <Search
+                          aria-hidden="true"
+                          className="w-4 h-4 text-content-neutral-400 absolute left-3.5 pointer-events-none"
+                        />
+                      )}
                       <input
                         ref={searchInputRef}
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        onFocus={() => setSearchFocused(true)}
+                        onBlur={() => setSearchFocused(false)}
                         placeholder="Jump to page, invoice, or client..."
-                        className="ui-field w-full h-9 !min-h-[36px] pl-9 pr-8 rounded-[11px] bg-surface-neutral-100 border border-transparent focus:border-line-neutral-300 focus:bg-surface text-[13px] text-content-neutral-900 outline-none"
+                        style={{
+                          paddingLeft:
+                            !searchFocused && searchQuery.length === 0
+                              ? "40px"
+                              : "14px",
+                          paddingRight: searchQuery.length > 0 ? "34px" : "14px",
+                        }}
+                        className="ui-field w-full h-9 !min-h-[36px] rounded-[11px] bg-surface-neutral-100 border border-transparent focus:border-line-neutral-300 focus:bg-surface text-[13px] text-content-neutral-900 outline-none"
                       />
                       <AnimatePresence initial={false}>
                         {searchQuery && (
@@ -384,7 +413,12 @@ export default function Sidebar() {
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: POPOVER_INITIAL_SCALE }}
                             transition={SPRING_LIQUID_BUTTON}
-                            onClick={() => setSearchQuery("")}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setSearchQuery("");
+                              setSearchFocused(true);
+                              searchInputRef.current?.focus();
+                            }}
                             className="absolute right-2.5 text-content-neutral-400 hover:text-content-neutral-700 cursor-pointer"
                             aria-label="Clear search"
                           >
@@ -420,7 +454,7 @@ export default function Sidebar() {
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={listRowTransition(idx, reducedMotion)}
                                   onClick={() => {
-                                    setSearchOpen(false);
+                                    closeSearch();
                                     router.push(p.href);
                                   }}
                                   className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13px] font-medium text-content-neutral-800 hover:bg-surface-neutral-100 text-left cursor-pointer"
@@ -451,7 +485,7 @@ export default function Sidebar() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={listRowTransition(idx, reducedMotion)}
                                 onClick={() => {
-                                  setSearchOpen(false);
+                                  closeSearch();
                                   router.push(
                                     `/invoices?invoice=${encodeURIComponent(inv.id)}`,
                                   );
@@ -489,7 +523,7 @@ export default function Sidebar() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={listRowTransition(idx, reducedMotion)}
                                 onClick={() => {
-                                  setSearchOpen(false);
+                                  closeSearch();
                                   router.push(
                                     `/clients?client=${encodeURIComponent(client.id)}`,
                                   );
@@ -519,7 +553,7 @@ export default function Sidebar() {
                 type="button"
                 onClick={() => {
                   setNotificationsOpen((prev) => !prev);
-                  setSearchOpen(false);
+                  closeSearch();
                   setProfileOpen(false);
                 }}
                 aria-expanded={notificationsOpen}
@@ -652,7 +686,7 @@ export default function Sidebar() {
                 type="button"
                 onClick={() => {
                   setProfileOpen((prev) => !prev);
-                  setSearchOpen(false);
+                  closeSearch();
                   setNotificationsOpen(false);
                 }}
                 aria-expanded={profileOpen}
