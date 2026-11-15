@@ -1,3 +1,5 @@
+import { daysToFullPayment } from "../../src/lib/client-payment-days";
+import { listInvoicesWithClient } from "./invoices";
 import { ipcMain } from "../security";
 import crypto from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
@@ -19,11 +21,7 @@ export function listClientsWithStats(): ClientWithStats[] {
     .from(clients)
     .orderBy(desc(clients.createdAt))
     .all();
-  const allInvoices = db
-    .select()
-    .from(invoices)
-    .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
-    .all();
+  const allInvoices = listInvoicesWithClient();
 
   const invoiceMap = new Map<string, typeof allInvoices>();
   for (const invoice of allInvoices) {
@@ -62,6 +60,14 @@ export function listClientsWithStats(): ClientWithStats[] {
       totalPaidCents: preferred.paid,
       outstandingBalanceCents: preferred.outstanding,
       invoicesCount: linked.length,
+      averagePaymentDays: (() => {
+        const days = linked
+          .map(daysToFullPayment)
+          .filter((value): value is number => value !== null);
+        return days.length
+          ? days.reduce((sum, value) => sum + value, 0) / days.length
+          : null;
+      })(),
       recentInvoices: linked.slice(0, 3).map((invoice) => ({
         id: invoice.id,
         code: invoice.code,
@@ -142,6 +148,10 @@ export function registerClientHandlers(broadcastDataChanged: () => void) {
           contactRole: validated.contactRole || null,
           email: validated.email,
           phone: validated.phone || null,
+          whatsappPhone: validated.whatsappPhone || null,
+          billingAddress: validated.billingAddress || null,
+          relationshipNotes: validated.relationshipNotes || null,
+          photoData: validated.photoData || null,
           currency: validated.currency,
           driveUrl: validated.driveUrl || null,
           hasQuickBill: true,
@@ -186,6 +196,10 @@ export function registerClientHandlers(broadcastDataChanged: () => void) {
               contactRole: validated.contactRole,
             }),
             ...(validated.email !== undefined && { email: validated.email }),
+            whatsappPhone: validated.whatsappPhone,
+            billingAddress: validated.billingAddress,
+            relationshipNotes: validated.relationshipNotes,
+            photoData: validated.photoData,
             ...(validated.phone !== undefined && { phone: validated.phone }),
             ...(validated.currency !== undefined && {
               currency: validated.currency,

@@ -25,6 +25,7 @@ export interface WhatsAppInvoicePayload {
   dueDate?: string | null;
   deliveryUrl?: string | null;
   paymentDetails?: string | null;
+  paymentUrl?: string | null;
   businessName?: string;
 }
 
@@ -97,6 +98,9 @@ export function buildInvoiceWhatsAppMessage(data: WhatsAppInvoicePayload): strin
   const clientGreeting = data.clientName?.trim() ? `Hi ${data.clientName.trim()},` : "Hello,";
   parts.push(`${clientGreeting} here is your invoice ${data.invoiceCode} (${data.totalFormatted}).`);
   parts.push("Please find the attached invoice PDF.");
+  parts.push(`Outstanding balance: ${data.balanceFormatted}`);
+  if (data.paymentUrl) parts.push(`Pay online: ${data.paymentUrl}`);
+  if (data.dueDate) parts.push(`Due date: ${data.dueDate}`);
   if (data.advanceFormatted) {
     parts.push(`Required Advance: ${data.advanceFormatted}`);
   }
@@ -135,6 +139,7 @@ export function generateInvoiceEmailLink(data: {
   dueDate?: string | null;
   deliveryUrl?: string | null;
   paymentDetails?: string | null;
+  paymentUrl?: string | null;
   businessName?: string;
 }): string {
   const subject = encodeURIComponent(`Invoice ${data.invoiceCode} from ${data.businessName || "BillFlow"}`);
@@ -156,6 +161,7 @@ export function generateInvoiceEmailLink(data: {
     lines.push(`— ${data.businessName}`);
   }
 
+  if (data.paymentUrl) lines.push(`Pay online: ${data.paymentUrl}`);
   const body = encodeURIComponent(lines.join("\n"));
   return `mailto:${data.clientEmail || ""}?subject=${subject}&body=${body}`;
 }

@@ -3,6 +3,11 @@ import type { Currency, InvoiceTemplateId } from "./billing";
 export type DateFormat = "YYYY-MM-DD" | "DD/MM/YYYY" | "MM/DD/YYYY";
 export type CurrencyDisplayMode = "symbol" | "code";
 
+export type NotificationPlacement =
+  "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export type WorkspaceTypeface = "inter" | "nunito" | "jakarta";
+export type LayoutDensity = "compact" | "comfortable" | "spacious";
+
 export interface AppSettings {
   id: string;
   businessName: string;
@@ -23,6 +28,11 @@ export interface AppSettings {
   dateFormat: DateFormat;
   currencyDisplay: CurrencyDisplayMode;
   pdfExportDirectory?: string | null;
+  defaultDeliveryUrl?: string | null;
+  signatureData?: string | null;
+  notificationPlacement?: NotificationPlacement | null;
+  typeface?: WorkspaceTypeface | null;
+  layoutDensity?: LayoutDensity | null;
   updatedAt: string;
 }
 
@@ -38,4 +48,9 @@ export interface ExportDataPayload {
   vendors?: unknown[];
   records?: Record<string, Array<Record<string, string | number | null>>>;
   files?: Array<{ storedName: string; sha256: string; base64: string }>;
+}
+
+export interface BackupStatus {
+  lastBackupAt: string | null;
+  hasChanges: boolean;
 }

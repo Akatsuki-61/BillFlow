@@ -391,3 +391,555 @@ test("installed payload contains only the desktop runtime and target native bina
     fs.existsSync(path.join(runtime.resources, "THIRD_PARTY_NOTICES.txt")),
   ).toBe(true);
 });
+
+test("workspace operations connect search, alerts, ledgers, forecast, PDFs and backups", async ({}, testInfo) => {
+  const fixtures = await page.evaluate(async (pdfExportDirectory) => {
+    const api = window.billflow!;
+    const created = await api.profiles.create({
+      name: "Operations QA",
+      role: "consulting",
+      seedRoleCatalog: false,
+    });
+    const profile = created.profiles.find(
+      (item) => item.name === "Operations QA",
+    )!;
+    await api.profiles.switch(profile.id);
+    await api.settings.update({ pdfExportDirectory });
+    const today = new Intl.DateTimeFormat("sv-SE").format(new Date());
+    const client = await api.clients.create({
+      name: "Statement Client & Partners",
+      email: "statement@example.invalid",
+      currency: "USD",
+    });
+    const invoice = await api.invoices.create({
+      clientId: client.id,
+      code: "OPS-USD",
+      title: "Quarterly assessment",
+      amountCents: 12345,
+      currency: "USD",
+      dueDate: today,
+    });
+    const second = await api.invoices.create({
+      clientId: client.id,
+      code: "OPS-EUR",
+      title: "Service assessment",
+      amountCents: 5000,
+      currency: "EUR",
+      dueDate: today,
+    });
+    const task = await api.tasks.create({
+      id: crypto.randomUUID(),
+      clientId: client.id,
+      title: "Deadline review",
+      dueDate: today,
+      currency: "USD",
+      description: "Review the assessment",
+      status: "todo",
+      priority: "high",
+      category: "Development",
+      subtasks: [],
+      assignee: {
+        name: "QA",
+        avatarLetter: "Q",
+        bgColor: "blue",
+        textColor: "white",
+      },
+    });
+    const vendor = await api.vendors.create({
+      name: "Statement Vendor",
+      service: "Consulting",
+    });
+    const order = await api.workOrders.create({
+      vendorId: vendor.id,
+      taskId: task.id,
+      invoiceId: invoice.id,
+      scope: "Deliver assessment",
+      feeCents: 8000,
+      currency: "USD",
+      payoutDueDate: today,
+    });
+    const { payment } = await api.invoices.recordPayment({
+      invoiceId: invoice.id,
+      amountCents: 12345,
+    });
+    const corrected = await api.invoices.correctPayment({
+      invoiceId: invoice.id,
+      paymentId: payment.id,
+      reason: "Transfer amount corrected",
+      replacement: {
+        amountCents: 2345,
+        receivedAt: today,
+        reference: "BANK-1",
+      },
+    });
+    await api.workOrders.recordPayout({
+      workOrderId: order.id,
+      amountCents: 2000,
+      paidAt: today,
+    });
+    const partial = await api.workOrders.recordPayout({
+      workOrderId: order.id,
+      amountCents: 3000,
+      paidAt: today,
+    });
+    await api.expenses.create({
+      merchant: "QA Expense",
+      category: "SOFTWARE",
+      amountCents: 300,
+      currency: "USD",
+      incurredAt: today,
+    });
+    await api.catalog.create({
+      title: "QA Catalog",
+      sku: "QA-TEST",
+      category: "Design",
+      price: "10.00",
+    });
+    return { client, invoice, second, task, vendor, order: partial, corrected };
+  }, directory);
+  expect(fixtures.corrected.paidCents).toBe(2345);
+  expect(fixtures.order.remainingPayoutCents).toBe(3000);
+  await page.reload();
+  await expect(page.getByRole("main")).toBeVisible();
+
+  const search = async (query: string) => {
+    await page.keyboard.press("Control+k");
+    const input = page.getByRole("combobox", {
+      name: "Search workspace records and actions",
+    });
+    await input.fill(query);
+    return input;
+  };
+  const catalog = await search("QA Catalog");
+  await expect(page.getByRole("option", { name: /QA Catalog/ })).toBeVisible();
+  await catalog.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "Edit Catalog Item" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  const expenses = await search("QA Expense");
+  await expenses.press("Enter");
+  await expect(page.getByText("Showing selected expense")).toBeVisible();
+
+  const shortcut = await search("");
+  await shortcut.press("Alt+3");
+  await expect(
+    page.getByRole("heading", { name: "Create New Deliverable" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Workspace notifications" }).click();
+  await expect(page.getByText("Task due today")).toBeVisible();
+  await page
+    .getByRole("link", { name: /Statement Vendor.*Deadline review/ })
+    .click();
+  await expect(page.getByText("$30.00 remaining")).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+
+  await page.getByRole("link", { name: "Analytics", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Cashflow forecast" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("table", { name: "Next 30 days by currency" })
+      .getByRole("row", { name: /USD.*100\.00.*30\.00/ }),
+  ).toBeVisible();
+
+  const exportDir = path.join(directory, "exports");
+  fs.mkdirSync(exportDir);
+  fs.writeFileSync(
+    path.join(exportDir, "Invoice-OPS-USD.pdf"),
+    "existing file",
+  );
+  await app.evaluate(({ dialog }, folder) => {
+    Object.assign(dialog, {
+      showOpenDialog: async () => ({ canceled: false, filePaths: [folder] }),
+    });
+  }, exportDir);
+  const exported = await page.evaluate(
+    (ids) => window.billflow!.invoices.exportBatch(ids),
+    [fixtures.invoice.id, fixtures.second.id],
+  );
+  expect(exported.filePaths).toHaveLength(2);
+  expect(
+    fs.readFileSync(path.join(exportDir, "Invoice-OPS-USD.pdf"), "utf8"),
+  ).toBe("existing file");
+  for (const filePath of exported.filePaths)
+    expect(
+      (await PDFDocument.load(fs.readFileSync(filePath))).getPageCount(),
+    ).toBeGreaterThan(0);
+  await app.evaluate(({ clipboard }) => {
+    let text = "";
+    Object.assign(clipboard, {
+      writeText: (value: string) => {
+        text = value;
+      },
+      readText: () => text,
+    });
+  });
+  const prepared = await page.evaluate(
+    (id) => window.billflow!.invoices.prepareShare(id),
+    fixtures.invoice.id,
+  );
+  expect(fs.existsSync(prepared.filePath)).toBe(true);
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toContain(
+    "OPS-USD",
+  );
+
+  const saveTo = (destination: string) =>
+    app.evaluate(({ dialog }, filePath) => {
+      Object.assign(dialog, {
+        showSaveDialog: async () => ({ canceled: false, filePath }),
+      });
+    }, destination);
+  const statementPaths = [
+    path.join(exportDir, "client.pdf"),
+    path.join(exportDir, "vendor.pdf"),
+  ];
+  await saveTo(statementPaths[0]);
+  await search("Statement Client");
+  await page
+    .getByRole("option", {
+      name: "Statement Client & Partners Client",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("button", { name: "Export Statement PDF" }).click();
+  await expect.poll(() => fs.existsSync(statementPaths[0])).toBe(true);
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await saveTo(statementPaths[1]);
+  await search("Statement Vendor");
+  await page
+    .getByRole("option", { name: "Statement Vendor Vendor", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Export Statement PDF" }).click();
+  await expect.poll(() => fs.existsSync(statementPaths[1])).toBe(true);
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  for (const [index, filePath] of statementPaths.entries()) {
+    expect(
+      (await PDFDocument.load(fs.readFileSync(filePath))).getPageCount(),
+    ).toBeGreaterThan(0);
+    await testInfo.attach(index ? "vendor-statement" : "client-statement", {
+      path: filePath,
+      contentType: "application/pdf",
+    });
+  }
+
+  await page.getByRole("link", { name: "Invoices", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Select invoice OPS-EUR" }).check();
+  await page
+    .getByRole("button", { name: "Move to Trash", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Move to Trash", exact: true })
+    .last()
+    .click();
+  await expect(
+    page.getByRole("checkbox", { name: "Select invoice OPS-EUR" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Trash", exact: true }).click();
+  await page.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(page.getByText("Trash is empty.")).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Select invoice OPS-EUR" }),
+  ).toBeVisible();
+
+  const backupPath = path.join(exportDir, "backup.json");
+  await saveTo(backupPath);
+  const settings = await search("backup restore");
+  await settings.press("Enter");
+  await page.getByRole("button", { name: "Save Backup" }).click();
+  await expect(page.getByText("Backup is up to date.")).toBeVisible();
+  expect(fs.existsSync(backupPath)).toBe(true);
+  await page.evaluate(() =>
+    window.billflow!.settings.update({ businessName: "Changed Studio" }),
+  );
+  await expect(
+    page.getByText("Workspace changed since this backup."),
+  ).toBeVisible();
+});
+
+test("customizes profiles and connects invoice stages, standalone payables and task undo", async ({}, testInfo) => {
+  page.setDefaultTimeout(10_000);
+  const created = await page.evaluate(async (pdfExportDirectory) => {
+    const api = window.billflow!;
+    const response = await api.profiles.create({
+      name: "Extension QA",
+      role: "general",
+      seedRoleCatalog: false,
+    });
+    const profile = response.profiles.find(
+      (row) => row.name === "Extension QA",
+    )!;
+    await api.profiles.switch(profile.id);
+    await api.settings.update({ pdfExportDirectory, defaultCurrency: "USD" });
+    const client = await api.clients.create({
+      name: "Extension Client",
+      email: "client@example.invalid",
+      phone: "+94771234567",
+      whatsappPhone: "+94711234567",
+      currency: "USD",
+      relationshipNotes: "Prefers monthly updates",
+      billingAddress: "123 Test Lane",
+    });
+    const invoices = await Promise.all(
+      ["EXT-01", "EXT-02"].map((code) =>
+        api.invoices.create({
+          clientId: client.id,
+          code,
+          currency: "USD",
+          amountCents: 10000,
+          workflowStage: "DELIVERED",
+          paymentUrl: "https://example.invalid/pay",
+          items: [
+            {
+              description: "Design review",
+              unitPriceCents: 10000,
+              quantity: 1,
+            },
+          ],
+        }),
+      ),
+    );
+    const tasks = await Promise.all(
+      ["Proofread work", "Check handover"].map((title) =>
+        api.tasks.create({
+          id: crypto.randomUUID(),
+          clientId: client.id,
+          title,
+          status: "todo",
+          priority: "high",
+          currency: "USD",
+          description: "",
+          dueDate: "",
+          category: "Development",
+          subtasks: [],
+          assignee: {
+            name: "QA",
+            avatarLetter: "Q",
+            bgColor: "blue",
+            textColor: "white",
+          },
+        }),
+      ),
+    );
+    return { profileId: profile.id, invoices, tasks };
+  }, directory);
+  await page.reload();
+  await expect(page.getByRole("main")).toBeVisible();
+
+  const openSettings = async (name: string) => {
+    await page.keyboard.press("Control+k");
+    const search = page.getByRole("combobox", {
+      name: "Search workspace records and actions",
+    });
+    await search.fill(name);
+    await search.press("Enter");
+    await expect(
+      page.getByRole("heading", { name: "Settings", exact: true }),
+    ).toBeVisible();
+  };
+  await openSettings("business profile");
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 48;
+    canvas.height = 48;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#14786b";
+    context.fillRect(0, 0, 48, 48);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.locator('input[type="file"][accept^="image/"]').setInputFiles({
+    name: "profile-fixture.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(png, "base64"),
+  });
+  await expect(page.getByRole("img", { name: "Workspace profile photo" })).toBeVisible();
+  await expect.poll(() => page.evaluate((id) =>
+    window.billflow!.profiles.list().then((state) =>
+      Boolean(state.profiles.find((profile) => profile.id === id)?.photoData)),
+    created.profileId,
+  )).toBe(true);
+
+  await openSettings("appearance");
+  await page
+    .getByRole("combobox", { name: "Typeface", exact: true })
+    .selectOption("nunito");
+  await page.getByLabel("Layout density").selectOption("compact");
+  await page.getByLabel("Notification placement").selectOption("top-left");
+  await page.getByRole("button", { name: "Save (Cmd+S)" }).click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-workspace-typeface",
+    "nunito",
+  );
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-workspace-density",
+    "compact",
+  );
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-notification-placement",
+    "top-left",
+  );
+
+  await openSettings("invoice defaults");
+  await page
+    .getByLabel("Default delivery destination")
+    .fill("https://example.invalid/deliverables");
+  const canvas = page.getByLabel("Draw invoice signature");
+  await canvas.scrollIntoViewIfNeeded();
+  const bounds = (await canvas.boundingBox())!;
+  await page.mouse.move(bounds.x + 40, bounds.y + 35);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 140, bounds.y + 55, { steps: 6 });
+  await page.mouse.up();
+  await page.getByRole("button", { name: "Use drawing" }).click();
+  await page.getByRole("button", { name: "Save (Cmd+S)" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window
+          .billflow!.settings.get()
+          .then((row) => Boolean(row.signatureData)),
+      ),
+    )
+    .toBe(true);
+
+  await page.getByRole("link", { name: "Invoices", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Select invoice EXT-01" }).check();
+  await page.getByRole("checkbox", { name: "Select invoice EXT-02" }).check();
+  await page
+    .getByRole("button", { name: "Change status", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Payment status", exact: true })
+    .selectOption("PAID");
+  await page.getByRole("button", { name: "Apply status" }).click();
+  const invoices = await page.evaluate(() => window.billflow!.invoices.list());
+  expect(
+    invoices.every(
+      (row) => row.status === "PAID" && row.workflowStage === "DELIVERED",
+    ),
+  ).toBe(true);
+
+  const drafts = await app.evaluate(({ shell }) => {
+    const opened: string[] = [];
+    Object.assign(shell, {
+      openExternal: async (url: string) => {
+        opened.push(url);
+      },
+      showItemInFolder: () => {},
+      billflowDraftFixtures: opened,
+    });
+    return opened.length;
+  });
+  expect(drafts).toBe(0);
+  await page
+    .getByRole("button", { name: "View invoice design EXT-01" })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("img", { name: "Invoice signature" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Pay online", exact: true }),
+  ).toBeVisible();
+  for (const name of ["WhatsApp Desktop", "WhatsApp Web", "SMS draft"]) {
+    await page.getByRole("button", { name: "Share", exact: true }).click();
+    await page.getByRole("button", { name }).click();
+    await expect
+      .poll(() =>
+        app.evaluate(
+          ({ shell }) =>
+            (shell as typeof shell & { billflowDraftFixtures: string[] })
+              .billflowDraftFixtures.length,
+        ),
+      )
+      .toBeGreaterThanOrEqual(
+        ["WhatsApp Desktop", "WhatsApp Web", "SMS draft"].indexOf(name) + 1,
+      );
+  }
+  const opened = await app.evaluate(
+    ({ shell }) =>
+      (shell as typeof shell & { billflowDraftFixtures: string[] })
+        .billflowDraftFixtures,
+  );
+  expect(opened[0]).toMatch(/^whatsapp:\/\/send\?/);
+  expect(opened[1]).toMatch(/^https:\/\/web\.whatsapp\.com\/send\?/);
+  expect(new URL(opened[0]).searchParams.get("phone")).toBe("94711234567");
+  expect(opened[2]).toMatch(/^sms:\+94771234567\?/);
+  await page.getByRole("button", { name: "Close dialog" }).click();
+
+  await page.getByRole("link", { name: "Outsourcing", exact: true }).click();
+  await page.getByRole("button", { name: "New Payable", exact: true }).click();
+  await page.getByLabel("Description", { exact: true }).fill("Adapter order");
+  await page.getByLabel("Vendor name").fill("One-time Fixture Vendor");
+  await page.getByLabel("Vendor phone country code").selectOption("LK");
+  await page.getByLabel("Vendor phone", { exact: true }).fill("0771234567");
+  await page.getByLabel("Billing address").fill("7 Supplier Road");
+  await page
+    .getByLabel("PayPal payment link")
+    .fill("https://www.paypal.com/example");
+  await page
+    .getByLabel("Stripe payment link")
+    .fill("https://buy.stripe.com/example");
+  await page.getByLabel("Item 1").fill("USB-C adapters");
+  await page.getByLabel("Quantity").fill("3");
+  await page.getByLabel("Unit price").fill("12.00");
+  await page.getByLabel("Discount (USD)").fill("2.00");
+  await page.getByRole("button", { name: "Save payable" }).click();
+  await expect(page.getByText("$34.00 remaining")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open PayPal" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Stripe" })).toBeVisible();
+  const payable = await page.evaluate(() =>
+    window.billflow!.workOrders.list().then((items) => items[0]),
+  );
+  expect(payable).toMatchObject({
+    vendorId: null,
+    invoiceId: null,
+    taskId: null,
+    vendorPhone: "+94771234567",
+    feeCents: 3400,
+  });
+  const voucher = await page.evaluate(
+    (id) => window.billflow!.workOrders.exportPdf(id),
+    payable.id,
+  );
+  expect(
+    (await PDFDocument.load(fs.readFileSync(voucher.filePath))).getPageCount(),
+  ).toBeGreaterThan(0);
+  await testInfo.attach("itemized-payable", {
+    path: voucher.filePath,
+    contentType: "application/pdf",
+  });
+  await page.getByRole("button", { name: "Close dialog" }).click();
+
+  await page.getByRole("link", { name: "Tasks", exact: true }).click();
+  await page.getByRole("button", { name: "Select tasks" }).click();
+  for (const task of created.tasks)
+    await page
+      .getByRole("checkbox", { name: `Select task ${task.title}` })
+      .check();
+  await page.getByRole("button", { name: "Delete selected (2)" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Proofread work", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Undo task deletion" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Proofread work", exact: true }),
+  ).toBeVisible();
+
+  const csvPath = path.join(directory, "workspace-extension.csv");
+  await app.evaluate(({ dialog }, filePath) => {
+    Object.assign(dialog, {
+      showSaveDialog: async () => ({ canceled: false, filePath }),
+    });
+  }, csvPath);
+  await openSettings("backup restore");
+  await page.getByRole("button", { name: "Export Workspace CSV" }).click();
+  await expect.poll(() => fs.existsSync(csvPath)).toBe(true);
+  const csv = fs.readFileSync(csvPath, "utf8");
+  expect(csv).toContain("record_type");
+  expect(csv).toContain("USB-C adapters");
+  expect(csv).toContain("Prefers monthly updates");
+});

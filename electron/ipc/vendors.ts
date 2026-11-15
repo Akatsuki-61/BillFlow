@@ -38,6 +38,8 @@ export function listVendors(): VendorItem[] {
     iconType: v.iconType as "design" | "devops" | "legal" | "development",
     email: v.email,
     phone: v.phone,
+    billingAddress: v.billingAddress,
+    photoData: v.photoData,
     linkedClientId: v.linkedClientId,
     linkedClientName:
       v.linkedClientName ||
@@ -113,6 +115,8 @@ export function registerVendorHandlers(broadcastDataChanged: () => void) {
           iconType: validated.iconType,
           email: validated.email || null,
           phone: validated.phone || null,
+          photoData: validated.photoData,
+          billingAddress: validated.billingAddress,
           linkedClientId: validated.linkedClientId || null,
           linkedClientName: validated.linkedClientName || null,
           payoutDueDate: validated.payoutDueDate || null,
@@ -158,6 +162,10 @@ export function registerVendorHandlers(broadcastDataChanged: () => void) {
         if (!existing) throw new AppError("NOT_FOUND", "Vendor not found");
 
         const updateData: Record<string, unknown> = {};
+        if (validated.photoData !== undefined)
+          updateData.photoData = validated.photoData;
+        if (validated.billingAddress !== undefined)
+          updateData.billingAddress = validated.billingAddress;
         if (validated.name !== undefined) updateData.name = validated.name;
         if (validated.service !== undefined)
           updateData.service = validated.service;

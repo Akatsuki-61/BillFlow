@@ -748,6 +748,7 @@ export function ProfileGateModal() {
                   <div className="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04]">
                     <ProfileAvatarTile
                       avatar={profile.avatar}
+                      photoData={profile.photoData}
                       accent={profile.accent}
                       size="xl"
                       hasPassword={profile.hasPassword}
@@ -839,6 +840,7 @@ export function ProfileGateModal() {
         >
           <ProfileAvatarTile
             avatar={unlockTarget.avatar}
+            photoData={unlockTarget.photoData}
             accent={unlockTarget.accent}
             size="lg"
             hasPassword

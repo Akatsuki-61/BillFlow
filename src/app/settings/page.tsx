@@ -1,4 +1,10 @@
 "use client";
+import { AppearanceFields } from "@/components/settings/WorkspaceAppearance";
+import { SignatureEditor } from "@/components/settings/SignatureEditor";
+import { PhoneField } from "@/components/ui/PhoneField";
+import { ImageUpload } from "@/components/ui/ImageUpload";
+
+import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { MAX_BACKUP_BYTES } from "@/lib/backup-limits";
 
 import { Dialog } from "@/components/ui/Dialog";
@@ -852,6 +858,7 @@ function SettingsContent() {
     openProfileGate,
     lockCurrentProfile,
     switchProfile,
+    updateProfile,
   } = useProfiles();
   const {
     settings,
@@ -859,12 +866,18 @@ function SettingsContent() {
     updateSettings,
     getDbPath,
     revealDbFile,
-    exportData,
+    backupStatus,
     importData,
     resetData,
   } = useSettings();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  useWorkspaceCommand("section", (section) => {
+    if (!["profile", "invoices", "data", "appearance"].includes(section))
+      return false;
+    setActiveTab(section as SettingsTab);
+    return true;
+  });
   const [previousRequestedTab, setPreviousRequestedTab] =
     useState(requestedTab);
   if (previousRequestedTab !== requestedTab) {
@@ -911,6 +924,7 @@ function SettingsContent() {
   );
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [importMode, setImportMode] = useState<"replace" | "merge">("replace");
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetConfirmation, setResetConfirmation] = useState("");
@@ -944,6 +958,11 @@ function SettingsContent() {
         dateFormat: settings.dateFormat || "YYYY-MM-DD",
         currencyDisplay: settings.currencyDisplay || "symbol",
         pdfExportDirectory: settings.pdfExportDirectory || null,
+        defaultDeliveryUrl: settings.defaultDeliveryUrl ?? null,
+        signatureData: settings.signatureData ?? null,
+        typeface: settings.typeface ?? null,
+        layoutDensity: settings.layoutDensity ?? null,
+        notificationPlacement: settings.notificationPlacement ?? null,
       });
     }
   }
@@ -978,6 +997,13 @@ function SettingsContent() {
         (settings.defaultInvoiceTemplate || "geometric-teal") ||
       formState.dateFormat !== settings.dateFormat ||
       formState.currencyDisplay !== settings.currencyDisplay ||
+      (formState.defaultDeliveryUrl || null) !==
+        (settings.defaultDeliveryUrl || null) ||
+      formState.signatureData !== (settings.signatureData ?? null) ||
+      formState.typeface !== (settings.typeface ?? null) ||
+      formState.layoutDensity !== (settings.layoutDensity ?? null) ||
+      formState.notificationPlacement !==
+        (settings.notificationPlacement ?? null) ||
       (formState.pdfExportDirectory || null) !==
         (settings.pdfExportDirectory || null)
     );
@@ -1072,30 +1098,34 @@ function SettingsContent() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const [savingBackup, setSavingBackup] = useState(false);
   const handleExportJson = async () => {
+    setSavingBackup(true);
     try {
-      const payload = await exportData();
-      const jsonString = URL.createObjectURL(
-        new Blob([JSON.stringify(payload)], { type: "application/json" }),
-      );
-      const downloadAnchor = document.createElement("a");
-      const dateTag = new Date().toISOString().split("T")[0];
-      downloadAnchor.setAttribute("href", jsonString);
-      downloadAnchor.setAttribute(
-        "download",
-        `billflow-backup-${dateTag}.json`,
-      );
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-      setTimeout(() => URL.revokeObjectURL(jsonString), 1000);
-      showToast("Backup saved to your computer.", "success");
+      const result = await window.billflow?.settings.saveBackup();
+      if (result?.success)
+        showToast("Backup saved to your computer.", "success");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to export data.";
       showToast(msg, "error");
+    } finally {
+      setSavingBackup(false);
     }
   };
 
+  const exportWorkspaceCsv = async () => {
+    try {
+      const result = await window.billflow?.settings.exportCsv();
+      if (result?.success) showToast("Workspace CSV saved.");
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Could not export the workspace CSV.",
+        "error",
+      );
+    }
+  };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1139,9 +1169,9 @@ function SettingsContent() {
     if (!parsedImport) return;
     setIsImporting(true);
     try {
-      const res = await importData(parsedImport);
+      const res = await importData(parsedImport, importMode);
       showToast(
-        `Restored ${res.importedClients} clients and ${res.importedInvoices} invoices.`,
+        `${importMode === "merge" ? "Merged" : "Restored"} ${res.importedClients} clients and ${res.importedInvoices} invoices.`,
         "success",
       );
       setIsImportModalOpen(false);
@@ -1149,7 +1179,8 @@ function SettingsContent() {
       setParsedImport(null);
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Failed to restore backup.";
+        err instanceof Error ? err.message : "Could not import the backup.";
+      setImportError(msg);
       showToast(msg, "error");
     } finally {
       setIsImporting(false);
@@ -1311,7 +1342,7 @@ function SettingsContent() {
         title="Settings"
         description="A workspace that works your way."
       >
-        {isDirty && activeTab !== "appearance" && (
+        {isDirty && (
           <div className="flex items-center gap-2.5">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-amber-50 text-content-amber-800 border border-line-amber-200/60">
               <span className="w-1.5 h-1.5 rounded-full bg-surface-amber-500 animate-pulse" />
@@ -1443,6 +1474,12 @@ function SettingsContent() {
           </div>
           {activeTab === "appearance" ? (
             <div className="settings-section space-y-6">
+              <AppearanceFields
+                value={formState}
+                onChange={(patch) =>
+                  setFormState((previous) => ({ ...previous, ...patch }))
+                }
+              />
               <section
                 className="ui-card p-5 flex flex-wrap items-center justify-between gap-4"
                 aria-labelledby="appearance-heading"
@@ -1649,6 +1686,7 @@ function SettingsContent() {
                             <div className="flex items-center gap-3 min-w-0">
                               <ProfileAvatarTile
                                 avatar={prof.avatar}
+                                photoData={prof.photoData}
                                 accent={prof.accent}
                                 size="sm"
                                 hasPassword={prof.hasPassword}
@@ -1760,6 +1798,15 @@ function SettingsContent() {
                     </div>
                   </div>
 
+                  <section className="ui-card p-6">
+                    <ImageUpload
+                      label="Workspace profile photo"
+                      value={activeProfile.photoData}
+                      onChange={(photoData) =>
+                        updateProfile(activeProfile.id, { photoData })
+                      }
+                    />
+                  </section>
                   {/* Basic Personal Info */}
                   <div className="ui-card p-6 space-y-4">
                     <div>
@@ -1848,26 +1895,13 @@ function SettingsContent() {
                         )}
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-medium text-content-neutral-700 mb-1">
-                          Phone Number{" "}
-                          <span className="text-content-neutral-400 font-normal">
-                            (Optional)
-                          </span>
-                        </label>
-                        <input
-                          type="tel"
-                          value={formState.phone || ""}
-                          onChange={(e) =>
-                            setFormState({
-                              ...formState,
-                              phone: e.target.value,
-                            })
-                          }
-                          placeholder="+1 (555) 000-0000"
-                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-colors"
-                        />
-                      </div>
+                      <PhoneField
+                        label="Business phone number"
+                        value={formState.phone || ""}
+                        onChange={(phone) =>
+                          setFormState((previous) => ({ ...previous, phone }))
+                        }
+                      />
 
                       <div className="sm:col-span-2">
                         <label className="block text-xs font-medium text-content-neutral-700 mb-1">
@@ -1990,6 +2024,35 @@ function SettingsContent() {
               {/* TAB 2: INVOICES */}
               {activeTab === "invoices" && (
                 <div className="settings-section space-y-6">
+                  <section className="ui-card space-y-4 p-6">
+                    <h2 className="text-sm font-semibold">
+                      Delivery and signature
+                    </h2>
+                    <label className="block space-y-1 text-xs font-medium">
+                      <span>Default delivery destination</span>
+                      <input
+                        type="url"
+                        value={formState.defaultDeliveryUrl ?? ""}
+                        placeholder="https://"
+                        className="ui-field w-full"
+                        onChange={(event) =>
+                          setFormState((previous) => ({
+                            ...previous,
+                            defaultDeliveryUrl: event.target.value || null,
+                          }))
+                        }
+                      />
+                    </label>
+                    <SignatureEditor
+                      value={formState.signatureData}
+                      onChange={(signatureData) =>
+                        setFormState((previous) => ({
+                          ...previous,
+                          signatureData,
+                        }))
+                      }
+                    />
+                  </section>
                   {/* Default Invoice Template */}
                   <div className="ui-card p-6 space-y-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2475,6 +2538,21 @@ function SettingsContent() {
                     </div>
                   </div>
 
+                  <section className="ui-card flex flex-wrap items-center justify-between gap-3 p-6">
+                    <div>
+                      <h2 className="text-sm font-semibold">Workspace CSV</h2>
+                      <p className="text-xs text-content-neutral-600">
+                        Export record data in a single spreadsheet file.
+                      </p>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      disabled={!isElectron}
+                      onClick={() => void exportWorkspaceCsv()}
+                    >
+                      <Download className="w-4 h-4" /> Export Workspace CSV
+                    </Button>
+                  </section>
                   {/* Backup & Restore */}
                   <div className="ui-card p-6 space-y-4">
                     <div>
@@ -2486,6 +2564,26 @@ function SettingsContent() {
                         backup file.
                       </p>
                     </div>
+
+                    {isElectron && backupStatus && (
+                      <div
+                        className="rounded-xl border border-line-neutral-200 p-3 text-xs text-content-neutral-700"
+                        role="status"
+                      >
+                        <p className="font-medium">
+                          {backupStatus.lastBackupAt
+                            ? `Last backup ${new Date(backupStatus.lastBackupAt).toLocaleString()}`
+                            : "No backup saved yet"}
+                        </p>
+                        {backupStatus.lastBackupAt && (
+                          <p className="mt-1">
+                            {backupStatus.hasChanges
+                              ? "Workspace changed since this backup."
+                              : "Backup is up to date."}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-4 rounded-xl border border-line-neutral-200 flex flex-col justify-between gap-3 bg-surface-neutral-50/30">
@@ -2502,7 +2600,7 @@ function SettingsContent() {
                         <Button
                           variant="secondary"
                           type="button"
-                          disabled={!isElectron}
+                          disabled={!isElectron || savingBackup}
                           onClick={handleExportJson}
                           className="w-full"
                         >
@@ -2656,8 +2754,7 @@ function SettingsContent() {
                 Restore Data from Backup
               </h3>
               <p className="text-xs text-content-neutral-500 mt-1">
-                Select a complete backup. Restoring replaces all business
-                records and profile settings with the backup contents.
+                Select a complete backup, then choose how to import its records.
               </p>
             </div>
             <div className="app-dialog-body">
@@ -2682,6 +2779,32 @@ function SettingsContent() {
                   </div>
                 )}
 
+                <fieldset className="space-y-2 text-sm">
+                  <legend className="mb-2 font-medium">Import mode</legend>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="backup-import-mode"
+                      checked={importMode === "replace"}
+                      onChange={() => setImportMode("replace")}
+                    />{" "}
+                    Replace workspace records
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="backup-import-mode"
+                      checked={importMode === "merge"}
+                      onChange={() => setImportMode("merge")}
+                    />{" "}
+                    Merge into this workspace
+                  </label>
+                  <p className="text-xs text-content-neutral-600">
+                    {importMode === "merge"
+                      ? "Adds new records, skips identical records and keeps current workspace settings. Conflicts stop the import."
+                      : "Replaces the active workspace records and settings."}
+                  </p>
+                </fieldset>
                 {parsedImport && (
                   <div className="p-3.5 rounded-xl bg-surface-purple-50 border border-line-purple-100 text-xs text-content-purple-950 space-y-1">
                     <div className="font-semibold text-accent">
@@ -2716,7 +2839,11 @@ function SettingsContent() {
                 disabled={!parsedImport || isImporting}
                 onClick={handleConfirmImport}
               >
-                {isImporting ? "Restoring..." : "Restore Data"}
+                {isImporting
+                  ? "Importing…"
+                  : importMode === "merge"
+                    ? "Merge Backup"
+                    : "Restore Data"}
               </Button>
             </div>
           </Dialog>

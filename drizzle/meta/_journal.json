@@ -78,6 +78,20 @@
       "when": 1791252000000,
       "tag": "0010_workspace_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791253000000,
+      "tag": "0011_workspace_operations",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791254000000,
+      "tag": "0012_workspace_customization",
+      "breakpoints": true
     }
   ]
 }

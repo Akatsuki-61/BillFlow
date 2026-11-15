@@ -431,6 +431,8 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       <div class="client-box">
         <div class="to-label">To:</div>
         <div class="client-name">${escapeHtml(data.client.name)}</div>
+        ${data.client.billingAddress ? `<div style="white-space:pre-line">${escapeHtml(data.client.billingAddress)}</div>` : ""}
+        ${data.paymentUrl ? `<div><a href="${escapeHtml(data.paymentUrl)}">Pay online</a></div>` : ""}
         ${data.client.driveUrl ? `<div class="client-detail">Delivery: ${escapeHtml(data.client.driveUrl)}</div>` : ""}
         ${data.client.email ? `<div class="client-detail">${escapeHtml(data.client.email)}</div>` : ""}
         ${data.client.phone ? `<div class="client-detail">${escapeHtml(data.client.phone)}</div>` : ""}

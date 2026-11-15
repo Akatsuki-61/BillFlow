@@ -1,3 +1,4 @@
+import { WorkspaceAppearance } from "@/components/settings/WorkspaceAppearance";
 import { ProfileWorkspace } from "@/components/profiles/ProfileWorkspace";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -45,6 +46,7 @@ export default function RootLayout({
         <ThemeProvider>
           <NavProvider>
             <DataProvider>
+              <WorkspaceAppearance />
               <InputPickerEnhancer />
               <ProfileProvider>
                 <ProfileWorkspace>

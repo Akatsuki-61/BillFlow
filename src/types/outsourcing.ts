@@ -43,6 +43,20 @@ export interface OutsourcingStats {
 }
 
 // Vendor / Subcontractor entity stored in SQLite DB
+export interface PayableVendor {
+  name: string;
+  service?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  billingAddress?: string | null;
+}
+
+export interface PayableItem {
+  description: string;
+  quantity: number;
+  unitPriceCents: number;
+}
+
 export interface VendorItem {
   id: string;
   name: string;
@@ -52,6 +66,8 @@ export interface VendorItem {
   iconType: "design" | "devops" | "legal" | "development";
   email?: string | null;
   phone?: string | null;
+  billingAddress?: string | null;
+  photoData?: string | null;
   linkedClientId?: string | null;
   linkedClientName?: string | null;
   payoutDueDate?: string | null;
@@ -69,6 +85,8 @@ export interface NewVendorInput {
   iconType?: "design" | "devops" | "legal" | "development";
   email?: string;
   phone?: string;
+  billingAddress?: string | null;
+  photoData?: string | null;
   linkedClientId?: string;
   linkedClientName?: string;
   payoutDueDate?: string;
@@ -84,6 +102,8 @@ export interface VendorPatchInput {
   iconType?: "design" | "devops" | "legal" | "development";
   email?: string | null;
   phone?: string | null;
+  billingAddress?: string | null;
+  photoData?: string | null;
   linkedClientId?: string | null;
   linkedClientName?: string | null;
   payoutDueDate?: string | null;
@@ -97,13 +117,19 @@ export interface VendorPatchInput {
  */
 export interface WorkOrderItem {
   id: string;
-  vendorId: string;
-  taskId: string;
-  invoiceId: string;
+  vendorId: string | null;
+  taskId: string | null;
+  invoiceId: string | null;
+  vendorSnapshot?: PayableVendor | null;
+  items?: PayableItem[] | null;
+  discountCents?: number;
+  paypalUrl?: string | null;
+  stripeUrl?: string | null;
   scope: string;
   feeCents: number;
   currency: Currency;
   dueDate?: string | null;
+  payoutDueDate?: string | null;
   status: "todo" | "in-progress" | "review" | "done";
   completedAt?: string | null;
   deliveryUrl?: string | null;
@@ -115,6 +141,7 @@ export interface WorkOrderItem {
   vendorService?: string;
   vendorEmail?: string | null;
   vendorPhone?: string | null;
+  vendorBillingAddress?: string | null;
   vendorIconType?: "design" | "devops" | "legal" | "development";
   taskTitle?: string;
   invoiceCode?: string;
@@ -124,28 +151,50 @@ export interface WorkOrderItem {
   payoutId?: string | null;
   paidAt?: string | null;
   payoutAmountCents?: number | null;
+  remainingPayoutCents?: number;
+  payouts?: VendorPayout[];
+}
+
+export interface VendorPayout {
+  id: string;
+  amountCents: number;
+  currency: Currency;
+  paidAt: string;
+  voidedAt?: string | null;
 }
 
 export interface NewWorkOrderInput {
   id?: string;
-  vendorId: string;
-  taskId: string;
-  invoiceId: string;
+  vendorId?: string | null;
+  taskId?: string | null;
+  invoiceId?: string | null;
+  vendorSnapshot?: PayableVendor | null;
+  items?: PayableItem[] | null;
+  discountCents?: number;
+  paypalUrl?: string | null;
+  stripeUrl?: string | null;
   scope: string;
   feeCents: number;
   currency: Currency;
   dueDate?: string | null;
+  payoutDueDate?: string | null;
   status?: "todo" | "in-progress" | "review" | "done";
   deliveryUrl?: string | null;
   notes?: string | null;
 }
 
 export interface WorkOrderPatchInput {
+  vendorSnapshot?: PayableVendor;
   vendorId?: string;
+  items?: PayableItem[] | null;
+  discountCents?: number;
+  paypalUrl?: string | null;
+  stripeUrl?: string | null;
   scope?: string;
   feeCents?: number;
   currency?: Currency;
   dueDate?: string | null;
+  payoutDueDate?: string | null;
   status?: "todo" | "in-progress" | "review" | "done";
   completedAt?: string | null;
   deliveryUrl?: string | null;
@@ -170,4 +219,5 @@ export interface RecordWorkOrderPayoutInput {
   amountCents?: number;
   currency?: Currency;
   paidAt?: string;
+  requestId?: string;
 }

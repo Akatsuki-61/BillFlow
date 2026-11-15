@@ -5,7 +5,7 @@ import path from "path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { closeDatabaseForTesting, initDatabase } from "../db";
+import { closeDatabaseForTesting, initDatabase, migrateDatabase } from "../db";
 
 let directory: string;
 beforeEach(() => {
@@ -53,5 +53,56 @@ describe("member branch database upgrades", () => {
       expect(sqlite.pragma("foreign_key_check")).toEqual([]);
       closeDatabaseForTesting();
     }
+  });
+});
+
+it("preserves linked work orders, payouts, receipts and export paths when adding standalone payables", () => {
+  const legacyFolder = path.join(directory, "drizzle");
+  fs.cpSync(path.resolve("drizzle"), legacyFolder, { recursive: true });
+  const journalPath = path.join(legacyFolder, "meta/_journal.json");
+  const journal = JSON.parse(fs.readFileSync(journalPath, "utf8"));
+  journal.entries = journal.entries.filter(
+    (entry: { idx: number }) => entry.idx <= 11,
+  );
+  fs.writeFileSync(journalPath, JSON.stringify(journal));
+
+  const databasePath = path.join(directory, "billflow.db");
+  const oldDb = new Database(databasePath);
+  oldDb.pragma("foreign_keys = ON");
+  migrateDatabase(oldDb, legacyFolder);
+  oldDb.exec(`
+    INSERT INTO clients (id,name,contact_person,email) VALUES ('c','Client','Test','test@example.invalid');
+    INSERT INTO invoices (id,code,client_id,amount_cents,currency,issue_date)
+      VALUES ('i','LEGACY-1','c',8000,'USD','2026-11-15');
+    INSERT INTO tasks (id,invoice_id,client_id,title,assignee,currency,created_at,updated_at)
+      VALUES ('t','i','c','Delivery','{}','USD','2026-11-15','2026-11-15');
+    INSERT INTO vendors (id,name,service) VALUES ('v','Supplier','Studio services');
+    INSERT INTO work_orders (id,vendor_id,task_id,invoice_id,scope,fee_cents,currency)
+      VALUES ('w','v','t','i','Delivery',4000,'USD');
+    INSERT INTO vendor_payouts (id,work_order_id,amount_cents,currency,paid_at,request_id)
+      VALUES ('p','w',1000,'USD','2026-11-15','legacy-payout');
+    INSERT INTO attachments (id,payout_id,original_name,stored_name,mime_type,size_bytes,sha256,created_at)
+      VALUES ('a','p','slip.pdf','slip.pdf','application/pdf',100,'legacy-fixture','2026-11-15');
+    INSERT INTO work_order_pdf_exports VALUES ('w','/tmp/legacy.pdf','2026-11-15');
+  `);
+  oldDb.close();
+
+  const { sqlite } = initDatabase(databasePath);
+  expect(sqlite.pragma("foreign_key_check")).toEqual([]);
+  expect(
+    sqlite
+      .prepare(
+        `SELECT v.vendor_id, v.task_id, v.invoice_id, p.amount_cents, a.original_name, pdf.file_path
+     FROM work_orders v JOIN vendor_payouts p ON p.work_order_id = v.id
+     JOIN attachments a ON a.payout_id = p.id JOIN work_order_pdf_exports pdf ON pdf.work_order_id = v.id`,
+      )
+      .get(),
+  ).toEqual({
+    vendor_id: "v",
+    task_id: "t",
+    invoice_id: "i",
+    amount_cents: 1000,
+    original_name: "slip.pdf",
+    file_path: "/tmp/legacy.pdf",
   });
 });

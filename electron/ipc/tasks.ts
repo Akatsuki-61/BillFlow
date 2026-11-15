@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { compareBoardTasks } from "../../src/lib/task-order";
+import { listPayments } from "./invoices";
 import { ipcMain } from "../security";
 import { randomUUID, createHash } from "crypto";
 import { and, eq, isNull, asc, desc } from "drizzle-orm";
@@ -9,7 +12,6 @@ import {
   clients,
   invoices,
   invoiceItems,
-  invoicePayments,
   calendarEvents,
   workOrders,
   taskTimeSlots,
@@ -189,7 +191,9 @@ export function updateTask(idInput: string, input: TaskPatchInput): TaskItem {
           .get()
       : undefined;
     if (
-      (nextInvoiceId && !invoice) ||
+      (nextInvoiceId &&
+        (!invoice ||
+          (invoice.trashedAt && nextInvoiceId !== existing.invoiceId))) ||
       (nextItemId && (!item || item.invoiceId !== nextInvoiceId)) ||
       (invoice &&
         (invoice.clientId !== nextClientId ||
@@ -232,8 +236,16 @@ export function updateTask(idInput: string, input: TaskPatchInput): TaskItem {
         })
         .run();
     }
+    const groupChanged =
+      (patch.status && patch.status !== existing.status) ||
+      (patch.priority && patch.priority !== existing.priority);
     tx.update(tasks)
-      .set({ ...fields, ...timing, updatedAt: now })
+      .set({
+        ...fields,
+        ...timing,
+        ...(groupChanged && { boardPosition: null }),
+        updatedAt: now,
+      })
       .where(eq(tasks.id, id))
       .run();
     if (patch.title !== undefined && patch.title !== existing.title) {
@@ -253,31 +265,130 @@ export function updateTask(idInput: string, input: TaskPatchInput): TaskItem {
   return listTasks().find((t) => t.id === id)!;
 }
 
+export function deleteTasks(input: string[]) {
+  const ids = [...new Set(z.array(recordId).min(1).parse(input))];
+  const token = randomUUID();
+  const now = new Date().toISOString();
+  let deleted = 0;
+  getDb().transaction((tx) => {
+    for (const id of ids) {
+      const task = tx.select().from(tasks).where(eq(tasks.id, id)).get();
+      if (!task || task.deletedAt) continue;
+      const events = tx
+        .select({ id: calendarEvents.id })
+        .from(calendarEvents)
+        .where(eq(calendarEvents.taskId, id))
+        .all();
+      tx.update(tasks)
+        .set({
+          deletedAt: now,
+          deletionToken: token,
+          deletedEventIds: JSON.stringify(events.map((event) => event.id)),
+          updatedAt: now,
+          activeSince: null,
+          activeMilliseconds:
+            task.activeMilliseconds +
+            (task.activeSince
+              ? Math.max(0, Date.parse(now) - Date.parse(task.activeSince))
+              : 0),
+        })
+        .where(eq(tasks.id, id))
+        .run();
+      tx.update(calendarEvents)
+        .set({ taskId: null, updatedAt: now })
+        .where(eq(calendarEvents.taskId, id))
+        .run();
+      deleted++;
+    }
+  });
+  return { token, deleted };
+}
 export function deleteTask(id: string) {
-  recordId.parse(id);
-  const db = getDb();
-  db.transaction((tx) => {
-    const existing = tx.select().from(tasks).where(eq(tasks.id, id)).get();
-    if (!existing || existing.deletedAt) return;
+  deleteTasks([id]);
+}
+
+export function undoTaskDeletion(input: string) {
+  const token = z.uuid().parse(input);
+  return getDb().transaction((tx) => {
+    const deleted = tx
+      .select()
+      .from(tasks)
+      .where(eq(tasks.deletionToken, token))
+      .all();
     const now = new Date().toISOString();
-    // Close active time and retain the last real status plus source-item uniqueness.
-    tx.update(tasks)
-      .set({
-        deletedAt: now,
-        updatedAt: now,
-        activeSince: null,
-        activeMilliseconds:
-          existing.activeMilliseconds +
-          (existing.activeSince
-            ? Math.max(0, Date.parse(now) - Date.parse(existing.activeSince))
-            : 0),
-      })
-      .where(eq(tasks.id, id))
-      .run();
-    tx.update(calendarEvents)
-      .set({ taskId: null, updatedAt: now })
-      .where(eq(calendarEvents.taskId, id))
-      .run();
+    for (const task of deleted) {
+      tx.update(tasks)
+        .set({
+          deletedAt: null,
+          deletionToken: null,
+          deletedEventIds: null,
+          activeSince: task.status === "in-progress" ? now : null,
+          updatedAt: now,
+        })
+        .where(eq(tasks.id, task.id))
+        .run();
+      if (!task.deletedAt || !task.deletedEventIds) continue;
+      for (const eventId of z
+        .array(recordId)
+        .parse(JSON.parse(task.deletedEventIds))) {
+        tx.update(calendarEvents)
+          .set({ taskId: task.id, updatedAt: now })
+          .where(
+            and(
+              eq(calendarEvents.id, eventId),
+              isNull(calendarEvents.taskId),
+              eq(calendarEvents.updatedAt, task.deletedAt),
+            ),
+          )
+          .run();
+      }
+    }
+    return { restored: deleted.length };
+  });
+}
+
+export function reorderTask(
+  idInput: string,
+  targetInput: string,
+  placementInput: "before" | "after",
+) {
+  const id = recordId.parse(idInput);
+  const targetId = recordId.parse(targetInput);
+  const placement = z.enum(["before", "after"]).parse(placementInput);
+  if (id === targetId) return;
+  getDb().transaction((tx) => {
+    const source = getTask(id);
+    const target = getTask(targetId);
+    if (source.status !== target.status || source.priority !== target.priority)
+      throw new AppError(
+        "TASK_GROUP",
+        "Reorder cards within the same column and priority.",
+      );
+    const group = tx
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.status, source.status),
+          eq(tasks.priority, source.priority),
+          isNull(tasks.deletedAt),
+        ),
+      )
+      .orderBy(desc(tasks.createdAt))
+      .all()
+      .sort(compareBoardTasks)
+      .filter((task) => task.id !== id);
+    const offset =
+      group.findIndex((task) => task.id === targetId) +
+      Number(placement === "after");
+    group.splice(offset, 0, source);
+    group.forEach((task, index) => {
+      if (task.boardPosition !== index)
+        tx.update(tasks)
+          .set({ boardPosition: index })
+          .where(eq(tasks.id, task.id))
+          .run();
+    });
   });
 }
 
@@ -295,18 +406,13 @@ function qualifyingInvoice(id: string) {
   const db = getDb();
   const invoice = db.select().from(invoices).where(eq(invoices.id, id)).get();
   if (!invoice) throw new AppError("NOT_FOUND", "Invoice no longer exists.");
-  const received = db
-    .select()
-    .from(invoicePayments)
-    .where(
-      and(
-        eq(invoicePayments.invoiceId, id),
-        eq(invoicePayments.currency, invoice.currency),
-      ),
+  const received = listPayments(id)
+    .filter(
+      (payment) => !payment.correction && payment.currency === invoice.currency,
     )
-    .all()
-    .reduce((sum, p) => sum + p.amountCents, 0);
+    .reduce((sum, payment) => sum + payment.amountCents, 0);
   if (
+    invoice.trashedAt ||
     invoice.status === "DRAFT" ||
     invoice.advanceCents <= 0 ||
     received < invoice.advanceCents
@@ -325,7 +431,7 @@ export function pendingTracking(): TrackingOffer[] {
     for (const row of tx
       .select()
       .from(invoices)
-      .where(isNull(invoices.trackingChoice))
+      .where(and(isNull(invoices.trackingChoice), isNull(invoices.trashedAt)))
       .all()) {
       let result: ReturnType<typeof qualifyingInvoice>;
       try {
@@ -473,6 +579,25 @@ export function registerTaskHandlers(broadcast: () => void) {
   });
   ipcMain.handle("tasks:update", (_e, id: string, patch: TaskPatchInput) => {
     const result = updateTask(id, patch);
+    broadcast();
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
+    return result;
+  });
+  ipcMain.handle(
+    "tasks:reorder",
+    (_e, id: string, targetId: string, placement: "before" | "after") => {
+      reorderTask(id, targetId, placement);
+      broadcast();
+    },
+  );
+  ipcMain.handle("tasks:removeMany", (_e, ids: string[]) => {
+    const result = deleteTasks(ids);
+    broadcast();
+    scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
+    return result;
+  });
+  ipcMain.handle("tasks:undoRemove", (_e, token: string) => {
+    const result = undoTaskDeletion(token);
     broadcast();
     scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return result;

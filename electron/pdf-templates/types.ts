@@ -24,9 +24,11 @@ export interface InvoicePdfPayload {
   amountCents: number;
   paidCents?: number;
   deliveryUrl?: string | null;
+  paymentUrl?: string | null;
   notes?: string | null;
   client: {
     name: string;
+    billingAddress?: string | null;
     email?: string;
     contactPerson?: string;
     phone?: string;

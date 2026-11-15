@@ -19,6 +19,10 @@ export interface Client {
   phone?: string | null;
   currency: Currency;
   driveUrl?: string | null;
+  whatsappPhone?: string | null;
+  relationshipNotes?: string | null;
+  billingAddress?: string | null;
+  photoData?: string | null;
   hasQuickBill: boolean;
   createdAt: string;
   updatedAt: string;
@@ -41,6 +45,7 @@ export interface ClientWithStats extends Client {
   totalPaidCents: number;
   outstandingBalanceCents: number;
   invoicesCount: number;
+  averagePaymentDays?: number | null;
   recentInvoices: ClientRecentInvoice[];
 }
 
@@ -53,6 +58,10 @@ export interface NewClientInput {
   phone?: string;
   currency: Currency;
   driveUrl?: string;
+  whatsappPhone?: string | null;
+  relationshipNotes?: string | null;
+  billingAddress?: string | null;
+  photoData?: string | null;
 }
 
 export interface ClientPatchInput {
@@ -64,7 +73,13 @@ export interface ClientPatchInput {
   phone?: string | null;
   currency?: Currency;
   driveUrl?: string | null;
+  whatsappPhone?: string | null;
+  relationshipNotes?: string | null;
+  billingAddress?: string | null;
+  photoData?: string | null;
 }
+
+export type InvoiceWorkflowStage = "SENT" | "WORK_CONFIRMED" | "DELIVERED";
 
 export type InvoiceStatus =
   "DRAFT" | "UNPAID" | "ADVANCE_PAID" | "PAID" | "OVERDUE";
@@ -96,6 +111,18 @@ export interface InvoicePayment {
   receivedAt: string;
   reference: string;
   requestId: string;
+  correction?: {
+    reason: string;
+    correctedAt: string;
+    replacementPaymentId: string | null;
+  };
+}
+
+export interface CorrectPaymentInput {
+  invoiceId: string;
+  paymentId: string;
+  reason: string;
+  replacement?: { amountCents: number; receivedAt: string; reference?: string };
 }
 
 export interface RecordPaymentInput {
@@ -116,6 +143,8 @@ export interface Invoice {
   clientSnapshot?: string | null;
   businessSnapshot?: string | null;
   deliveryUrl?: string | null;
+  paymentUrl?: string | null;
+  workflowStage?: InvoiceWorkflowStage | null;
   notes?: string | null;
   discountCents?: number;
   taxCents?: number;
@@ -129,6 +158,7 @@ export interface Invoice {
   dueDate?: string | null;
   status: InvoiceStatus;
   paidCents: number;
+  trashedAt?: string | null;
   items?: InvoiceItem[];
   payments?: InvoicePayment[];
   createdAt: string;
@@ -139,6 +169,8 @@ export interface InvoiceWithClient extends Invoice {
   clientName: string;
   clientEmail?: string;
   clientPhone?: string | null;
+  clientWhatsAppPhone?: string | null;
+  clientBillingAddress?: string | null;
   clientContactPerson?: string | null;
   clientCategory?: string | null;
   items?: InvoiceItem[];
@@ -159,6 +191,8 @@ export interface NewInvoiceInput {
   taxCents?: number;
   advanceCents?: number;
   deliveryUrl?: string | null;
+  paymentUrl?: string | null;
+  workflowStage?: InvoiceWorkflowStage | null;
   notes?: string | null;
   amountCents: number;
   currency: Currency;
@@ -177,6 +211,8 @@ export interface InvoicePatchInput {
   taxCents?: number;
   advanceCents?: number;
   deliveryUrl?: string | null;
+  paymentUrl?: string | null;
+  workflowStage?: InvoiceWorkflowStage | null;
   notes?: string | null;
   amountCents?: number;
   currency?: Currency;

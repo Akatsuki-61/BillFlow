@@ -1,5 +1,6 @@
 "use client";
 
+import { InvoiceSupplement } from "./InvoiceSupplement";
 import { ExternalLink, Phone, Mail, Globe, MapPin } from "lucide-react";
 import type { InvoiceTemplateProps } from "./types";
 
@@ -24,7 +25,9 @@ export function NoirCrimsonTemplate({
 
   const paidCents =
     invoice.payments && invoice.payments.length > 0
-      ? invoice.payments.reduce((sum, p) => sum + p.amountCents, 0)
+      ? invoice.payments
+          .filter((payment) => !payment.correction)
+          .reduce((sum, p) => sum + p.amountCents, 0)
       : invoice.paidCents || 0;
 
   const balanceDueCents = Math.max(0, invoice.amountCents - paidCents);
@@ -374,6 +377,11 @@ export function NoirCrimsonTemplate({
         </div>
       </div>
 
+      <InvoiceSupplement
+        invoice={invoice}
+        client={client}
+        settings={settings}
+      />
       {/* 7. BOTTOM FULL-WIDTH SOLID CRIMSON FOOTER */}
       <div className="w-full bg-[#D9383A] h-[38px] mt-auto flex items-center justify-around px-6 text-white text-[10px] font-medium select-none shrink-0">
         <div className="flex items-center gap-1.5">

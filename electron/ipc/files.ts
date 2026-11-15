@@ -1,3 +1,4 @@
+import { isMessageDraftUrl } from "../../src/lib/message-drafts";
 import { captureWorkspace } from "../workspace-session";
 import { app, dialog, shell } from "electron";
 import { ipcMain } from "../security";
@@ -202,7 +203,8 @@ export function saveInvoicePdf(invoiceId: string, bytes: Buffer) {
     .from(invoices)
     .where(eq(invoices.id, recordId.parse(invoiceId)))
     .get();
-  if (!invoice) throw new Error("Save the invoice before exporting it.");
+  if (!invoice || invoice.trashedAt)
+    throw new Error("An active invoice is required to export a PDF.");
   if (bytes.subarray(0, 5).toString() !== "%PDF-")
     throw new Error("Invoice exporter did not produce a PDF.");
   const name = `${invoice.code.replace(/[^a-zA-Z0-9_-]/g, "_")}-${createHash("sha256").update(`${getActiveProfileId()}:${invoiceId}`).digest("hex").slice(0, 12)}.pdf`;
@@ -387,6 +389,11 @@ export function registerFileHandlers(broadcast: () => void) {
     if (result.canceled || !result.filePaths[0]) return null;
     fs.accessSync(result.filePaths[0], fs.constants.W_OK);
     return result.filePaths[0];
+  });
+  ipcMain.handle("files:openDraft", async (_event, link: string) => {
+    if (typeof link !== "string" || !isMessageDraftUrl(link))
+      throw new Error("Invalid WhatsApp or SMS draft.");
+    await shell.openExternal(link);
   });
   ipcMain.handle("files:openInvoicePdf", (_e, id: string, reveal?: boolean) =>
     openInvoicePdf(id, reveal),

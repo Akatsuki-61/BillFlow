@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, { useId } from "react";
 import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
@@ -123,6 +124,7 @@ export const PROFILE_AVATAR_ICONS: Record<
 
 interface ProfileAvatarTileProps {
   avatar: ProfileAvatar;
+  photoData?: string | null;
   accent: AccentPreference;
   name?: string;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
@@ -179,6 +181,7 @@ const SIZE_MAP = {
 
 export function ProfileAvatarTile({
   avatar,
+  photoData,
   accent,
   size = "md",
   hasPassword = false,
@@ -258,7 +261,18 @@ export function ProfileAvatarTile({
           className="relative z-10 flex items-center justify-center transition-transform duration-200 group-hover:scale-105"
           style={{ color: style.iconColor }}
         >
-          <Icon className={sizeSpec.icon} strokeWidth={1.75} />
+          {photoData ? (
+            <Image
+              unoptimized
+              src={photoData}
+              alt=""
+              fill
+              sizes="96px"
+              className="object-cover"
+            />
+          ) : (
+            <Icon className={sizeSpec.icon} strokeWidth={1.75} />
+          )}
         </div>
 
         {/* Netflix Manage Profiles Pencil Overlay */}

@@ -54,7 +54,10 @@ export function AudienceGrowthChart() {
         )
         .forEach((invoice) => {
           (invoice.payments || [])
-            .filter((payment) => payment.currency === activeCurrency)
+            .filter(
+              (payment) =>
+                payment.currency === activeCurrency && !payment.correction,
+            )
             .forEach((payment) => {
               const target = months.find(
                 (month) => month.key === payment.receivedAt.slice(0, 7),
@@ -71,19 +74,24 @@ export function AudienceGrowthChart() {
           if (target) target.expenses += expense.amountCents / 100;
         });
       workOrders
-        .filter(
-          (order) =>
-            order.currency === activeCurrency &&
-            order.payoutStatus === "PAID" &&
-            order.paidAt,
-        )
+        .filter((order) => order.currency === activeCurrency)
         .forEach((order) => {
-          const target = months.find(
-            (month) => month.key === order.paidAt?.slice(0, 7),
-          );
-          if (target)
-            target.expenses +=
-              (order.payoutAmountCents ?? order.feeCents) / 100;
+          const payouts =
+            order.payouts?.filter((payout) => !payout.voidedAt) ??
+            (order.paidAt
+              ? [
+                  {
+                    paidAt: order.paidAt,
+                    amountCents: order.payoutAmountCents ?? 0,
+                  },
+                ]
+              : []);
+          for (const payout of payouts) {
+            const target = months.find(
+              (month) => month.key === payout.paidAt.slice(0, 7),
+            );
+            if (target) target.expenses += payout.amountCents / 100;
+          }
         });
       months.forEach((month) => {
         month.profit = month.collections - month.expenses;

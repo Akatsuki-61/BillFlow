@@ -18,6 +18,7 @@ import type {
   CatalogItemPatchInput,
   InvoicePayment,
   RecordPaymentInput,
+  CorrectPaymentInput,
 } from "../src/types/billing";
 import type {
   AppSettings,
@@ -184,6 +185,7 @@ if (process.isMainFrame && trustedDocument)
       }> => invoke("events:openNative", taskTimeSlots),
     },
     clients: {
+      exportStatement: (id: string) => invoke("clients:statement", id),
       list: (): Promise<ClientWithStats[]> => invoke("clients:list"),
       get: (id: string): Promise<ClientWithStats> => invoke("clients:get", id),
       create: (input: NewClientInput): Promise<ClientWithStats> =>
@@ -194,6 +196,18 @@ if (process.isMainFrame && trustedDocument)
         invoke("clients:remove", id),
     },
     invoices: {
+      setStatuses: (ids: string[], status: InvoiceStatus) =>
+        invoke("invoices:setStatuses", ids, status),
+      listTrash: (): Promise<InvoiceWithClient[]> =>
+        invoke("invoices:trashList"),
+      trash: (ids: string[]) => invoke("invoices:trash", ids),
+      restore: (ids: string[]) => invoke("invoices:restore", ids),
+      exportBatch: (ids: string[]) => invoke("invoices:exportBatch", ids),
+      prepareShare: (id: string, template?: string) =>
+        invoke("invoices:prepareShare", id, template),
+      correctPayment: (
+        input: CorrectPaymentInput,
+      ): Promise<InvoiceWithClient> => invoke("invoices:correctPayment", input),
       list: (filter?: { clientId?: string }): Promise<InvoiceWithClient[]> =>
         invoke("invoices:list", filter),
       nextCode: (): Promise<string> => invoke("invoices:nextCode"),
@@ -230,6 +244,7 @@ if (process.isMainFrame && trustedDocument)
         invoke("invoices:remove", id),
     },
     vendors: {
+      exportStatement: (id: string) => invoke("vendors:statement", id),
       list: (): Promise<VendorItem[]> => invoke("vendors:list"),
       create: (input: NewVendorInput): Promise<VendorItem> =>
         invoke("vendors:create", input),
@@ -260,8 +275,11 @@ if (process.isMainFrame && trustedDocument)
       recordPayout: (
         input: RecordWorkOrderPayoutInput,
       ): Promise<WorkOrderItem> => invoke("workOrders:recordPayout", input),
-      removePayout: (workOrderId: string): Promise<WorkOrderItem> =>
-        invoke("workOrders:removePayout", workOrderId),
+      removePayout: (
+        workOrderId: string,
+        payoutId?: string,
+      ): Promise<WorkOrderItem> =>
+        invoke("workOrders:removePayout", workOrderId, payoutId),
       setPayoutStatus: (
         id: string,
         status: "PENDING" | "PAID",
@@ -306,6 +324,8 @@ if (process.isMainFrame && trustedDocument)
       summary: (): Promise<DashboardSummary> => invoke("dashboard:summary"),
     },
     settings: {
+      exportCsv: () => invoke("settings:exportCsv"),
+      saveBackup: () => invoke("settings:saveBackup"),
       get: (): Promise<AppSettings> => invoke("settings:get"),
       update: (patch: UpdateSettingsInput): Promise<AppSettings> =>
         invoke("settings:update", patch),
@@ -313,16 +333,15 @@ if (process.isMainFrame && trustedDocument)
       revealDbFile: (): Promise<{ success: boolean }> =>
         invoke("settings:revealDbFile"),
       export: (): Promise<ExportDataPayload> => invoke("settings:export"),
-      import: (
-        payload: ExportDataPayload,
-      ): Promise<{
-        success: boolean;
-        importedClients: number;
-        importedInvoices: number;
-      }> => invoke("settings:import", payload),
+      import: (payload: ExportDataPayload, mode?: "replace" | "merge") =>
+        invoke("settings:import", payload, mode),
       reset: (): Promise<{ success: boolean }> => invoke("settings:reset"),
     },
     tasks: {
+      reorder: (id: string, target: string, placement: "before" | "after") =>
+        invoke("tasks:reorder", id, target, placement),
+      removeMany: (ids: string[]) => invoke("tasks:removeMany", ids),
+      undoRemove: (token: string) => invoke("tasks:undoRemove", token),
       list: () => invoke("tasks:list"),
       create: (input: TaskCreateInput) => invoke("tasks:create", input),
       update: (id: string, patch: TaskPatchInput) =>
@@ -343,6 +362,7 @@ if (process.isMainFrame && trustedDocument)
       open: (id: string) => invoke("attachments:open", id),
     },
     files: {
+      openDraft: (link: string) => invoke("files:openDraft", link),
       selectPdfDirectory: () => invoke("files:selectPdfDirectory"),
       openInvoicePdf: (id: string, reveal?: boolean) =>
         invoke("files:openInvoicePdf", id, reveal),

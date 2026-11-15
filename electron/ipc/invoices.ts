@@ -1,11 +1,16 @@
+import { localDateKey } from "../../src/lib/visual-metrics";
 import { validateInvoiceAmounts } from "../../src/lib/invoice-math";
 import { recordId } from "../workflow-validation";
 import { z } from "zod";
-import { dialog, BrowserWindow } from "electron";
+import { clipboard, dialog, BrowserWindow } from "electron";
 import { ipcMain } from "../security";
 
 import crypto from "crypto";
-import { eq, desc, asc, inArray } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
+import { formatCents } from "../../src/lib/format";
+import { buildInvoiceWhatsAppMessage } from "../../src/lib/whatsapp";
+import { eq, desc, asc, inArray, and, isNull, isNotNull } from "drizzle-orm";
 import { getDb, getSqlite } from "../db";
 import { captureWorkspace } from "../workspace-session";
 import { atomicWrite } from "../managed-files";
@@ -17,10 +22,10 @@ import {
   catalogServices,
   invoiceItems,
   invoicePayments,
+  invoicePaymentCorrections,
   invoicePdfExports,
   tasks,
   workOrders,
-  expenses,
 } from "../db/schema";
 import {
   newInvoiceSchema,
@@ -39,6 +44,7 @@ import {
   InvoiceStatus,
   Currency,
   RecordPaymentInput,
+  CorrectPaymentInput,
   InvoicePayment,
 } from "../../src/types/billing";
 
@@ -88,7 +94,10 @@ export function getNextInvoiceCode(): string {
   return `${activePrefix}${padded}`;
 }
 
-export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
+export function listInvoicesWithClient(
+  clientId?: string,
+  trash = false,
+): InvoiceWithClient[] {
   const db = getDb();
   const allInvoices = db
     .select({
@@ -96,19 +105,23 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
       clientName: clients.name,
       clientEmail: clients.email,
       clientPhone: clients.phone,
+      clientWhatsAppPhone: clients.whatsappPhone,
+      clientBillingAddress: clients.billingAddress,
       clientContactPerson: clients.contactPerson,
       clientCategory: clients.category,
     })
     .from(invoices)
     .leftJoin(clients, eq(invoices.clientId, clients.id))
+    .where(
+      and(
+        trash ? isNotNull(invoices.trashedAt) : isNull(invoices.trashedAt),
+        clientId ? eq(invoices.clientId, clientId) : undefined,
+      ),
+    )
     .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
     .all();
 
-  const filtered = clientId
-    ? allInvoices.filter((r) => r.invoice.clientId === clientId)
-    : allInvoices;
-
-  const ids = filtered.map((row) => row.invoice.id);
+  const ids = allInvoices.map((row) => row.invoice.id);
   const allItems = ids.length
     ? db
         .select()
@@ -117,14 +130,7 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
         .orderBy(asc(invoiceItems.position))
         .all()
     : [];
-  const allPayments = ids.length
-    ? db
-        .select()
-        .from(invoicePayments)
-        .where(inArray(invoicePayments.invoiceId, ids))
-        .orderBy(asc(invoicePayments.receivedAt))
-        .all()
-    : [];
+  const allPayments = ids.length ? readPayments(ids) : [];
   const itemMap = new Map<string, typeof allItems>();
   const paymentMap = new Map<string, InvoicePayment[]>();
   for (const item of allItems) {
@@ -137,7 +143,7 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
     rows.push({ ...payment, currency: payment.currency as Currency });
     paymentMap.set(payment.invoiceId, rows);
   }
-  return filtered.map((r) => {
+  return allInvoices.map((r) => {
     const items = itemMap.get(r.invoice.id) || [];
     const payments = paymentMap.get(r.invoice.id) || [];
 
@@ -145,6 +151,8 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
       name?: string;
       email?: string;
       phone?: string;
+      whatsappPhone?: string;
+      billingAddress?: string;
       contactPerson?: string;
       category?: string;
     } | null = null;
@@ -163,6 +171,10 @@ export function listInvoicesWithClient(clientId?: string): InvoiceWithClient[] {
       clientName: snapshot?.name || r.clientName || "Unknown Client",
       clientEmail: snapshot?.email || r.clientEmail || undefined,
       clientPhone: snapshot?.phone || r.clientPhone || null,
+      clientWhatsAppPhone: r.invoice.clientId
+        ? r.clientWhatsAppPhone
+        : snapshot?.whatsappPhone,
+      clientBillingAddress: snapshot?.billingAddress || r.clientBillingAddress,
       clientContactPerson:
         snapshot?.contactPerson || r.clientContactPerson || null,
       clientCategory: snapshot?.category || r.clientCategory || null,
@@ -212,7 +224,8 @@ export async function buildInvoicePdfPayloadAndBuffer(
       advanceCents: value.advanceCents,
       amountCents: value.amountCents,
       paidCents: 0,
-      deliveryUrl: value.deliveryUrl,
+      deliveryUrl: value.deliveryUrl || profile.defaultDeliveryUrl,
+      paymentUrl: value.paymentUrl,
       notes: value.notes,
       client: { name: client.name, email: client.email },
       business: profile,
@@ -270,12 +283,14 @@ export async function buildInvoicePdfPayloadAndBuffer(
     .from(invoices)
     .where(eq(invoices.id, invoiceId))
     .get();
-  if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
+  if (!invoice || invoice.trashedAt)
+    throw new AppError("NOT_FOUND", "Active invoice not found.");
 
   const client = invoice.clientId
     ? db.select().from(clients).where(eq(clients.id, invoice.clientId)).get()
     : undefined;
   let clientSnapshot: {
+    billingAddress?: string | null;
     name: string;
     email?: string;
     contactPerson?: string;
@@ -283,6 +298,7 @@ export async function buildInvoicePdfPayloadAndBuffer(
     driveUrl?: string | null;
   } = {
     name: client?.name || "Client",
+    billingAddress: client?.billingAddress,
     email: client?.email,
   };
   if (invoice.clientSnapshot) {
@@ -342,6 +358,7 @@ export async function buildInvoicePdfPayloadAndBuffer(
     amountCents: invoice.amountCents,
     paidCents: invoice.paidCents,
     deliveryUrl: invoice.deliveryUrl,
+    paymentUrl: invoice.paymentUrl,
     notes: invoice.notes,
     client: clientSnapshot,
     business: businessSnapshot,
@@ -370,7 +387,11 @@ export function exportInvoicePdf(
         .from(invoices)
         .where(eq(invoices.id, invoiceId))
         .get();
-      if (invoice.updatedAt && current?.updatedAt !== invoice.updatedAt)
+      if (
+        !current ||
+        current.trashedAt ||
+        current.updatedAt !== invoice.updatedAt
+      )
         throw new Error(
           "The invoice changed during PDF generation. Export it again.",
         );
@@ -379,6 +400,106 @@ export function exportInvoicePdf(
   exportQueue = result;
   return result;
 }
+export async function exportInvoiceBatch(idsInput: string[]) {
+  const ids = [...new Set(z.array(recordId).min(1).parse(idsInput))];
+  const workspace = captureWorkspace();
+  const result = await dialog.showOpenDialog({
+    title: "Choose a Folder for Invoice PDFs",
+    properties: ["openDirectory", "createDirectory"],
+  });
+  workspace.assertCurrent();
+  const directory = result.filePaths[0];
+  if (result.canceled || !directory)
+    return { success: false, canceled: true, filePaths: [] };
+  const staging = fs.mkdtempSync(path.join(directory, ".billflow-invoices-"));
+  const documents: Array<{
+    temporary: string;
+    filePath: string;
+    id: string;
+    updatedAt?: string;
+  }> = [];
+  const published: string[] = [];
+  const used = new Set<string>();
+  try {
+    for (const id of ids) {
+      workspace.assertCurrent();
+      const { invoice, pdfBuffer } = await buildInvoicePdfPayloadAndBuffer(id);
+      workspace.assertCurrent();
+      const stem = `Invoice-${(invoice.code ?? id).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+      let filePath = path.join(directory, `${stem}.pdf`);
+      for (
+        let suffix = 2;
+        fs.lstatSync(filePath, { throwIfNoEntry: false }) ||
+        used.has(filePath.toLowerCase());
+        suffix++
+      )
+        filePath = path.join(directory, `${stem}-${suffix}.pdf`);
+      used.add(filePath.toLowerCase());
+      const temporary = path.join(staging, `${documents.length}.pdf`);
+      atomicWrite(temporary, pdfBuffer);
+      documents.push({ temporary, filePath, id, updatedAt: invoice.updatedAt });
+    }
+    for (const document of documents) {
+      const current = getDb()
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, document.id))
+        .get();
+      if (
+        !current ||
+        current.trashedAt ||
+        current.updatedAt !== document.updatedAt
+      )
+        throw new Error(
+          "An invoice changed during PDF generation. Export the selection again.",
+        );
+      if (fs.lstatSync(document.filePath, { throwIfNoEntry: false }))
+        throw new Error(
+          "A file appeared in the export folder. Export the selection again.",
+        );
+    }
+    for (const document of documents) {
+      fs.renameSync(document.temporary, document.filePath);
+      published.push(document.filePath);
+    }
+    return { success: true, filePaths: published };
+  } catch (error) {
+    for (const file of published) fs.rmSync(file, { force: true });
+    throw error;
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+async function prepareInvoiceShare(invoiceId: string, template?: string) {
+  const id = recordId.parse(invoiceId);
+  const workspace = captureWorkspace();
+  const filePath = await exportInvoicePdf(id, template);
+  workspace.assertCurrent();
+  const invoice = listInvoicesWithClient().find((row) => row.id === id);
+  if (!invoice) throw new AppError("NOT_FOUND", "Active invoice not found.");
+  const settings = getOrCreateSettings();
+  const balance = Math.max(0, invoice.amountCents - invoice.paidCents);
+  const advance = Math.min(
+    balance,
+    Math.max(0, (invoice.advanceCents ?? 0) - invoice.paidCents),
+  );
+  clipboard.writeText(
+    buildInvoiceWhatsAppMessage({
+      clientName: invoice.clientName,
+      invoiceCode: invoice.code,
+      totalFormatted: formatCents(invoice.amountCents, invoice.currency),
+      advanceFormatted: advance ? formatCents(advance, invoice.currency) : null,
+      balanceFormatted: formatCents(balance, invoice.currency),
+      dueDate: balance ? invoice.dueDate : null,
+      businessName: settings.businessName,
+      paymentDetails: balance ? settings.paymentDetails : null,
+      paymentUrl: balance ? invoice.paymentUrl : null,
+    }),
+  );
+  return { success: true, filePath };
+}
+
 const scheduledExports = new Map<string, ReturnType<typeof setTimeout>>();
 function scheduleInvoiceExport(id: string) {
   if (getSqlite().inTransaction) return;
@@ -432,6 +553,22 @@ export async function saveInvoicePdfAs(
     return { success: false, canceled: true };
   }
 
+  if (invoiceId !== "sample-preview" && invoiceId !== "draft-preview") {
+    const current = getDb()
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, invoiceId))
+      .get();
+    if (
+      !current ||
+      current.trashedAt ||
+      current.updatedAt !== invoice.updatedAt
+    )
+      throw new Error(
+        "The invoice changed during PDF generation. Export it again.",
+      );
+  }
+
   const chosenPath = result.filePath;
   atomicWrite(chosenPath, pdfBuffer);
 
@@ -471,6 +608,11 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
       .where(eq(invoices.id, id))
       .get();
     if (existing) {
+      if (existing.trashedAt)
+        throw new AppError(
+          "IN_TRASH",
+          "Restore this invoice from Trash before using it.",
+        );
       if (existing.requestHash !== requestHash) {
         throw new AppError(
           "CONFLICT",
@@ -514,6 +656,8 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
               email: client.email,
               contactPerson: client.contactPerson,
               phone: client.phone,
+              whatsappPhone: client.whatsappPhone,
+              billingAddress: client.billingAddress,
               driveUrl: client.driveUrl,
               category: client.category,
               currency: client.currency,
@@ -527,6 +671,8 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
           email: value.newClient.email,
           contactPerson: value.newClient.contactPerson || value.newClient.name,
           phone: value.newClient.phone || null,
+          whatsappPhone: value.newClient.whatsappPhone,
+          billingAddress: value.newClient.billingAddress,
           driveUrl: value.newClient.driveUrl || null,
           category: value.newClient.category || "Enterprise",
           currency: value.newClient.currency || value.currency,
@@ -545,6 +691,8 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
         email: client.email,
         contactPerson: client.contactPerson,
         phone: client.phone,
+        whatsappPhone: client.whatsappPhone,
+        billingAddress: client.billingAddress,
         driveUrl: client.driveUrl,
         category: client.category,
         currency: client.currency,
@@ -624,6 +772,7 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
       value.deliveryUrl ||
       client?.driveUrl ||
       value.newClient?.driveUrl ||
+      profile.defaultDeliveryUrl ||
       null;
     const notes = value.notes || profile.defaultNotes || null;
 
@@ -636,7 +785,12 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
         catalogItemId: value.catalogItemId || null,
         title: value.title || null,
         clientSnapshot: clientSnapshotStr,
-        businessSnapshot: JSON.stringify(profile),
+        businessSnapshot: JSON.stringify({
+          ...profile,
+          signatureData: undefined,
+        }),
+        workflowStage: value.workflowStage,
+        paymentUrl: value.paymentUrl,
         deliveryUrl,
         notes,
         discountCents,
@@ -770,7 +924,8 @@ export function recordPayment(input: RecordPaymentInput): {
       .from(invoices)
       .where(eq(invoices.id, value.invoiceId))
       .get();
-    if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
+    if (!invoice || invoice.trashedAt)
+      throw new AppError("NOT_FOUND", "Active invoice not found.");
 
     if (value.currency && value.currency !== invoice.currency)
       throw new AppError(
@@ -812,47 +967,7 @@ export function recordPayment(input: RecordPaymentInput): {
       })
       .run();
 
-    // Calculate total received payments
-    const allPayments = tx
-      .select()
-      .from(invoicePayments)
-      .where(eq(invoicePayments.invoiceId, invoice.id))
-      .all();
-    if (allPayments.some((p) => p.currency !== invoice.currency))
-      throw new AppError(
-        "CURRENCY_MISMATCH",
-        "Existing payments have inconsistent currencies. Correct them before recording another payment.",
-      );
-    const totalPaidCents = allPayments.reduce(
-      (sum, p) => sum + p.amountCents,
-      0,
-    );
-
-    if (!Number.isSafeInteger(totalPaidCents))
-      throw new AppError(
-        "AMOUNT_OVERFLOW",
-        "Total payments exceed the supported amount.",
-      );
-    let nextStatus: InvoiceStatus = invoice.status as InvoiceStatus;
-    if (totalPaidCents >= invoice.amountCents) {
-      nextStatus = "PAID";
-    } else if (
-      invoice.advanceCents > 0 &&
-      totalPaidCents >= invoice.advanceCents
-    ) {
-      nextStatus = "ADVANCE_PAID";
-    } else if (totalPaidCents > 0 && invoice.status === "DRAFT") {
-      nextStatus = "UNPAID";
-    }
-
-    tx.update(invoices)
-      .set({
-        paidCents: totalPaidCents,
-        status: nextStatus,
-        updatedAt: now,
-      })
-      .where(eq(invoices.id, invoice.id))
-      .run();
+    refreshInvoiceCollection(tx, invoice, now);
 
     createdPayment = {
       id: paymentId,
@@ -874,18 +989,140 @@ export function recordPayment(input: RecordPaymentInput): {
   return { payment: createdPayment!, invoice: updatedInvoice };
 }
 
-export function listPayments(invoiceId: string): InvoicePayment[] {
-  const db = getDb();
-  return db
-    .select()
+function readPayments(invoiceIds: string[]): InvoicePayment[] {
+  return getDb()
+    .select({ payment: invoicePayments, correction: invoicePaymentCorrections })
     .from(invoicePayments)
-    .where(eq(invoicePayments.invoiceId, invoiceId))
-    .orderBy(asc(invoicePayments.receivedAt))
+    .leftJoin(
+      invoicePaymentCorrections,
+      eq(invoicePaymentCorrections.originalPaymentId, invoicePayments.id),
+    )
+    .where(inArray(invoicePayments.invoiceId, invoiceIds))
+    .orderBy(asc(invoicePayments.receivedAt), asc(invoicePayments.id))
     .all()
-    .map((p) => ({
-      ...p,
-      currency: p.currency as Currency,
+    .map(({ payment, correction }) => ({
+      ...payment,
+      currency: payment.currency as Currency,
+      ...(correction && { correction }),
     }));
+}
+
+export function listPayments(invoiceId: string): InvoicePayment[] {
+  return readPayments([recordId.parse(invoiceId)]);
+}
+
+type InvoiceTransaction = Parameters<
+  Parameters<ReturnType<typeof getDb>["transaction"]>[0]
+>[0];
+function refreshInvoiceCollection(
+  tx: InvoiceTransaction,
+  invoice: typeof invoices.$inferSelect,
+  now: string,
+) {
+  const active = listPayments(invoice.id).filter(
+    (payment) => !payment.correction,
+  );
+  if (active.some((payment) => payment.currency !== invoice.currency))
+    throw new AppError(
+      "CURRENCY_MISMATCH",
+      "Existing payments do not match the invoice currency.",
+    );
+  const total = active.reduce((sum, payment) => sum + payment.amountCents, 0);
+  if (!Number.isSafeInteger(total))
+    throw new AppError(
+      "AMOUNT_OVERFLOW",
+      "Total payments exceed the supported amount.",
+    );
+  const overdue =
+    invoice.status === "OVERDUE" ||
+    Boolean(invoice.dueDate && invoice.dueDate < localDateKey(new Date(now)));
+  let status: InvoiceStatus = overdue ? "OVERDUE" : "UNPAID";
+  if (invoice.status === "DRAFT" && total === 0) {
+    status = "DRAFT";
+  } else if (total >= invoice.amountCents) {
+    status = "PAID";
+  } else if (invoice.advanceCents > 0 && total >= invoice.advanceCents) {
+    status = "ADVANCE_PAID";
+  }
+  tx.update(invoices)
+    .set({
+      paidCents: total,
+      status,
+      updatedAt: now,
+      ...(total < invoice.advanceCents &&
+        !invoice.trackingChoice && { trackingEligibleAt: null }),
+    })
+    .where(eq(invoices.id, invoice.id))
+    .run();
+}
+
+const correctionSchema = z.object({
+  invoiceId: recordId,
+  paymentId: recordId,
+  reason: z
+    .string()
+    .trim()
+    .min(1, "Enter a reason for this correction.")
+    .max(500),
+  replacement: recordPaymentSchema
+    .pick({ amountCents: true, receivedAt: true, reference: true })
+    .required()
+    .optional(),
+});
+export function correctPayment(input: CorrectPaymentInput): InvoiceWithClient {
+  const value = correctionSchema.parse({
+    ...input,
+    replacement: input?.replacement && {
+      ...input.replacement,
+      reference: input.replacement.reference ?? "",
+    },
+  });
+  const db = getDb();
+  db.transaction((tx) => {
+    const invoice = tx
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, value.invoiceId))
+      .get();
+    if (!invoice || invoice.trashedAt)
+      throw new AppError("NOT_FOUND", "Active invoice not found.");
+    const original = listPayments(invoice.id).find(
+      (payment) => payment.id === value.paymentId,
+    );
+    if (!original)
+      throw new AppError("NOT_FOUND", "Payment not found on this invoice.");
+    if (original.correction)
+      throw new AppError(
+        "ALREADY_CORRECTED",
+        "This payment was already reversed or corrected.",
+      );
+    const now = new Date().toISOString();
+    const replacementId = value.replacement ? crypto.randomUUID() : null;
+    if (value.replacement && replacementId) {
+      tx.insert(invoicePayments)
+        .values({
+          id: replacementId,
+          requestId: replacementId,
+          invoiceId: invoice.id,
+          currency: invoice.currency,
+          ...value.replacement,
+        })
+        .run();
+    }
+    tx.insert(invoicePaymentCorrections)
+      .values({
+        originalPaymentId: original.id,
+        replacementPaymentId: replacementId,
+        reason: value.reason,
+        correctedAt: now,
+      })
+      .run();
+    refreshInvoiceCollection(tx, invoice, now);
+  });
+  scheduleInvoiceExport(value.invoiceId);
+  return listInvoicesWithClient().find(
+    (invoice) => invoice.id === value.invoiceId,
+  )!;
 }
 
 export function promoteInvoiceClient(
@@ -897,7 +1134,8 @@ export function promoteInvoiceClient(
     .from(invoices)
     .where(eq(invoices.id, invoiceId))
     .get();
-  if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
+  if (!invoice || invoice.trashedAt)
+    throw new AppError("NOT_FOUND", "Active invoice not found.");
 
   if (invoice.clientId) {
     const existing = db
@@ -920,6 +1158,8 @@ export function promoteInvoiceClient(
     email: string;
     contactPerson?: string;
     phone?: string;
+    whatsappPhone?: string | null;
+    billingAddress?: string | null;
     driveUrl?: string;
     category?: string;
     currency?: Currency;
@@ -940,6 +1180,8 @@ export function promoteInvoiceClient(
     email: snapshot.email || "client@example.com",
     contactPerson: snapshot.contactPerson || snapshot.name || "Client",
     phone: snapshot.phone || null,
+    whatsappPhone: snapshot.whatsappPhone ?? null,
+    billingAddress: snapshot.billingAddress ?? null,
     driveUrl: snapshot.driveUrl || invoice.deliveryUrl || null,
     category: snapshot.category || "Enterprise",
     currency: (snapshot.currency || invoice.currency || "USD") as Currency,
@@ -959,47 +1201,52 @@ export function promoteInvoiceClient(
   return db.select().from(clients).where(eq(clients.id, newClientId)).get()!;
 }
 
-export function removeInvoice(id: string): { success: boolean } {
-  recordId.parse(id);
-  const db = getDb();
-  return db.transaction((tx) => {
-    if (!tx.select().from(invoices).where(eq(invoices.id, id)).get())
-      throw new AppError("NOT_FOUND", "Invoice not found.");
-    if (
-      tx
+export function setInvoiceTrash(
+  idsInput: string[],
+  trash: boolean,
+): { success: boolean } {
+  const ids = [...new Set(z.array(recordId).min(1).parse(idsInput))];
+  return getDb().transaction((tx) => {
+    const now = new Date().toISOString();
+    for (const id of ids) {
+      const invoice = tx
         .select()
-        .from(invoicePayments)
-        .where(eq(invoicePayments.invoiceId, id))
-        .get()
-    )
-      throw new AppError(
-        "HAS_PAYMENTS",
-        "Invoices with recorded payments cannot be deleted. Payment history must be preserved.",
-      );
-    if (tx.select().from(workOrders).where(eq(workOrders.invoiceId, id)).get())
-      throw new AppError(
-        "HAS_WORK_ORDERS",
-        "Remove unpaid contractor work orders before deleting this invoice. Paid work must be retained.",
-      );
-    tx.update(tasks)
-      .set({
-        invoiceId: null,
-        invoiceItemId: null,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(tasks.invoiceId, id))
-      .run();
-    tx.update(expenses)
-      .set({ invoiceId: null })
-      .where(eq(expenses.invoiceId, id))
-      .run();
-    tx.delete(invoicePdfExports)
-      .where(eq(invoicePdfExports.invoiceId, id))
-      .run();
-    tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id)).run();
-    tx.delete(invoices).where(eq(invoices.id, id)).run();
+        .from(invoices)
+        .where(eq(invoices.id, id))
+        .get();
+      if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
+      if (Boolean(invoice.trashedAt) === trash) continue;
+      if (
+        trash &&
+        tx
+          .select()
+          .from(invoicePayments)
+          .where(eq(invoicePayments.invoiceId, id))
+          .get()
+      )
+        throw new AppError(
+          "HAS_PAYMENTS",
+          "Invoices with recorded payments cannot be moved to Trash.",
+        );
+      if (
+        trash &&
+        tx.select().from(workOrders).where(eq(workOrders.invoiceId, id)).get()
+      )
+        throw new AppError(
+          "HAS_WORK_ORDERS",
+          "Remove unpaid contractor work orders before moving this invoice to Trash. Paid work must be retained.",
+        );
+      tx.update(invoices)
+        .set({ trashedAt: trash ? now : null, updatedAt: now })
+        .where(eq(invoices.id, id))
+        .run();
+    }
     return { success: true };
   });
+}
+
+export function removeInvoice(id: string) {
+  return setInvoiceTrash([id], true);
 }
 
 const invoiceStatusSchema = z.enum([
@@ -1019,18 +1266,20 @@ export function settleInvoiceStatus(
   const db = getDb();
   db.transaction((tx) => {
     const invoice = tx.select().from(invoices).where(eq(invoices.id, id)).get();
-    if (!invoice) throw new AppError("NOT_FOUND", "Invoice not found.");
-    const payments = tx
-      .select()
-      .from(invoicePayments)
-      .where(eq(invoicePayments.invoiceId, id))
-      .all();
+    if (!invoice || invoice.trashedAt)
+      throw new AppError("NOT_FOUND", "Active invoice not found.");
+    const payments = listPayments(id).filter((p) => !p.correction);
     if (payments.some((p) => p.currency !== invoice.currency))
       throw new AppError(
         "CURRENCY_MISMATCH",
         "Existing payments do not match the invoice currency.",
       );
     const paid = payments.reduce((sum, p) => sum + p.amountCents, 0);
+    if (status === "DRAFT" && paid > 0)
+      throw new AppError(
+        "HAS_PAYMENTS",
+        "Reverse or correct recorded payments before moving this invoice to Draft.",
+      );
     const advance =
       status === "ADVANCE_PAID" && !invoice.advanceCents
         ? Math.round(invoice.amountCents * 0.5)
@@ -1051,7 +1300,7 @@ export function settleInvoiceStatus(
       });
     const finalPaid = Math.max(paid, target);
     const derived =
-      finalPaid >= invoice.amountCents && finalPaid > 0
+      finalPaid >= invoice.amountCents && (finalPaid > 0 || status === "PAID")
         ? "PAID"
         : advance > 0 && finalPaid >= advance
           ? "ADVANCE_PAID"
@@ -1068,6 +1317,32 @@ export function settleInvoiceStatus(
       .where(eq(invoices.id, id))
       .run();
   });
+}
+
+export function setInvoiceStatuses(
+  idsInput: string[],
+  statusInput: InvoiceStatus,
+) {
+  const ids = [...new Set(z.array(recordId).min(1).parse(idsInput))];
+  const status = invoiceStatusSchema.parse(statusInput);
+  const db = getDb();
+  db.transaction((tx) => {
+    for (const id of ids) {
+      settleInvoiceStatus(id, status);
+      const invoice = tx
+        .select({ status: invoices.status, code: invoices.code })
+        .from(invoices)
+        .where(eq(invoices.id, id))
+        .get()!;
+      if (invoice.status !== status)
+        throw new AppError(
+          "STATUS_CONFLICT",
+          `${invoice.code} cannot move to this status with its current payment history.`,
+        );
+    }
+  });
+  ids.forEach(scheduleInvoiceExport);
+  return { success: true };
 }
 
 export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
@@ -1126,8 +1401,8 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
           .from(invoices)
           .where(eq(invoices.id, id))
           .get();
-        if (!existing) {
-          throw new AppError("NOT_FOUND", "Invoice not found.");
+        if (!existing || existing.trashedAt) {
+          throw new AppError("NOT_FOUND", "Active invoice not found.");
         }
 
         const paymentRows = db
@@ -1229,6 +1504,14 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
                 validated.dueDate !== undefined
                   ? validated.dueDate
                   : existing.dueDate,
+              workflowStage:
+                validated.workflowStage === undefined
+                  ? existing.workflowStage
+                  : validated.workflowStage,
+              paymentUrl:
+                validated.paymentUrl === undefined
+                  ? existing.paymentUrl
+                  : validated.paymentUrl,
               status: existing.status,
               paidCents: paymentRows.reduce((sum, p) => sum + p.amountCents, 0),
               updatedAt: new Date().toISOString(),
@@ -1319,6 +1602,19 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
   );
 
   ipcMain.handle(
+    "invoices:setStatuses",
+    (_event, ids: string[], status: InvoiceStatus) => {
+      try {
+        const result = setInvoiceStatuses(ids, status);
+        broadcastDataChanged();
+        return result;
+      } catch (error) {
+        throw formatError(error);
+      }
+    },
+  );
+
+  ipcMain.handle(
     "invoices:setStatus",
     async (_event, id: string, status: InvoiceStatus) => {
       try {
@@ -1330,6 +1626,54 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
         return all.find((inv) => inv.id === id)!;
       } catch (err) {
         throw formatError(err);
+      }
+    },
+  );
+
+  ipcMain.handle("invoices:exportBatch", async (_event, ids: string[]) => {
+    try {
+      return await exportInvoiceBatch(ids);
+    } catch (error) {
+      throw formatError(error);
+    }
+  });
+  ipcMain.handle(
+    "invoices:prepareShare",
+    async (_event, id: string, template?: string) => {
+      try {
+        return await prepareInvoiceShare(id, template);
+      } catch (error) {
+        throw formatError(error);
+      }
+    },
+  );
+
+  ipcMain.handle("invoices:trashList", () =>
+    listInvoicesWithClient(undefined, true),
+  );
+  for (const trash of [true, false]) {
+    ipcMain.handle(
+      trash ? "invoices:trash" : "invoices:restore",
+      (_event, ids: string[]) => {
+        try {
+          const result = setInvoiceTrash(ids, trash);
+          broadcastDataChanged();
+          return result;
+        } catch (error) {
+          throw formatError(error);
+        }
+      },
+    );
+  }
+  ipcMain.handle(
+    "invoices:correctPayment",
+    (_event, input: CorrectPaymentInput) => {
+      try {
+        const result = correctPayment(input);
+        broadcastDataChanged();
+        return result;
+      } catch (error) {
+        throw formatError(error);
       }
     },
   );

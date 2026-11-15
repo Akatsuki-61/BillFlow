@@ -12,16 +12,38 @@ export function assertWorkspaceIntegrity(sqlite: Database.Database) {
     ).some((column) => column.name === "voided_at")
   )
     return;
+  const supportsCorrections = Boolean(
+    sqlite
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'invoice_payment_corrections'",
+      )
+      .get(),
+  );
+  const activePayments = supportsCorrections
+    ? "AND NOT EXISTS (SELECT 1 FROM invoice_payment_corrections c WHERE c.original_payment_id = p.id)"
+    : "";
+  const auditChecks = supportsCorrections
+    ? `UNION ALL SELECT 'payment correction owner', c.original_payment_id
+        FROM invoice_payment_corrections c
+        JOIN invoice_payments original ON original.id = c.original_payment_id
+        JOIN invoice_payments replacement ON replacement.id = c.replacement_payment_id
+        WHERE original.invoice_id IS NOT replacement.invoice_id
+      UNION ALL SELECT 'trashed invoice with financial history', i.id FROM invoices i
+        WHERE i.trashed_at IS NOT NULL AND (
+          EXISTS (SELECT 1 FROM invoice_payments p WHERE p.invoice_id = i.id)
+          OR EXISTS (SELECT 1 FROM work_orders w WHERE w.invoice_id = i.id)
+        )`
+    : "UNION ALL SELECT 'duplicate active payouts', work_order_id FROM vendor_payouts WHERE voided_at IS NULL GROUP BY work_order_id HAVING COUNT(*)>1";
   const conflicts = sqlite
     .prepare(
       `
     SELECT 'payment currency' AS kind, p.id FROM invoice_payments p JOIN invoices i ON i.id=p.invoice_id WHERE p.currency<>i.currency
     UNION ALL SELECT 'payout currency', p.id FROM vendor_payouts p JOIN work_orders w ON w.id=p.work_order_id WHERE p.currency<>w.currency
-    UNION ALL SELECT 'invoice collection', i.id FROM invoices i WHERE i.paid_cents <> COALESCE((SELECT SUM(p.amount_cents) FROM invoice_payments p WHERE p.invoice_id=i.id),0)
+    UNION ALL SELECT 'invoice collection', i.id FROM invoices i WHERE i.paid_cents <> COALESCE((SELECT SUM(p.amount_cents) FROM invoice_payments p WHERE p.invoice_id=i.id ${activePayments}),0)
     UNION ALL SELECT 'task invoice', t.id FROM tasks t JOIN invoices i ON i.id=t.invoice_id WHERE t.client_id IS NOT i.client_id OR t.currency<>i.currency
     UNION ALL SELECT 'task item', t.id FROM tasks t JOIN invoice_items item ON item.id=t.invoice_item_id WHERE t.invoice_id IS NOT item.invoice_id
     UNION ALL SELECT 'work order task', w.id FROM work_orders w JOIN tasks t ON t.id=w.task_id WHERE t.invoice_id IS NOT w.invoice_id
-    UNION ALL SELECT 'duplicate active payouts', work_order_id FROM vendor_payouts WHERE voided_at IS NULL GROUP BY work_order_id HAVING COUNT(*)>1
+    ${auditChecks}
     LIMIT 20
   `,
     )

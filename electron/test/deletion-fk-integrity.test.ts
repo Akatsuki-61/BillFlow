@@ -234,25 +234,16 @@ describe("Database Foreign Key Integrity on Deletions", () => {
   });
 
   it("deleting a client with tasks but no invoices unlinks tasks without FK errors", () => {
-    const invoice = createInvoice({
-      requestId: crypto.randomUUID(),
-      newClient: {
-        name: "Temporary Client",
-        email: "temp@example.com",
-        currency: "USD",
+    const clientId = crypto.randomUUID();
+    getDb()
+      .insert(clients)
+      .values({
+        id: clientId,
+        name: "Eve",
         contactPerson: "Eve",
-      },
-      code: "INV-2026-003",
-      items: [{ description: "Design", quantity: 1, unitPriceCents: 30000 }],
-      amountCents: 30000,
-      currency: "USD",
-      issueDate: "2026-10-01",
-    });
-
-    const clientId = invoice.clientId!;
-
-    // Delete the invoice first so client has no invoices
-    removeInvoice(invoice.id);
+        email: "eve@example.com",
+      })
+      .run();
 
     // Create a manual task linked to this client
     createTask({

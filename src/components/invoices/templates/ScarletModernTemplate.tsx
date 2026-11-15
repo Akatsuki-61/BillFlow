@@ -1,5 +1,6 @@
 "use client";
 
+import { InvoiceSupplement } from "./InvoiceSupplement";
 import { ExternalLink, Phone, Mail, MapPin } from "lucide-react";
 import type { InvoiceTemplateProps } from "./types";
 
@@ -24,7 +25,9 @@ export function ScarletModernTemplate({
 
   const paidCents =
     invoice.payments && invoice.payments.length > 0
-      ? invoice.payments.reduce((sum, p) => sum + p.amountCents, 0)
+      ? invoice.payments
+          .filter((payment) => !payment.correction)
+          .reduce((sum, p) => sum + p.amountCents, 0)
       : invoice.paidCents || 0;
 
   const balanceDueCents = Math.max(0, invoice.amountCents - paidCents);
@@ -301,6 +304,11 @@ export function ScarletModernTemplate({
         </div>
       </div>
 
+      <InvoiceSupplement
+        invoice={invoice}
+        client={client}
+        settings={settings}
+      />
       {/* 6. BOTTOM SPLIT GEOMETRIC FOOTER */}
       <div className="relative w-full h-[40px] overflow-hidden select-none">
         <div className="absolute inset-0 pointer-events-none z-0">

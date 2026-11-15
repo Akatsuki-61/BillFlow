@@ -480,6 +480,8 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
       <div>
         <div class="section-label">INVOICE TO:</div>
         <div class="client-name">${escapeHtml(data.client.name)}</div>
+        ${data.client.billingAddress ? `<div style="white-space:pre-line">${escapeHtml(data.client.billingAddress)}</div>` : ""}
+        ${data.paymentUrl ? `<div><a href="${escapeHtml(data.paymentUrl)}">Pay online</a></div>` : ""}
         ${data.client.contactPerson ? `<div class="client-detail">${escapeHtml(data.client.contactPerson)}</div>` : ""}
         ${data.client.phone ? `<div class="client-detail">Phone: ${escapeHtml(data.client.phone)}</div>` : ""}
         ${data.client.email ? `<div class="client-detail">${escapeHtml(data.client.email)}</div>` : ""}

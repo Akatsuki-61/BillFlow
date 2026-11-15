@@ -1,5 +1,9 @@
 "use client";
 
+import { profileStorageKey } from "@/lib/profile-scope";
+import { compareBoardTasks } from "@/lib/task-order";
+import { openMessageDraft, smsDraft } from "@/lib/message-drafts";
+import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
@@ -229,6 +233,25 @@ export default function TasksView({
     activeCurrency,
   } = useData();
   const [saving, setSaving] = useState(false);
+  const [selectingTasks, setSelectingTasks] = useState(false);
+  const [selectedForDeletion, setSelectedForDeletion] = useState<string[]>([]);
+  const [taskUndoToken, setTaskUndoToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(profileStorageKey("last_task_deletion"));
+    } catch {
+      return null;
+    }
+  });
+  const rememberTaskDeletion = (token: string | null) => {
+    setTaskUndoToken(token);
+    try {
+      const key = profileStorageKey("last_task_deletion");
+      if (token) localStorage.setItem(key, token);
+      else localStorage.removeItem(key);
+    } catch {
+      // The current view still offers undo if browser storage is unavailable.
+    }
+  };
   const draftId = useRef<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [viewMode, setViewMode] = useState<"kanban" | "list">(initialView);
@@ -251,6 +274,10 @@ export default function TasksView({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
+  const [dragInsert, setDragInsert] = useState<{
+    id: string;
+    side: "before" | "after";
+  } | null>(null);
 
   // Synchronized Invoice Hover & Batch Invoicing state
   const [hoveredInvoiceId, setHoveredInvoiceId] = useState<string | null>(null);
@@ -271,6 +298,9 @@ export default function TasksView({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const selectedTaskForDetail =
     tasks.find((task) => task.id === selectedTaskId) || null;
+  const selectedTaskInvoice = invoices.find(
+    (invoice) => invoice.id === selectedTaskForDetail?.invoiceId,
+  );
   const setSelectedTaskForDetail = (task: TaskItem | null) => {
     setSubtaskTitle("");
     setSelectedTaskId(task?.id || null);
@@ -382,6 +412,18 @@ export default function TasksView({
     setIsAddModalOpen(true);
   };
 
+  useWorkspaceCommand("create", () => {
+    setNewRecordType("task");
+    openAddTaskModal();
+    return true;
+  });
+  useWorkspaceCommand("task", (id) => {
+    const task = tasks.find((record) => record.id === id);
+    if (!task) return false;
+    setSelectedTaskForDetail(task);
+    return true;
+  });
+
   const showToast = React.useCallback((message: string) => {
     setToastMessage(message);
     if (toastTimerRef.current) {
@@ -450,7 +492,9 @@ export default function TasksView({
 
   // In Kanban, tasks matching search by title float to top of their column
   const getColumnTasks = (status: TaskStatus) => {
-    const colTasks = baseTasks.filter((t) => t.status === status);
+    const colTasks = baseTasks
+      .filter((t) => t.status === status)
+      .sort(compareBoardTasks);
     if (!isSearching) {
       return colTasks;
     }
@@ -496,6 +540,7 @@ export default function TasksView({
   };
 
   const handleDragOver = (e: React.DragEvent, status: TaskStatus) => {
+    setDragInsert(null);
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     if (dragOverColumn !== status) {
@@ -563,6 +608,8 @@ export default function TasksView({
   };
 
   const handleToggleBatchInvoiceMode = (unbilledTasks: TaskItem[]) => {
+    setSelectingTasks(false);
+    setSelectedForDeletion([]);
     if (isBatchInvoicingMode) {
       setIsBatchInvoicingMode(false);
       setSelectedBatchTaskIds([]);
@@ -607,9 +654,7 @@ export default function TasksView({
     if (linkedInv) {
       setPreviewInvoice(linkedInv);
     } else {
-      router.push(
-        `/invoices?invoice=${encodeURIComponent(task.invoiceId)}&preview=1`,
-      );
+      router.push("/invoices?trash=1");
     }
   };
 
@@ -731,13 +776,106 @@ export default function TasksView({
       showToast("Updated task subtasks");
     }
   };
+  const toggleTaskSelection = (id: string) =>
+    setSelectedForDeletion((ids) =>
+      ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id],
+    );
+  const deleteSelectedTasks = async () => {
+    if (!selectedForDeletion.length || saving) return;
+    setSaving(true);
+    try {
+      const result = await workflow.tasks.removeMany(selectedForDeletion);
+      if (result.deleted) rememberTaskDeletion(result.token);
+      setSelectedForDeletion([]);
+      setSelectingTasks(false);
+      showToast(`Deleted ${result.deleted} tasks.`);
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Could not delete the tasks.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  const undoSelectedDeletion = async () => {
+    if (!taskUndoToken || saving) return;
+    setSaving(true);
+    try {
+      const result = await workflow.tasks.undoRemove(taskUndoToken);
+      rememberTaskDeletion(null);
+      showToast(`Restored ${result.restored} tasks.`);
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Could not undo task deletion.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  const reorderOnBoard = async (
+    id: string,
+    targetId: string,
+    placement: "before" | "after",
+  ) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await workflow.tasks.reorder(id, targetId, placement);
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Could not reorder the task.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sendCompletionDraft = async (task: TaskItem) => {
+    const client = clients.find((record) => record.id === task.clientId);
+    const invoice = invoices.find((record) => record.id === task.invoiceId);
+    const delivery = resolveDeliveryUrl(task, { invoices, clients });
+    const message = `Hi ${client?.contactPerson || client?.name || invoice?.clientName || "there"}, ${task.title} is complete.${delivery.hasLink ? ` Delivery: ${delivery.url}` : ""}`;
+    try {
+      await openMessageDraft(
+        smsDraft(client?.phone || invoice?.clientPhone, message),
+      );
+      showToast("SMS draft opened.");
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Could not open the SMS draft.",
+      );
+    }
+  };
+
+  const detailGroup = selectedTaskForDetail
+    ? tasks
+        .filter(
+          (task) =>
+            task.priority === selectedTaskForDetail.priority &&
+            task.status === selectedTaskForDetail.status,
+        )
+        .sort(compareBoardTasks)
+    : [];
+  const detailPosition = detailGroup.findIndex(
+    (task) => task.id === selectedTaskForDetail?.id,
+  );
+
   const handleDeleteTask = async (taskId: string) => {
     if (saving) return;
     const target = tasks.find((t) => t.id === taskId);
     const targetTitle = target?.title;
     setSaving(true);
     try {
-      await workflow.tasks.remove(taskId);
+      if (isElectron) {
+        const result = await workflow.tasks.removeMany([taskId]);
+        if (result.deleted) rememberTaskDeletion(result.token);
+      } else {
+        await workflow.tasks.remove(taskId);
+      }
       setSelectedTaskForDetail(null);
       showToast(targetTitle ? `Task "${targetTitle}" deleted` : "Task deleted");
     } catch (error) {
@@ -882,6 +1020,43 @@ export default function TasksView({
           </Button>
         </div>
       </PageHeader>
+      {isElectron && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            size="small"
+            aria-pressed={selectingTasks}
+            onClick={() => {
+              setIsBatchInvoicingMode(false);
+              setSelectedBatchTaskIds([]);
+              setSelectingTasks((active) => !active);
+              setSelectedForDeletion([]);
+            }}
+          >
+            {selectingTasks ? "Cancel selection" : "Select tasks"}
+          </Button>
+          {selectingTasks && (
+            <Button
+              variant="danger"
+              size="small"
+              disabled={!selectedForDeletion.length || saving}
+              onClick={() => void deleteSelectedTasks()}
+            >
+              Delete selected ({selectedForDeletion.length})
+            </Button>
+          )}
+          {taskUndoToken && (
+            <Button
+              variant="secondary"
+              size="small"
+              disabled={saving}
+              onClick={() => void undoSelectedDeletion()}
+            >
+              Undo task deletion
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* ==============================================================          ZENTRA 3-CARD SPRINT BENTO HEADER ROW
          ===================================================================== */}
@@ -1253,8 +1428,74 @@ export default function TasksView({
                       return (
                         <div
                           key={task.id}
-                          draggable={!saving && !isBatchInvoicingMode}
+                          draggable={
+                            !saving && !isBatchInvoicingMode && !selectingTasks
+                          }
+                          onDragOver={(event) => {
+                            const source = tasks.find(
+                              (item) => item.id === draggedTaskId,
+                            );
+                            if (
+                              isElectron &&
+                              !isSearching &&
+                              source?.id !== task.id &&
+                              source?.status === task.status &&
+                              source.priority === task.priority
+                            ) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              event.dataTransfer.dropEffect = "move";
+                              const bounds =
+                                event.currentTarget.getBoundingClientRect();
+                              const side =
+                                event.clientY < bounds.top + bounds.height / 2
+                                  ? "before"
+                                  : "after";
+                              if (
+                                dragInsert?.id !== task.id ||
+                                dragInsert.side !== side
+                              )
+                                setDragInsert({ id: task.id, side });
+                            }
+                          }}
+                          onDrop={(event) => {
+                            const source = tasks.find(
+                              (item) => item.id === draggedTaskId,
+                            );
+                            if (
+                              !isElectron ||
+                              isSearching ||
+                              source?.id === task.id ||
+                              source?.status !== task.status ||
+                              source.priority !== task.priority
+                            )
+                              return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const rect =
+                              event.currentTarget.getBoundingClientRect();
+                            setDraggedTaskId(null);
+                            setDragOverColumn(null);
+                            setDragInsert(null);
+                            void reorderOnBoard(
+                              source.id,
+                              task.id,
+                              event.clientY < rect.top + rect.height / 2
+                                ? "before"
+                                : "after",
+                            );
+                          }}
                           onDragStart={(e) => handleDragStart(e, task.id)}
+                          onDragEnd={() => {
+                            setDraggedTaskId(null);
+                            setDragOverColumn(null);
+                            setDragInsert(null);
+                          }}
+                          data-task-drop-edge={
+                            dragInsert?.id === task.id
+                              ? dragInsert.side
+                              : undefined
+                          }
                           onMouseEnter={() => {
                             if (hasLinkedInvoice && task.invoiceId) {
                               setHoveredInvoiceId(task.invoiceId);
@@ -1268,6 +1509,10 @@ export default function TasksView({
                             }
                           }}
                           onClick={(e) => {
+                            if (selectingTasks) {
+                              toggleTaskSelection(task.id);
+                              return;
+                            }
                             if (
                               col.id === "done" &&
                               isBatchInvoicingMode &&
@@ -1407,6 +1652,15 @@ export default function TasksView({
                             </div>
                           </div>
 
+                          {selectingTasks && (
+                            <input
+                              type="checkbox"
+                              aria-label={`Select task ${task.title}`}
+                              checked={selectedForDeletion.includes(task.id)}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={() => toggleTaskSelection(task.id)}
+                            />
+                          )}
                           {/* Bottom Row: Due Date, Subtle Invoice Indicator, and Direct Outsource / Delivery Actions */}
                           <div className="mt-3 pt-2.5 border-t border-line-neutral-100 flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-2 min-w-0">
@@ -1620,7 +1874,11 @@ export default function TasksView({
                           );
                         }
                       }}
-                      onClick={() => setSelectedTaskForDetail(task)}
+                      onClick={() =>
+                        selectingTasks
+                          ? toggleTaskSelection(task.id)
+                          : setSelectedTaskForDetail(task)
+                      }
                       className={`transition-all duration-150 ease-out cursor-pointer group ${
                         isInvoiceHoverLinked && invoicePalette
                           ? `${invoicePalette.ringClass} bg-surface`
@@ -1633,6 +1891,15 @@ export default function TasksView({
                     >
                       <td className="py-3.5 px-4 font-medium text-content-neutral-900 max-w-xs">
                         <div className="flex items-center gap-2">
+                          {selectingTasks && (
+                            <input
+                              type="checkbox"
+                              aria-label={`Select task ${task.title}`}
+                              checked={selectedForDeletion.includes(task.id)}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={() => toggleTaskSelection(task.id)}
+                            />
+                          )}
                           <div className="font-semibold text-content-neutral-900 group-hover:text-accent transition-colors truncate">
                             <HighlightText
                               text={task.title}
@@ -2390,12 +2657,65 @@ export default function TasksView({
                         });
                     }}
                   />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {isElectron && detailGroup.length > 1 && (
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          disabled={saving || detailPosition < 1}
+                          onClick={() =>
+                            void reorderOnBoard(
+                              selectedTaskForDetail.id,
+                              detailGroup[detailPosition - 1].id,
+                              "before",
+                            )
+                          }
+                        >
+                          Move up in priority
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          disabled={
+                            saving || detailPosition >= detailGroup.length - 1
+                          }
+                          onClick={() =>
+                            void reorderOnBoard(
+                              selectedTaskForDetail.id,
+                              detailGroup[detailPosition + 1].id,
+                              "after",
+                            )
+                          }
+                        >
+                          Move down in priority
+                        </Button>
+                      </>
+                    )}
+                    {selectedTaskForDetail.status === "done" && (
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() =>
+                          void sendCompletionDraft(selectedTaskForDetail)
+                        }
+                      >
+                        Completion SMS draft
+                      </Button>
+                    )}
+                  </div>
                   <div className="flex gap-4 mt-3 text-sm">
                     {selectedTaskForDetail.invoiceId && (
                       <Link
-                        href={`/invoices?invoice=${encodeURIComponent(selectedTaskForDetail.invoiceId)}`}
+                        href={
+                          selectedTaskInvoice
+                            ? `/invoices?record=${encodeURIComponent(selectedTaskInvoice.id)}`
+                            : "/invoices?trash=1"
+                        }
                       >
-                        Open {selectedTaskForDetail.invoiceCode || "invoice"}
+                        {selectedTaskInvoice
+                          ? `Open ${selectedTaskInvoice.code}`
+                          : "Open Invoice Trash"}
                       </Link>
                     )}
                     {selectedTaskForDetail.clientId && (

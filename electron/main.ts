@@ -1,3 +1,4 @@
+import { registerStatementHandlers } from "./ipc/statements";
 import { registerWorkspaceHandlers } from "./ipc/workspace";
 import { affectedDatasets } from "../src/types/workspace";
 import { getActiveProfileId, getWorkspaceGeneration } from "./db";
@@ -252,6 +253,7 @@ app
 
     // Register IPC handlers
     registerWorkspaceHandlers();
+    registerStatementHandlers();
     registerProfileHandlers(broadcastDataChanged);
     registerClientHandlers(broadcastDataChanged);
     registerInvoiceHandlers(broadcastDataChanged);

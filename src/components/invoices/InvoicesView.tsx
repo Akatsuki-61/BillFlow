@@ -1,7 +1,16 @@
 "use client";
 
+import { PhoneField } from "@/components/ui/PhoneField";
+import {
+  InvoiceStatusBulk,
+  InvoiceWorkflowSelect,
+  workflowStages,
+} from "./InvoiceStatusBulk";
 import { profileStorageKey } from "@/lib/profile-scope";
 
+import { InvoiceTrash } from "./InvoiceTrash";
+import { PaymentCorrectionForm } from "./PaymentCorrectionForm";
+import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
@@ -81,6 +90,7 @@ import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import type {
   InvoiceWithClient,
   InvoiceStatus,
+  InvoiceWorkflowStage,
   Currency,
 } from "@/types/billing";
 import type { AttachmentItem } from "@/types/workflow";
@@ -129,18 +139,26 @@ export default function InvoicesView() {
     openInvoicePdf,
     deleteInvoice,
     getNextInvoiceCode,
+    refresh,
   } = useInvoices();
 
   const { clients } = useClients();
   const { catalogItems } = useCatalog();
   const { settings } = useSettings();
-  const { tasks, workflow, activeCurrency, getUnbilledCompletedTasks } =
-    useData();
+  const {
+    tasks,
+    workflow,
+    activeCurrency,
+    getUnbilledCompletedTasks,
+    isElectron,
+  } = useData();
 
   const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientContact, setClientContact] = useState("");
+  const [clientWhatsApp, setClientWhatsApp] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
   const [clientCategory, setClientCategory] = useState("Enterprise");
   const [saveAsPermanentClient, setSaveAsPermanentClient] = useState(true);
   const requestId = useRef<string | null>(null);
@@ -148,6 +166,7 @@ export default function InvoicesView() {
   const [activeTab, setActiveTab] = useState<FilterTab>("All Invoices");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkStatusIds, setBulkStatusIds] = useState<string[]>([]);
   const [actionMenu, setActionMenu] = useState<FloatingActionMenuState | null>(
     null,
   );
@@ -231,6 +250,9 @@ export default function InvoicesView() {
   const [requireAdvance, setRequireAdvance] = useState(true);
   const [advancePercent, setAdvancePercent] = useState(50);
   const [newDeliveryUrl, setNewDeliveryUrl] = useState("");
+  const [newPaymentUrl, setNewPaymentUrl] = useState("");
+  const [newWorkflowStage, setNewWorkflowStage] =
+    useState<InvoiceWorkflowStage | null>(null);
   const [newNotes, setNewNotes] = useState("");
   const [isSubmittingNew, setIsSubmittingNew] = useState(false);
   const [hasInvoiceDraft, setHasInvoiceDraft] = useState(false);
@@ -259,6 +281,9 @@ export default function InvoicesView() {
   const [editDueDate, setEditDueDate] = useState("");
   const [editStatus, setEditStatus] = useState<InvoiceStatus>("UNPAID");
   const [editDeliveryUrl, setEditDeliveryUrl] = useState("");
+  const [editPaymentUrl, setEditPaymentUrl] = useState("");
+  const [editWorkflowStage, setEditWorkflowStage] =
+    useState<InvoiceWorkflowStage | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [editLineItems, setEditLineItems] = useState<LineItemDraft[]>([]);
   const [editDiscount, setEditDiscount] = useState("");
@@ -268,8 +293,10 @@ export default function InvoicesView() {
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Delete Confirm Modal state
-  const [deletingInvoice, setDeletingInvoice] =
-    useState<InvoiceWithClient | null>(null);
+  const [trashTargets, setTrashTargets] = useState<string[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
+  const [movingToTrash, setMovingToTrash] = useState(false);
+  const [exportingBatch, setExportingBatch] = useState(false);
 
   // Record Payment Modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -501,6 +528,18 @@ export default function InvoicesView() {
     setPreviewInvoice(previewTargetInv);
   }
 
+  useWorkspaceCommand("trash", () => {
+    if (!isElectron) return false;
+    setShowTrash(true);
+    return true;
+  });
+  useWorkspaceCommand("record", (id) => {
+    const invoice = allInvoices.find((item) => item.id === id);
+    if (!invoice) return false;
+    setPreviewInvoice(invoice);
+    return true;
+  });
+
   // Helper to resolve default fee for an imported task
   const getTaskDefaultFee = React.useCallback(
     (task: TaskItem): string => {
@@ -626,7 +665,11 @@ export default function InvoicesView() {
         ? Boolean(clientName.trim() || clientEmail.trim())
         : false;
     const hasNotes = Boolean(
-      newNotes.trim() || newDiscount.trim() || newDeliveryUrl.trim(),
+      newNotes.trim() ||
+      newDiscount.trim() ||
+      newDeliveryUrl.trim() ||
+      newPaymentUrl.trim() ||
+      newWorkflowStage,
     );
     return hasItems || hasClient || hasNotes;
   };
@@ -639,6 +682,8 @@ export default function InvoicesView() {
       clientName,
       clientEmail,
       clientContact,
+      clientWhatsApp,
+      clientPhone,
       clientCategory,
       newCurrency,
       newDueDate,
@@ -649,6 +694,8 @@ export default function InvoicesView() {
       advancePercent,
       saveAsPermanentClient,
       newDeliveryUrl,
+      newPaymentUrl,
+      newWorkflowStage,
       newNotes,
     };
     try {
@@ -678,6 +725,9 @@ export default function InvoicesView() {
       if (draft.newClientId !== undefined) setNewClientId(draft.newClientId);
       if (draft.clientName !== undefined) setClientName(draft.clientName);
       if (draft.clientEmail !== undefined) setClientEmail(draft.clientEmail);
+      if (draft.clientPhone !== undefined) setClientPhone(draft.clientPhone);
+      if (draft.clientWhatsApp !== undefined)
+        setClientWhatsApp(draft.clientWhatsApp);
       if (draft.clientContact !== undefined)
         setClientContact(draft.clientContact);
       if (draft.clientCategory !== undefined)
@@ -695,6 +745,10 @@ export default function InvoicesView() {
         setAdvancePercent(draft.advancePercent);
       if (draft.saveAsPermanentClient !== undefined)
         setSaveAsPermanentClient(draft.saveAsPermanentClient);
+      if (draft.newPaymentUrl !== undefined)
+        setNewPaymentUrl(draft.newPaymentUrl);
+      if (draft.newWorkflowStage !== undefined)
+        setNewWorkflowStage(draft.newWorkflowStage);
       if (draft.newDeliveryUrl !== undefined)
         setNewDeliveryUrl(draft.newDeliveryUrl);
       if (draft.newNotes !== undefined) setNewNotes(draft.newNotes);
@@ -896,7 +950,7 @@ export default function InvoicesView() {
     }
     setStatusMenu(null);
     const rect = e.currentTarget.getBoundingClientRect();
-    const estimatedHeight = 360;
+    const estimatedHeight = 395;
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUpward =
       spaceBelow < estimatedHeight && rect.top > estimatedHeight;
@@ -1023,6 +1077,8 @@ export default function InvoicesView() {
     setEditDueDate(inv.dueDate || "");
     setEditStatus(inv.status);
     setEditDeliveryUrl(inv.deliveryUrl || "");
+    setEditPaymentUrl(inv.paymentUrl || "");
+    setEditWorkflowStage(inv.workflowStage ?? null);
     setEditNotes(inv.notes || "");
 
     const items: LineItemDraft[] =
@@ -1183,6 +1239,8 @@ export default function InvoicesView() {
         dueDate: editDueDate || null,
         status: editStatus,
         deliveryUrl: editDeliveryUrl.trim() || null,
+        paymentUrl: editPaymentUrl.trim() || null,
+        workflowStage: editWorkflowStage,
         notes: editNotes.trim() || null,
       });
 
@@ -1199,21 +1257,63 @@ export default function InvoicesView() {
     }
   };
 
-  // Execute Delete
   const confirmDelete = async () => {
-    if (!deletingInvoice) return;
+    if (!trashTargets.length || movingToTrash) return;
+    setMovingToTrash(true);
     try {
-      await deleteInvoice(deletingInvoice.id);
-      setSelectedIds((prev) => prev.filter((id) => id !== deletingInvoice.id));
-      showToast(`Invoice ${deletingInvoice.code} deleted.`);
-      setDeletingInvoice(null);
-      setActionMenu(null);
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String(err.message)
-          : "Failed to delete invoice";
-      showToast(msg, "error");
+      if (isElectron) {
+        await window.billflow!.invoices.trash(trashTargets);
+        await refresh();
+      } else {
+        await deleteInvoice(trashTargets[0]);
+      }
+      setSelectedIds((ids) => ids.filter((id) => !trashTargets.includes(id)));
+      showToast(isElectron ? "Moved to Invoice Trash." : "Invoice deleted.");
+      setTrashTargets([]);
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Could not move the selected invoices to Trash.",
+        "error",
+      );
+    } finally {
+      setMovingToTrash(false);
+    }
+  };
+
+  const exportSelectedPdfs = async () => {
+    setExportingBatch(true);
+    try {
+      const result = await window.billflow!.invoices.exportBatch(selectedIds);
+      if (result.success)
+        showToast(
+          `Exported ${result.filePaths.length} invoice PDFs to the selected folder.`,
+        );
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Could not export invoice PDFs.",
+        "error",
+      );
+    } finally {
+      setExportingBatch(false);
+    }
+  };
+
+  const prepareShare = async (id: string) => {
+    setActionMenu(null);
+    try {
+      const result = await window.billflow!.invoices.prepareShare(id);
+      if (result.success) showToast("PDF saved and share message copied.");
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Could not prepare the invoice for sharing.",
+        "error",
+      );
     }
   };
 
@@ -1562,6 +1662,8 @@ export default function InvoicesView() {
                 email: clientEmail,
                 currency: newCurrency,
                 contactPerson: clientContact || clientName,
+                phone: clientPhone.trim() || undefined,
+                whatsappPhone: clientWhatsApp.trim() || null,
                 category: clientCategory,
                 driveUrl: newDeliveryUrl.trim() || undefined,
               },
@@ -1578,6 +1680,8 @@ export default function InvoicesView() {
         taxCents,
         advanceCents,
         deliveryUrl: newDeliveryUrl.trim() || undefined,
+        paymentUrl: newPaymentUrl.trim() || null,
+        workflowStage: newWorkflowStage,
         notes: newNotes.trim() || undefined,
         currency: newCurrency,
         issueDate: today,
@@ -1595,6 +1699,10 @@ export default function InvoicesView() {
       setNewDiscount("");
       setNewTaxRate("");
       setNewDeliveryUrl("");
+      setNewPaymentUrl("");
+      setNewWorkflowStage(null);
+      setClientWhatsApp("");
+      setClientPhone("");
       setNewNotes("");
       setNewDueDate("");
       setNewStatus("UNPAID");
@@ -2175,35 +2283,73 @@ export default function InvoicesView() {
               {filteredInvoices.length === 1 ? "record" : "records"}
             </span>
           </div>
-          {selectedIds.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-medium text-accent">
-                {selectedIds.length} selected
-              </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {isElectron && (
               <Button
                 variant="secondary"
                 size="small"
-                type="button"
-                onClick={() => handleExportInvoicesCsv("selected", "csv")}
-                className="!text-xs !py-1 text-accent"
-                title="Export selected invoices to CSV (.csv)"
+                onClick={() => setShowTrash(true)}
               >
-                <Download className="w-3 h-3" />
-                <span>Export CSV</span>
+                <Trash2 className="w-3.5 h-3.5" />
+                Trash
               </Button>
-              <Button
-                variant="secondary"
-                size="small"
-                type="button"
-                onClick={() => handleExportInvoicesCsv("selected", "excel")}
-                className="!text-xs !py-1 text-emerald-700 dark:text-emerald-300 !border-emerald-300 dark:!border-emerald-800"
-                title="Convert & export selected invoices to Excel (.xls)"
-              >
-                <FileSpreadsheet className="w-3 h-3" />
-                <span>Export Excel</span>
-              </Button>
-            </div>
-          )}
+            )}
+            {selectedIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-medium text-accent">
+                  {selectedIds.length} selected
+                </span>
+                {isElectron && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      disabled={exportingBatch}
+                      onClick={() => void exportSelectedPdfs()}
+                    >
+                      {exportingBatch ? "Exporting PDFs…" : "Export PDFs"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={() => setBulkStatusIds(selectedIds)}
+                    >
+                      Change status
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={() => setTrashTargets(selectedIds)}
+                    >
+                      Move to Trash
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="secondary"
+                  size="small"
+                  type="button"
+                  onClick={() => handleExportInvoicesCsv("selected", "csv")}
+                  className="!text-xs !py-1 text-accent"
+                  title="Export selected invoices to CSV (.csv)"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>Export CSV</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  type="button"
+                  onClick={() => handleExportInvoicesCsv("selected", "excel")}
+                  className="!text-xs !py-1 text-emerald-700 dark:text-emerald-300 !border-emerald-300 dark:!border-emerald-800"
+                  title="Convert & export selected invoices to Excel (.xls)"
+                >
+                  <FileSpreadsheet className="w-3 h-3" />
+                  <span>Export Excel</span>
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="record-table-scroll">
@@ -2336,6 +2482,11 @@ export default function InvoicesView() {
                               <Eye className="w-3 h-3 text-[#00A887]/70" />
                               {!inv.clientId ? " · Temporary" : ""}
                             </button>
+                            {inv.workflowStage && (
+                              <p className="record-meta">
+                                {workflowStages[inv.workflowStage]}
+                              </p>
+                            )}
                             {(() => {
                               const resolved = resolveDeliveryUrl(inv, {
                                 clients,
@@ -2637,6 +2788,16 @@ export default function InvoicesView() {
                         temporary one-off client)
                       </span>
                     </label>
+                    <PhoneField
+                      label="Phone number"
+                      value={clientPhone}
+                      onChange={setClientPhone}
+                    />
+                    <PhoneField
+                      label="WhatsApp number"
+                      value={clientWhatsApp}
+                      onChange={setClientWhatsApp}
+                    />
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -2888,13 +3049,32 @@ export default function InvoicesView() {
                     type="url"
                     value={newDeliveryUrl}
                     onChange={(e) => setNewDeliveryUrl(e.target.value)}
-                    placeholder="https://drive.google.com/drive/folders/... or https://github.com/..."
+                    placeholder={
+                      settings?.defaultDeliveryUrl ||
+                      "https://drive.google.com/drive/folders/..."
+                    }
                     className="ui-field w-full px-3.5 font-mono text-xs"
                   />
                   <p className="text-[11px] text-content-neutral-400">
                     Links directly to client deliverables, PDF invoice, and
                     tasks board.
                   </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block space-y-1 text-xs font-medium">
+                    <span>Online payment URL</span>
+                    <input
+                      type="url"
+                      className="ui-field w-full"
+                      placeholder="https://"
+                      value={newPaymentUrl}
+                      onChange={(event) => setNewPaymentUrl(event.target.value)}
+                    />
+                  </label>
+                  <InvoiceWorkflowSelect
+                    value={newWorkflowStage}
+                    onChange={setNewWorkflowStage}
+                  />
                 </div>
 
                 {/* Financial Summary & 50% Advance Requirement Box */}
@@ -3070,7 +3250,10 @@ export default function InvoicesView() {
                       taxCents: Math.round(taxVal * 100),
                       discountCents: Math.round(discountVal * 100),
                       notes: newNotes,
-                      deliveryUrl: newDeliveryUrl,
+                      deliveryUrl:
+                        newDeliveryUrl || settings?.defaultDeliveryUrl,
+                      paymentUrl: newPaymentUrl || null,
+                      workflowStage: newWorkflowStage,
                       items: newLineItems.map((li, idx) => ({
                         id: li.id || `it-${idx}`,
                         invoiceId: "draft-preview",
@@ -3666,6 +3849,42 @@ export default function InvoicesView() {
                           </div>
                         )}
 
+                        {payment.correction ? (
+                          <div className="rounded-lg bg-surface-neutral-100 p-2 text-content-neutral-800">
+                            <p className="font-medium">
+                              {payment.correction.replacementPaymentId
+                                ? "Corrected"
+                                : "Reversed"}{" "}
+                              ·{" "}
+                              {formatDateDisplay(
+                                payment.correction.correctedAt,
+                              )}
+                            </p>
+                            <p className="mt-1 break-words">
+                              {payment.correction.reason}
+                            </p>
+                          </div>
+                        ) : (
+                          isElectron && (
+                            <PaymentCorrectionForm
+                              payment={payment}
+                              onSubmit={async (input) => {
+                                const updated =
+                                  await window.billflow!.invoices.correctPayment(
+                                    input,
+                                  );
+                                setInspectingInvoice(updated);
+                                await refresh();
+                                showToast(
+                                  input.replacement
+                                    ? "Payment corrected."
+                                    : "Payment reversed.",
+                                );
+                              }}
+                            />
+                          )
+                        )}
+
                         {/* Attached slips */}
                         <div className="pt-2 border-t border-line-neutral-200/60">
                           {slips.length > 0 ? (
@@ -3998,8 +4217,29 @@ export default function InvoicesView() {
                       type="url"
                       value={editDeliveryUrl}
                       onChange={(e) => setEditDeliveryUrl(e.target.value)}
-                      placeholder="https://drive.google.com/drive/folders/... or https://github.com/..."
+                      placeholder={
+                        settings?.defaultDeliveryUrl ||
+                        "https://drive.google.com/drive/folders/..."
+                      }
                       className="ui-field w-full px-3.5 font-mono text-xs"
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block space-y-1 text-xs font-medium">
+                      <span>Online payment URL</span>
+                      <input
+                        type="url"
+                        className="ui-field w-full"
+                        placeholder="https://"
+                        value={editPaymentUrl}
+                        onChange={(event) =>
+                          setEditPaymentUrl(event.target.value)
+                        }
+                      />
+                    </label>
+                    <InvoiceWorkflowSelect
+                      value={editWorkflowStage}
+                      onChange={setEditWorkflowStage}
                     />
                   </div>
 
@@ -4193,37 +4433,54 @@ export default function InvoicesView() {
         )}
       </MotionPresence>
 
-      {/* Delete Confirmation Modal */}
       <MotionPresence>
-        {deletingInvoice && (
-          <Dialog onClose={() => setDeletingInvoice(null)} width={460} compact>
+        {bulkStatusIds.length > 0 && (
+          <InvoiceStatusBulk
+            ids={bulkStatusIds}
+            onClose={() => setBulkStatusIds([])}
+            onSaved={async () => {
+              await refresh();
+              setBulkStatusIds([]);
+              setSelectedIds([]);
+              showToast("Invoice statuses updated.");
+            }}
+          />
+        )}
+      </MotionPresence>
+
+      <MotionPresence>
+        {showTrash && (
+          <InvoiceTrash
+            onClose={() => setShowTrash(false)}
+            onRestore={refresh}
+          />
+        )}
+        {trashTargets.length > 0 && (
+          <Dialog onClose={() => setTrashTargets([])} width={460} compact>
             <div className="app-dialog-body app-dialog-confirmation">
-              <div className="w-12 h-12 rounded-xl bg-surface-rose-50 text-content-rose-600 flex items-center justify-center mx-auto mb-3.5">
-                <Trash2 className="w-6 h-6" />
-              </div>
               <h3 className="text-base font-semibold text-content-neutral-900">
-                Delete Invoice?
+                {isElectron ? "Move invoices to Trash?" : "Delete invoice?"}
               </h3>
-              <p className="text-xs text-content-neutral-500 mt-1">
-                Are you sure you want to delete invoice{" "}
-                <strong className="text-content-neutral-900">
-                  {deletingInvoice.code}
-                </strong>{" "}
-                for {deletingInvoice.clientName}? Linked tasks will be kept and
-                unlinked. Recorded payments and contractor work prevent
-                deletion. This action cannot be undone.
+              <p className="text-sm text-content-neutral-600 mt-2">
+                {isElectron
+                  ? `${trashTargets.length} selected. Only invoices without payment history or contractor work orders can move to Trash. Restore them from Trash at any time.`
+                  : "This removes the invoice from the browser preview."}
               </p>
             </div>
             <div className="app-dialog-footer">
               <Button
                 variant="secondary"
-                type="button"
-                onClick={() => setDeletingInvoice(null)}
+                disabled={movingToTrash}
+                onClick={() => setTrashTargets([])}
               >
                 Cancel
               </Button>
-              <Button variant="danger" type="button" onClick={confirmDelete}>
-                Delete
+              <Button
+                variant="danger"
+                disabled={movingToTrash}
+                onClick={() => void confirmDelete()}
+              >
+                {isElectron ? "Move to Trash" : "Delete"}
               </Button>
             </div>
           </Dialog>
@@ -4452,6 +4709,18 @@ export default function InvoicesView() {
               <span>Reveal PDF in folder</span>
             </button>
 
+            {isElectron && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => void prepareShare(actionMenu.invoice.id)}
+                className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5 text-content-neutral-500" />
+                <span>Prepare PDF and copy share message</span>
+              </button>
+            )}
+
             {actionMenu.invoice.payments &&
               actionMenu.invoice.payments.length > 0 && (
                 <button
@@ -4543,12 +4812,12 @@ export default function InvoicesView() {
               onClick={() => {
                 const inv = actionMenu.invoice;
                 setActionMenu(null);
-                setDeletingInvoice(inv);
+                setTrashTargets([inv.id]);
               }}
               className="w-full px-3.5 py-1.5 hover:bg-surface-rose-50 text-content-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
-              <span>Delete Invoice</span>
+              <span>{isElectron ? "Move to Trash" : "Delete Invoice"}</span>
             </button>
           </motion.div>
         )}

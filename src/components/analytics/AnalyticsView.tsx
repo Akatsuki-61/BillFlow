@@ -1,5 +1,9 @@
 "use client";
 
+import { useData } from "@/lib/data/DataProvider";
+import { calculateFinancials } from "@/lib/financials";
+import { formatCents } from "@/lib/format";
+
 import { Dialog } from "@/components/ui/Dialog";
 
 import React, { useState, useRef } from "react";
@@ -26,6 +30,7 @@ import { useWidgetContext } from "@/context/WidgetContext";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { Timeframe } from "@/types/analytics";
 import "./analytics.css";
+import { CashflowForecast } from "./CashflowForecast";
 
 export default function AnalyticsView() {
   const {
@@ -81,6 +86,18 @@ export default function AnalyticsView() {
 
   // Selected timeframe filter state: Month, Quarter, or Year
   const [timeframe, setTimeframe] = useState<Timeframe>("Quarter");
+  const { invoices, activeCurrency } = useData();
+  const { averageBilledPerClientCents, billedClientCount } = React.useMemo(
+    () =>
+      calculateFinancials({
+        invoices,
+        workOrders: [],
+        expenses: [],
+        currency: activeCurrency,
+        period: timeframe.toLowerCase(),
+      }),
+    [invoices, activeCurrency, timeframe],
+  );
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
 
   // Context menu state
@@ -222,6 +239,18 @@ export default function AnalyticsView() {
           </Button>
         </div>
       </PageHeader>
+
+      <section className="ui-card p-5">
+        <h2 className="text-sm font-medium">Average billed value per client</h2>
+        <p className="summary-value mt-2">
+          {formatCents(averageBilledPerClientCents, activeCurrency)}
+        </p>
+        <p className="summary-caption">
+          This {timeframe.toLowerCase()} · {billedClientCount} billed{" "}
+          {billedClientCount === 1 ? "client" : "clients"} · {activeCurrency}
+        </p>
+      </section>
+      <CashflowForecast />
 
       {/* Empty State when all widgets are hidden */}
       {visibleWidgets.length === 0 ? (

@@ -113,6 +113,8 @@ export interface AnalyticsSummaryPayload {
 
   /** Average invoice value in cents */
   avgInvoiceCents: number;
+  billedClientCount: number;
+  averageBilledPerClientCents: number;
 
   /** Number of active client accounts */
   activeClientsCount: number;

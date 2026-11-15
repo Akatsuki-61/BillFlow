@@ -25,6 +25,7 @@ export interface TaskAssignee {
 
 export interface TaskItem {
   id: string;
+  boardPosition?: number | null;
   title: string;
   description: string;
   status: TaskStatus;

@@ -17,6 +17,13 @@ export interface AttachmentItem {
 export interface ChosenAttachmentFile { path: string; name: string; size: number }
 export interface WorkflowAPI {
   tasks: {
+    reorder: (
+      id: string,
+      targetId: string,
+      placement: "before" | "after",
+    ) => Promise<void>;
+    removeMany: (ids: string[]) => Promise<{ token: string; deleted: number }>;
+    undoRemove: (token: string) => Promise<{ restored: number }>;
     list: () => Promise<TaskItem[]>;
     create: (input: TaskCreateInput) => Promise<TaskItem>;
     update: (id: string, patch: TaskPatchInput) => Promise<TaskItem>;
@@ -34,6 +41,7 @@ export interface WorkflowAPI {
     open: (id: string) => Promise<void>;
   };
   files: {
+    openDraft: (link: string) => Promise<void>;
     selectPdfDirectory: () => Promise<string | null>;
     openInvoicePdf: (invoiceId: string, reveal?: boolean) => Promise<void>;
   };

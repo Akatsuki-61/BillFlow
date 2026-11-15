@@ -10,7 +10,7 @@ import {
 import { listClientsWithStats } from "./clients";
 import { listInvoicesWithClient } from "./invoices";
 import { getDashboardSummary } from "./dashboard";
-import { getOrCreateSettings } from "./settings";
+import { getBackupStatus, getOrCreateSettings } from "./settings";
 import { listVendors } from "./vendors";
 import { listCatalogItems } from "./catalog";
 import { listTasks, pendingTracking } from "./tasks";
@@ -62,11 +62,16 @@ export function loadWorkspaceSnapshot(
         case "workOrders":
           snapshot.workOrders = listWorkOrders();
           break;
+        case "backupStatus":
+          break;
         case "events":
           snapshot.events = listCalendarEvents();
           break;
       }
     }
+    // Read after datasets that may initialize persisted workflow state.
+    if (datasets.includes("backupStatus"))
+      snapshot.backupStatus = getBackupStatus();
     return snapshot;
   })();
 }

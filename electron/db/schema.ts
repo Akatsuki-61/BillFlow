@@ -20,6 +20,10 @@ export const clients = sqliteTable("clients", {
     .notNull()
     .default("USD"),
   driveUrl: text("drive_url"),
+  whatsappPhone: text("whatsapp_phone"),
+  relationshipNotes: text("relationship_notes"),
+  billingAddress: text("billing_address"),
+  photoData: text("photo_data"),
   hasQuickBill: integer("has_quick_bill", { mode: "boolean" })
     .notNull()
     .default(true),
@@ -66,6 +70,11 @@ export const invoices = sqliteTable(
       .notNull()
       .default("UNPAID"),
     paidCents: integer("paid_cents").notNull().default(0),
+    trashedAt: text("trashed_at"),
+    workflowStage: text("workflow_stage", {
+      enum: ["SENT", "WORK_CONFIRMED", "DELIVERED"],
+    }),
+    paymentUrl: text("payment_url"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`(CURRENT_TIMESTAMP)`),
@@ -73,7 +82,10 @@ export const invoices = sqliteTable(
       .notNull()
       .default(sql`(CURRENT_TIMESTAMP)`),
   },
-  (table) => [index("invoices_client_id_idx").on(table.clientId)],
+  (table) => [
+    index("invoices_client_id_idx").on(table.clientId),
+    index("invoices_trashed_at_idx").on(table.trashedAt),
+  ],
 );
 
 export const catalogItems = sqliteTable("catalog_items", {
@@ -130,6 +142,11 @@ export const settings = sqliteTable("settings", {
   dateFormat: text("date_format").notNull().default("YYYY-MM-DD"),
   currencyDisplay: text("currency_display").notNull().default("symbol"),
   pdfExportDirectory: text("pdf_export_directory"),
+  defaultDeliveryUrl: text("default_delivery_url"),
+  signatureData: text("signature_data"),
+  notificationPlacement: text("notification_placement"),
+  typeface: text("typeface"),
+  layoutDensity: text("layout_density"),
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(CURRENT_TIMESTAMP)`),
@@ -158,6 +175,8 @@ export const vendors = sqliteTable(
     linkedClientName: text("linked_client_name"),
     payoutDueDate: text("payout_due_date"),
     notes: text("notes"),
+    billingAddress: text("billing_address"),
+    photoData: text("photo_data"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`(CURRENT_TIMESTAMP)`),
@@ -229,6 +248,31 @@ export const invoicePayments = sqliteTable(
   ],
 );
 
+export const invoicePaymentCorrections = sqliteTable(
+  "invoice_payment_corrections",
+  {
+    originalPaymentId: text("original_payment_id")
+      .primaryKey()
+      .notNull()
+      .references(() => invoicePayments.id, { onDelete: "restrict" }),
+    replacementPaymentId: text("replacement_payment_id")
+      .unique()
+      .references(() => invoicePayments.id, { onDelete: "restrict" }),
+    reason: text("reason").notNull(),
+    correctedAt: text("corrected_at").notNull(),
+  },
+  (t) => [
+    check(
+      "payment_correction_reason",
+      sql`length(trim(${t.reason})) BETWEEN 1 AND 500`,
+    ),
+    check(
+      "payment_correction_replacement",
+      sql`${t.originalPaymentId} IS NOT ${t.replacementPaymentId}`,
+    ),
+  ],
+);
+
 export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
   requestHash: text("request_hash"),
@@ -269,6 +313,9 @@ export const tasks = sqliteTable("tasks", {
   activeSince: text("active_since"),
   activeMilliseconds: integer("active_milliseconds").notNull().default(0),
   deletedAt: text("deleted_at"), // retain generated-item uniqueness after deletion
+  boardPosition: integer("board_position"),
+  deletionToken: text("deletion_token"),
+  deletedEventIds: text("deleted_event_ids"),
 });
 
 export const subtasks = sqliteTable(
@@ -323,16 +370,17 @@ export const workOrders = sqliteTable(
   "work_orders",
   {
     id: text("id").primaryKey(),
-    vendorId: text("vendor_id")
-      .notNull()
-      .references(() => vendors.id, { onDelete: "restrict" }),
-    taskId: text("task_id")
-      .notNull()
-      .references(() => tasks.id, { onDelete: "restrict" }),
-    invoiceId: text("invoice_id")
-      .notNull()
-      .references(() => invoices.id, { onDelete: "restrict" }),
+    vendorId: text("vendor_id").references(() => vendors.id, {
+      onDelete: "restrict",
+    }),
+    taskId: text("task_id").references(() => tasks.id, {
+      onDelete: "restrict",
+    }),
+    invoiceId: text("invoice_id").references(() => invoices.id, {
+      onDelete: "restrict",
+    }),
     scope: text("scope").notNull(),
+    payoutDueDate: text("payout_due_date"),
     feeCents: integer("fee_cents").notNull(),
     currency: text("currency").notNull(),
     dueDate: text("due_date"),
@@ -340,9 +388,28 @@ export const workOrders = sqliteTable(
     completedAt: text("completed_at"),
     deliveryUrl: text("delivery_url"),
     notes: text("notes"),
+    createdAt: text("created_at"),
+    vendorSnapshot: text("vendor_snapshot", { mode: "json" }).$type<
+      import("../../src/types/outsourcing").PayableVendor
+    >(),
+    items: text("items", { mode: "json" }).$type<
+      import("../../src/types/outsourcing").PayableItem[]
+    >(),
+    discountCents: integer("discount_cents").notNull().default(0),
+    paypalUrl: text("paypal_url"),
+    stripeUrl: text("stripe_url"),
   },
   (t) => [
     check("work_order_amount", sql`${t.feeCents} >= 0`),
+    check(
+      "work_order_source",
+      sql`(${t.taskId} IS NULL) = (${t.invoiceId} IS NULL)`,
+    ),
+    check(
+      "work_order_vendor",
+      sql`${t.vendorId} IS NOT NULL OR ${t.vendorSnapshot} IS NOT NULL`,
+    ),
+    check("work_order_discount", sql`${t.discountCents} >= 0`),
     index("work_orders_invoice_idx").on(t.invoiceId),
   ],
 );
@@ -360,7 +427,10 @@ export const vendorPayouts = sqliteTable(
     voidedAt: text("voided_at"),
     requestId: text("request_id").notNull().unique(),
   },
-  (t) => [check("payout_amount", sql`${t.amountCents} > 0`)],
+  (t) => [
+    check("payout_amount", sql`${t.amountCents} > 0`),
+    index("vendor_payouts_work_order_idx").on(t.workOrderId),
+  ],
 );
 
 export const attachments = sqliteTable(
@@ -406,6 +476,7 @@ export const userProfiles = sqliteTable("user_profiles", {
   role: text("role").notNull().default("software-engineering"),
   subtitle: text("subtitle").notNull().default("Full-Stack & Systems"),
   avatar: text("avatar").notNull().default("code"),
+  photoData: text("photo_data"),
   accent: text("accent").notNull().default("blue"),
   themePreference: text("theme_preference").notNull().default("system"),
   defaultCurrency: text("default_currency", {

@@ -17,6 +17,7 @@ import type {
   CatalogItemPatchInput,
   InvoicePayment,
   RecordPaymentInput,
+  CorrectPaymentInput,
 } from "./billing";
 import type {
   AppSettings,
@@ -54,6 +55,12 @@ import type {
 } from "./profiles";
 
 import type { WorkflowAPI } from "./workflow";
+
+type SaveFileResult = {
+  success: boolean;
+  canceled?: boolean;
+  filePath?: string;
+};
 
 export interface BillFlowAPI extends WorkflowAPI {
   isElectron: boolean;
@@ -124,6 +131,7 @@ export interface BillFlowAPI extends WorkflowAPI {
     }>;
   };
   clients: {
+    exportStatement: (id: string) => Promise<SaveFileResult>;
     list: () => Promise<ClientWithStats[]>;
     get: (id: string) => Promise<ClientWithStats>;
     create: (input: NewClientInput) => Promise<ClientWithStats>;
@@ -131,6 +139,21 @@ export interface BillFlowAPI extends WorkflowAPI {
     remove: (id: string) => Promise<{ success: boolean }>;
   };
   invoices: {
+    setStatuses: (
+      ids: string[],
+      status: InvoiceStatus,
+    ) => Promise<{ success: boolean }>;
+    listTrash: () => Promise<InvoiceWithClient[]>;
+    trash: (ids: string[]) => Promise<{ success: boolean }>;
+    restore: (ids: string[]) => Promise<{ success: boolean }>;
+    correctPayment: (input: CorrectPaymentInput) => Promise<InvoiceWithClient>;
+    exportBatch: (
+      ids: string[],
+    ) => Promise<{ success: boolean; canceled?: boolean; filePaths: string[] }>;
+    prepareShare: (
+      id: string,
+      template?: string,
+    ) => Promise<{ success: boolean; filePath: string }>;
     list: (filter?: { clientId?: string }) => Promise<InvoiceWithClient[]>;
     nextCode: () => Promise<string>;
     create: (input: NewInvoiceInput) => Promise<InvoiceWithClient>;
@@ -160,6 +183,7 @@ export interface BillFlowAPI extends WorkflowAPI {
   };
   /** Reusable subcontractor directory management */
   vendors: {
+    exportStatement: (id: string) => Promise<SaveFileResult>;
     list: () => Promise<VendorItem[]>;
     create: (input: NewVendorInput) => Promise<VendorItem>;
     update: (id: string, patch: VendorPatchInput) => Promise<VendorItem>;
@@ -178,7 +202,10 @@ export interface BillFlowAPI extends WorkflowAPI {
     update: (id: string, patch: WorkOrderPatchInput) => Promise<WorkOrderItem>;
     review: (input: ReviewWorkOrderInput) => Promise<WorkOrderItem>;
     recordPayout: (input: RecordWorkOrderPayoutInput) => Promise<WorkOrderItem>;
-    removePayout: (workOrderId: string) => Promise<WorkOrderItem>;
+    removePayout: (
+      workOrderId: string,
+      payoutId?: string,
+    ) => Promise<WorkOrderItem>;
     setPayoutStatus: (
       id: string,
       status: "PENDING" | "PAID",
@@ -210,15 +237,21 @@ export interface BillFlowAPI extends WorkflowAPI {
     summary: () => Promise<DashboardSummary>;
   };
   settings: {
+    exportCsv: () => Promise<SaveFileResult>;
+    saveBackup: () => Promise<SaveFileResult>;
     get: () => Promise<AppSettings>;
     update: (patch: UpdateSettingsInput) => Promise<AppSettings>;
     getDbPath: () => Promise<string>;
     revealDbFile: () => Promise<{ success: boolean }>;
     export: () => Promise<ExportDataPayload>;
-    import: (payload: ExportDataPayload) => Promise<{
+    import: (
+      payload: ExportDataPayload,
+      mode?: "replace" | "merge",
+    ) => Promise<{
       success: boolean;
       importedClients: number;
       importedInvoices: number;
+      skipped?: number;
     }>;
     reset: () => Promise<{ success: boolean }>;
   };

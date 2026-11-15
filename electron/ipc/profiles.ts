@@ -1,3 +1,4 @@
+import { imageDataSchema } from "../validation";
 import {
   initializeProfileSession,
   unlockProfileSession,
@@ -76,6 +77,7 @@ const createProfileSchema = z.object({
   role: roleEnum.default("software-engineering"),
   subtitle: z.string().trim().max(80).optional(),
   avatar: avatarEnum.optional(),
+  photoData: imageDataSchema,
   accent: accentEnum.optional(),
   themePreference: themeEnum.optional(),
   defaultCurrency: currencyEnum.optional(),
@@ -100,6 +102,7 @@ const updateProfileSchema = z.object({
   role: roleEnum.optional(),
   subtitle: z.string().trim().max(80).optional(),
   avatar: avatarEnum.optional(),
+  photoData: imageDataSchema,
   accent: accentEnum.optional(),
   themePreference: themeEnum.optional(),
   defaultCurrency: currencyEnum.optional(),
@@ -209,6 +212,7 @@ function mapProfileRow(row: UserProfileRow): UserProfile {
     role,
     subtitle: row.subtitle,
     avatar,
+    photoData: row.photoData,
     accent: (row.accent as AccentPreference) || "blue",
     themePreference: (row.themePreference as ThemePreference) || "system",
     defaultCurrency: (row.defaultCurrency as Currency) || "USD",
@@ -488,6 +492,7 @@ export function createProfile(input: CreateProfileInput): ProfileListResponse {
       role: value.role,
       subtitle,
       avatar,
+      photoData: value.photoData,
       accent,
       themePreference,
       defaultCurrency,
@@ -605,6 +610,8 @@ export function updateProfile(
       role: nextRole,
       subtitle: nextSubtitle,
       avatar: value.avatar ?? existing.avatar,
+      photoData:
+        value.photoData === undefined ? existing.photoData : value.photoData,
       accent: value.accent ?? existing.accent,
       themePreference: value.themePreference ?? existing.themePreference,
       defaultCurrency: nextCurrency,

@@ -2937,3 +2937,61 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
   font-display: swap;
   src: url("/fonts/plusjakartasans.woff2") format("woff2");
 }
+
+:root[data-workspace-typeface="nunito"] {
+  --workspace-font: "Nunito", system-ui, sans-serif;
+}
+:root[data-workspace-typeface="jakarta"] {
+  --workspace-font: "Plus Jakarta Sans", system-ui, sans-serif;
+}
+
+:root[data-workspace-typeface] body,
+:root[data-workspace-typeface] :is(.page-header, .record-title, .record-meta, .ui-field, .ui-button, .app-dialog-header) {
+  font-family: var(--workspace-font, var(--font-inter), Inter, sans-serif);
+}
+
+:root[data-workspace-density="compact"] {
+  --workspace-row-block: 7px;
+  --workspace-field-height: 34px;
+  --workspace-gap: 12px;
+}
+:root[data-workspace-density="spacious"] {
+  --workspace-row-block: 16px;
+  --workspace-field-height: 44px;
+  --workspace-gap: 24px;
+}
+:root:is([data-workspace-density="compact"], [data-workspace-density="spacious"]) :is(.record-table th, .record-table td) {
+  padding-block: var(--workspace-row-block);
+}
+:root:is([data-workspace-density="compact"], [data-workspace-density="spacious"]) :is(.workspace-page, .app-dialog-body) {
+  gap: var(--workspace-gap);
+}
+:root:is([data-workspace-density="compact"], [data-workspace-density="spacious"]) :is(input.ui-field, select.ui-field, .ui-button) {
+  min-height: var(--workspace-field-height);
+}
+
+:root[data-notification-placement] [data-motion-surface="toast"] {
+  position: fixed !important;
+  inset: var(--toast-top, auto) var(--toast-right, 24px) var(--toast-bottom, 24px) var(--toast-left, auto) !important;
+}
+:root:is([data-notification-placement="top-left"], [data-notification-placement="top-right"]) {
+  --toast-top: 84px;
+  --toast-bottom: auto;
+}
+:root:is([data-notification-placement="top-left"], [data-notification-placement="bottom-left"]) {
+  --toast-left: 24px;
+  --toast-right: auto;
+}
+
+[data-task-drop-edge="before"]::before,
+[data-task-drop-edge="after"]::before {
+  content: "";
+  position: absolute;
+  inset-inline: 6px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--theme-accent-solid);
+  pointer-events: none;
+}
+[data-task-drop-edge="before"]::before { top: -3px; }
+[data-task-drop-edge="after"]::before { bottom: -3px; }

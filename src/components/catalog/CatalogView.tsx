@@ -1,6 +1,11 @@
 "use client";
 
-import { IconCrossfade, MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { useWorkspaceCommand } from "@/lib/use-workspace-command";
+import {
+  IconCrossfade,
+  MotionPresence,
+  MotionSurface,
+} from "@/components/ui/MotionSurface";
 import { Dialog } from "@/components/ui/Dialog";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_NAV_GLIDE, SPRING_LIQUID_BUTTON } from "@/lib/motion";
@@ -339,6 +344,17 @@ export default function CatalogView() {
     setEditUnit(item.unit);
     setEditDescription(item.description);
   };
+
+  useWorkspaceCommand("create", () => {
+    openNewItemModal();
+    return true;
+  });
+  useWorkspaceCommand("item", (id) => {
+    const item = catalogItems.find((record) => record.id === id);
+    if (!item) return false;
+    handleOpenEdit(item);
+    return true;
+  });
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();

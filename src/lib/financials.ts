@@ -50,8 +50,17 @@ export function calculateFinancials(input: {
     financialDateInPeriod(i.issueDate, period, now),
   );
   const totalRevenueCents = cohort.reduce((sum, i) => sum + i.amountCents, 0);
-  const paidCents = issued
-    .flatMap((i) => i.payments || [])
+  const billedClientCount = new Set(
+    cohort.map((invoice) =>
+      invoice.clientId
+        ? `client:${invoice.clientId}`
+        : `temporary:${(invoice.clientEmail || invoice.clientName).trim().toLowerCase()}`,
+    ),
+  ).size;
+  const payments = issued
+    .flatMap((i) => i.payments ?? [])
+    .filter((p) => !p.correction);
+  const paidCents = payments
     .filter(
       (p) =>
         matchesCurrency(p.currency) &&
@@ -64,15 +73,22 @@ export function calculateFinancials(input: {
   );
   const matchingOrders = workOrders.filter((w) => matchesCurrency(w.currency));
   const committedCostCents = matchingOrders
-    .filter((w) => cohort.some((i) => i.id === w.invoiceId))
-    .reduce((sum, w) => sum + w.feeCents, 0);
-  const paidCostCents = matchingOrders
-    .filter(
-      (w) =>
-        w.payoutStatus === "PAID" &&
-        financialDateInPeriod(w.paidAt, period, now),
+    .filter((w) =>
+      w.invoiceId
+        ? cohort.some((i) => i.id === w.invoiceId)
+        : financialDateInPeriod(w.createdAt ?? w.payoutDueDate, period, now),
     )
-    .reduce((sum, w) => sum + (w.payoutAmountCents || 0), 0);
+    .reduce((sum, w) => sum + w.feeCents, 0);
+  const payouts = matchingOrders.flatMap((order) =>
+    order.payouts
+      ? order.payouts.filter((payout) => !payout.voidedAt)
+      : order.paidAt
+        ? [{ paidAt: order.paidAt, amountCents: order.payoutAmountCents ?? 0 }]
+        : [],
+  );
+  const paidCostCents = payouts
+    .filter((payout) => financialDateInPeriod(payout.paidAt, period, now))
+    .reduce((sum, payout) => sum + payout.amountCents, 0);
   const generalExpensesCents = expenses
     .filter(
       (e) =>
@@ -103,8 +119,7 @@ export function calculateFinancials(input: {
       key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const revenueCents =
       accountingMethod === "cash"
-        ? issued
-            .flatMap((i) => i.payments || [])
+        ? payments
             .filter(
               (p) =>
                 p.currency === currency && p.receivedAt.slice(0, 7) === key,
@@ -119,11 +134,9 @@ export function calculateFinancials(input: {
           (e) => e.currency === currency && e.incurredAt.slice(0, 7) === key,
         )
         .reduce((s, e) => s + e.amountCents, 0) +
-      matchingOrders
-        .filter(
-          (w) => w.payoutStatus === "PAID" && w.paidAt?.slice(0, 7) === key,
-        )
-        .reduce((s, w) => s + (w.payoutAmountCents || 0), 0);
+      payouts
+        .filter((p) => p.paidAt.slice(0, 7) === key)
+        .reduce((s, p) => s + p.amountCents, 0);
     return {
       key,
       label: d.toLocaleString("en", { month: "short" }),
@@ -169,6 +182,10 @@ export function calculateFinancials(input: {
             totalRevenueCents) *
             100,
         )
+      : 0,
+    billedClientCount,
+    averageBilledPerClientCents: billedClientCount
+      ? Math.round(totalRevenueCents / billedClientCount)
       : 0,
     avgInvoiceCents: cohort.length
       ? Math.round(totalRevenueCents / cohort.length)

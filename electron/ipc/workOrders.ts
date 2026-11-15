@@ -1,9 +1,11 @@
+import { payableAmount } from "../../src/lib/payable-math";
+import { recordId } from "../workflow-validation";
 import { updateTask } from "./tasks";
 import { captureWorkspace } from "../workspace-session";
 
 import { ipcMain } from "../security";
 import crypto from "crypto";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, asc, and, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   workOrders,
@@ -69,15 +71,27 @@ export function listWorkOrders(filter?: {
   const allPayouts = db
     .select()
     .from(vendorPayouts)
-    .where(isNull(vendorPayouts.voidedAt))
+    .orderBy(asc(vendorPayouts.paidAt), asc(vendorPayouts.id))
     .all();
-  const payoutMap = new Map(allPayouts.map((p) => [p.workOrderId, p]));
+  const payoutMap = new Map<string, WorkOrderItem["payouts"]>();
+  for (const payout of allPayouts) {
+    const ledger = payoutMap.get(payout.workOrderId) ?? [];
+    ledger.push({
+      ...payout,
+      currency: payout.currency as WorkOrderItem["currency"],
+    });
+    payoutMap.set(payout.workOrderId, ledger);
+  }
 
   return query.map((wo) => {
-    const v = vendorMap.get(wo.vendorId);
-    const t = taskMap.get(wo.taskId);
-    const inv = invoiceMap.get(wo.invoiceId);
-    const payout = payoutMap.get(wo.id);
+    const v = wo.vendorId ? vendorMap.get(wo.vendorId) : wo.vendorSnapshot;
+    const t = wo.taskId ? taskMap.get(wo.taskId) : undefined;
+    const inv = wo.invoiceId ? invoiceMap.get(wo.invoiceId) : undefined;
+    const payouts = payoutMap.get(wo.id) ?? [];
+    const active = payouts.filter((payout) => !payout.voidedAt);
+    const paid = active.reduce((sum, payout) => sum + payout.amountCents, 0);
+    const remaining = Math.max(0, wo.feeCents - paid);
+    const latest = active.at(-1);
 
     let clientName = t?.clientName;
     if (!clientName && inv?.clientId) {
@@ -98,26 +112,38 @@ export function listWorkOrders(filter?: {
       taskId: wo.taskId,
       invoiceId: wo.invoiceId,
       scope: wo.scope,
+      createdAt: wo.createdAt ?? undefined,
+      vendorSnapshot: wo.vendorSnapshot,
+      items: wo.items,
+      discountCents: wo.discountCents,
+      paypalUrl: wo.paypalUrl,
+      stripeUrl: wo.stripeUrl,
       feeCents: wo.feeCents,
       currency: wo.currency as WorkOrderItem["currency"],
       dueDate: wo.dueDate,
+      payoutDueDate: wo.payoutDueDate,
       status: (wo.status as WorkOrderItem["status"]) || "todo",
       completedAt: wo.completedAt,
       deliveryUrl: wo.deliveryUrl || t?.deliveryUrl || null,
       notes: wo.notes || null,
       vendorName: v?.name || "Unknown Contractor",
-      vendorService: v?.service,
+      vendorService: v?.service ?? undefined,
       vendorEmail: v?.email,
       vendorPhone: v?.phone,
-      vendorIconType: v?.iconType as WorkOrderItem["vendorIconType"],
-      taskTitle: t?.title || "Deliverable Task",
-      invoiceCode: inv?.code || "INV-000",
+      vendorBillingAddress: v?.billingAddress,
+      vendorIconType: wo.vendorId
+        ? vendorMap.get(wo.vendorId)?.iconType
+        : undefined,
+      taskTitle: t?.title || wo.scope,
+      invoiceCode: inv?.code,
       clientId: inv?.clientId || t?.clientId || null,
-      clientName: clientName || "Client Account",
-      payoutStatus: payout ? "PAID" : "PENDING",
-      payoutId: payout?.id || null,
-      paidAt: payout?.paidAt || null,
-      payoutAmountCents: payout?.amountCents || null,
+      clientName: clientName || undefined,
+      payoutStatus: remaining === 0 ? "PAID" : "PENDING",
+      payoutId: latest?.id ?? null,
+      paidAt: latest?.paidAt ?? null,
+      payoutAmountCents: paid,
+      remainingPayoutCents: remaining,
+      payouts,
     };
   });
 }
@@ -139,96 +165,79 @@ export function createWorkOrder(
   const db = getDb();
 
   // Validate relationships exist
-  const vendor = db
-    .select()
-    .from(vendors)
-    .where(eq(vendors.id, validated.vendorId))
-    .get();
-  if (!vendor) {
-    throw new AppError(
-      "NOT_FOUND",
-      `Vendor with ID ${validated.vendorId} not found.`,
-    );
-  }
-
-  const task = db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.id, validated.taskId))
-    .get();
-  if (!task) {
-    throw new AppError(
-      "NOT_FOUND",
-      `Task with ID ${validated.taskId} not found.`,
-    );
-  }
-
-  const invoice = db
-    .select()
-    .from(invoices)
-    .where(eq(invoices.id, validated.invoiceId))
-    .get();
-  if (!invoice) {
-    throw new AppError(
-      "NOT_FOUND",
-      `Invoice with ID ${validated.invoiceId} not found.`,
-    );
-  }
-
+  const vendor = validated.vendorId
+    ? db.select().from(vendors).where(eq(vendors.id, validated.vendorId)).get()
+    : undefined;
+  if (validated.vendorId && !vendor)
+    throw new AppError("NOT_FOUND", "Vendor not found.");
+  const task = validated.taskId
+    ? db.select().from(tasks).where(eq(tasks.id, validated.taskId)).get()
+    : undefined;
+  const invoice = validated.invoiceId
+    ? db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, validated.invoiceId))
+        .get()
+    : undefined;
+  if (validated.taskId && (!task || task.deletedAt))
+    throw new AppError("NOT_FOUND", "Task not found.");
+  if (validated.invoiceId && (!invoice || invoice.trashedAt))
+    throw new AppError("NOT_FOUND", "Invoice not found.");
   if (
-    task.deletedAt ||
-    (task.invoiceId && task.invoiceId !== invoice.id) ||
-    (task.clientId && task.clientId !== invoice.clientId) ||
-    task.currency !== invoice.currency
+    task &&
+    invoice &&
+    ((task.invoiceId && task.invoiceId !== invoice.id) ||
+      (task.clientId && task.clientId !== invoice.clientId) ||
+      task.currency !== invoice.currency)
   )
     throw new AppError(
       "SOURCE_MISMATCH",
       "Contractor work must reference the task's invoice and client.",
     );
-  const id =
-    validated.id || `wo-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+  const fee = validated.items
+    ? payableAmount(validated.items, validated.discountCents)
+    : validated.feeCents;
+  if (!validated.items && validated.discountCents)
+    throw new AppError(
+      "INVALID_DISCOUNT",
+      "Add line items before applying a discount.",
+    );
 
-  db.transaction(() => {
-    // 1. Insert into work_orders
-    db.insert(workOrders)
+  const id = validated.id || crypto.randomUUID();
+  db.transaction((tx) => {
+    tx.insert(workOrders)
       .values({
+        ...validated,
         id,
-        vendorId: validated.vendorId,
-        taskId: validated.taskId,
-        invoiceId: validated.invoiceId,
-        scope: validated.scope,
-        feeCents: validated.feeCents,
-        currency: validated.currency,
-        dueDate: validated.dueDate || null,
-        status: validated.status || "todo",
-        deliveryUrl: validated.deliveryUrl || task.deliveryUrl || null,
-        notes: validated.notes || null,
+        feeCents: fee,
+        createdAt: new Date().toISOString(),
+        deliveryUrl: validated.deliveryUrl || task?.deliveryUrl || null,
       })
       .run();
-
-    // 2. Update task outsourcing fields
-    db.update(tasks)
-      .set({
-        isOutsourced: true,
-        outsourcedVendor: vendor.name,
-        outsourceBudgetCents: validated.feeCents,
-        invoiceId: invoice.id,
-        clientId: invoice.clientId,
-        deliveryUrl: validated.deliveryUrl || task.deliveryUrl || null,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(tasks.id, validated.taskId))
-      .run();
-
-    // 3. Update vendor current balance with this work order fee
-    const currentBalance = vendor.balanceCents || 0;
-    db.update(vendors)
-      .set({
-        balanceCents: currentBalance + validated.feeCents,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(vendors.id, validated.vendorId))
-      .run();
+    if (task && invoice) {
+      tx.update(tasks)
+        .set({
+          isOutsourced: true,
+          outsourcedVendor: vendor?.name ?? validated.vendorSnapshot?.name,
+          outsourceBudgetCents: fee,
+          invoiceId: invoice.id,
+          clientId: invoice.clientId,
+          deliveryUrl: validated.deliveryUrl || task.deliveryUrl,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(tasks.id, task.id))
+        .run();
+    }
+    if (vendor) {
+      tx.update(vendors)
+        .set({
+          balanceCents: vendor.balanceCents + fee,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(vendors.id, vendor.id))
+        .run();
+    }
   });
 
   broadcastDataChanged?.();
@@ -270,10 +279,40 @@ export function updateWorkOrder(
       "HAS_PAYOUT",
       "Voucher currency cannot change after payout.",
     );
+  const paid = getWorkOrder(id)?.payoutAmountCents ?? 0;
+  const items =
+    validated.items === undefined ? existing.items : validated.items;
+  const discount = validated.discountCents ?? existing.discountCents;
+  if (!items && discount)
+    throw new AppError(
+      "INVALID_DISCOUNT",
+      "Add line items before applying a discount.",
+    );
+  const fee = items
+    ? payableAmount(items, discount)
+    : (validated.feeCents ?? existing.feeCents);
+  if (fee < paid && fee !== existing.feeCents)
+    throw new AppError(
+      "FEE_BELOW_PAYOUTS",
+      "The fee cannot be lower than the payouts already recorded.",
+    );
   const updateData: Record<string, unknown> = {};
+  if (validated.vendorSnapshot) {
+    if (existing.vendorId)
+      throw new AppError("VENDOR_LINK", "Edit this vendor in the directory.");
+    updateData.vendorSnapshot = validated.vendorSnapshot;
+  }
+  if (fee !== existing.feeCents) updateData.feeCents = fee;
+  if (validated.items !== undefined) updateData.items = items;
+  if (validated.discountCents !== undefined)
+    updateData.discountCents = discount;
+  if (validated.paypalUrl !== undefined)
+    updateData.paypalUrl = validated.paypalUrl;
+  if (validated.stripeUrl !== undefined)
+    updateData.stripeUrl = validated.stripeUrl;
+  if (validated.payoutDueDate !== undefined)
+    updateData.payoutDueDate = validated.payoutDueDate;
   if (validated.scope !== undefined) updateData.scope = validated.scope;
-  if (validated.feeCents !== undefined)
-    updateData.feeCents = validated.feeCents;
   if (validated.currency !== undefined)
     updateData.currency = validated.currency;
   if (validated.dueDate !== undefined) updateData.dueDate = validated.dueDate;
@@ -295,49 +334,27 @@ export function updateWorkOrder(
       db.update(workOrders).set(updateData).where(eq(workOrders.id, id)).run();
     }
 
-    // If fee or currency changed, keep task in sync
-    if (validated.feeCents !== undefined || validated.currency !== undefined) {
-      const taskUpdate: Record<string, unknown> = {
-        updatedAt: new Date().toISOString(),
-      };
-      if (validated.feeCents !== undefined)
-        taskUpdate.outsourceBudgetCents = validated.feeCents;
-
+    if (existing.taskId && fee !== existing.feeCents) {
       db.update(tasks)
-        .set(taskUpdate)
+        .set({ outsourceBudgetCents: fee, updatedAt: new Date().toISOString() })
         .where(eq(tasks.id, existing.taskId))
         .run();
     }
-
-    // If updateTask requested, sync delivery URL, status, and completion to original task after review
-    if (validated.updateTask) {
-      const taskUpdate: Record<string, unknown> = {
-        updatedAt: new Date().toISOString(),
-      };
-      const finalDeliveryUrl =
-        validated.deliveryUrl !== undefined
-          ? validated.deliveryUrl
-          : existing.deliveryUrl;
-      if (finalDeliveryUrl) {
-        taskUpdate.deliveryUrl = finalDeliveryUrl;
-      }
-      const targetStatus =
+    if (existing.taskId && validated.updateTask) {
+      const deliveryUrl =
+        validated.deliveryUrl === undefined
+          ? existing.deliveryUrl
+          : validated.deliveryUrl;
+      const status =
         validated.taskStatus ??
-        (validated.status === "done"
-          ? "done"
-          : validated.status === "review"
-            ? "review"
-            : undefined);
-      if (targetStatus) {
-        taskUpdate.status = targetStatus;
-        if (targetStatus === "done") {
-          taskUpdate.completedAt = new Date().toISOString();
-        }
-      }
-      updateTask(existing.taskId, {
-        ...(finalDeliveryUrl ? { deliveryUrl: finalDeliveryUrl } : {}),
-        ...(targetStatus ? { status: targetStatus } : {}),
-      });
+        (validated.status === "done" || validated.status === "review"
+          ? validated.status
+          : undefined);
+      if (deliveryUrl || status)
+        updateTask(existing.taskId, {
+          ...(deliveryUrl && { deliveryUrl }),
+          ...(status && { status }),
+        });
     }
 
     if (validated.payoutStatus === "PAID")
@@ -397,45 +414,57 @@ export function recordWorkOrderPayout(
       "CURRENCY_MISMATCH",
       "Payout currency must match the voucher.",
     );
-  const existingPayout = db
-    .select()
-    .from(vendorPayouts)
-    .where(
-      and(
-        eq(vendorPayouts.workOrderId, validated.workOrderId),
-        isNull(vendorPayouts.voidedAt),
-      ),
-    )
-    .get();
-
-  const amountCents =
-    validated.amountCents ?? existingPayout?.amountCents ?? existing.feeCents;
-  const paidAt =
-    validated.paidAt ?? existingPayout?.paidAt ?? new Date().toISOString();
-  if (
-    existingPayout &&
-    existingPayout.amountCents === amountCents &&
-    existingPayout.paidAt === paidAt
-  ) {
-    return getWorkOrder(validated.workOrderId)!;
-  }
-  const payoutId = `payout-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-
-  db.transaction(() => {
-    if (existingPayout) {
-      db.update(vendorPayouts)
-        .set({ voidedAt: new Date().toISOString() })
-        .where(eq(vendorPayouts.id, existingPayout.id))
-        .run();
+  db.transaction((tx) => {
+    const requestId = validated.requestId ?? crypto.randomUUID();
+    const previous = tx
+      .select()
+      .from(vendorPayouts)
+      .where(eq(vendorPayouts.requestId, requestId))
+      .get();
+    if (previous) {
+      if (
+        previous.workOrderId !== existing.id ||
+        (validated.amountCents !== undefined &&
+          previous.amountCents !== validated.amountCents) ||
+        (validated.paidAt !== undefined && previous.paidAt !== validated.paidAt)
+      )
+        throw new AppError(
+          "REQUEST_CONFLICT",
+          "This payout request was already used with different details.",
+        );
+      return;
     }
-    db.insert(vendorPayouts)
+
+    const active = tx
+      .select()
+      .from(vendorPayouts)
+      .where(
+        and(
+          eq(vendorPayouts.workOrderId, existing.id),
+          isNull(vendorPayouts.voidedAt),
+        ),
+      )
+      .all();
+    const remaining = Math.max(
+      0,
+      existing.feeCents -
+        active.reduce((sum, payout) => sum + payout.amountCents, 0),
+    );
+    if (remaining === 0 && validated.amountCents === undefined) return;
+    const amountCents = validated.amountCents ?? remaining;
+    if (amountCents > remaining)
+      throw new AppError(
+        "PAYOUT_EXCEEDS_BALANCE",
+        "The payout cannot exceed the remaining work order balance.",
+      );
+    tx.insert(vendorPayouts)
       .values({
-        id: payoutId,
-        workOrderId: validated.workOrderId,
+        id: requestId,
+        workOrderId: existing.id,
         amountCents,
         currency: existing.currency,
-        paidAt,
-        requestId: crypto.randomUUID(),
+        paidAt: validated.paidAt ?? new Date().toISOString(),
+        requestId,
       })
       .run();
   });
@@ -454,6 +483,7 @@ export function recordWorkOrderPayout(
 export function removeWorkOrderPayout(
   workOrderId: string,
   broadcastDataChanged?: () => void,
+  payoutId?: string,
 ): WorkOrderItem {
   const db = getDb();
   const existing = db
@@ -472,6 +502,7 @@ export function removeWorkOrderPayout(
         and(
           eq(vendorPayouts.workOrderId, workOrderId),
           isNull(vendorPayouts.voidedAt),
+          payoutId ? eq(vendorPayouts.id, payoutId) : undefined,
         ),
       )
       .run();
@@ -534,15 +565,16 @@ export function removeWorkOrder(
     tx.delete(workOrders).where(eq(workOrders.id, id)).run();
 
     // 3. Reset task outsource state
-    tx.update(tasks)
-      .set({
-        isOutsourced: false,
-        outsourcedVendor: null,
-        outsourceBudgetCents: null,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(tasks.id, existing.taskId))
-      .run();
+    if (existing.taskId)
+      tx.update(tasks)
+        .set({
+          isOutsourced: false,
+          outsourcedVendor: null,
+          outsourceBudgetCents: null,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(tasks.id, existing.taskId))
+        .run();
   });
 
   broadcastDataChanged?.();
@@ -558,12 +590,20 @@ export async function exportWorkOrderPdf(id: string): Promise<string> {
   if (!wo) throw new AppError("NOT_FOUND", "Work order not found");
 
   const db = getDb();
-  const task = db.select().from(tasks).where(eq(tasks.id, wo.taskId)).get();
+  const task = wo.taskId
+    ? db.select().from(tasks).where(eq(tasks.id, wo.taskId)).get()
+    : undefined;
   const profile = getOrCreateSettings();
 
   const pdfBuffer = await generateWorkOrderPdfBuffer({
     voucherNumber: wo.id.slice(-8).toUpperCase(),
     scope: wo.scope,
+    items: wo.items,
+    discountCents: wo.discountCents,
+    paidCents: wo.payoutAmountCents ?? 0,
+    payoutDueDate: wo.payoutDueDate,
+    paypalUrl: wo.paypalUrl,
+    stripeUrl: wo.stripeUrl,
     feeCents: wo.feeCents,
     currency: wo.currency,
     status: wo.status,
@@ -578,6 +618,7 @@ export async function exportWorkOrderPdf(id: string): Promise<string> {
       service: wo.vendorService,
       email: wo.vendorEmail,
       phone: wo.vendorPhone,
+      billingAddress: wo.vendorBillingAddress,
     },
     task: {
       title: task?.title || wo.taskTitle,
@@ -675,9 +716,13 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle(
     "workOrders:removePayout",
-    async (_event, workOrderId: string) => {
+    async (_event, workOrderId: string, payoutId?: string) => {
       try {
-        return removeWorkOrderPayout(workOrderId, broadcastDataChanged);
+        return removeWorkOrderPayout(
+          workOrderId,
+          broadcastDataChanged,
+          payoutId === undefined ? undefined : recordId.parse(payoutId),
+        );
       } catch (err) {
         throw formatError(err);
       }

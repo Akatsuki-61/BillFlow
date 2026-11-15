@@ -1,4 +1,9 @@
 "use client";
+import Image from "next/image";
+import { ImageUpload } from "@/components/ui/ImageUpload";
+import { PhoneField } from "@/components/ui/PhoneField";
+
+import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { formatClientBalance } from "@/lib/client-balances";
 
 import { Dialog } from "@/components/ui/Dialog";
@@ -49,7 +54,7 @@ function ClientsContent() {
   const { clients, isLoading, createClient, updateClient, deleteClient } =
     useClients();
   const { createInvoice, invoices: allInvoices } = useInvoices();
-  const { activeCurrency, settings } = useData();
+  const { activeCurrency, settings, isElectron } = useData();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const targetClientId = searchParams.get("client");
@@ -114,6 +119,10 @@ function ClientsContent() {
     contactRole: "",
     email: "",
     phone: "",
+    whatsappPhone: "",
+    billingAddress: "",
+    relationshipNotes: "",
+    photoData: null as string | null,
     currency: (settings?.defaultCurrency ||
       activeCurrency ||
       "USD") as Currency,
@@ -128,6 +137,10 @@ function ClientsContent() {
       formData.name.trim() ||
       formData.email.trim() ||
       formData.phone.trim() ||
+      formData.whatsappPhone.trim() ||
+      formData.billingAddress.trim() ||
+      formData.relationshipNotes.trim() ||
+      formData.photoData ||
       formData.contactPerson.trim() ||
       formData.driveUrl.trim(),
     );
@@ -175,6 +188,35 @@ function ClientsContent() {
     setIsAddModalOpen(true);
   };
 
+  useWorkspaceCommand("create", () => {
+    openAddClientModal();
+    return true;
+  });
+  useWorkspaceCommand("record", (id) => {
+    const client = clients.find((item) => item.id === id);
+    if (!client) return false;
+    setSelectedClientForHistory(client);
+    return true;
+  });
+
+  const [exportingStatement, setExportingStatement] = useState(false);
+  const exportClientStatement = async (id: string) => {
+    setExportingStatement(true);
+    try {
+      const result = await window.billflow?.clients.exportStatement(id);
+      if (result?.success) showToast("Client statement saved.");
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Could not export the client statement.",
+        "error",
+      );
+    } finally {
+      setExportingStatement(false);
+    }
+  };
+
   // Edit Client Form State
   const [editingClient, setEditingClient] = useState<ClientWithStats | null>(
     null,
@@ -186,6 +228,10 @@ function ClientsContent() {
     contactRole: "",
     email: "",
     phone: "",
+    whatsappPhone: "",
+    billingAddress: "",
+    relationshipNotes: "",
+    photoData: null as string | null,
     currency: (settings?.defaultCurrency ||
       activeCurrency ||
       "USD") as Currency,
@@ -241,6 +287,10 @@ function ClientsContent() {
         contactRole: formData.contactRole.trim() || undefined,
         email: formData.email.trim(),
         phone: formData.phone.trim() || undefined,
+        whatsappPhone: formData.whatsappPhone.trim() || null,
+        billingAddress: formData.billingAddress.trim() || null,
+        relationshipNotes: formData.relationshipNotes.trim() || null,
+        photoData: formData.photoData,
         currency: formData.currency,
         driveUrl: formData.driveUrl.trim() || undefined,
       });
@@ -254,6 +304,10 @@ function ClientsContent() {
         contactRole: "",
         email: "",
         phone: "",
+        whatsappPhone: "",
+        billingAddress: "",
+        relationshipNotes: "",
+        photoData: null as string | null,
         currency: (settings?.defaultCurrency ||
           activeCurrency ||
           "USD") as Currency,
@@ -280,6 +334,10 @@ function ClientsContent() {
       contactRole: client.contactRole || "",
       email: client.email,
       phone: client.phone || "",
+      whatsappPhone: client.whatsappPhone || "",
+      billingAddress: client.billingAddress || "",
+      relationshipNotes: client.relationshipNotes || "",
+      photoData: client.photoData ?? null,
       currency: client.currency,
       driveUrl: client.driveUrl || "",
     });
@@ -318,6 +376,10 @@ function ClientsContent() {
         contactRole: editFormData.contactRole.trim() || null,
         email: editFormData.email.trim(),
         phone: editFormData.phone.trim() || null,
+        whatsappPhone: editFormData.whatsappPhone.trim() || null,
+        billingAddress: editFormData.billingAddress.trim() || null,
+        relationshipNotes: editFormData.relationshipNotes.trim() || null,
+        photoData: editFormData.photoData,
         currency: editFormData.currency,
         driveUrl: editFormData.driveUrl.trim() || null,
       });
@@ -1099,20 +1161,62 @@ function ClientsContent() {
                     )}
                   </div>
 
-                  <div>
-                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Phone Number
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
+                  <PhoneField
+                    label="Phone number"
+                    value={formData.phone}
+                    onChange={(phone) =>
+                      setFormData((previous) => ({ ...previous, phone }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <PhoneField
+                    label="WhatsApp number"
+                    value={formData.whatsappPhone}
+                    onChange={(whatsappPhone) =>
+                      setFormData((previous) => ({
+                        ...previous,
+                        whatsappPhone,
+                      }))
+                    }
+                  />
+                  <ImageUpload
+                    label="Client photo"
+                    value={formData.photoData}
+                    onChange={(photoData) =>
+                      setFormData((previous) => ({ ...previous, photoData }))
+                    }
+                  />
+                  <label className="space-y-1 text-xs">
+                    <span>Billing address</span>
+                    <textarea
+                      className="ui-field w-full"
+                      rows={2}
+                      maxLength={1000}
+                      value={formData.billingAddress}
+                      onChange={(event) =>
+                        setFormData((previous) => ({
+                          ...previous,
+                          billingAddress: event.target.value,
+                        }))
                       }
-                      placeholder="+1 (555) 284-9102"
-                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
-                  </div>
+                  </label>
+                  <label className="space-y-1 text-xs">
+                    <span>Relationship notes</span>
+                    <textarea
+                      className="ui-field w-full"
+                      rows={2}
+                      maxLength={4000}
+                      value={formData.relationshipNotes}
+                      onChange={(event) =>
+                        setFormData((previous) => ({
+                          ...previous,
+                          relationshipNotes: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
                 </div>
 
                 <div>
@@ -1297,23 +1401,65 @@ function ClientsContent() {
                     )}
                   </div>
 
-                  <div>
-                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                      Phone Number
-                    </label>
-                    <input
-                      type="text"
-                      value={editFormData.phone}
-                      onChange={(e) =>
-                        setEditFormData({
-                          ...editFormData,
-                          phone: e.target.value,
-                        })
+                  <PhoneField
+                    label="Phone number"
+                    value={editFormData.phone}
+                    onChange={(phone) =>
+                      setEditFormData((previous) => ({ ...previous, phone }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <PhoneField
+                    label="WhatsApp number"
+                    value={editFormData.whatsappPhone}
+                    onChange={(whatsappPhone) =>
+                      setEditFormData((previous) => ({
+                        ...previous,
+                        whatsappPhone,
+                      }))
+                    }
+                  />
+                  <ImageUpload
+                    label="Client photo"
+                    value={editFormData.photoData}
+                    onChange={(photoData) =>
+                      setEditFormData((previous) => ({
+                        ...previous,
+                        photoData,
+                      }))
+                    }
+                  />
+                  <label className="space-y-1 text-xs">
+                    <span>Billing address</span>
+                    <textarea
+                      className="ui-field w-full"
+                      rows={2}
+                      maxLength={1000}
+                      value={editFormData.billingAddress}
+                      onChange={(event) =>
+                        setEditFormData((previous) => ({
+                          ...previous,
+                          billingAddress: event.target.value,
+                        }))
                       }
-                      placeholder="+1 (555) 284-9102"
-                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
                     />
-                  </div>
+                  </label>
+                  <label className="space-y-1 text-xs">
+                    <span>Relationship notes</span>
+                    <textarea
+                      className="ui-field w-full"
+                      rows={2}
+                      maxLength={4000}
+                      value={editFormData.relationshipNotes}
+                      onChange={(event) =>
+                        setEditFormData((previous) => ({
+                          ...previous,
+                          relationshipNotes: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
                 </div>
 
                 <div>
@@ -1367,7 +1513,18 @@ function ClientsContent() {
             <div className="app-dialog-header">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-surface border border-line-neutral-200 flex items-center justify-center font-bold text-accent">
-                  {selectedClientForHistory.name.charAt(0).toUpperCase()}
+                  {selectedClientForHistory.photoData ? (
+                    <Image
+                      unoptimized
+                      src={selectedClientForHistory.photoData}
+                      alt=""
+                      width={40}
+                      height={40}
+                      className="size-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    selectedClientForHistory.name.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-content-neutral-900">
@@ -1426,6 +1583,37 @@ function ClientsContent() {
                       <strong>Email:</strong> {selectedClientForHistory.email}
                     </div>
                   </div>
+                  <div className="space-y-1">
+                    <p>
+                      <strong>Average payment time</strong>{" "}
+                      {selectedClientForHistory.averagePaymentDays == null
+                        ? "—"
+                        : `${new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(selectedClientForHistory.averagePaymentDays)} days`}
+                    </p>
+                    {selectedClientForHistory.phone && (
+                      <p>
+                        <strong>Phone</strong> {selectedClientForHistory.phone}
+                      </p>
+                    )}
+                    {selectedClientForHistory.whatsappPhone && (
+                      <p>
+                        <strong>WhatsApp</strong>{" "}
+                        {selectedClientForHistory.whatsappPhone}
+                      </p>
+                    )}
+                    {selectedClientForHistory.billingAddress && (
+                      <p className="whitespace-pre-line">
+                        <strong>Billing address</strong>{" "}
+                        {selectedClientForHistory.billingAddress}
+                      </p>
+                    )}
+                    {selectedClientForHistory.relationshipNotes && (
+                      <p className="whitespace-pre-line">
+                        <strong>Relationship notes</strong>{" "}
+                        {selectedClientForHistory.relationshipNotes}
+                      </p>
+                    )}
+                  </div>
                   {selectedClientForHistory.driveUrl && (
                     <button
                       type="button"
@@ -1447,6 +1635,19 @@ function ClientsContent() {
                       Invoices & Payment Records
                     </h4>
                     <div className="flex items-center gap-2">
+                      {isElectron && (
+                        <Button
+                          variant="secondary"
+                          disabled={exportingStatement}
+                          onClick={() =>
+                            void exportClientStatement(
+                              selectedClientForHistory.id,
+                            )
+                          }
+                        >
+                          Export Statement PDF
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         onClick={() => {

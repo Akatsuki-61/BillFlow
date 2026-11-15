@@ -34,6 +34,7 @@ import type {
 import { getSystemCurrency } from "@/lib/format";
 import type {
   AppSettings,
+  BackupStatus,
   UpdateSettingsInput,
   ExportDataPayload,
 } from "@/types/settings";
@@ -109,6 +110,7 @@ interface DataContextType {
   catalogItems: CatalogItem[];
   dashboard: DashboardSummary | null;
   settings: AppSettings | null;
+  backupStatus: BackupStatus | null;
   activeCurrency: Currency;
   isLoading: boolean;
   isElectron: boolean;
@@ -182,7 +184,10 @@ interface DataContextType {
   recordWorkOrderPayout: (
     input: RecordWorkOrderPayoutInput,
   ) => Promise<WorkOrderItem>;
-  removeWorkOrderPayout: (workOrderId: string) => Promise<WorkOrderItem>;
+  removeWorkOrderPayout: (
+    workOrderId: string,
+    payoutId?: string,
+  ) => Promise<WorkOrderItem>;
   setWorkOrderPayoutStatus: (
     id: string,
     status: "PENDING" | "PAID",
@@ -201,7 +206,10 @@ interface DataContextType {
   getDbPath: () => Promise<string>;
   revealDbFile: () => Promise<void>;
   exportData: () => Promise<ExportDataPayload>;
-  importData: (payload: ExportDataPayload) => Promise<{
+  importData: (
+    payload: ExportDataPayload,
+    mode?: "replace" | "merge",
+  ) => Promise<{
     success: boolean;
     importedClients: number;
     importedInvoices: number;
@@ -314,6 +322,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [workOrders, setWorkOrders] = useState<WorkOrderItem[]>([]);
   const [events, setEvents] = useState<CalendarEventItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -424,6 +433,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setEvents([]);
     setCatalogItems([]);
     setSettings(null);
+    setBackupStatus(null);
     setDashboard(null);
   }, []);
   const refresh = useCallback(
@@ -491,6 +501,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
                 if (snapshot.events) setEvents(snapshot.events);
                 if (snapshot.catalogItems)
                   setCatalogItems(snapshot.catalogItems);
+                if (snapshot.backupStatus)
+                  setBackupStatus(snapshot.backupStatus);
                 if (snapshot.settings) setSettings(snapshot.settings);
                 if (snapshot.dashboard) setDashboard(snapshot.dashboard);
                 setError(null);
@@ -551,6 +563,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         contactRole: input.contactRole || null,
         email: input.email,
         phone: input.phone || null,
+        whatsappPhone: input.whatsappPhone,
+        billingAddress: input.billingAddress,
+        relationshipNotes: input.relationshipNotes,
+        photoData: input.photoData,
         currency: input.currency,
         driveUrl: input.driveUrl || null,
         hasQuickBill: true,
@@ -963,13 +979,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const importData = async (
     payload: ExportDataPayload,
+    mode?: "replace" | "merge",
   ): Promise<{
     success: boolean;
     importedClients: number;
     importedInvoices: number;
   }> => {
     if (checkIsElectron() && window.billflow) {
-      const res = await window.billflow.settings.import(payload);
+      const res = await window.billflow.settings.import(payload, mode);
 
       return res;
     } else {
@@ -1138,6 +1155,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         iconType: input.iconType || "devops",
         email: input.email,
         phone: input.phone,
+        billingAddress: input.billingAddress,
+        photoData: input.photoData,
         linkedClientId: input.linkedClientId,
         linkedClientName: input.linkedClientName || client?.name,
         payoutDueDate: input.payoutDueDate,
@@ -1239,19 +1258,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const invoice = memoryInvoices.find((i) => i.id === input.invoiceId);
       const newWo: WorkOrderItem = {
         id,
-        vendorId: input.vendorId,
-        taskId: input.taskId,
-        invoiceId: input.invoiceId,
+        vendorId: input.vendorId ?? null,
+        taskId: input.taskId ?? null,
+        invoiceId: input.invoiceId ?? null,
         scope: input.scope,
         feeCents: input.feeCents,
         currency: input.currency,
         dueDate: input.dueDate || null,
+        payoutDueDate: input.payoutDueDate || null,
         status: input.status || "todo",
         deliveryUrl: input.deliveryUrl || null,
-        vendorName: vendor?.name || "Contractor",
+        vendorSnapshot: input.vendorSnapshot,
+        items: input.items,
+        discountCents: input.discountCents,
+        paypalUrl: input.paypalUrl,
+        stripeUrl: input.stripeUrl,
+        vendorName: vendor?.name || input.vendorSnapshot?.name || "Contractor",
         vendorService: vendor?.service,
-        vendorEmail: vendor?.email,
-        vendorPhone: vendor?.phone,
+        vendorEmail: vendor?.email || input.vendorSnapshot?.email,
+        vendorPhone: vendor?.phone || input.vendorSnapshot?.phone,
+        vendorBillingAddress:
+          vendor?.billingAddress || input.vendorSnapshot?.billingAddress,
         vendorIconType: vendor?.iconType,
         invoiceCode: invoice?.code || "INV-000",
         clientId: invoice?.clientId || null,
@@ -1315,6 +1342,30 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const applyBrowserPayouts = async (
+    order: WorkOrderItem,
+    payouts: NonNullable<WorkOrderItem["payouts"]>,
+  ) => {
+    const active = payouts.filter((payout) => !payout.voidedAt);
+    const paid = active.reduce((sum, payout) => sum + payout.amountCents, 0);
+    const remaining = Math.max(0, order.feeCents - paid);
+    const latest = active.at(-1);
+    const updated: WorkOrderItem = {
+      ...order,
+      payoutStatus: remaining === 0 ? "PAID" : "PENDING",
+      payoutId: latest?.id ?? null,
+      paidAt: latest?.paidAt ?? null,
+      payoutAmountCents: paid,
+      remainingPayoutCents: remaining,
+      payouts,
+    };
+    memoryWorkOrders = memoryWorkOrders.map((item) =>
+      item.id === order.id ? updated : item,
+    );
+    await refresh();
+    return updated;
+  };
+
   /**
    * Explicitly records a vendor payout entry in SQLite `vendor_payouts`.
    * Separate from contractor work progress.
@@ -1329,17 +1380,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } else {
       const wo = memoryWorkOrders.find((w) => w.id === input.workOrderId);
       if (!wo) throw new Error("Work order not found");
-      const updated: WorkOrderItem = {
-        ...wo,
-        payoutStatus: "PAID",
-        payoutId: `payout-${Date.now()}`,
-        paidAt: input.paidAt || new Date().toISOString(),
-        payoutAmountCents: input.amountCents ?? wo.feeCents,
-      };
-      const idx = memoryWorkOrders.findIndex((w) => w.id === input.workOrderId);
-      memoryWorkOrders[idx] = updated;
-      await refresh();
-      return updated;
+      const payouts = wo.payouts ?? [];
+      const id = input.requestId ?? crypto.randomUUID();
+      if (payouts.some((payout) => payout.id === id)) return wo;
+      if (input.currency && input.currency !== wo.currency)
+        throw new Error("Payout currency must match the voucher.");
+      const balance = Math.max(0, wo.feeCents - (wo.payoutAmountCents ?? 0));
+      if (!balance && input.amountCents === undefined) return wo;
+      const amountCents = input.amountCents ?? balance;
+      if (
+        !Number.isSafeInteger(amountCents) ||
+        amountCents <= 0 ||
+        amountCents > balance
+      )
+        throw new Error("Enter a payout up to the remaining balance.");
+      return applyBrowserPayouts(wo, [
+        ...payouts,
+        {
+          id,
+          amountCents,
+          currency: wo.currency,
+          paidAt: input.paidAt ?? new Date().toISOString(),
+        },
+      ]);
     }
   };
 
@@ -1349,25 +1412,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
    */
   const removeWorkOrderPayout = async (
     workOrderId: string,
+    payoutId?: string,
   ): Promise<WorkOrderItem> => {
     if (checkIsElectron() && window.billflow?.workOrders) {
-      const updated =
-        await window.billflow.workOrders.removePayout(workOrderId);
+      const updated = await window.billflow.workOrders.removePayout(
+        workOrderId,
+        payoutId,
+      );
 
       return updated;
     } else {
       const wo = memoryWorkOrders.find((w) => w.id === workOrderId);
       if (!wo) throw new Error("Work order not found");
-      const updated: WorkOrderItem = {
-        ...wo,
-        payoutStatus: "PENDING",
-        payoutId: null,
-        paidAt: null,
-      };
-      const idx = memoryWorkOrders.findIndex((w) => w.id === workOrderId);
-      memoryWorkOrders[idx] = updated;
-      await refresh();
-      return updated;
+      return applyBrowserPayouts(
+        wo,
+        (wo.payouts ?? []).map((payout) =>
+          !payout.voidedAt && (!payoutId || payoutId === payout.id)
+            ? { ...payout, voidedAt: new Date().toISOString() }
+            : payout,
+        ),
+      );
     }
   };
 
@@ -1590,6 +1654,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
   const workflow: WorkflowAPI = {
     tasks: {
+      reorder: (id, target, placement) =>
+        requireDesktop().tasks.reorder(id, target, placement),
+      removeMany: (ids) => requireDesktop().tasks.removeMany(ids),
+      undoRemove: (token) => requireDesktop().tasks.undoRemove(token),
       list: async () =>
         checkIsElectron() && window.billflow
           ? window.billflow.tasks.list()
@@ -1671,6 +1739,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       open: async (id) => requireDesktop().attachments.open(id),
     },
     files: {
+      openDraft: (link) => requireDesktop().files.openDraft(link),
       selectPdfDirectory: async () =>
         requireDesktop().files.selectPdfDirectory(),
       openInvoicePdf: async (id, reveal) =>
@@ -1713,6 +1782,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         bulkImportCatalogItems,
         dashboard,
         settings,
+        backupStatus,
         activeCurrency,
         isLoading,
         isElectron,
@@ -1849,6 +1919,7 @@ export function useInvoices(filter?: { clientId?: string }) {
 export function useSettings() {
   const {
     settings,
+    backupStatus,
     isLoading,
     error,
     updateSettings,
@@ -1861,6 +1932,7 @@ export function useSettings() {
   } = useData();
   return {
     settings,
+    backupStatus,
     isLoading,
     error,
     updateSettings,

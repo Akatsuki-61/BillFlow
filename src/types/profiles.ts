@@ -26,6 +26,7 @@ export interface UserProfile {
   role: ProfileRole;
   subtitle: string;
   avatar: ProfileAvatar;
+  photoData?: string | null;
   accent: AccentPreference;
   themePreference: ThemePreference;
   defaultCurrency: Currency;
@@ -46,6 +47,7 @@ export interface CreateProfileInput {
   role: ProfileRole;
   subtitle?: string;
   avatar?: ProfileAvatar;
+  photoData?: string | null;
   accent?: AccentPreference;
   themePreference?: ThemePreference;
   defaultCurrency?: Currency;
@@ -60,6 +62,7 @@ export interface UpdateProfileInput {
   role?: ProfileRole;
   subtitle?: string;
   avatar?: ProfileAvatar;
+  photoData?: string | null;
   accent?: AccentPreference;
   themePreference?: ThemePreference;
   defaultCurrency?: Currency;

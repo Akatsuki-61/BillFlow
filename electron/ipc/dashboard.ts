@@ -2,7 +2,7 @@ import { ipcMain } from "../security";
 import { getDb } from "../db";
 import { clients, invoices } from "../db/schema";
 import { formatError } from "./errors";
-import { desc } from "drizzle-orm";
+import { desc, isNull } from "drizzle-orm";
 import type { InvoiceWithClient } from "../../src/types/billing";
 import { DashboardSummary } from "../../src/types/billing";
 
@@ -12,6 +12,7 @@ export function getDashboardSummary(): DashboardSummary {
   const allInvoices = db
     .select()
     .from(invoices)
+    .where(isNull(invoices.trashedAt))
     .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
     .all();
 

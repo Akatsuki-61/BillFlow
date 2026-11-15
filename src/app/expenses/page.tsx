@@ -1,5 +1,6 @@
 "use client";
 
+import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
@@ -16,7 +17,7 @@ import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE, listRowTransition } from "@/lib/motion";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, Suspense } from "react";
 import {
   Download,
   Plus,
@@ -120,6 +121,14 @@ const EXPENSE_CATEGORY_OPTIONS: SelectOption[] = [
 ];
 
 export default function ExpensesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ExpensesContent />
+    </Suspense>
+  );
+}
+
+function ExpensesContent() {
   const [selectedCategory, setSelectedCategory] =
     useState<string>("All Categories");
   const [searchQuery, setSearchQuery] = useState("");
@@ -203,6 +212,18 @@ export default function ExpensesPage() {
     }
     setIsLogModalOpen(true);
   };
+
+  const [openedExpenseId, setOpenedExpenseId] = useState<string | null>(null);
+  useWorkspaceCommand("create", () => {
+    openLogExpenseModal();
+    return true;
+  });
+  useWorkspaceCommand("expense", (id) => {
+    if (!allExpenses.some((expense) => expense.id === id)) return false;
+    setOpenedExpenseId(id);
+    setCurrentPage(1);
+    return true;
+  });
 
   const showToast = (msg: string) => {
     setNotification(msg);
@@ -352,6 +373,8 @@ export default function ExpensesPage() {
   };
 
   const searchedExpenses = useMemo(() => {
+    if (openedExpenseId)
+      return allExpenses.filter((expense) => expense.id === openedExpenseId);
     if (!searchQuery.trim()) return expenses;
     const q = searchQuery.toLowerCase().trim();
     return expenses.filter(
@@ -360,7 +383,7 @@ export default function ExpensesPage() {
         (e.description && e.description.toLowerCase().includes(q)) ||
         e.category.toLowerCase().includes(q),
     );
-  }, [expenses, searchQuery]);
+  }, [expenses, searchQuery, openedExpenseId, allExpenses]);
 
   const itemsPerPage = 8;
   const paginatedExpenses = useMemo(() => {
@@ -443,6 +466,18 @@ export default function ExpensesPage() {
           Log Expense
         </Button>
       </PageHeader>
+      {openedExpenseId && (
+        <div className="flex items-center gap-3 text-sm text-content-neutral-800">
+          Showing selected expense
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={() => setOpenedExpenseId(null)}
+          >
+            Show all expenses
+          </Button>
+        </div>
+      )}
 
       {/* =====================================================================
           ZENTRA 3-CARD EXPENSES BENTO HEADER ROW

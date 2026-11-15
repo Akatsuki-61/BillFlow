@@ -1,4 +1,10 @@
 "use client";
+import {
+  openMessageDraft,
+  smsDraft,
+  whatsAppDraft,
+  type WhatsAppTarget,
+} from "@/lib/message-drafts";
 import { profileStorageKey } from "@/lib/profile-scope";
 
 import { useState, useEffect, useRef } from "react";
@@ -33,7 +39,7 @@ import type {
 import { useSettings, useClients, useInvoices } from "@/lib/data/DataProvider";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import {
-  generateInvoiceWhatsAppLink,
+  buildInvoiceWhatsAppMessage,
   generateInvoiceEmailLink,
 } from "@/lib/whatsapp";
 import {
@@ -112,6 +118,7 @@ export default function InvoiceDocumentSheet({
         ? ({
             ...currentSettings,
             ...JSON.parse(invoice.businessSnapshot),
+            signatureData: currentSettings?.signatureData,
           } as typeof currentSettings)
         : currentSettings;
     } catch {
@@ -168,7 +175,9 @@ export default function InvoiceDocumentSheet({
 
   const paidCents =
     invoice.payments && invoice.payments.length > 0
-      ? invoice.payments.reduce((sum, p) => sum + p.amountCents, 0)
+      ? invoice.payments
+          .filter((payment) => !payment.correction)
+          .reduce((sum, p) => sum + p.amountCents, 0)
       : invoice.paidCents || 0;
 
   const balanceDueCents = Math.max(0, invoice.amountCents - paidCents);
@@ -247,6 +256,7 @@ export default function InvoiceDocumentSheet({
               issueDate: invoice.issueDate.slice(0, 10),
               dueDate: invoice.dueDate?.slice(0, 10),
               deliveryUrl: invoice.deliveryUrl,
+              paymentUrl: invoice.paymentUrl,
               notes: invoice.notes,
               status: "DRAFT",
             }
@@ -291,7 +301,7 @@ export default function InvoiceDocumentSheet({
     }
   };
 
-  const handleShareWhatsApp = async () => {
+  const handleShareWhatsApp = async (target: WhatsAppTarget) => {
     setIsShareOpen(false);
     setSavedNotice("Preparing invoice PDF...");
 
@@ -312,9 +322,13 @@ export default function InvoiceDocumentSheet({
       console.warn("Could not auto-reveal exported PDF:", err);
     }
 
-    const link = generateInvoiceWhatsAppLink({
+    const message = buildInvoiceWhatsAppMessage({
       clientName: invoice.clientName,
-      clientPhone: client?.phone,
+      clientPhone:
+        client?.whatsappPhone ||
+        invoice.clientWhatsAppPhone ||
+        client?.phone ||
+        invoice.clientPhone,
       invoiceCode: invoice.code,
       totalFormatted: formatCents(invoice.amountCents, invoice.currency),
       advanceFormatted: invoice.advanceCents
@@ -324,14 +338,46 @@ export default function InvoiceDocumentSheet({
       dueDate: invoice.dueDate ? formatDateDisplay(invoice.dueDate) : null,
       deliveryUrl: delivery.hasLink ? delivery.formattedUrl : null,
       paymentDetails: settings?.paymentDetails,
+      paymentUrl: invoice.paymentUrl,
       businessName,
     });
-    openExternalLink(link);
-    setSavedNotice(
-      pdfExported
-        ? "Invoice PDF ready in Explorer to attach in WhatsApp!"
-        : "WhatsApp opened with invoice message!",
-    );
+    try {
+      await openMessageDraft(
+        whatsAppDraft(
+          client?.whatsappPhone ||
+            invoice.clientWhatsAppPhone ||
+            client?.phone ||
+            invoice.clientPhone,
+          message,
+          target,
+        ),
+      );
+      setSavedNotice(
+        pdfExported ? "PDF ready to attach." : "WhatsApp draft opened.",
+      );
+    } catch (error) {
+      setSavedNotice(
+        error instanceof Error ? error.message : "Could not open WhatsApp.",
+      );
+    }
+    setTimeout(() => setSavedNotice(null), 5000);
+  };
+
+  const handleShareSms = async () => {
+    setIsShareOpen(false);
+    const body = `Hi ${invoice.clientName}, invoice ${invoice.code} has a balance of ${formatCents(balanceDueCents, invoice.currency)}.${invoice.dueDate ? ` Due ${invoice.dueDate.slice(0, 10)}.` : ""}${invoice.paymentUrl ? ` Pay online: ${invoice.paymentUrl}` : ""}`;
+    try {
+      await openMessageDraft(
+        smsDraft(client?.phone || invoice.clientPhone, body),
+      );
+      setSavedNotice("SMS draft opened.");
+    } catch (error) {
+      setSavedNotice(
+        error instanceof Error
+          ? error.message
+          : "Could not open the SMS draft.",
+      );
+    }
     setTimeout(() => setSavedNotice(null), 5000);
   };
 
@@ -368,6 +414,7 @@ export default function InvoiceDocumentSheet({
       dueDate: invoice.dueDate ? formatDateDisplay(invoice.dueDate) : null,
       deliveryUrl: delivery.hasLink ? delivery.formattedUrl : null,
       paymentDetails: settings?.paymentDetails,
+      paymentUrl: invoice.paymentUrl,
       businessName,
     });
     window.open(link);
@@ -667,18 +714,34 @@ export default function InvoiceDocumentSheet({
               >
                 <button
                   type="button"
-                  onClick={handleShareWhatsApp}
+                  onClick={() => void handleShareWhatsApp("desktop")}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-neutral-50 dark:hover:bg-white/10 text-left transition-colors cursor-pointer text-xs font-semibold"
                 >
                   <div className="w-6 h-6 rounded-md bg-[#25D366]/15 text-[#25D366] flex items-center justify-center shrink-0">
                     <MessageSquare className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <div className="font-bold">WhatsApp</div>
+                    <div className="font-bold">WhatsApp Desktop</div>
                     <div className="text-[10px] text-content-neutral-400 font-normal">
                       Share invoice PDF &amp; brief
                     </div>
                   </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleShareWhatsApp("web")}
+                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-surface-neutral-100"
+                >
+                  WhatsApp Web
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleShareSms()}
+                  disabled={!(client?.phone || invoice.clientPhone)}
+                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-surface-neutral-100 disabled:opacity-50"
+                >
+                  SMS draft
                 </button>
 
                 <button

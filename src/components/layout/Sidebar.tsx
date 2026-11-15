@@ -2,13 +2,12 @@
 
 import React, { useState, useRef, useEffect, useMemo, useId, useCallback } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import {
   SPRING_NAV_GLIDE,
   SPRING_LIQUID_BUTTON,
   POPOVER_INITIAL_SCALE,
-  listRowTransition,
 } from "@/lib/motion";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -44,6 +43,8 @@ import {
   PROFILE_ACCENT_STYLES,
   ProfileAvatarTile,
 } from "@/components/profiles/ProfileAvatarTile";
+import { remainingPayout } from "@/lib/cashflow-forecast";
+import { localDateKey } from "@/lib/visual-metrics";
 import { formatCents } from "@/lib/format";
 
 interface NavItem {
@@ -69,10 +70,70 @@ const mainNavItems: NavItem[] = [
   { id: "analytics", name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
 
+const creationCommands = [
+  { title: "New invoice", href: "/invoices?new=1" },
+  { title: "New client", href: "/clients?create=1" },
+  { title: "New task", href: "/tasks?create=1" },
+  { title: "Log expense", href: "/expenses?create=1" },
+  { title: "New catalog item", href: "/catalog?create=1" },
+  { title: "New vendor", href: "/outsourcing?create=vendor" },
+  { title: "New work order", href: "/outsourcing?create=order" },
+].map((command, index) => ({
+  ...command,
+  kind: "Create",
+  shortcut: index + 1,
+}));
+
+const settingsCommands = [
+  {
+    title: "Business profile",
+    tab: "profile",
+    keywords:
+      "name email bank account contact workspace studio phone website address tax id bank wise paypal password pin security",
+  },
+  {
+    title: "Invoice defaults",
+    tab: "invoices",
+    keywords:
+      "payment terms template logo tax currency prefix PDF download folder export save due date notes numbering sequence signature delivery destination",
+  },
+  {
+    title: "Backup & Restore",
+    tab: "data",
+    keywords:
+      "data backup import export storage database restore reset privacy",
+  },
+  {
+    title: "Appearance",
+    tab: "appearance",
+    keywords:
+      "theme accent color dark light display date format typeface fonts density spacing notification placement",
+  },
+];
+
+type SearchResult = {
+  title: string;
+  kind: string;
+  href: string;
+  keywords?: string;
+  shortcut?: number;
+};
+
+const recordLink = (route: string, key: string, id: string) =>
+  `${route}?${key}=${encodeURIComponent(id)}`;
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { invoices, clients, tasks } = useData();
+  const {
+    invoices,
+    clients,
+    tasks,
+    catalogItems,
+    expenses,
+    vendors,
+    workOrders,
+  } = useData();
   const { preference, setPreference } = useTheme();
   const {
     profiles,
@@ -98,6 +159,8 @@ export default function Sidebar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeResult, setActiveResult] = useState(0);
+  const [activityDay, setActivityDay] = useState(localDateKey);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [hoveredNavId, setHoveredNavId] = useState<string | null>(null);
@@ -107,10 +170,11 @@ export default function Sidebar() {
   const profileRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sheenId = useId();
-  const reducedMotion = Boolean(useReducedMotion());
 
   const openSearch = useCallback(() => {
     setSearchFocused(true);
+    setSearchQuery("");
+    setActiveResult(0);
     setSearchOpen(true);
     setNotificationsOpen(false);
     setProfileOpen(false);
@@ -158,6 +222,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
+      if (isGateOpen) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         toggleSearch();
@@ -178,57 +243,210 @@ export default function Sidebar() {
     };
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [searchOpen, notificationsOpen, profileOpen, toggleSearch, closeSearch]);
+  }, [
+    searchOpen,
+    notificationsOpen,
+    profileOpen,
+    toggleSearch,
+    closeSearch,
+    isGateOpen,
+  ]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setActivityDay(localDateKey()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const activeAlerts = useMemo(() => {
+    const dueTasks = tasks.filter(
+      (task) =>
+        task.status !== "done" && task.dueDate?.slice(0, 10) === activityDay,
+    );
     const unpaid = invoices.filter(
-      (inv) =>
-        inv.status === "UNPAID" ||
-        inv.status === "OVERDUE" ||
-        inv.status === "ADVANCE_PAID",
+      (invoice) =>
+        invoice.status !== "DRAFT" && invoice.paidCents < invoice.amountCents,
     );
-    const activeTasks = tasks.filter(
-      (t) => t.status === "in-progress" || t.status === "review",
+    const payouts = workOrders
+      .filter((order) => remainingPayout(order) > 0)
+      .sort((a, b) =>
+        (a.payoutDueDate || "9999").localeCompare(b.payoutDueDate || "9999"),
+      );
+    const inProgress = tasks.filter(
+      (task) =>
+        (task.status === "in-progress" || task.status === "review") &&
+        !dueTasks.includes(task),
     );
-    return {
-      unpaid,
-      activeTasks,
-      totalCount: unpaid.length + activeTasks.length,
-    };
-  }, [invoices, tasks]);
+    return [
+      ...dueTasks.map((task) => ({
+        title: task.title,
+        detail: "Task due today",
+        href: recordLink("/tasks", "task", task.id),
+        amount: "",
+      })),
+      ...payouts.map((order) => ({
+        title: `${order.vendorName || "Vendor"} · ${order.taskTitle || order.scope}`,
+        detail: order.payoutDueDate
+          ? `${order.payoutDueDate < activityDay ? "Overdue payout" : "Payout due"} · ${order.payoutDueDate}`
+          : "Unscheduled payout",
+        href: recordLink("/outsourcing", "order", order.id),
+        amount: `${order.currency} ${formatCents(remainingPayout(order), order.currency)}`,
+      })),
+      ...unpaid.map((invoice) => ({
+        title: `${invoice.code} · ${invoice.clientName}`,
+        detail: invoice.status.replaceAll("_", " "),
+        href: recordLink("/invoices", "record", invoice.id),
+        amount: `${invoice.currency} ${formatCents(invoice.amountCents - invoice.paidCents, invoice.currency)}`,
+      })),
+      ...inProgress.map((task) => ({
+        title: task.title,
+        detail:
+          task.status === "review" ? "Task under review" : "Task in progress",
+        href: recordLink("/tasks", "task", task.id),
+        amount: "",
+      })),
+    ];
+  }, [activityDay, invoices, tasks, workOrders]);
 
+  const searchIndex = useMemo<SearchResult[]>(
+    () => [
+      ...creationCommands,
+      ...mainNavItems.map((page) => ({
+        title: page.name,
+        kind: "Page",
+        href: page.href,
+      })),
+      { title: "Settings", kind: "Page", href: "/settings" },
+      { title: "Support", kind: "Page", href: "/support" },
+      ...settingsCommands.map(({ title, tab, keywords }) => ({
+        title,
+        keywords,
+        kind: "Settings",
+        href: `/settings?section=${tab}`,
+      })),
+      ...invoices.map((i) => ({
+        title: `${i.code} · ${i.clientName}`,
+        kind: "Invoice",
+        href: recordLink("/invoices", "record", i.id),
+        keywords: [
+          i.title,
+          i.clientEmail,
+          i.status,
+          i.currency,
+          ...(i.items ?? []).map((item) => item.description),
+        ].join(" "),
+      })),
+      ...clients.map((c) => ({
+        title: c.name,
+        kind: "Client",
+        href: recordLink("/clients", "record", c.id),
+        keywords: [
+          c.category,
+          c.email,
+          c.contactPerson,
+          c.phone,
+          c.whatsappPhone,
+          c.relationshipNotes,
+          c.billingAddress,
+        ].join(" "),
+      })),
+      ...tasks.map((task) => ({
+        title: task.title,
+        kind: "Task",
+        href: recordLink("/tasks", "task", task.id),
+        keywords: [
+          task.description,
+          task.clientName,
+          task.status,
+          task.category,
+        ].join(" "),
+      })),
+      ...expenses.map((expense) => ({
+        title: expense.merchant || expense.description || "Expense",
+        kind: "Expense",
+        href: recordLink("/expenses", "expense", expense.id),
+        keywords: [
+          expense.description,
+          expense.category,
+          expense.currency,
+        ].join(" "),
+      })),
+      ...catalogItems.map((item) => ({
+        title: item.title,
+        kind: "Catalog item",
+        href: recordLink("/catalog", "item", item.id),
+        keywords: [item.sku, item.category, item.description].join(" "),
+      })),
+      ...vendors.map((vendor) => ({
+        title: vendor.name,
+        kind: "Vendor",
+        href: recordLink("/outsourcing", "vendor", vendor.id),
+        keywords: [vendor.service, vendor.email, vendor.phone].join(" "),
+      })),
+      ...workOrders.map((order) => ({
+        title: `VND-INV-${order.id.slice(-8).toUpperCase()} · ${order.taskTitle || order.scope}`,
+        kind: "Work order",
+        href: recordLink("/outsourcing", "order", order.id),
+        keywords: [
+          order.vendorName,
+          order.scope,
+          order.invoiceCode,
+          order.clientName,
+        ].join(" "),
+      })),
+    ],
+    [invoices, clients, tasks, expenses, catalogItems, vendors, workOrders],
+  );
   const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) {
-      return {
-        pages: mainNavItems.slice(0, 5),
-        invoices: invoices.slice(0, 3),
-        clients: clients.slice(0, 3),
-      };
+    const query = searchQuery.trim().toLowerCase();
+    if (!query)
+      return searchIndex.filter(
+        (entry) => entry.kind === "Create" || entry.kind === "Page",
+      );
+    const tokens = query.split(/\s+/);
+    return searchIndex
+      .filter((entry) => {
+        const text =
+          `${entry.title} ${entry.kind} ${entry.keywords || ""}`.toLowerCase();
+        return tokens.every((token) => text.includes(token));
+      })
+      .sort(
+        (a, b) =>
+          Number(b.title.toLowerCase().includes(query)) -
+          Number(a.title.toLowerCase().includes(query)),
+      )
+      .slice(0, 60);
+  }, [searchIndex, searchQuery]);
+  const selectedResult = Math.min(activeResult, searchResults.length - 1);
+  const activateResult = (entry: SearchResult) => {
+    closeSearch();
+    router.push(entry.href);
+  };
+  const onSearchKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.altKey && /^Digit[1-7]$/.test(event.code)) {
+      event.preventDefault();
+      activateResult(creationCommands[Number(event.code.slice(-1)) - 1]);
+      return;
     }
-    return {
-      pages: [
-        ...mainNavItems,
-        { id: "settings", name: "Settings", href: "/settings", icon: Settings },
-        { id: "support", name: "Support", href: "/support", icon: HelpCircle },
-      ].filter((item) => item.name.toLowerCase().includes(q)),
-      invoices: invoices
-        .filter(
-          (inv) =>
-            inv.code.toLowerCase().includes(q) ||
-            inv.clientName.toLowerCase().includes(q),
-        )
-        .slice(0, 4),
-      clients: clients
-        .filter(
-          (c) =>
-            c.name.toLowerCase().includes(q) ||
-            (c.category || "").toLowerCase().includes(q) ||
-            c.email.toLowerCase().includes(q),
-        )
-        .slice(0, 4),
-    };
-  }, [searchQuery, invoices, clients]);
+    if (event.key === "Enter" && selectedResult >= 0) {
+      event.preventDefault();
+      activateResult(searchResults[selectedResult]);
+    } else if (
+      (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+      searchResults.length
+    ) {
+      event.preventDefault();
+      const next =
+        (selectedResult +
+          (event.key === "ArrowDown" ? 1 : -1) +
+          searchResults.length) %
+        searchResults.length;
+      setActiveResult(next);
+      document
+        .getElementById(`${sheenId}-search-${next}`)
+        ?.scrollIntoView({ block: "nearest" });
+    }
+  };
 
   const dragClass = isGateOpen ? "app-no-drag" : "app-drag-region";
 
@@ -391,10 +609,24 @@ export default function Sidebar() {
                         ref={searchInputRef}
                         type="text"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setActiveResult(0);
+                        }}
+                        onKeyDown={onSearchKey}
+                        role="combobox"
+                        aria-label="Search workspace records and actions"
+                        aria-expanded={searchOpen}
+                        aria-autocomplete="list"
+                        aria-controls={`${sheenId}-search-results`}
+                        aria-activedescendant={
+                          selectedResult >= 0
+                            ? `${sheenId}-search-${selectedResult}`
+                            : undefined
+                        }
                         onFocus={() => setSearchFocused(true)}
                         onBlur={() => setSearchFocused(false)}
-                        placeholder="Jump to page, invoice, or client..."
+                        placeholder="Search records, settings and actions…"
                         style={{
                           paddingLeft:
                             !searchFocused && searchQuery.length === 0
@@ -416,6 +648,7 @@ export default function Sidebar() {
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               setSearchQuery("");
+                              setActiveResult(0);
                               setSearchFocused(true);
                               searchInputRef.current?.focus();
                             }}
@@ -428,120 +661,47 @@ export default function Sidebar() {
                       </AnimatePresence>
                     </div>
 
-                    <div className="mt-2.5 max-h-[300px] overflow-y-auto space-y-2.5 pr-0.5">
-                      {searchResults.pages.length +
-                        searchResults.invoices.length +
-                        searchResults.clients.length ===
-                        0 && (
-                        <p className="summary-caption px-3 py-5 text-center">
-                          No matches. Try an invoice number, client, or page
-                          name.
-                        </p>
-                      )}
-                      {searchResults.pages.length > 0 && (
-                        <div>
-                          <div className="px-2 py-1 text-[11px] font-medium text-content-neutral-400">
-                            Pages
-                          </div>
-                          <div className="space-y-0.5">
-                            {searchResults.pages.map((p, idx) => {
-                              const Icon = p.icon;
-                              return (
-                                <motion.button
-                                  key={p.id}
-                                  type="button"
-                                  initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={listRowTransition(idx, reducedMotion)}
-                                  onClick={() => {
-                                    closeSearch();
-                                    router.push(p.href);
-                                  }}
-                                  className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13px] font-medium text-content-neutral-800 hover:bg-surface-neutral-100 text-left cursor-pointer"
-                                >
-                                  <span className="flex items-center gap-2.5">
-                                    <Icon className="w-4 h-4 text-content-neutral-500" />
-                                    {p.name}
-                                  </span>
-                                  <ArrowUpRight className="w-3.5 h-3.5 text-content-neutral-400" />
-                                </motion.button>
-                              );
-                            })}
-                          </div>
+                    <div
+                      id={`${sheenId}-search-results`}
+                      role="listbox"
+                      aria-label="Workspace search results"
+                      className="mt-2.5 max-h-[325px] overflow-y-auto space-y-1 pr-0.5"
+                    >
+                      {searchResults.map((entry, index) => (
+                        <div
+                          id={`${sheenId}-search-${index}`}
+                          key={entry.href}
+                          role="option"
+                          aria-selected={selectedResult === index}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => activateResult(entry)}
+                          className={`cursor-pointer rounded-lg px-3 py-2 flex items-center gap-2 ${selectedResult === index ? "bg-accent-faint" : "hover:bg-surface-neutral-100"}`}
+                        >
+                          <span className="text-sm text-content-neutral-950 truncate flex-1">
+                            {entry.title}
+                          </span>
+                          <span className="text-xs text-content-neutral-600 shrink-0">
+                            {entry.kind}
+                          </span>
+                          {entry.shortcut && (
+                            <kbd className="text-xs text-content-neutral-600 shrink-0">
+                              Alt+{entry.shortcut}
+                            </kbd>
+                          )}
                         </div>
-                      )}
-
-                      {searchResults.invoices.length > 0 && (
-                        <div>
-                          <div className="px-2 py-1 text-[11px] font-medium text-content-neutral-400">
-                            Invoices
-                          </div>
-                          <div className="space-y-0.5">
-                            {searchResults.invoices.map((inv, idx) => (
-                              <motion.button
-                                key={inv.id}
-                                type="button"
-                                initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={listRowTransition(idx, reducedMotion)}
-                                onClick={() => {
-                                  closeSearch();
-                                  router.push(
-                                    `/invoices?invoice=${encodeURIComponent(inv.id)}`,
-                                  );
-                                }}
-                                className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13px] text-content-neutral-800 hover:bg-surface-neutral-100 text-left cursor-pointer"
-                              >
-                                <div className="min-w-0">
-                                  <span className="font-medium text-content-neutral-900">
-                                    {inv.code}
-                                  </span>
-                                  <span className="text-content-neutral-500 ml-2 truncate">
-                                    {inv.clientName}
-                                  </span>
-                                </div>
-                                <span className="text-xs font-medium tabular-nums text-content-neutral-700 shrink-0 ml-2">
-                                  {formatCents(inv.amountCents, inv.currency)}
-                                </span>
-                              </motion.button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {searchResults.clients.length > 0 && (
-                        <div>
-                          <div className="px-2 py-1 text-[11px] font-medium text-content-neutral-400">
-                            Clients
-                          </div>
-                          <div className="space-y-0.5">
-                            {searchResults.clients.map((client, idx) => (
-                              <motion.button
-                                key={client.id}
-                                type="button"
-                                initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={listRowTransition(idx, reducedMotion)}
-                                onClick={() => {
-                                  closeSearch();
-                                  router.push(
-                                    `/clients?client=${encodeURIComponent(client.id)}`,
-                                  );
-                                }}
-                                className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13px] text-content-neutral-800 hover:bg-surface-neutral-100 text-left cursor-pointer"
-                              >
-                                <span className="font-medium truncate">
-                                  {client.name}
-                                </span>
-                                <span className="text-xs text-content-neutral-400 truncate ml-2">
-                                  {client.category || client.contactPerson}
-                                </span>
-                              </motion.button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      ))}
                     </div>
+                    {!searchResults.length && (
+                      <p
+                        role="status"
+                        className="px-3 py-4 text-sm text-content-neutral-600"
+                      >
+                        No matches found.
+                      </p>
+                    )}
+                    <p className="mt-2 border-t border-line-neutral-100 pt-2 text-xs text-content-neutral-600">
+                      ↑ ↓ Navigate · Enter Open · Esc Close
+                    </p>
                   </MotionSurface>
                 )}
               </MotionPresence>
@@ -552,6 +712,7 @@ export default function Sidebar() {
               <button
                 type="button"
                 onClick={() => {
+                  setActivityDay(localDateKey());
                   setNotificationsOpen((prev) => !prev);
                   closeSearch();
                   setProfileOpen(false);
@@ -563,7 +724,7 @@ export default function Sidebar() {
                 className="relative w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer"
               >
                 <Bell className="w-[17px] h-[17px]" strokeWidth={1.9} />
-                {activeAlerts.totalCount > 0 && (
+                {activeAlerts.length > 0 && (
                   <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-surface" />
                 )}
               </button>
@@ -579,80 +740,40 @@ export default function Sidebar() {
                   >
                     <div className="flex items-center justify-between pb-2.5 border-b border-line-neutral-100">
                       <span className="text-[14px] font-medium text-content-neutral-950">
-                        Workspace Pulse
+                        Activity
                       </span>
                       <span className="zentra-pill-badge !py-0.5 !px-2 !text-[11px]">
-                        {activeAlerts.totalCount} active
+                        {activeAlerts.length} active
                       </span>
                     </div>
 
                     <div className="py-2.5 space-y-2 max-h-[260px] overflow-y-auto">
-                      {activeAlerts.unpaid.slice(0, 3).map((inv, idx) => {
-                        const remaining = Math.max(
-                          0,
-                          inv.amountCents - (inv.paidCents || 0),
-                        );
-                        return (
-                          <motion.button
-                            key={inv.id}
-                            type="button"
-                            initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={listRowTransition(idx, reducedMotion)}
-                            onClick={() => {
-                              setNotificationsOpen(false);
-                              router.push(
-                                `/invoices?invoice=${encodeURIComponent(inv.id)}`,
-                              );
-                            }}
-                            className="w-full flex items-center justify-between p-2.5 rounded-[12px] bg-surface-neutral-50 hover:bg-surface-neutral-100 text-left cursor-pointer"
-                          >
-                            <div className="min-w-0">
-                              <div className="text-[12.5px] font-medium text-content-neutral-900 truncate">
-                                {inv.code} · {inv.clientName}
-                              </div>
-                              <div className="text-[11.5px] text-content-neutral-500">
-                                {inv.status.replace("_", " ")}
-                              </div>
-                            </div>
-                            <span className="text-[12.5px] font-medium tabular-nums text-content-neutral-900 ml-2 shrink-0">
-                              {formatCents(remaining, inv.currency)}
-                            </span>
-                          </motion.button>
-                        );
-                      })}
-
-                      {activeAlerts.activeTasks.slice(0, 2).map((task, idx) => (
-                        <motion.button
-                          key={task.id}
-                          type="button"
-                          initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={listRowTransition(
-                            Math.min(activeAlerts.unpaid.length, 3) + idx,
-                            reducedMotion,
-                          )}
-                          onClick={() => {
-                            setNotificationsOpen(false);
-                            router.push("/tasks");
-                          }}
-                          className="w-full flex items-center justify-between p-2.5 rounded-[12px] bg-surface-neutral-50 hover:bg-surface-neutral-100 text-left cursor-pointer"
+                      {activeAlerts.map((alert) => (
+                        <Link
+                          key={alert.href}
+                          href={alert.href}
+                          onClick={() => setNotificationsOpen(false)}
+                          className="w-full flex items-center justify-between gap-2 p-2.5 rounded-[12px] bg-surface-neutral-50 hover:bg-surface-neutral-100 text-left"
                         >
                           <div className="min-w-0">
-                            <div className="text-[12.5px] font-medium text-content-neutral-900 truncate">
-                              {task.title}
-                            </div>
-                            <div className="text-[11.5px] text-content-neutral-500">
-                              Task {task.status.replace("-", " ")}
-                            </div>
+                            <p className="text-[12.5px] font-medium text-content-neutral-900 truncate">
+                              {alert.title}
+                            </p>
+                            <p className="text-[11.5px] text-content-neutral-600">
+                              {alert.detail}
+                            </p>
                           </div>
-                          <ArrowUpRight className="w-3.5 h-3.5 text-content-neutral-400 shrink-0 ml-2" />
-                        </motion.button>
+                          {alert.amount && (
+                            <span className="text-xs tabular-nums text-content-neutral-900 shrink-0">
+                              {alert.amount}
+                            </span>
+                          )}
+                        </Link>
                       ))}
 
-                      {activeAlerts.totalCount === 0 && (
+                      {activeAlerts.length === 0 && (
                         <div className="py-6 text-center text-[12.5px] text-content-neutral-500">
-                          All invoices settled and tasks up to date.
+                          No workspace alerts.
                         </div>
                       )}
                     </div>
@@ -764,10 +885,21 @@ export default function Sidebar() {
                       </linearGradient>
                     </defs>
                   </svg>
-                  <ActiveProfileIcon
-                    className="w-[16px] h-[16px] relative z-10 transition-transform duration-200 group-hover:scale-110"
-                    strokeWidth={2.1}
-                  />
+                  {activeProfile.photoData ? (
+                    <Image
+                      unoptimized
+                      src={activeProfile.photoData}
+                      alt=""
+                      fill
+                      sizes="40px"
+                      className="relative z-10 object-cover"
+                    />
+                  ) : (
+                    <ActiveProfileIcon
+                      className="w-4 h-4 relative z-10"
+                      strokeWidth={2.1}
+                    />
+                  )}
                 </span>
 
                 {/* Profile status / lock badge */}
@@ -798,6 +930,7 @@ export default function Sidebar() {
                     <div className="px-2 py-2 border-b border-line-neutral-100 flex items-center gap-3">
                       <ProfileAvatarTile
                         avatar={activeProfile.avatar}
+                        photoData={activeProfile.photoData}
                         accent={activeProfile.accent}
                         size="sm"
                         hasPassword={activeProfile.hasPassword}

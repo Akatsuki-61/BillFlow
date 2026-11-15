@@ -15,7 +15,45 @@ const timestamp = z
   .max(40)
   .refine((v) => Number.isFinite(Date.parse(v)), "Use a valid payment date");
 
+export const imageDataSchema = z
+  .string()
+  .max(700_000)
+  .regex(
+    /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
+    "Choose a PNG, JPEG, or WebP image.",
+  )
+  .nullable()
+  .optional();
+export const onlinePaymentUrl = z
+  .url({
+    protocol: /^https$/,
+    hostname: /^.+$/,
+  })
+  .max(2048)
+  .refine((value) => {
+    const url = new URL(value);
+    return !url.username && !url.password;
+  }, "Use an HTTPS link without credentials.")
+  .nullable()
+  .optional();
+export const invoiceWorkflowStage = z.enum([
+  "SENT",
+  "WORK_CONFIRMED",
+  "DELIVERED",
+]);
+const clientContactFields = {
+  whatsappPhone: z.string().trim().max(40).nullable().optional(),
+  relationshipNotes: z.string().trim().max(4000).nullable().optional(),
+  billingAddress: z.string().trim().max(1000).nullable().optional(),
+  photoData: imageDataSchema,
+};
+const vendorContactFields = {
+  billingAddress: clientContactFields.billingAddress,
+  photoData: imageDataSchema,
+};
+
 export const newClientSchema = z.object({
+  ...clientContactFields,
   name: z
     .string()
     .trim()
@@ -42,6 +80,7 @@ export const newClientSchema = z.object({
 });
 
 export const clientPatchSchema = z.object({
+  ...clientContactFields,
   name: z
     .string()
     .trim()
@@ -81,6 +120,8 @@ export const newInvoiceItemSchema = z.object({
 
 export const newInvoiceSchema = z
   .object({
+    paymentUrl: onlinePaymentUrl,
+    workflowStage: invoiceWorkflowStage.nullable().optional(),
     clientId: z.string().min(1).optional(),
     newClient: newClientSchema.optional(),
     saveAsPermanentClient: z.boolean().optional().default(true),
@@ -116,6 +157,8 @@ export const promoteInvoiceClientSchema = z.object({
 });
 
 export const invoicePatchSchema = z.object({
+  paymentUrl: onlinePaymentUrl,
+  workflowStage: invoiceWorkflowStage.nullable().optional(),
   code: z.string().trim().min(1).max(40).optional(),
   clientId: z.string().min(1).optional(),
   catalogItemId: z.string().trim().nullable().optional(),
@@ -183,6 +226,17 @@ export const catalogItemPatchSchema = z.object({
 });
 
 export const updateSettingsSchema = z.object({
+  defaultDeliveryUrl: deliveryLink,
+  signatureData: imageDataSchema,
+  notificationPlacement: z
+    .enum(["top-left", "top-right", "bottom-left", "bottom-right"])
+    .nullable()
+    .optional(),
+  typeface: z.enum(["inter", "nunito", "jakarta"]).nullable().optional(),
+  layoutDensity: z
+    .enum(["compact", "comfortable", "spacious"])
+    .nullable()
+    .optional(),
   businessName: z.string().trim().max(120).optional(),
   professionalTitle: z.string().trim().max(120).nullable().optional(),
   email: z
@@ -228,6 +282,7 @@ export const updateSettingsSchema = z.object({
 });
 
 export const newVendorSchema = z.object({
+  ...vendorContactFields,
   name: z
     .string()
     .trim()
@@ -267,6 +322,7 @@ export const newVendorSchema = z.object({
 });
 
 export const vendorPatchSchema = z.object({
+  ...vendorContactFields,
   name: z.string().trim().min(1).max(120).optional(),
   service: z.string().trim().min(1).max(160).optional(),
   balanceCents: minorAmount.optional(),
@@ -319,29 +375,66 @@ export const expensePatchSchema = z.object({
  * Validates relational foreign key links (vendor, task, invoice),
  * non-negative contractor fee in minor currency units, and optional delivery links.
  */
-export const newWorkOrderSchema = z.object({
-  id: z.string().optional(),
-  vendorId: z.string().trim().min(1, "Vendor ID is required"),
-  taskId: z.string().trim().min(1, "Task ID is required"),
-  invoiceId: z.string().trim().min(1, "Invoice ID is required"),
-  scope: z.string().trim().min(1, "Scope description cannot be blank").max(500),
-  feeCents: minorAmount,
-  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("LKR"),
-  dueDate: z.string().trim().max(60).nullable().optional(),
-  status: z.enum(["todo", "in-progress", "review", "done"]).default("todo"),
-  deliveryUrl: deliveryLink,
-  notes: z.string().trim().max(2000).nullable().optional(),
+export const payableItemSchema = newInvoiceItemSchema.pick({
+  description: true,
+  quantity: true,
+  unitPriceCents: true,
 });
+export const payableVendorSchema = z.object({
+  name: z.string().trim().min(1, "Enter a vendor name.").max(120),
+  service: z.string().trim().max(160).nullable().optional(),
+  email: z.string().trim().max(120).email().nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  billingAddress: clientContactFields.billingAddress,
+});
+const payableFields = {
+  items: z.array(payableItemSchema).min(1).max(500).nullable().optional(),
+  discountCents: minorAmount.optional(),
+  paypalUrl: onlinePaymentUrl,
+  stripeUrl: onlinePaymentUrl,
+};
+export const newWorkOrderSchema = z
+  .object({
+    id: z.string().optional(),
+    ...payableFields,
+    vendorId: z.string().trim().min(1).nullable().optional(),
+    vendorSnapshot: payableVendorSchema.nullable().optional(),
+    taskId: z.string().trim().min(1).nullable().optional(),
+    invoiceId: z.string().trim().min(1).nullable().optional(),
+    scope: z
+      .string()
+      .trim()
+      .min(1, "Scope description cannot be blank")
+      .max(500),
+    feeCents: minorAmount,
+    currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("LKR"),
+    dueDate: z.string().trim().max(60).nullable().optional(),
+    payoutDueDate: invoiceDate.nullable().optional(),
+    status: z.enum(["todo", "in-progress", "review", "done"]).default("todo"),
+    deliveryUrl: deliveryLink,
+    notes: z.string().trim().max(2000).nullable().optional(),
+  })
+  .refine(
+    (value) => Boolean(value.vendorId) !== Boolean(value.vendorSnapshot),
+    "Choose a directory vendor or enter a one-time vendor.",
+  )
+  .refine(
+    (value) => Boolean(value.taskId) === Boolean(value.invoiceId),
+    "Linked work orders require a task and its invoice.",
+  );
 
 /**
  * Validation schema for partial updates to an existing work order.
  */
 export const workOrderPatchSchema = z.object({
+  vendorSnapshot: payableVendorSchema.optional(),
+  ...payableFields,
   vendorId: z.string().trim().min(1).optional(),
   scope: z.string().trim().min(1).max(500).optional(),
   feeCents: minorAmount.optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
   dueDate: z.string().trim().max(60).nullable().optional(),
+  payoutDueDate: invoiceDate.nullable().optional(),
   status: z.enum(["todo", "in-progress", "review", "done"]).optional(),
   deliveryUrl: deliveryLink,
   notes: z.string().trim().max(2000).nullable().optional(),
@@ -367,13 +460,12 @@ export const reviewWorkOrderSchema = z.object({
  */
 export const recordWorkOrderPayoutSchema = z.object({
   workOrderId: z.string().trim().min(1, "Work order ID is required"),
-  amountCents: z
-    .number()
-    .int()
-    .positive("Payout amount must be positive")
+  amountCents: minorAmount
+    .refine((n) => n > 0, "Payout amount must be positive")
     .optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
-  paidAt: z.string().trim().optional(),
+  paidAt: timestamp.optional(),
+  requestId: z.string().uuid().optional(),
 });
 
 /**

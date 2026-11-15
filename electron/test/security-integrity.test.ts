@@ -1,3 +1,4 @@
+import { compareBoardTasks } from "../../src/lib/task-order";
 import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import fs from "fs";
 import os from "os";
@@ -24,6 +25,11 @@ import {
   createInvoice,
   recordPayment,
   removeInvoice,
+  setInvoiceTrash,
+  setInvoiceStatuses,
+  listInvoicesWithClient,
+  listPayments,
+  correctPayment,
   registerInvoiceHandlers,
   exportInvoicePdf,
   buildInvoicePdfPayloadAndBuffer,
@@ -33,12 +39,16 @@ import {
   listTasks,
   updateTask,
   getTaskHistory,
+  reorderTask,
+  deleteTasks,
+  undoTaskDeletion,
 } from "../ipc/tasks";
 import {
   createWorkOrder,
   recordWorkOrderPayout,
   reviewWorkOrder,
   removeWorkOrder,
+  removeWorkOrderPayout,
   updateWorkOrder,
 } from "../ipc/workOrders";
 import {
@@ -47,7 +57,11 @@ import {
   switchProfile,
   verifyProfilePassword,
 } from "../ipc/profiles";
-import { updateSettings, registerSettingsHandlers } from "../ipc/settings";
+import {
+  getOrCreateSettings,
+  updateSettings,
+  registerSettingsHandlers,
+} from "../ipc/settings";
 import {
   registerFileHandlers,
   copyReceipt,
@@ -62,6 +76,7 @@ import {
 } from "../ipc/calendar";
 import {
   exportWorkspace,
+  resetWorkspace,
   importWorkspace,
   assertBackupBudget,
 } from "../backup";
@@ -319,7 +334,7 @@ it("rejects cross-client, incomplete, duplicate and already-billed task imports"
   invoice("a", { items });
   expect(() => invoice("a", { items })).toThrow(/unbilled/);
 });
-it("preserves task IDs, timing and history when deleting an unpaid invoice", () => {
+it("preserves task IDs, timing and history when trashing and restoring an unpaid invoice", () => {
   client();
   const t = task();
   const inv = invoice("a", {
@@ -335,13 +350,100 @@ it("preserves task IDs, timing and history when deleting an unpaid invoice", () 
   removeInvoice(inv.id);
   expect(listTasks()[0]).toMatchObject({
     id: t.id,
-    invoiceId: null,
-    invoiceItemId: null,
+    invoiceId: inv.id,
+    invoiceItemId: inv.items![0].id,
     status: "done",
   });
+  expect(listInvoicesWithClient()).toEqual([]);
+  expect(listInvoicesWithClient(undefined, true)).toMatchObject([
+    { id: inv.id },
+  ]);
+  setInvoiceTrash([inv.id], false);
+  expect(listInvoicesWithClient()).toMatchObject([
+    { id: inv.id, trashedAt: null },
+  ]);
   expect(getTaskHistory(t.id)).toHaveLength(1);
   expect(() => importWorkspace(exportWorkspace())).not.toThrow();
 });
+it("preserves payment receipts and recalculates collections after a correction and reversal", () => {
+  client();
+  const inv = invoice("a", { advanceCents: 5000 });
+  const { payment } = recordPayment({
+    invoiceId: inv.id,
+    amountCents: 10000,
+    receivedAt: "2026-10-02",
+  });
+  const source = path.join(dir, "transfer.pdf");
+  fs.writeFileSync(source, "%PDF-1.4 fixture");
+  copyReceipt(
+    { type: "payment", id: payment.id },
+    source,
+    "correction-fixture",
+  );
+  const corrected = correctPayment({
+    invoiceId: inv.id,
+    paymentId: payment.id,
+    reason: "Transposed amount",
+    replacement: {
+      amountCents: 3500,
+      receivedAt: "2026-11-02",
+      reference: "Correct reference",
+    },
+  });
+  expect(corrected).toMatchObject({ paidCents: 3500 });
+  const history = listPayments(inv.id);
+  expect(history[0]).toMatchObject({
+    id: payment.id,
+    amountCents: 10000,
+    correction: {
+      reason: "Transposed amount",
+      replacementPaymentId: history[1].id,
+    },
+  });
+  expect(getAnalyticsSummary("all", "USD", "cash").paidCents).toBe(3500);
+  expect(() =>
+    correctPayment({
+      invoiceId: inv.id,
+      paymentId: payment.id,
+      reason: "Duplicate",
+    }),
+  ).toThrow(/already/);
+  expect(
+    correctPayment({
+      invoiceId: inv.id,
+      paymentId: history[1].id,
+      reason: "Duplicate transfer",
+    }).paidCents,
+  ).toBe(0);
+  expect(() => removeInvoice(inv.id)).toThrow(/recorded payments/);
+  const backup = exportWorkspace();
+  expect(backup.records?.invoice_payment_corrections).toHaveLength(2);
+  expect(backup.records?.attachments).toMatchObject([
+    { payment_id: payment.id },
+  ]);
+  expect(() => importWorkspace(backup)).not.toThrow();
+  expect(getAnalyticsSummary("all", "USD", "cash").paidCents).toBe(0);
+});
+
+it("rolls back a multi-invoice trash action if any selected invoice is protected", () => {
+  client();
+  const eligible = invoice();
+  const protectedInvoice = invoice();
+  recordPayment({ invoiceId: protectedInvoice.id, amountCents: 1 });
+  expect(() =>
+    setInvoiceTrash([eligible.id, protectedInvoice.id], true),
+  ).toThrow(/recorded payments/);
+  expect(listInvoicesWithClient(undefined, true)).toEqual([]);
+  setInvoiceTrash([eligible.id], true);
+  expect(getAnalyticsSummary("all", "USD").totalRevenueCents).toBe(
+    protectedInvoice.amountCents,
+  );
+  expect(() => importWorkspace(exportWorkspace())).not.toThrow();
+  expect(listInvoicesWithClient(undefined, true)).toMatchObject([
+    { id: eligible.id },
+  ]);
+});
+
 it("edits stable invoice items and prevents currency changes after settlement", async () => {
   client();
   const t = task();
@@ -425,7 +527,7 @@ it("closes timers and records history when reviewing outsourced work", () => {
   const wo = order("in-progress");
   reviewWorkOrder({ workOrderId: wo.id, status: "done", updateTask: true });
   expect(listTasks()[0].activeSince).toBeNull();
-  expect(getTaskHistory(wo.taskId).at(-1)?.toStatus).toBe("done");
+  expect(getTaskHistory(wo.taskId!).at(-1)?.toStatus).toBe("done");
   expect(() => importWorkspace(exportWorkspace())).not.toThrow();
 });
 it("validates payout currency and protects paid voucher history", () => {
@@ -437,26 +539,48 @@ it("validates payout currency and protects paid voucher history", () => {
       currency: "EUR",
     }),
   ).toThrow(/currency/);
-  recordWorkOrderPayout({ workOrderId: wo.id, amountCents: 1500 });
-  recordWorkOrderPayout({ workOrderId: wo.id });
+  const requestId = randomUUID();
+  const first = recordWorkOrderPayout({
+    workOrderId: wo.id,
+    amountCents: 1500,
+    requestId,
+  });
+  expect(first).toMatchObject({
+    payoutStatus: "PENDING",
+    remainingPayoutCents: 1500,
+  });
   expect(
-    getSqlite()
-      .prepare(
-        "SELECT amount_cents FROM vendor_payouts WHERE voided_at IS NULL",
-      )
-      .get(),
-  ).toEqual({ amount_cents: 1500 });
-  recordWorkOrderPayout({ workOrderId: wo.id, amountCents: 1200 });
+    recordWorkOrderPayout({ workOrderId: wo.id, amountCents: 1500, requestId })
+      .payouts,
+  ).toHaveLength(1);
+  expect(() =>
+    recordWorkOrderPayout({ workOrderId: wo.id, amountCents: 1501 }),
+  ).toThrow(/remaining/);
+  const partial = recordWorkOrderPayout({
+    workOrderId: wo.id,
+    amountCents: 1200,
+  });
+  expect(partial).toMatchObject({
+    payoutAmountCents: 2700,
+    remainingPayoutCents: 300,
+    payoutStatus: "PENDING",
+  });
+  const settled = recordWorkOrderPayout({ workOrderId: wo.id });
+  expect(settled).toMatchObject({
+    payoutAmountCents: 3000,
+    remainingPayoutCents: 0,
+    payoutStatus: "PAID",
+  });
+  expect(settled.payouts).toHaveLength(3);
+  const reopened = removeWorkOrderPayout(wo.id, undefined, requestId);
+  expect(reopened).toMatchObject({
+    payoutAmountCents: 1500,
+    remainingPayoutCents: 1500,
+    payoutStatus: "PENDING",
+  });
   expect(
-    getSqlite()
-      .prepare(
-        "SELECT amount_cents, voided_at FROM vendor_payouts ORDER BY amount_cents DESC",
-      )
-      .all(),
-  ).toEqual([
-    { amount_cents: 1500, voided_at: expect.any(String) },
-    { amount_cents: 1200, voided_at: null },
-  ]);
+    reopened.payouts?.find((payout) => payout.id === requestId)?.voidedAt,
+  ).toBeTruthy();
   expect(() => importWorkspace(exportWorkspace())).not.toThrow();
   expect(() => updateWorkOrder(wo.id, { currency: "EUR" })).toThrow(/currency/);
   expect(() => removeWorkOrder(wo.id)).toThrow(/payout history/);
@@ -767,4 +891,161 @@ it("falls back safely when legacy invoice snapshots contain invalid JSON", async
 
   const built = await buildInvoicePdfPayloadAndBuffer(inv.id);
   expect(built.invoice.code).toBe(inv.code);
+});
+
+it("applies bulk invoice settlement atomically and keeps independent workflow stages", () => {
+  client();
+  updateSettings({ defaultDeliveryUrl: "https://example.invalid/deliveries" });
+  const first = invoice("a", {
+    workflowStage: "SENT",
+    paymentUrl: "https://example.invalid/pay",
+  });
+  const second = invoice();
+  setInvoiceStatuses([first.id, second.id], "OVERDUE");
+  expect(listInvoicesWithClient().map((item) => item.status)).toEqual([
+    "OVERDUE",
+    "OVERDUE",
+  ]);
+  expect(() => setInvoiceStatuses([first.id, "missing"], "PAID")).toThrow();
+  expect(listPayments(first.id)).toEqual([]);
+  setInvoiceStatuses([first.id, second.id], "PAID");
+  expect(
+    listInvoicesWithClient().find((item) => item.id === first.id),
+  ).toMatchObject({
+    paidCents: 10000,
+    workflowStage: "SENT",
+    paymentUrl: "https://example.invalid/pay",
+    deliveryUrl: "https://example.invalid/deliveries",
+  });
+});
+
+it("tracks average time to full payment and average billed per invoiced client", () => {
+  client("a");
+  client("b");
+  client("no-invoices");
+  const first = invoice("a", { issueDate: "2026-10-01" });
+  const second = invoice("a", { issueDate: "2026-10-04" });
+  invoice("b", { issueDate: "2026-10-06" });
+  recordPayment({
+    invoiceId: first.id,
+    receivedAt: "2026-10-03",
+    amountCents: 1000,
+  });
+  recordPayment({
+    invoiceId: first.id,
+    receivedAt: "2026-10-06",
+    amountCents: 9000,
+  });
+  recordPayment({
+    invoiceId: second.id,
+    receivedAt: "2026-10-11",
+    amountCents: 10000,
+  });
+  expect(
+    listClientsWithStats().find((row) => row.id === "a")?.averagePaymentDays,
+  ).toBe(6);
+  expect(
+    listClientsWithStats().find((row) => row.id === "b")?.averagePaymentDays,
+  ).toBeNull();
+  expect(getAnalyticsSummary("all", "USD")).toMatchObject({
+    billedClientCount: 2,
+    averageBilledPerClientCents: 15000,
+  });
+});
+
+it("calculates an itemized standalone payable, keeps its one-time vendor and protects paid amounts", () => {
+  const payable = createWorkOrder({
+    vendorSnapshot: {
+      name: "One-time supplier",
+      billingAddress: "1 Main Street",
+    },
+    scope: "Studio supplies",
+    items: [{ description: "USB drives", quantity: 4, unitPriceCents: 500 }],
+    discountCents: 200,
+    feeCents: 1,
+    currency: "USD",
+    paypalUrl: "https://www.paypal.com/pay",
+    stripeUrl: "https://buy.stripe.com/qa",
+  });
+  expect(payable).toMatchObject({
+    vendorId: null,
+    invoiceId: null,
+    taskId: null,
+    vendorName: "One-time supplier",
+    feeCents: 1800,
+    remainingPayoutCents: 1800,
+    vendorBillingAddress: "1 Main Street",
+  });
+  recordWorkOrderPayout({ workOrderId: payable.id, amountCents: 1000 });
+  expect(() => updateWorkOrder(payable.id, { discountCents: 1500 })).toThrow(
+    /lower than/,
+  );
+  expect(getAnalyticsSummary("all", "USD")).toMatchObject({
+    committedCostCents: 1800,
+    paidCostCents: 1000,
+  });
+  expect(getDb().select().from(vendors).all()).toEqual([]);
+  expect(() => importWorkspace(exportWorkspace())).not.toThrow();
+});
+
+it("persists manual card order and restores a batch of deleted cards", () => {
+  client();
+  const first = task("first", "a", "in-progress");
+  const second = task("second", "a", "in-progress");
+  const third = task("third", "a", "todo");
+  reorderTask(second.id, first.id, "before");
+  expect(
+    listTasks()
+      .filter((row) => row.status === "in-progress")
+      .sort(compareBoardTasks)
+      .map((row) => row.id),
+  ).toEqual([second.id, first.id]);
+  expect(() => reorderTask(second.id, third.id, "before")).toThrow(
+    /same column/,
+  );
+  const { token, deleted } = deleteTasks([first.id, second.id, first.id]);
+  expect(deleted).toBe(2);
+  expect(listTasks().map((row) => row.id)).toEqual([third.id]);
+  expect(undoTaskDeletion(token).restored).toBe(2);
+  const ordered = listTasks()
+    .filter((row) => row.status === "in-progress")
+    .sort(compareBoardTasks);
+  expect(ordered.map((row) => row.id)).toEqual([second.id, first.id]);
+  expect(ordered.every((row) => row.activeSince)).toBe(true);
+  expect(undoTaskDeletion(token).restored).toBe(0);
+});
+
+it("merges disjoint records, skips identical rows and rolls back conflicts", () => {
+  client();
+  const first = invoice();
+  recordPayment({ invoiceId: first.id, amountCents: 5000 });
+  const backup = exportWorkspace();
+  resetWorkspace();
+  updateSettings({ businessName: "Destination Workspace" });
+  client("existing");
+  expect(importWorkspace(backup, "merge")).toMatchObject({
+    importedClients: 1,
+    importedInvoices: 1,
+    skipped: 0,
+  });
+  expect(importWorkspace(backup, "merge")).toMatchObject({
+    importedClients: 0,
+    importedInvoices: 0,
+    skipped: 4,
+  });
+  expect(getOrCreateSettings().businessName).toBe("Destination Workspace");
+  expect(listPayments(first.id)).toHaveLength(1);
+  const conflicting = structuredClone(backup);
+  const records = conflicting.records!;
+  records.clients[0].name = "Conflicting source";
+  records.clients.unshift({ ...records.clients[0], id: "new" });
+  conflicting.clients.push({ id: "new" });
+  expect(() => importWorkspace(conflicting, "merge")).toThrow(
+    /conflict in clients/,
+  );
+  expect(
+    listClientsWithStats()
+      .map((row) => row.id)
+      .sort(),
+  ).toEqual(["a", "existing"]);
 });

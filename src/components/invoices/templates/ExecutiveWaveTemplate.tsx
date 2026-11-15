@@ -1,5 +1,6 @@
 "use client";
 
+import { InvoiceSupplement } from "./InvoiceSupplement";
 import { ExternalLink } from "lucide-react";
 import type { InvoiceTemplateProps } from "./types";
 
@@ -24,7 +25,9 @@ export function ExecutiveWaveTemplate({
 
   const paidCents =
     invoice.payments && invoice.payments.length > 0
-      ? invoice.payments.reduce((sum, p) => sum + p.amountCents, 0)
+      ? invoice.payments
+          .filter((payment) => !payment.correction)
+          .reduce((sum, p) => sum + p.amountCents, 0)
       : invoice.paidCents || 0;
 
   const balanceDueCents = Math.max(0, invoice.amountCents - paidCents);
@@ -339,6 +342,11 @@ export function ExecutiveWaveTemplate({
           </div>
         </div>
 
+        <InvoiceSupplement
+          invoice={invoice}
+          client={client}
+          settings={settings}
+        />
         {/* Footer */}
         <div className="mt-auto pt-4 border-t border-slate-200">
           <div className="max-w-xl">

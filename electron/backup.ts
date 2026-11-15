@@ -9,7 +9,16 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import { createHash } from "crypto";
 import { getTableColumns } from "drizzle-orm";
-import { newCalendarEventSchema, updateSettingsSchema } from "./validation";
+import {
+  imageDataSchema,
+  invoiceWorkflowStage,
+  onlinePaymentUrl,
+  payableItemSchema,
+  payableVendorSchema,
+  newCalendarEventSchema,
+  updateSettingsSchema,
+} from "./validation";
+import { payableAmount } from "../src/lib/payable-math";
 import { z } from "zod";
 import { getDb, getSqlite, migrateDatabase } from "./db";
 import { assertWorkspaceIntegrity } from "./db/integrity";
@@ -45,6 +54,7 @@ export const backupTables = [
   "invoices",
   "invoice_items",
   "invoice_payments",
+  "invoice_payment_corrections",
   "tasks",
   "calendar_events",
   "subtasks",
@@ -202,8 +212,28 @@ function validateRows(database: Database.Database, table: string, rows: Row[]) {
       )
         throw new Error(`Invalid timestamp ${table}.${field}`);
     }
+    if ("photo_data" in row) imageDataSchema.parse(row.photo_data);
+    if (table === "work_orders") {
+      onlinePaymentUrl.parse(row.paypal_url);
+      onlinePaymentUrl.parse(row.stripe_url);
+      if (row.vendor_snapshot !== undefined && row.vendor_snapshot !== null)
+        payableVendorSchema.parse(JSON.parse(String(row.vendor_snapshot)));
+      if (row.items !== undefined && row.items !== null) {
+        const items = z
+          .array(payableItemSchema)
+          .min(1)
+          .max(500)
+          .parse(JSON.parse(String(row.items)));
+        if (payableAmount(items, Number(row.discount_cents)) !== row.fee_cents)
+          throw new Error("An itemized payable has an inconsistent total.");
+      } else if (row.discount_cents) {
+        throw new Error("A payable discount requires line items.");
+      }
+    }
     if (row.delivery_url) deliveryLink.parse(row.delivery_url);
     if (table === "invoices") {
+      invoiceWorkflowStage.nullable().optional().parse(row.workflow_stage);
+      onlinePaymentUrl.parse(row.payment_url);
       z.enum(["DRAFT", "UNPAID", "PAID", "OVERDUE", "ADVANCE_PAID"]).parse(
         row.status,
       );
@@ -324,14 +354,68 @@ export function assertBackupBudget(input: ExportDataPayload) {
     throw new Error("Backup exceeds the 150 MiB restore limit.");
 }
 
-export function importWorkspace(input: ExportDataPayload) {
+const newerFields: Partial<Record<(typeof backupTables)[number], Row>> = {
+  clients: {
+    whatsapp_phone: null,
+    relationship_notes: null,
+    billing_address: null,
+    photo_data: null,
+  },
+  vendors: { billing_address: null, photo_data: null },
+  invoices: { payment_url: null, workflow_stage: null },
+  settings: {
+    default_delivery_url: null,
+    signature_data: null,
+    notification_placement: null,
+    typeface: null,
+    layout_density: null,
+  },
+  tasks: {
+    board_position: null,
+    deletion_token: null,
+    deleted_event_ids: null,
+  },
+  work_orders: {
+    created_at: null,
+    items: null,
+    vendor_snapshot: null,
+    discount_cents: 0,
+    paypal_url: null,
+    stripe_url: null,
+  },
+};
+
+export function importWorkspace(
+  input: ExportDataPayload,
+  mode: "replace" | "merge" = "replace",
+) {
   if (input?.version !== "2")
     throw new Error(
       "This backup predates complete workflow backups. Use the previous app version to restore it, then export a version 2 backup.",
     );
   assertBackupBudget(input);
   const payload = backupSchema.parse(input);
+  for (const table of backupTables)
+    for (const row of payload.records[table] ?? [])
+      for (const [column, fallback] of Object.entries(newerFields[table] ?? {}))
+        if (!(column in row)) row[column] = fallback;
   // Backups from before the calendar feature have no events.
+  payload.records.invoice_payment_corrections ??= [];
+  for (const row of payload.records.invoices || []) row.trashed_at ??= null;
+  const legacyVendorDates = new Map(
+    (payload.records.vendors ?? []).map((row) => [row.id, row.payout_due_date]),
+  );
+  for (const row of payload.records.work_orders ?? []) {
+    if ("payout_due_date" in row) continue;
+    const date = String(legacyVendorDates.get(row.vendor_id) ?? "").slice(
+      0,
+      10,
+    );
+    row.payout_due_date =
+      /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date))
+        ? date
+        : null;
+  }
   payload.records.calendar_events ??= [];
   payload.records.task_time_slots ??= [];
   payload.records.work_order_pdf_exports ??= [];
@@ -477,6 +561,9 @@ export function importWorkspace(input: ExportDataPayload) {
     sandbox.close();
   }
 
+  let importedClients = 0;
+  let importedInvoices = 0;
+  let skipped = 0;
   const created: string[] = [];
   try {
     // Content-addressed files are immutable: publish new files before committing their metadata.
@@ -487,10 +574,52 @@ export function importWorkspace(input: ExportDataPayload) {
     }
     const sqlite = getSqlite();
     sqlite.transaction(() => {
-      for (const table of [...backupTables].reverse())
-        sqlite.prepare(`DELETE FROM "${table}"`).run();
-      for (const table of backupTables)
-        insertRows(sqlite, table, payload.records[table]);
+      if (mode === "replace") {
+        for (const table of [...backupTables].reverse())
+          sqlite.prepare(`DELETE FROM "${table}"`).run();
+      }
+      for (const table of backupTables) {
+        if (mode === "merge" && table === "settings") continue;
+        let rows = payload.records[table];
+        if (mode === "merge" && rows.length) {
+          const key = (
+            sqlite.prepare(`PRAGMA table_info("${table}")`).all() as Array<{
+              name: string;
+              pk: number;
+            }>
+          ).find((column) => column.pk === 1)!.name;
+          const lookup = sqlite.prepare(
+            `SELECT * FROM "${table}" WHERE "${key}" = ?`,
+          );
+          rows = rows.filter((row) => {
+            const identity = row[key];
+            const existing = lookup.get(identity) as Row | undefined;
+            if (!existing) return true;
+            if (
+              Object.entries(row).some(
+                ([column, value]) => existing[column] !== value,
+              )
+            )
+              throw new Error(
+                `Backup merge conflict in ${table} for record ${identity}.`,
+              );
+            skipped++;
+            return false;
+          });
+        }
+        try {
+          insertRows(sqlite, table, rows);
+        } catch (error) {
+          if (mode !== "merge") throw error;
+          throw new Error(
+            `Could not merge ${table}. Check for duplicate invoice codes, catalog SKUs, or linked records.`,
+            { cause: error },
+          );
+        }
+        if (table === "clients") importedClients = rows.length;
+        if (table === "invoices") importedInvoices = rows.length;
+      }
+      assertWorkspaceIntegrity(sqlite);
     })();
   } catch (error) {
     for (const file of created) fs.rmSync(file, { force: true });
@@ -499,8 +628,9 @@ export function importWorkspace(input: ExportDataPayload) {
   reclaimUnreferencedReceipts();
   return {
     success: true,
-    importedClients: payload.records.clients.length,
-    importedInvoices: payload.records.invoices.length,
+    importedClients,
+    importedInvoices,
+    ...(mode === "merge" && { skipped }),
   };
 }
 

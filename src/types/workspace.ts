@@ -4,7 +4,7 @@ import type {
   DashboardSummary,
   CatalogItem,
 } from "./billing";
-import type { AppSettings } from "./settings";
+import type { AppSettings, BackupStatus } from "./settings";
 import type { VendorItem, WorkOrderItem } from "./outsourcing";
 import type { ExpenseItem } from "./expenses";
 import type { TaskItem } from "./tasks";
@@ -22,6 +22,7 @@ export const WORKSPACE_DATASETS = [
   "expenses",
   "workOrders",
   "events",
+  "backupStatus",
 ] as const;
 export type WorkspaceDataset = (typeof WORKSPACE_DATASETS)[number];
 export interface WorkspaceSnapshot {
@@ -38,6 +39,7 @@ export interface WorkspaceSnapshot {
   expenses?: ExpenseItem[];
   workOrders?: WorkOrderItem[];
   events?: CalendarEventItem[];
+  backupStatus?: BackupStatus;
 }
 export interface WorkspaceChange {
   profileId: string;
@@ -45,6 +47,13 @@ export interface WorkspaceChange {
   datasets: WorkspaceDataset[];
 }
 export function affectedDatasets(channel: string): WorkspaceDataset[] {
+  if (channel === "settings:saveBackup") return ["backupStatus"];
+  return [
+    ...new Set<WorkspaceDataset>([...domainDatasets(channel), "backupStatus"]),
+  ];
+}
+
+function domainDatasets(channel: string): WorkspaceDataset[] {
   const domain = channel.split(":")[0];
   if (domain === "invoices")
     return [

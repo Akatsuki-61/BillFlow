@@ -419,6 +419,8 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
       <div>
         <div class="col-heading">Invoice to:</div>
         <div class="client-name">${escapeHtml(data.client.name)}</div>
+        ${data.client.billingAddress ? `<div style="white-space:pre-line">${escapeHtml(data.client.billingAddress)}</div>` : ""}
+        ${data.paymentUrl ? `<div><a href="${escapeHtml(data.paymentUrl)}">Pay online</a></div>` : ""}
         <div class="col-body">
           ${data.client.email ? `<div>${escapeHtml(data.client.email)}</div>` : ""}
           ${data.client.phone ? `<div>${escapeHtml(data.client.phone)}</div>` : ""}
