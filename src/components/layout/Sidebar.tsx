@@ -78,6 +78,7 @@ export default function Sidebar() {
     profiles,
     activeProfile,
     maxProfiles,
+    isGateOpen,
     openProfileGate,
     lockCurrentProfile,
   } = useProfiles();
@@ -210,15 +211,17 @@ export default function Sidebar() {
     };
   }, [searchQuery, invoices, clients]);
 
+  const dragClass = isGateOpen ? "app-no-drag" : "app-drag-region";
+
   return (
     <MotionConfig reducedMotion="user">
-      <header className="workspace-nav w-full shrink-0 bg-canvas select-none z-30 app-drag-region">
-        <div className="max-w-[1440px] mx-auto px-8 h-[68px] grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4 app-drag-region">
+      <header className={`workspace-nav w-full shrink-0 bg-canvas select-none z-30 ${dragClass}`}>
+        <div className={`w-full px-8 h-[68px] grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4 ${dragClass}`}>
           {/* Left: Brand Identity */}
-          <div className="flex items-center justify-self-start app-drag-region">
+          <div className={`flex items-center justify-self-start ${dragClass}`}>
             <Link
               href="/"
-              className="flex items-center gap-2.5 shrink-0 group focus:outline-none app-drag-region cursor-default"
+              className={`flex items-center gap-2.5 shrink-0 group focus:outline-none ${dragClass} cursor-default`}
             >
               <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 pointer-events-none">
                 <Image

@@ -2085,7 +2085,7 @@ export default function InvoicesView() {
               onClick={() => setExportFormat("csv")}
               className={`relative px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                 exportFormat === "csv"
-                  ? "text-content-neutral-950"
+                  ? "text-white"
                   : "text-content-neutral-500 hover:text-content-neutral-800"
               }`}
               title="Set export format to RFC 4180 CSV (.csv)"
@@ -2094,7 +2094,7 @@ export default function InvoicesView() {
                 <motion.span
                   layoutId="invoices-export-format-pill"
                   transition={SPRING_NAV_GLIDE}
-                  className="absolute inset-0 rounded-full bg-surface-card shadow-xs"
+                  className="absolute inset-0 rounded-full bg-accent-solid shadow-xs"
                 />
               )}
               <span className="relative z-10">CSV</span>
@@ -2113,7 +2113,7 @@ export default function InvoicesView() {
                 <motion.span
                   layoutId="invoices-export-format-pill"
                   transition={SPRING_NAV_GLIDE}
-                  className="absolute inset-0 rounded-full bg-emerald-600 shadow-xs"
+                  className="absolute inset-0 rounded-full bg-accent-solid shadow-xs"
                 />
               )}
               <span className="relative z-10">Excel</span>
@@ -3474,7 +3474,7 @@ export default function InvoicesView() {
                       required
                       value={paymentDate}
                       onChange={(e) => setPaymentDate(e.target.value)}
-                      className="ui-field w-full px-3.5"
+                      className="ui-field w-full px-3.5 cursor-pointer"
                     />
                   </div>
 

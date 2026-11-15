@@ -10,6 +10,7 @@ import { WidgetProvider } from "@/context/WidgetContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { ProfileGateModal } from "@/components/profiles/ProfileGateModal";
+import { InputPickerEnhancer } from "@/components/ui/InputPickerEnhancer";
 import { themeBootstrap } from "@/lib/theme";
 import "./globals.css";
 
@@ -44,8 +45,8 @@ export default function RootLayout({
         <ThemeProvider>
           <NavProvider>
             <DataProvider>
+              <InputPickerEnhancer />
               <ProfileProvider>
-                <ProfileGateModal />
                 <ProfileWorkspace>
                   <AdvanceTrackingPrompt />
                   <WidgetProvider>
@@ -56,6 +57,7 @@ export default function RootLayout({
                     </main>
                   </WidgetProvider>
                 </ProfileWorkspace>
+                <ProfileGateModal />
               </ProfileProvider>
             </DataProvider>
           </NavProvider>

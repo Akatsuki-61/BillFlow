@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { X, Calendar, Clock, MapPin, Link2, CheckSquare, Trash2, Video, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
+import { TimePickerInput } from "@/components/ui/TimePickerInput";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { useData } from "@/lib/data/DataProvider";
 import {
@@ -34,13 +35,13 @@ const CATEGORY_OPTIONS: { id: EventCategory; label: string; icon: string }[] = [
   { id: "general", label: "General Event", icon: "📅" },
 ];
 
-const COLOR_OPTIONS: { id: EventColor; label: string; bgClass: string; borderClass: string }[] = [
-  { id: "blue", label: "Blue", bgClass: "bg-surface-blue-500", borderClass: "border-line-blue-400" },
-  { id: "emerald", label: "Emerald", bgClass: "bg-surface-emerald-500", borderClass: "border-line-emerald-400" },
-  { id: "purple", label: "Purple", bgClass: "bg-surface-purple-500", borderClass: "border-line-purple-400" },
-  { id: "amber", label: "Amber", bgClass: "bg-surface-amber-500", borderClass: "border-line-amber-400" },
-  { id: "rose", label: "Rose", bgClass: "bg-surface-rose-500", borderClass: "border-line-rose-400" },
-  { id: "cyan", label: "Cyan", bgClass: "bg-surface-cyan-500", borderClass: "border-line-cyan-400" },
+const COLOR_OPTIONS: { id: EventColor; label: string; bgClass: string; borderClass: string; hex: string }[] = [
+  { id: "blue", label: "Blue", bgClass: "bg-blue-500", borderClass: "border-blue-400", hex: "#3b82f6" },
+  { id: "emerald", label: "Emerald", bgClass: "bg-emerald-500", borderClass: "border-emerald-400", hex: "#10b981" },
+  { id: "purple", label: "Purple", bgClass: "bg-purple-500", borderClass: "border-purple-400", hex: "#a855f7" },
+  { id: "amber", label: "Amber", bgClass: "bg-amber-500", borderClass: "border-amber-400", hex: "#f59e0b" },
+  { id: "rose", label: "Rose", bgClass: "bg-rose-500", borderClass: "border-rose-400", hex: "#f43f5e" },
+  { id: "cyan", label: "Cyan", bgClass: "bg-cyan-500", borderClass: "border-cyan-400", hex: "#06b6d4" },
 ];
 
 function EventForm({
@@ -224,15 +225,19 @@ function EventForm({
               <label className="block text-xs font-semibold uppercase tracking-wider text-content-neutral-600 mb-1.5">
                 Badge Color
               </label>
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2.5 pt-1">
                 {COLOR_OPTIONS.map((opt) => (
                   <button
                     key={opt.id}
                     type="button"
                     title={opt.label}
+                    aria-label={`Badge color: ${opt.label}`}
                     onClick={() => setColor(opt.id)}
-                    className={`w-6 h-6 rounded-full ${opt.bgClass} transition-transform ${
-                      color === opt.id ? "scale-125 ring-2 ring-accent ring-offset-2" : "opacity-70 hover:opacity-100"
+                    style={{ backgroundColor: opt.hex }}
+                    className={`w-6 h-6 rounded-full ${opt.bgClass} transition-transform cursor-pointer border border-black/15 dark:border-white/25 ${
+                      color === opt.id
+                        ? "scale-120 ring-2 ring-accent ring-offset-2 ring-offset-surface"
+                        : "opacity-85 hover:opacity-100"
                     }`}
                   />
                 ))}
@@ -268,7 +273,7 @@ function EventForm({
                   required
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="ui-field w-full px-3 py-1.5 text-sm border border-line-neutral-200/90 rounded-xl text-content-neutral-800 bg-surface focus:outline-none focus:border-accent"
+                  className="ui-field w-full px-3 py-1.5 text-sm border border-line-neutral-200/90 rounded-xl text-content-neutral-800 bg-surface focus:outline-none focus:border-accent cursor-pointer"
                 />
               </div>
 
@@ -281,7 +286,7 @@ function EventForm({
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="ui-field w-full px-3 py-1.5 text-sm border border-line-neutral-200/90 rounded-xl text-content-neutral-800 bg-surface focus:outline-none focus:border-accent"
+                  className="ui-field w-full px-3 py-1.5 text-sm border border-line-neutral-200/90 rounded-xl text-content-neutral-800 bg-surface focus:outline-none focus:border-accent cursor-pointer"
                 />
               </div>
             </div>
@@ -292,9 +297,9 @@ function EventForm({
                   <label htmlFor="event-start-time" className="block text-xs text-content-neutral-500 mb-1">
                     Start Time
                   </label>
-                  <input
+                  <TimePickerInput
                     id="event-start-time"
-                    type="time"
+                    aria-label="Start Time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
                     className="ui-field w-full px-3 py-1.5 text-sm border border-line-neutral-200/90 rounded-xl text-content-neutral-800 bg-surface focus:outline-none focus:border-accent"
@@ -304,9 +309,9 @@ function EventForm({
                   <label htmlFor="event-end-time" className="block text-xs text-content-neutral-500 mb-1">
                     End Time
                   </label>
-                  <input
+                  <TimePickerInput
                     id="event-end-time"
-                    type="time"
+                    aria-label="End Time"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
                     className="ui-field w-full px-3 py-1.5 text-sm border border-line-neutral-200/90 rounded-xl text-content-neutral-800 bg-surface focus:outline-none focus:border-accent"

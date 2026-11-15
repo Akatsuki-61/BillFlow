@@ -1412,7 +1412,7 @@ export default function CatalogView() {
                     type="date"
                     value={invoiceDueDate}
                     onChange={(e) => setInvoiceDueDate(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600"
+                    className="w-full px-3.5 py-2 rounded-xl border border-line-neutral-200 text-sm text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-line-purple-500/20 focus:border-line-purple-600 cursor-pointer"
                   />
                 </div>
               </div>

@@ -646,8 +646,8 @@ export function ProfileGateModal() {
           />
 
           {/* Minimal Top Bar (pt-12 clears both macOS traffic lights and Windows 40px titleBarOverlay) */}
-          <div className="relative z-10 w-full max-w-6xl mx-auto px-6 sm:px-10 pt-12 pb-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+          <div className="relative z-30 w-full max-w-6xl mx-auto px-6 sm:px-10 pt-12 pb-4 flex items-center justify-between shrink-0 app-no-drag">
+        <div className="flex items-center gap-3 app-no-drag">
           {view !== "select" && (
             <button
               type="button"
@@ -655,15 +655,15 @@ export function ProfileGateModal() {
                 setErrorMsg(null);
                 setView("select");
               }}
-              className="inline-flex items-center gap-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="app-no-drag inline-flex items-center gap-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 pointer-events-none" />
               Back to Profiles
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 app-no-drag">
           {view === "select" && (
             <button
               type="button"
@@ -673,21 +673,28 @@ export function ProfileGateModal() {
                 );
                 setView("onboarding");
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors cursor-pointer"
+              className="app-no-drag inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors cursor-pointer"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-300" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-300 pointer-events-none" />
               Role Setup
             </button>
           )}
 
-          {!isLocked && (
+          {(!isLocked || view !== "select") && (
             <button
               type="button"
-              onClick={closeProfileGate}
+              onClick={() => {
+                if (isLocked && view !== "select") {
+                  setErrorMsg(null);
+                  setView("select");
+                  return;
+                }
+                closeProfileGate();
+              }}
               aria-label="Close profile screen"
-              className="w-9 h-9 rounded-full flex items-center justify-center text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 transition-colors cursor-pointer"
+              className="app-no-drag w-9 h-9 rounded-full flex items-center justify-center text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4 pointer-events-none" />
             </button>
           )}
         </div>

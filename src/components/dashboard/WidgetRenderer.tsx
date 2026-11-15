@@ -854,7 +854,7 @@ export function WidgetRenderer({
               }))}
               formatValue={(value) => formatCents(value, activeCurrency)}
             />
-            <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+            <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
               <span>{marginPct}% net margin</span>
               <Link
                 href="/analytics"
@@ -919,7 +919,7 @@ export function WidgetRenderer({
               />
             </div>
 
-            <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+            <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
               <span>
                 {pendingCount}{" "}
                 {pendingCount === 1 ? "invoice awaiting" : "invoices awaiting"}
@@ -984,7 +984,7 @@ export function WidgetRenderer({
               />
             </div>
 
-            <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+            <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
               <span>{activeClientsCount} active accounts</span>
               <Link
                 href="/clients"

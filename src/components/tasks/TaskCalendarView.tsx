@@ -30,6 +30,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
+import { TimePickerInput } from "@/components/ui/TimePickerInput";
 import type {
   TaskItem,
   TaskStatus,
@@ -1797,13 +1798,12 @@ export default function TaskCalendarView({
             aria-label="Quick item date"
             value={quickDate}
             onChange={(e) => setQuickDate(e.target.value)}
-            className="ui-field px-3 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
+            className="ui-field px-3 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0 cursor-pointer"
           />
 
           {/* Shared Time Inputs (Start Time & End Time) for BOTH Tasks and Events */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <input
-              type="time"
+            <TimePickerInput
               aria-label="Quick start time"
               title="Start Time"
               value={quickStartTime}
@@ -1811,8 +1811,7 @@ export default function TaskCalendarView({
               className="ui-field px-2.5 py-2 text-xs border border-line-neutral-200 rounded-xl bg-surface shrink-0"
             />
             <span className="text-content-neutral-400 text-xs">&ndash;</span>
-            <input
-              type="time"
+            <TimePickerInput
               aria-label="Quick end time"
               title="End Time"
               value={quickEndTime}
@@ -1949,10 +1948,9 @@ export default function TaskCalendarView({
                             onChange={(e) =>
                               setEditingTaskDueDate(e.target.value)
                             }
-                            className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
+                            className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface cursor-pointer"
                           />
-                          <input
-                            type="time"
+                          <TimePickerInput
                             aria-label="Edit task start time"
                             title="Start Time"
                             value={editingTaskStartTime}
@@ -1961,8 +1959,7 @@ export default function TaskCalendarView({
                             }
                             className="ui-field px-2 py-1 text-xs border border-line-neutral-200 rounded-lg bg-surface"
                           />
-                          <input
-                            type="time"
+                          <TimePickerInput
                             aria-label="Edit task end time"
                             title="End Time"
                             value={editingTaskEndTime}

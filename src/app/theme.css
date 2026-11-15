@@ -16,12 +16,16 @@
   --color-content-amber-600: var(--theme-content-amber-600);
   --color-content-amber-700: var(--theme-content-amber-700);
   --color-content-amber-800: var(--theme-content-amber-800);
+  --color-content-amber-900: var(--theme-content-amber-900);
   --color-content-blue-700: var(--theme-content-blue-700);
   --color-content-blue-800: var(--theme-content-blue-800);
+  --color-content-blue-900: var(--theme-content-blue-900);
+  --color-content-cyan-900: var(--theme-content-cyan-900);
   --color-content-emerald-400: var(--theme-content-emerald-400);
   --color-content-emerald-600: var(--theme-content-emerald-600);
   --color-content-emerald-700: var(--theme-content-emerald-700);
   --color-content-emerald-800: var(--theme-content-emerald-800);
+  --color-content-emerald-900: var(--theme-content-emerald-900);
   --color-content-neutral-300: var(--theme-content-neutral-300);
   --color-content-neutral-400: var(--theme-content-neutral-400);
   --color-content-neutral-500: var(--theme-content-neutral-500);
@@ -45,6 +49,7 @@
   --color-content-rose-600: var(--theme-content-rose-600);
   --color-content-rose-700: var(--theme-content-rose-700);
   --color-content-rose-800: var(--theme-content-rose-800);
+  --color-content-rose-900: var(--theme-content-rose-900);
   --color-content-rose-950: var(--theme-content-rose-950);
   --color-danger: var(--theme-danger);
   --color-focus: var(--theme-focus);
@@ -52,6 +57,7 @@
   --color-line-amber-400: var(--theme-line-amber-400);
   --color-line-blue-200: var(--theme-line-blue-200);
   --color-line-blue-400: var(--theme-line-blue-400);
+  --color-line-cyan-400: var(--theme-line-cyan-400);
   --color-line-emerald-100: var(--theme-line-emerald-100);
   --color-line-emerald-200: var(--theme-line-emerald-200);
   --color-line-emerald-400: var(--theme-line-emerald-400);
@@ -83,8 +89,11 @@
   --color-surface-amber-500: var(--theme-surface-amber-500);
   --color-surface-blue-100: var(--theme-surface-blue-100);
   --color-surface-blue-50: var(--theme-surface-blue-50);
+  --color-surface-blue-500: var(--theme-surface-blue-500);
   --color-surface-bright: var(--theme-surface-bright);
   --color-surface-cool: var(--theme-surface-cool);
+  --color-surface-cyan-50: var(--theme-surface-cyan-50);
+  --color-surface-cyan-500: var(--theme-surface-cyan-500);
   --color-surface-emerald-100: var(--theme-surface-emerald-100);
   --color-surface-emerald-50: var(--theme-surface-emerald-50);
   --color-surface-emerald-500: var(--theme-surface-emerald-500);
@@ -99,11 +108,13 @@
   --color-surface-orange-100: var(--theme-surface-orange-100);
   --color-surface-purple-100: var(--theme-surface-purple-100);
   --color-surface-purple-50: var(--theme-surface-purple-50);
+  --color-surface-purple-500: var(--theme-surface-purple-500);
   --color-surface-red-100: var(--theme-surface-red-100);
   --color-surface-red-400: var(--theme-surface-red-400);
   --color-surface-red-500: var(--theme-surface-red-500);
   --color-surface-rose-100: var(--theme-surface-rose-100);
   --color-surface-rose-50: var(--theme-surface-rose-50);
+  --color-surface-rose-500: var(--theme-surface-rose-500);
   --color-surface-rose-950: var(--theme-surface-rose-950);
   --color-surface-secondary: var(--theme-surface-secondary);
   --color-surface-soft: var(--theme-surface-soft);
@@ -156,12 +167,16 @@
   --theme-content-amber-600: var(--color-amber-600);
   --theme-content-amber-700: var(--color-amber-700);
   --theme-content-amber-800: var(--color-amber-800);
+  --theme-content-amber-900: var(--color-amber-900);
   --theme-content-blue-700: var(--color-blue-700);
   --theme-content-blue-800: var(--color-blue-800);
+  --theme-content-blue-900: var(--color-blue-900);
+  --theme-content-cyan-900: var(--color-cyan-900);
   --theme-content-emerald-400: var(--color-emerald-400);
   --theme-content-emerald-600: var(--color-emerald-600);
   --theme-content-emerald-700: var(--color-emerald-700);
   --theme-content-emerald-800: var(--color-emerald-800);
+  --theme-content-emerald-900: var(--color-emerald-900);
   --theme-content-neutral-300: var(--color-neutral-300);
   --theme-content-neutral-400: var(--color-neutral-400);
   --theme-content-neutral-500: var(--color-neutral-500);
@@ -185,6 +200,7 @@
   --theme-content-rose-600: var(--color-rose-600);
   --theme-content-rose-700: var(--color-rose-700);
   --theme-content-rose-800: var(--color-rose-800);
+  --theme-content-rose-900: var(--color-rose-900);
   --theme-content-rose-950: var(--color-rose-950);
   --theme-danger: #dc2626;
   --theme-focus: #2563eb;
@@ -192,6 +208,7 @@
   --theme-line-amber-400: var(--color-amber-400);
   --theme-line-blue-200: var(--color-blue-200);
   --theme-line-blue-400: var(--color-blue-400);
+  --theme-line-cyan-400: var(--color-cyan-400);
   --theme-line-emerald-100: var(--color-emerald-100);
   --theme-line-emerald-200: var(--color-emerald-200);
   --theme-line-emerald-400: var(--color-emerald-400);
@@ -223,8 +240,11 @@
   --theme-surface-amber-500: var(--color-amber-500);
   --theme-surface-blue-100: var(--color-blue-100);
   --theme-surface-blue-50: var(--color-blue-50);
+  --theme-surface-blue-500: var(--color-blue-500);
   --theme-surface-bright: #ffffff;
   --theme-surface-cool: #f5f5f8;
+  --theme-surface-cyan-50: var(--color-cyan-50);
+  --theme-surface-cyan-500: var(--color-cyan-500);
   --theme-surface-emerald-100: var(--color-emerald-100);
   --theme-surface-emerald-50: var(--color-emerald-50);
   --theme-surface-emerald-500: var(--color-emerald-500);
@@ -239,11 +259,13 @@
   --theme-surface-orange-100: var(--color-orange-100);
   --theme-surface-purple-100: var(--color-purple-100);
   --theme-surface-purple-50: var(--color-purple-50);
+  --theme-surface-purple-500: var(--color-purple-500);
   --theme-surface-red-100: var(--color-red-100);
   --theme-surface-red-400: var(--color-red-400);
   --theme-surface-red-500: var(--color-red-500);
   --theme-surface-rose-100: var(--color-rose-100);
   --theme-surface-rose-50: var(--color-rose-50);
+  --theme-surface-rose-500: var(--color-rose-500);
   --theme-surface-rose-950: var(--color-rose-950);
   --theme-surface-secondary: #ededf2;
   --theme-surface-soft: #f8f8fa;
@@ -257,6 +279,8 @@
   --theme-text-secondary: #27272a;
   --theme-text-subtle: #8e8e93;
   --theme-toast: #18181b;
+  --scrollbar-thumb: color-mix(in srgb, var(--theme-accent-solid) 52%, rgba(255, 255, 255, 0.22));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--theme-accent-solid) 80%, rgba(0, 0, 0, 0.08));
 }
 
 :root[data-theme="dark"] {
@@ -296,12 +320,16 @@
   --theme-content-amber-600: var(--color-amber-400);
   --theme-content-amber-700: var(--color-amber-300);
   --theme-content-amber-800: var(--color-amber-300);
+  --theme-content-amber-900: var(--color-amber-200);
   --theme-content-blue-700: var(--color-blue-300);
   --theme-content-blue-800: var(--color-blue-300);
+  --theme-content-blue-900: var(--color-blue-200);
+  --theme-content-cyan-900: var(--color-cyan-200);
   --theme-content-emerald-400: var(--color-emerald-400);
   --theme-content-emerald-600: var(--color-emerald-400);
   --theme-content-emerald-700: var(--color-emerald-300);
   --theme-content-emerald-800: var(--color-emerald-300);
+  --theme-content-emerald-900: var(--color-emerald-200);
   --theme-content-neutral-300: var(--color-neutral-600);
   --theme-content-neutral-400: var(--color-neutral-400);
   --theme-content-neutral-500: var(--color-neutral-400);
@@ -325,6 +353,7 @@
   --theme-content-rose-600: var(--color-rose-400);
   --theme-content-rose-700: var(--color-rose-300);
   --theme-content-rose-800: var(--color-rose-300);
+  --theme-content-rose-900: var(--color-rose-200);
   --theme-content-rose-950: var(--color-rose-100);
   --theme-danger: #f87171;
   --theme-focus: #60a5fa;
@@ -332,6 +361,7 @@
   --theme-line-amber-400: var(--color-amber-400);
   --theme-line-blue-200: var(--color-blue-800);
   --theme-line-blue-400: var(--color-blue-400);
+  --theme-line-cyan-400: var(--color-cyan-400);
   --theme-line-emerald-100: var(--color-emerald-900);
   --theme-line-emerald-200: var(--color-emerald-800);
   --theme-line-emerald-400: var(--color-emerald-400);
@@ -363,8 +393,11 @@
   --theme-surface-amber-500: var(--color-amber-500);
   --theme-surface-blue-100: var(--color-blue-900);
   --theme-surface-blue-50: var(--color-blue-950);
+  --theme-surface-blue-500: var(--color-blue-500);
   --theme-surface-bright: #202028;
   --theme-surface-cool: #202028;
+  --theme-surface-cyan-50: var(--color-cyan-950);
+  --theme-surface-cyan-500: var(--color-cyan-500);
   --theme-surface-emerald-100: var(--color-emerald-900);
   --theme-surface-emerald-50: var(--color-emerald-950);
   --theme-surface-emerald-500: var(--color-emerald-500);
@@ -379,11 +412,13 @@
   --theme-surface-orange-100: var(--color-orange-900);
   --theme-surface-purple-100: var(--color-purple-900);
   --theme-surface-purple-50: var(--color-purple-950);
+  --theme-surface-purple-500: var(--color-purple-500);
   --theme-surface-red-100: var(--color-red-900);
   --theme-surface-red-400: var(--color-red-400);
   --theme-surface-red-500: var(--color-red-500);
   --theme-surface-rose-100: var(--color-rose-900);
   --theme-surface-rose-50: var(--color-rose-950);
+  --theme-surface-rose-500: var(--color-rose-500);
   --theme-surface-rose-950: var(--color-rose-950);
   --theme-surface-secondary: #202028;
   --theme-surface-soft: #202028;
@@ -397,6 +432,8 @@
   --theme-text-secondary: #d4d4d8;
   --theme-text-subtle: #9ca3af;
   --theme-toast: #18181b;
+  --scrollbar-thumb: color-mix(in srgb, var(--ui-accent) 44%, rgba(0, 0, 0, 0.28));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--ui-accent) 72%, rgba(255, 255, 255, 0.12));
 }
 
 @media print {

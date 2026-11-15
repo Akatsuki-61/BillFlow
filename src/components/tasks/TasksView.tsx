@@ -54,6 +54,7 @@ import SubmitWorkModal from "@/components/tasks/SubmitWorkModal";
 import Link from "next/link";
 import { resolveDeliveryUrl, openExternalLink } from "@/lib/deliveryUrl";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
+import { TimePickerInput } from "@/components/ui/TimePickerInput";
 import {
   saveTaskTimeSlot,
   getTaskTimeSlot,
@@ -2019,7 +2020,7 @@ export default function TasksView({
                         type="date"
                         value={newDueDate}
                         onChange={(e) => setNewDueDate(e.target.value)}
-                        className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all"
+                        className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:border-accent transition-all cursor-pointer"
                       />
                     </div>
 
@@ -2029,8 +2030,7 @@ export default function TasksView({
                           <label className="block text-[11px] font-semibold text-content-neutral-600 mb-1">
                             Start Time
                           </label>
-                          <input
-                            type="time"
+                          <TimePickerInput
                             aria-label="Start time"
                             value={newStartTime}
                             onChange={(e) => setNewStartTime(e.target.value)}
@@ -2042,8 +2042,7 @@ export default function TasksView({
                           <label className="block text-[11px] font-semibold text-content-neutral-600 mb-1">
                             End Time
                           </label>
-                          <input
-                            type="time"
+                          <TimePickerInput
                             aria-label="End time"
                             value={newEndTime}
                             onChange={(e) => setNewEndTime(e.target.value)}
@@ -2658,7 +2657,7 @@ export default function TasksView({
                         });
                         showToast(`Updated due date to ${e.target.value}`);
                       }}
-                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
+                      className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800 cursor-pointer"
                     />
                   </div>
 
@@ -2666,8 +2665,7 @@ export default function TasksView({
                     <span className="text-content-neutral-400 block mb-1">
                       Start Time
                     </span>
-                    <input
-                      type="time"
+                    <TimePickerInput
                       aria-label="Task start time"
                       value={
                         selectedTaskForDetail.startTime ??
@@ -2694,8 +2692,7 @@ export default function TasksView({
                     <span className="text-content-neutral-400 block mb-1">
                       End Time
                     </span>
-                    <input
-                      type="time"
+                    <TimePickerInput
                       aria-label="Task end time"
                       value={
                         selectedTaskForDetail.endTime ??

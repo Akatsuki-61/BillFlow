@@ -334,7 +334,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   flex-direction: column;
   gap: 20px;
   width: 100%;
-  max-width: 1440px;
+  max-width: 100%;
   margin-inline: auto;
   padding: 18px 32px 44px;
 }
@@ -754,9 +754,16 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   transform: translateX(2px);
 }
 
-/* Ensure all select elements and options respect the application color theme */
+/* Ensure all select elements, options, and date/time inputs respect the application color theme */
 select {
   color-scheme: light dark;
+}
+input[type="date"] {
+  color-scheme: light dark;
+  cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
 }
 :root[data-theme="dark"] select,
 [data-theme="dark"] select,
@@ -1172,11 +1179,9 @@ input[type="checkbox"] {
   line-height: 1.35;
   letter-spacing: -0.02em;
 }
-.ui-card table thead tr:first-child th:first-child {
-  border-top-left-radius: var(--ui-radius-card);
-}
-.ui-card table thead tr:first-child th:last-child {
-  border-top-right-radius: var(--ui-radius-card);
+.record-table th,
+.record-table td {
+  border-radius: 0;
 }
 
 /* Keep long creation forms inside the desktop window with a single form scroll. */
@@ -1900,77 +1905,6 @@ input[type="checkbox"] {
   line-height: 1.6;
   margin-top: 10px;
 }
-@media (min-width: 1200px) {
-  .dashboard-grid.reference-layout {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 18px;
-  }
-  .reference-layout > [data-widget="workspace-insights"] {
-    grid-column: 1 / span 12;
-  }
-  .reference-layout > [data-widget="profit-trajectory-chart"] {
-    grid-column: 1 / span 8;
-  }
-  .reference-layout > [data-widget="total-revenue"] {
-    grid-column: 9 / span 4;
-  }
-  .reference-layout > [data-widget="net-profit"] {
-    grid-column: 1 / span 4;
-  }
-  .reference-layout > [data-widget="pending-receivables"] {
-    grid-column: 5 / span 4;
-  }
-  .reference-layout > [data-widget="active-clients"] {
-    grid-column: 9 / span 4;
-  }
-  .reference-layout > [data-widget="sprint-tasks"] {
-    grid-column: 1 / span 6;
-  }
-  .reference-layout > [data-widget="recent-invoices"] {
-    grid-column: 7 / span 6;
-  }
-  .reference-layout [data-widget="pending-receivables"] .ui-card,
-  .reference-layout [data-widget="active-clients"] .ui-card {
-    position: relative;
-    padding: 24px;
-  }
-  .reference-layout [data-widget="pending-receivables"] .data-dots,
-  .reference-layout [data-widget="active-clients"] .data-dots {
-    position: absolute;
-    left: 45%;
-    right: 24px;
-    bottom: 20px;
-    margin: 0;
-  }
-  .reference-layout [data-widget="pending-receivables"] .data-dots-grid,
-  .reference-layout [data-widget="active-clients"] .data-dots-grid {
-    gap: 7px;
-  }
-  .reference-layout [data-widget="pending-receivables"] .text-right,
-  .reference-layout [data-widget="active-clients"] .text-right {
-    display: none;
-  }
-  .reference-layout [data-widget="pending-receivables"] .data-dots-column small,
-  .reference-layout [data-widget="active-clients"] .data-dots-column small {
-    display: none;
-  }
-  .reference-layout [data-widget="net-profit"] .data-month-column {
-    height: 210px;
-  }
-  .reference-layout [data-widget="net-profit"] .data-months-grid {
-    gap: 3px;
-  }
-  .reference-layout [data-widget="net-profit"] .data-month-bar {
-    background-color: transparent;
-    background-image: repeating-linear-gradient(
-      90deg,
-      rgb(236 72 153 / 20%) 0 3px,
-      transparent 3px 7px
-    );
-    border-radius: 0;
-    box-shadow: inset 0 3px #ec4899;
-  }
-}
 @media (max-width: 1100px) {
   .workspace-nav > div {
     height: 76px;
@@ -2014,21 +1948,10 @@ input[type="checkbox"] {
     ),
     var(--theme-accent-solid);
 }
-@media (min-width: 1200px) {
-  .reference-layout [data-widget="net-profit"] .data-month-value {
-    display: none;
-  }
-}
 @media (min-width: 1100px) {
   .task-overview .data-breakdown {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
-  }
-}
-@media (min-width: 1200px) {
-  .reference-layout [data-widget="pending-receivables"] .data-dots-column small,
-  .reference-layout [data-widget="active-clients"] .data-dots-column small {
-    display: block;
   }
 }
 
@@ -2918,10 +2841,10 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
   animation: bf-toast-progress 3.5s linear forwards;
 }
 
-/* Modern Sleek Pill Scrollbar Design (Light & Dark Mode) */
+/* Modern Sleek Pill Scrollbar Design (Accent-Matched for Light & Dark Modes) */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(139, 92, 246, 0.32) transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -2935,7 +2858,7 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.38);
+  background: var(--scrollbar-thumb);
   border-radius: 9999px;
   border: 1px solid transparent;
   background-clip: padding-box;
@@ -2943,21 +2866,16 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 58, 237, 0.62);
+  background: var(--scrollbar-thumb-hover);
 }
 
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
 
-.dark ::-webkit-scrollbar-thumb,
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.28);
-}
-
-.dark ::-webkit-scrollbar-thumb:hover,
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(167, 139, 250, 0.65);
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 .bf-scroll-area {

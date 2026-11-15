@@ -28,10 +28,7 @@ import {
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { useWidgetContext } from "@/context/WidgetContext";
-import {
-  DEFAULT_DASHBOARD_WIDGET_IDS,
-  WIDGET_CATALOG,
-} from "@/lib/widgets/widgetDefinitions";
+import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
 import { DashboardPeriod } from "@/types/dashboard";
 
@@ -444,9 +441,7 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : (
-        <div
-          className={`dashboard-grid grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 ${!isDashboardEditing && dashboardWidgets.join(",") === DEFAULT_DASHBOARD_WIDGET_IDS.join(",") && dashboardWidgets.every((id) => widgetSizes[id] !== "compact") ? "reference-layout" : ""}`}
-        >
+        <div className="dashboard-grid grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4">
           {pinnedWidgets.map((w, index) => {
             const colSpan = getColSpanClass(w.id, w.size);
             const isCompact = (widgetSizes[w.id] || "normal") === "compact";

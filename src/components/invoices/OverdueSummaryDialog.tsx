@@ -371,7 +371,7 @@ export function OverdueSummaryDialog({
                 onClick={() => setExportFormat("csv")}
                 className={`relative isolate px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   exportFormat === "csv"
-                    ? "text-content-neutral-950"
+                    ? "text-white"
                     : "text-content-neutral-500 hover:text-content-neutral-800"
                 }`}
               >
@@ -379,7 +379,7 @@ export function OverdueSummaryDialog({
                   <motion.span
                     layoutId="overdue-export-fmt-pill"
                     transition={SPRING_NAV_GLIDE}
-                    className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-2xs border border-line-neutral-200/80"
+                    className="absolute inset-0 -z-10 rounded-lg bg-accent-solid shadow-2xs"
                   />
                 )}
                 <span className="relative z-10">CSV (.csv)</span>
@@ -397,7 +397,7 @@ export function OverdueSummaryDialog({
                   <motion.span
                     layoutId="overdue-export-fmt-pill"
                     transition={SPRING_NAV_GLIDE}
-                    className="absolute inset-0 -z-10 rounded-lg bg-emerald-600 shadow-2xs"
+                    className="absolute inset-0 -z-10 rounded-lg bg-accent-solid shadow-2xs"
                   />
                 )}
                 <span className="relative z-10">Excel (.xls)</span>
@@ -410,7 +410,7 @@ export function OverdueSummaryDialog({
               type="button"
               onClick={() => handleExportData(exportFormat, csvTemplateMode)}
               disabled={overdueList.length === 0}
-              className="!border-emerald-600/30 !bg-emerald-50 dark:!bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:!bg-emerald-100"
+              className="!border-emerald-600/30 !bg-emerald-50 dark:!bg-emerald-950/60 !text-emerald-800 dark:!text-emerald-100 hover:!bg-emerald-100/70 dark:hover:!bg-emerald-900/50"
               title={
                 exportFormat === "excel"
                   ? "Convert and download multi-sheet Microsoft Excel Workbook (.xls)"
@@ -967,7 +967,7 @@ export function OverdueSummaryDialog({
                         onClick={() => setExportFormat("csv")}
                         className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                           exportFormat === "csv"
-                            ? "bg-accent text-white"
+                            ? "bg-accent-solid text-white"
                             : "text-content-neutral-600 hover:text-content-neutral-900"
                         }`}
                       >
@@ -978,7 +978,7 @@ export function OverdueSummaryDialog({
                         onClick={() => setExportFormat("excel")}
                         className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                           exportFormat === "excel"
-                            ? "bg-emerald-600 text-white"
+                            ? "bg-accent-solid text-white"
                             : "text-content-neutral-600 hover:text-content-neutral-900"
                         }`}
                       >
@@ -1320,7 +1320,7 @@ export function OverdueSummaryDialog({
               type="button"
               onClick={() => handleExportData("excel", csvTemplateMode)}
               disabled={overdueList.length === 0}
-              className="!border-emerald-600/30 !bg-emerald-50 dark:!bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+              className="!border-emerald-600/30 !bg-emerald-50 dark:!bg-emerald-950/60 !text-emerald-800 dark:!text-emerald-100 hover:!bg-emerald-100/70 dark:hover:!bg-emerald-900/50"
               title="Convert & download Microsoft Excel Workbook (.xls)"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />

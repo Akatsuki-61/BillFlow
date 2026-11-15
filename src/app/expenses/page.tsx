@@ -975,7 +975,7 @@ export default function ExpensesPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, date: e.target.value })
                       }
-                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40 cursor-pointer"
                     />
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-# BillFlow — Team Contribution & Engineering Log
+# BillFlow: Team Contribution & Engineering Log
 
 This document records the individual module ownership, development timeline, and code contributions of the BillFlow engineering team (Akatsuki) for evaluation and academic auditing under IEEE Std 830-1998 and CMMI-DEV Level 2/3 guidelines.
 
@@ -8,10 +8,10 @@ This document records the individual module ownership, development timeline, and
 
 | Member | GitHub Username | Branch | Core Responsibilities & Modules |
 | :--- | :--- | :--- | :--- |
-| **Nipun Yatawara** | `nipunyatawara-dev` | `Nipun` | Project architecture, Electron desktop runtime, SQLite database & Drizzle ORM migrations, Multi-profile workspace system & PIN/password locks, Task-to-invoice workflow & batch invoicing engine, synchronized Kanban hover highlights, spring motion animations, and test engineering. |
-| **GVSL-Lahiru** | `GVSL-Lahiru` | `Lahiru` | Lead Quality Assurance & exploratory bug hunting, deliverable handoff workflow (Submit Work modal & Google Drive link integration), Overdue invoices summary engine (AR aging 0-7, 8-14, 15+ days), CSV data export engine, and top navigation bar polish. |
-| **Binuka Reshan** | `Binukareshane` | `Binuka` | Task outsourcing engine & contractor payable vouchers (`VND-INV-xxxx`), WhatsApp contractor task dispatch, auto-posting paid contractor jobs to expense ledger, 3-tab AR aging template table, and Excel workbook (`.xlsx`) export engine. |
-| **Sandika** | `Sandika-2003` | `Sandika` | Catalog management & bulk CSV/Excel import, UI Rework integration (PR #6), invoice preview document sheet (`InvoiceDocumentSheet.tsx`) with PDF export, macOS Calendar two-way `.ics` sync engine, and task trash delete microinteractions. |
+| **Nipun Yatawara** | `nipunyatawara-dev` | `Nipun` | Project architecture, Electron desktop runtime, SQLite database & Drizzle ORM migrations, multi-profile workspaces & PIN/password locks, task-to-invoice & batch invoicing engine, synchronized Kanban hover highlights, Settings 5-column invoice template gallery, Electron IPC/profile/financial security hardening, motion transitions, DMG packaging artwork, and automated testing (Vitest + Playwright E2E). |
+| **GVSL-Lahiru** | `GVSL-Lahiru` | `Lahiru` | Lead Quality Assurance & exploratory bug hunting, deliverable handoff workflow (`SubmitWorkModal` & Google Drive/repo delivery links), overdue invoices summary engine (AR aging: `Current`, `1-15 Days`, `16-30 Days`, `31-60 Days`, `60+ Days`), RFC 4180 CSV data export engine, and top navigation bar polish. |
+| **Binuka Reshan** | `Binukareshane` | `Binuka` | Task outsourcing engine & contractor payable vouchers (`VND-INV-xxxx`), WhatsApp contractor task dispatch, auto-posting settled payouts to expense ledger, 3-tab AR aging template table, Excel workbook (`.xlsx`) export engine, and background macOS Calendar `.ics` synchronization with live sync status badges. |
+| **Sandika** | `Sandika-2003` | `Sandika` | Catalog management & bulk CSV/Excel import, UI Rework integration (`PR #6`), interactive invoice preview sheet (`InvoiceDocumentSheet.tsx`), five modular offline HTML/PDF invoice templates (`Geometric Teal`, `Executive Wave`, `Scarlet Modern`, `Apex Orange`, `Noir Crimson`), local calendar embedding & `.ics` sync, and task trash delete microinteractions. |
 
 ---
 
@@ -44,8 +44,12 @@ This document records the individual module ownership, development timeline, and
   - Implemented PIN and password protection for profiles with security hint recovery and active profile switching.
 - **Microinteractions & Spring Physics (Post-Oct 08):**
   - Built cross-platform spring physics animations using Motion (`src/lib/motion.ts`), live widget drag-and-drop customization, and navbar profile avatar polish (`e4d150d`).
+- **Security Hardening, Template Gallery & v0.2.0 Release (Nov 12-13):**
+  - Added the 5-column miniature invoice template preview gallery and custom logo settings flow (`51cccca`).
+  - Hardened Electron IPC origin checks, per-profile SQLite/passcode isolation, filesystem symlink guards (`lstatSync`) and atomic file writes (`atomicWrite`), shell-free calendar process checks (`execFileSync`), URL scheme filtering in `formatExternalUrl`, and financial/migration integrity (`fc1953a`).
+  - Resolved lint errors, fixed legacy backup imports and PDF page margins, created Retina macOS DMG installer artwork (`scripts/generate-dmg-background.mjs`), fixed macOS `startViewTransition` trigger origins (`7f2feb7`, `bf66017`), overhauled `README.md` (`98b68da`), added `CHANGELOG.md`, and tagged desktop release `v0.2.0` (`bab6fdb`, `bf66017`).
 - **Testing & Quality Engineering:**
-  - Authored automated test suites across SQLite foreign key integrity, multi-profile limits, and task-to-invoice workflows, expanding test coverage to 26 test suites and 168 tests.
+  - Authored automated tests covering SQLite foreign keys, multi-profile limits, task-to-invoice workflows, and Electron IPC/path security (`electron/test/security-integrity.test.ts`), expanding Vitest coverage to `27` test files and `210` unit/integration tests, alongside `3` Playwright packaged Electron end-to-end tests (`tests/electron/desktop.spec.ts`).
 
 ---
 
@@ -54,6 +58,7 @@ This document records the individual module ownership, development timeline, and
 
 - **Lead Quality Assurance & Exploratory Bug Hunting:**
   - Conducted end-to-end exploratory testing across desktop releases, uncovering and documenting 17 critical user-facing defects post-v0.1.0.
+  - Conducted Windows and cross-surface QA testing on `v0.2.0` (Nov 15), identifying 18 additional UI, theme, and input bugs covering full-screen window sizing, accent-adaptive scrollbars, default Home widget row height and link clickability, invoice table corner radii, overdue export hover contrast, CSV/Excel toggle accent states, event badge swatch visibility, Choose/Edit Profile top-bar button clicks, Work Order due date picker support, click-anywhere date picker opening, and custom time selector scroll visibility.
   - Verified z-index modal hierarchies, database foreign key constraints, and navigation route retention.
 - **Deliverable Submission Workflow (Post-Oct 08):**
   - Implemented the deliverable handoff workflow (`src/components/tasks/SubmitWorkModal.tsx`, `e794e22`, `7453c2e`).
@@ -61,7 +66,7 @@ This document records the individual module ownership, development timeline, and
   - Added deliverable submission confirmation, marking the task as submitted and updating the parent invoice status to `Finished / Submitted`.
 - **Overdue Invoices Summary & Financial Aging (Post-Oct 08):**
   - Built the Overdue Invoices Summary engine and modal (`src/components/invoices/OverdueSummaryDialog.tsx`, `e552b05`, `1e7116c`).
-  - Grouped unpaid invoices into aging buckets (Current 0-7 days, Overdue 8-14 days, Critical 15+ days) with overdue warning badges.
+  - Grouped unpaid invoices into aging buckets (`Current`, `1-15 Days`, `16-30 Days`, `31-60 Days`, `60+ Days`) with overdue warning badges and WhatsApp/Email reminder shortcuts.
 - **Data Export Engine (Post-Oct 08):**
   - Implemented tabular CSV ledger export functionality for Invoices, Expenses, and Outsourcing records (`src/lib/csv-export.ts`).
 - **Application Shell & UI Polish:**
@@ -85,6 +90,9 @@ This document records the individual module ownership, development timeline, and
   - Built the CSV-to-Excel workbook (`.xlsx`) generation engine and format selector (Excel, TSV, CSV) for accounting exports (`9e6098a`, `b95585b`).
 - **Analytics & Currency Synchronization:**
   - Implemented executive metrics, gross revenue tracking, and global currency synchronization across dashboard widgets.
+- **Background Calendar Sync & Status Badges (Nov 08-09):**
+  - Optimized calendar sync performance with silent `isMacCalendarAppRunning()` checks so local `.ics` updates sync without opening the Apple Calendar window (`2d69ece`, `dcbf1c1`, `80a1c8b`).
+  - Connected task edits, reschedules, and deletions to background sync and redesigned the Calendar & Schedule header icon, live sync ping indicator, and animated update badges (`4cde5bf`, `a302ef4`, `62a8ee3`, `bad410c`, `4f6bad3`).
 
 ---
 
@@ -103,6 +111,10 @@ This document records the individual module ownership, development timeline, and
   - Implemented the two-way local macOS Calendar (`.ics`) synchronization engine (`src/lib/local-calendar.ts`, `a744187`, `2e8ec09`).
   - Built the event creation modal (`EventModal.tsx`) with date and time pickers, task manager bar, and calendar filter controls (`b8c4116`).
   - Designed playful microinteractions for task deletion, including hover-shake and click-press animations for trash icons (`9301bae`, `a4b6e51`).
+- **Modular Invoice Templates & Preview Refinement (Nov 11):**
+  - Extracted and modularized `electron/pdf-templates/` and `src/components/invoices/templates/`, replacing `SL.` with `No.` (`d316fd9`) and aligning `Invoice No.` metadata across templates (`aebec78`).
+  - Implemented and refined five offline HTML/PDF templates: `Geometric Teal`, `Executive Wave` (`4d90e1e`, `7eeb4da`, `f380fc6`, `3ff9da2`), `Scarlet Modern` (`5d11c59`), `Apex Orange` (`65206e0`, `a860938`), and dark-surface `Noir Crimson` (`bbac2ca`).
+  - Replaced template toggle buttons with a selector dropdown (`0e5c6b7`), removed signature/payment footer sections across all templates (`0b17f54`), disabled modal drag-region capture (`aa38503`), and streamlined PDF preview closing and WhatsApp/Email PDF sharing (`4bf374a`).
 
 ---
 
@@ -150,21 +162,26 @@ This document records the individual module ownership, development timeline, and
 | **Nov 07** | Sandika | `Sandika` | Trash icon shake/press animations, month selector, and custom scrollbar (`9301bae`, `2e8ec09`). |
 | **Nov 08** | Nipun | `Nipun` | Cross-platform spring animations, live widget drag-and-drop, and navbar avatar polish (`e4d150d`). |
 | **Nov 08** | All Members | `main` | Production merge of member feature upgrades into `main` (`848d07e`). |
-| **Nov 09** | Nipun | `Nipun` | Task-to-Invoice workflow, batch invoicing dialog, and synchronized Kanban hover highlights (`62f8520`). |
+| **Nov 09** | Nipun | `Nipun` | Task-to-Invoice workflow, batch invoicing dialog, and synchronized Kanban hover highlights (`62f8520`), plus `AGENTS.md` and `CONTRIBUTIONS.md` updates (`6c59bb4`). |
+| **Nov 09** | Binuka | `Binuka` / `main` | Silent background macOS Calendar `.ics` sync, auto-sync on task edits/deletes, and Calendar & Schedule live sync badges (`2d69ece`..`4f6bad3`, merged via `80a1c8b`). |
+| **Nov 11** | Sandika | `Sandika` | Modular HTML/PDF invoice template architecture (`d316fd9`), `Executive Wave`, `Scarlet Modern`, `Apex Orange`, and `Noir Crimson` templates (`4d90e1e`..`bbac2ca`), selector dropdown (`0e5c6b7`), footer cleanup (`0b17f54`), and modal/preview fixes (`4bf374a`, `aa38503`). |
+| **Nov 12** | Nipun | `Nipun` | ESLint cleanup, legacy backup import & PDF margin fixes, `v0.2.0` bump (`bab6fdb`), and IPC/profile/financial/filesystem security hardening + Playwright Electron E2E suite (`fc1953a`). |
+| **Nov 13** | Nipun | `Nipun` / `main` | Settings 5-column miniature template preview gallery (`51cccca`), unified UI motion & macOS trigger origin fixes (`7f2feb7`, `0fd3e47`), `README.md` overhaul (`98b68da`), Retina DMG background artwork, `CHANGELOG.md`, and production release `v0.2.0` (`bf66017`). |
+| **Nov 15** | Lahiru | `Lahiru` | Post-`v0.2.0` Windows and desktop QA pass uncovering 18 UI, theme, profile-gate, widget-layout, invoice toggle/table, and date/time picker bugs (all 18 resolved across CSS tokens, `ProfileGateModal`, `WidgetRenderer`, `OverdueSummaryDialog`, `InputPickerEnhancer`, and `TimePickerInput`). |
 
 ---
 
 ## Test & Build Verification
 
-The integrated system is tested and verified through automated test suites and production packaging:
-- **Test Framework:** Vitest runner (`vitest run`).
-- **Total Test Suites:** 26 test files passed.
-- **Total Unit & Integration Tests:** 168 tests passed (100% pass rate).
+BillFlow `v0.2.0` is verified with automated tests and desktop installers:
+- **Unit & Integration Framework:** Vitest (`vitest run`).
+- **Vitest Results:** `27` test files passed, `210` tests passed (100% pass rate).
+- **Desktop End-to-End Tests:** `3` Playwright Electron specs (`tests/electron/desktop.spec.ts`) covering both billing loops, offline PDFs, multi-profile backups, bridge origin checks, and packaged runtime payload validation.
 - **Type Checking:** `npx tsc --noEmit` compiles cleanly with zero errors.
 - **Linter:** `npm run lint` passes cleanly with zero errors.
-- **Desktop Packaging:**
-  - macOS Apple Silicon (M1+): `release/BillFlow-0.1.2-arm64.dmg` verified and built.
-  - macOS Intel: `release/BillFlow-0.1.2.dmg` verified and built.
-  - Windows: `release/BillFlow Setup 0.1.2.exe` NSIS installer verified and built.
+- **Desktop Packaging (`v0.2.0`):**
+  - macOS Apple Silicon (arm64): `release/BillFlow-0.2.0-arm64.dmg` built and verified alongside the local `.app` preview (`release/preview-0.2.0/mac-arm64/BillFlow.app`).
+  - Windows (x64): `BillFlow Setup 0.2.0.exe` NSIS installer built (`npm run dist:win`).
+  - Previous `v0.1.2` installers remain in `release/` (`BillFlow-0.1.2-arm64.dmg` and `BillFlow-0.1.2.dmg`); the Intel macOS `0.2.0` `.dmg` has not yet been packaged locally.
 
-For the product overview and freelance workflow specification, see [README.md](README.md).
+For the product overview and freelance workflow specification, see [README.md](README.md) and [CHANGELOG.md](CHANGELOG.md).

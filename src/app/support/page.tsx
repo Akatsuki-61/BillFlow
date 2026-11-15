@@ -276,7 +276,7 @@ export default function SupportPage() {
   };
 
   return (
-    <div className="workspace-page motion-page max-w-6xl mx-auto space-y-8 pb-16">
+    <div className="workspace-page motion-page space-y-8 pb-16">
       {/* Page Header */}
       <PageHeader
         title="Help & Support"

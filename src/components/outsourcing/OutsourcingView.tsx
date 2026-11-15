@@ -2323,15 +2323,26 @@ export default function OutsourcingView() {
                 {/* Target Due Date & Delivery URL */}
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[12px] font-semibold text-text-secondary mb-1">
+                    <label
+                      htmlFor="wo-due-date"
+                      className="block text-[12px] font-semibold text-text-secondary mb-1"
+                    >
                       Milestone Due Date
                     </label>
                     <input
-                      type="text"
-                      placeholder="YYYY-MM-DD or Oct 20"
-                      value={woDueDate}
+                      id="wo-due-date"
+                      type="date"
+                      value={/^\d{4}-\d{2}-\d{2}/.test(woDueDate) ? woDueDate.slice(0, 10) : ""}
                       onChange={(e) => setWoDueDate(e.target.value)}
-                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        if (e.clientX === 0 || e.clientX < rect.right - 28) {
+                          try {
+                            e.currentTarget.showPicker?.();
+                          } catch {}
+                        }
+                      }}
+                      className="ui-field w-full text-[12.5px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus cursor-pointer"
                     />
                   </div>
 
