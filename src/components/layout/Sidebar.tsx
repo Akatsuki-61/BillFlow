@@ -835,56 +835,58 @@ export default function Sidebar() {
                   }}
                 >
                   {/* Profile studio geometric contour artwork */}
-                  <svg
-                    className="absolute inset-0 w-full h-full pointer-events-none"
-                    viewBox="0 0 100 100"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <circle
-                      cx="82"
-                      cy="18"
-                      r="34"
-                      stroke={activeProfileStyle.patternStroke}
-                      strokeWidth="2.2"
-                    />
-                    <circle
-                      cx="82"
-                      cy="18"
-                      r="54"
-                      stroke={activeProfileStyle.patternStroke}
-                      strokeWidth="1.6"
-                    />
-                    <path
-                      d="M-10 80 Q 42 58, 110 86"
-                      stroke={activeProfileStyle.patternStroke}
-                      strokeWidth="2.2"
-                    />
-                    <rect
-                      x="0"
-                      y="0"
-                      width="100"
-                      height="48"
-                      fill={`url(#${sheenId})`}
-                      opacity="0.22"
-                    />
-                    <defs>
-                      <linearGradient
-                        id={sheenId}
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop offset="0%" stopColor="#FFFFFF" />
-                        <stop
-                          offset="100%"
-                          stopColor="#FFFFFF"
-                          stopOpacity="0"
-                        />
-                      </linearGradient>
-                    </defs>
-                  </svg>
+                  {!activeProfile.photoData && (
+                    <svg
+                      className="absolute inset-0 w-full h-full pointer-events-none"
+                      viewBox="0 0 100 100"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <circle
+                        cx="82"
+                        cy="18"
+                        r="34"
+                        stroke={activeProfileStyle.patternStroke}
+                        strokeWidth="2.2"
+                      />
+                      <circle
+                        cx="82"
+                        cy="18"
+                        r="54"
+                        stroke={activeProfileStyle.patternStroke}
+                        strokeWidth="1.6"
+                      />
+                      <path
+                        d="M-10 80 Q 42 58, 110 86"
+                        stroke={activeProfileStyle.patternStroke}
+                        strokeWidth="2.2"
+                      />
+                      <rect
+                        x="0"
+                        y="0"
+                        width="100"
+                        height="48"
+                        fill={`url(#${sheenId})`}
+                        opacity="0.22"
+                      />
+                      <defs>
+                        <linearGradient
+                          id={sheenId}
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop offset="0%" stopColor="#FFFFFF" />
+                          <stop
+                            offset="100%"
+                            stopColor="#FFFFFF"
+                            stopOpacity="0"
+                          />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  )}
                   {activeProfile.photoData ? (
                     <Image
                       unoptimized
@@ -892,7 +894,7 @@ export default function Sidebar() {
                       alt=""
                       fill
                       sizes="40px"
-                      className="relative z-10 object-cover"
+                      className="z-10 object-cover"
                     />
                   ) : (
                     <ActiveProfileIcon

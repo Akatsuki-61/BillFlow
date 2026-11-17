@@ -3,13 +3,15 @@
 import { useData } from "@/lib/data/DataProvider";
 import { cashflowForecast } from "@/lib/cashflow-forecast";
 import { formatCents } from "@/lib/format";
+import "./analytics.css";
 
 export function CashflowForecast() {
   const { invoices, workOrders, isLoading } = useData();
+  const periods = cashflowForecast(invoices, workOrders);
 
   return (
     <section
-      className="ui-card p-5 space-y-4"
+      className="ui-card p-5 space-y-4 cashflow-forecast-section"
       aria-labelledby="cashflow-forecast-heading"
     >
       <div>
@@ -27,60 +29,62 @@ export function CashflowForecast() {
       {isLoading ? (
         <p className="text-xs text-content-neutral-600">Loading forecast…</p>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {cashflowForecast(invoices, workOrders).map((period) => (
-            <div
-              key={period.label}
-              className="min-w-0 rounded-xl border border-line-neutral-200 p-3"
-            >
-              <h3 className="text-sm font-medium text-content-neutral-950">
-                {period.label}
-              </h3>
-              <p className="mt-0.5 text-xs text-content-neutral-600">
-                {period.start} to {period.end}
-              </p>
-              {period.totals.length ? (
-                <table className="mt-3 w-full text-left text-xs tabular-nums">
+        <div className="cashflow-forecast-grid">
+          {periods.map((period) => (
+            <div key={period.label} className="cashflow-forecast-card">
+              <div className="cashflow-forecast-card-header">
+                <h3 className="cashflow-forecast-card-title">{period.label}</h3>
+                <p className="cashflow-forecast-card-range">
+                  {period.start} to {period.end}
+                </p>
+              </div>
+              <div className="cashflow-forecast-table-wrap">
+                <table className="cashflow-forecast-table">
                   <caption className="sr-only">
                     {period.label} by currency
                   </caption>
-                  <thead className="text-content-neutral-600">
+                  <colgroup>
+                    <col className="cashflow-forecast-col-currency" />
+                    <col className="cashflow-forecast-col-amount" />
+                    <col className="cashflow-forecast-col-amount" />
+                  </colgroup>
+                  <thead>
                     <tr>
-                      <th scope="col" className="pb-2 font-medium">
-                        Currency
-                      </th>
-                      <th scope="col" className="pb-2 text-right font-medium">
+                      <th scope="col">Currency</th>
+                      <th scope="col" className="cashflow-forecast-num">
                         Collections
                       </th>
-                      <th scope="col" className="pb-2 text-right font-medium">
+                      <th scope="col" className="cashflow-forecast-num">
                         Payouts
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {period.totals.map(([currency, total]) => (
-                      <tr
-                        key={currency}
-                        className="border-t border-line-neutral-200 text-content-neutral-950"
-                      >
-                        <th scope="row" className="py-2 font-medium">
-                          {currency}
-                        </th>
-                        <td className="text-right">
-                          {formatCents(total.collections, currency)}
-                        </td>
-                        <td className="text-right">
-                          {formatCents(total.payouts, currency)}
+                    {period.totals.length ? (
+                      period.totals.map(([currency, total]) => (
+                        <tr key={currency}>
+                          <th scope="row">{currency}</th>
+                          <td className="cashflow-forecast-num">
+                            {formatCents(total.collections, currency)}
+                          </td>
+                          <td className="cashflow-forecast-num">
+                            {formatCents(total.payouts, currency)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="cashflow-forecast-empty-row">
+                        <td
+                          colSpan={3}
+                          className="cashflow-forecast-empty-cell"
+                        >
+                          No collections or payouts due.
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
-              ) : (
-                <p className="mt-3 text-xs text-content-neutral-600">
-                  No collections or payouts due.
-                </p>
-              )}
+              </div>
             </div>
           ))}
         </div>

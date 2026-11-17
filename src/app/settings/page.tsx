@@ -11,11 +11,13 @@ import { Dialog } from "@/components/ui/Dialog";
 
 import { Button, PageHeader } from "@/components/ui/Workspace";
 
+import Image from "next/image";
 import React, {
   useState,
   useEffect,
   useEffectEvent,
   useMemo,
+  useRef,
   Suspense,
 } from "react";
 import { IconCrossfade, MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
@@ -1009,12 +1011,24 @@ function SettingsContent() {
     );
   }, [formState, settings]);
 
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
   const showToast = (
     message: string,
     type: "success" | "error" = "success",
   ) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3200);
+    toastTimerRef.current = setTimeout(() => {
+      setNotification(null);
+      toastTimerRef.current = null;
+    }, 3200);
   };
 
   const handleCopyPath = () => {
@@ -1764,8 +1778,19 @@ function SettingsContent() {
                   {/* Live Preview Card */}
                   <div className="ui-card from-surface-purple-50/70 to-surface-neutral-50 border-line-purple-200/70 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-accent-solid text-white flex items-center justify-center text-lg font-bold shadow-sm shrink-0">
-                        {avatarLetter}
+                      <div className="relative w-12 h-12 rounded-full overflow-hidden bg-accent-solid text-white flex items-center justify-center text-lg font-bold shadow-sm shrink-0">
+                        {activeProfile.photoData ? (
+                          <Image
+                            unoptimized
+                            src={activeProfile.photoData}
+                            alt=""
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          avatarLetter
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -1802,9 +1827,15 @@ function SettingsContent() {
                     <ImageUpload
                       label="Workspace profile photo"
                       value={activeProfile.photoData}
-                      onChange={(photoData) =>
-                        updateProfile(activeProfile.id, { photoData })
-                      }
+                      onChange={async (photoData) => {
+                        await updateProfile(activeProfile.id, { photoData });
+                        showToast(
+                          photoData
+                            ? "Successfully uploaded"
+                            : "Successfully removed",
+                          "success",
+                        );
+                      }}
                     />
                   </section>
                   {/* Basic Personal Info */}

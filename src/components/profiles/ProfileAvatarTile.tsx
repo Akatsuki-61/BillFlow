@@ -183,6 +183,7 @@ export function ProfileAvatarTile({
   avatar,
   photoData,
   accent,
+  name,
   size = "md",
   hasPassword = false,
   isActive = false,
@@ -216,58 +217,60 @@ export function ProfileAvatarTile({
         }}
       >
         {/* Subtle studio geometric contours */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          viewBox="0 0 100 100"
-          fill="none"
-          aria-hidden="true"
-        >
-          <circle
-            cx="84"
-            cy="16"
-            r="36"
-            stroke={style.patternStroke}
-            strokeWidth="1.2"
-          />
-          <circle
-            cx="84"
-            cy="16"
-            r="56"
-            stroke={style.patternStroke}
-            strokeWidth="0.9"
-          />
-          <path
-            d="M-10 82 Q 42 62, 110 88"
-            stroke={style.patternStroke}
-            strokeWidth="1.2"
-          />
-          <rect
-            x="0"
-            y="0"
-            width="100"
-            height="46"
-            fill={`url(#${sheenId})`}
-            opacity="0.16"
-          />
-          <defs>
-            <linearGradient id={sheenId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FFFFFF" />
-              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-        </svg>
+        {!photoData && (
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox="0 0 100 100"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle
+              cx="84"
+              cy="16"
+              r="36"
+              stroke={style.patternStroke}
+              strokeWidth="1.2"
+            />
+            <circle
+              cx="84"
+              cy="16"
+              r="56"
+              stroke={style.patternStroke}
+              strokeWidth="0.9"
+            />
+            <path
+              d="M-10 82 Q 42 62, 110 88"
+              stroke={style.patternStroke}
+              strokeWidth="1.2"
+            />
+            <rect
+              x="0"
+              y="0"
+              width="100"
+              height="46"
+              fill={`url(#${sheenId})`}
+              opacity="0.16"
+            />
+            <defs>
+              <linearGradient id={sheenId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#FFFFFF" />
+                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+          </svg>
+        )}
 
         <div
-          className="relative z-10 flex items-center justify-center transition-transform duration-200 group-hover:scale-105"
+          className="relative z-10 w-full h-full flex items-center justify-center transition-transform duration-200 group-hover:scale-105"
           style={{ color: style.iconColor }}
         >
           {photoData ? (
             <Image
               unoptimized
               src={photoData}
-              alt=""
+              alt={name ? `${name} avatar` : ""}
               fill
-              sizes="96px"
+              sizes="144px"
               className="object-cover"
             />
           ) : (

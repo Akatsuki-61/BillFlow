@@ -99,6 +99,10 @@ import type { TaskItem } from "@/types/tasks";
 import "./invoices.css";
 import InvoiceDocumentSheet from "./InvoiceDocumentSheet";
 
+const ACCENT_ICON_CLASS = "text-accent-deep-solid dark:text-accent";
+const ACCENT_EXPORT_BUTTON_CLASS =
+  "!border-border-accent !bg-accent-faint !text-accent-deep-solid enabled:hover:!bg-accent-soft enabled:hover:!border-accent/60 dark:!bg-accent-faint dark:!text-content-purple-950 dark:enabled:hover:!bg-accent-soft";
+
 type FilterTab =
   "All Invoices" | "Advance Paid" | "Drafts" | "Overdue" | "Paid";
 
@@ -1923,10 +1927,10 @@ export default function InvoicesView() {
           <button
             type="button"
             onClick={() => setShowOverdueSummary(true)}
-            className="zentra-control-pill"
+            className="zentra-control-pill hover:!border-accent/50"
             title="Open Overdue Invoices Summary & Professional CSV Template Table"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <FileSpreadsheet className={`w-3.5 h-3.5 ${ACCENT_ICON_CLASS}`} />
             <span>Overdue Summary & CSV Template</span>
           </button>
           <button
@@ -1936,10 +1940,10 @@ export default function InvoicesView() {
                 allInvoices.length > 0 ? allInvoices[0] : getSampleInvoice();
               setPreviewInvoice(target);
             }}
-            className="zentra-control-pill hover:border-[#00A887] text-[#00A887]"
+            className="zentra-control-pill hover:!border-accent/50"
             title="Preview the geometric EPS invoice design template"
           >
-            <Eye className="w-3.5 h-3.5 text-[#00A887]" />
+            <Eye className={`w-3.5 h-3.5 ${ACCENT_ICON_CLASS}`} />
             <span>Preview Template</span>
           </button>
           <button
@@ -2069,7 +2073,7 @@ export default function InvoicesView() {
                   <button
                     type="button"
                     onClick={() => handleExportInvoicesCsv("overdue", "excel")}
-                    className="zentra-circle-btn zentra-circle-btn--sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                    className="zentra-circle-btn zentra-circle-btn--sm hover:!border-accent/50 !text-accent-deep-solid dark:!text-accent"
                     aria-label="Export overdue invoices to Excel"
                     title="Convert & Export Overdue Invoices to Excel (.xls)"
                   >
@@ -2187,14 +2191,19 @@ export default function InvoicesView() {
             )}
           </div>
 
-          <div className="relative inline-flex items-center rounded-full border border-border-subtle bg-surface-neutral-100/80 dark:bg-surface-neutral-900 p-0.5 shrink-0">
+          <div
+            role="group"
+            aria-label="Export file format"
+            className="relative inline-flex items-center rounded-full border border-line-neutral-200 bg-surface-neutral-100/80 dark:bg-surface-neutral-900 p-0.5 shrink-0"
+          >
             <button
               type="button"
+              aria-pressed={exportFormat === "csv"}
               onClick={() => setExportFormat("csv")}
               className={`relative px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                 exportFormat === "csv"
                   ? "text-white"
-                  : "text-content-neutral-500 hover:text-content-neutral-800"
+                  : "text-content-neutral-600 hover:text-content-neutral-950"
               }`}
               title="Set export format to RFC 4180 CSV (.csv)"
             >
@@ -2209,11 +2218,12 @@ export default function InvoicesView() {
             </button>
             <button
               type="button"
+              aria-pressed={exportFormat === "excel"}
               onClick={() => setExportFormat("excel")}
               className={`relative px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                 exportFormat === "excel"
                   ? "text-white"
-                  : "text-content-neutral-500 hover:text-content-neutral-800"
+                  : "text-content-neutral-600 hover:text-content-neutral-950"
               }`}
               title="Set export format to Microsoft Excel Workbook (.xls) via Convert Engine"
             >
@@ -2242,11 +2252,7 @@ export default function InvoicesView() {
                 ? `Export overdue summary report to ${exportFormat === "excel" ? "Excel (.xls)" : "CSV (.csv)"}`
                 : `Export currently filtered invoices to ${exportFormat === "excel" ? "Excel (.xls)" : "CSV (.csv)"}`
             }
-            className={`shrink-0 ${
-              exportFormat === "excel"
-                ? "!border-emerald-300 dark:!border-emerald-800 !text-emerald-700 dark:!text-emerald-300"
-                : ""
-            }`}
+            className={`shrink-0 ${ACCENT_EXPORT_BUTTON_CLASS}`}
           >
             <IconCrossfade
               iconKey={exportFormat}
@@ -2330,7 +2336,7 @@ export default function InvoicesView() {
                   size="small"
                   type="button"
                   onClick={() => handleExportInvoicesCsv("selected", "csv")}
-                  className="!text-xs !py-1 text-accent"
+                  className={`!text-xs !py-1 ${ACCENT_EXPORT_BUTTON_CLASS}`}
                   title="Export selected invoices to CSV (.csv)"
                 >
                   <Download className="w-3 h-3" />
@@ -2341,7 +2347,7 @@ export default function InvoicesView() {
                   size="small"
                   type="button"
                   onClick={() => handleExportInvoicesCsv("selected", "excel")}
-                  className="!text-xs !py-1 text-emerald-700 dark:text-emerald-300 !border-emerald-300 dark:!border-emerald-800"
+                  className={`!text-xs !py-1 ${ACCENT_EXPORT_BUTTON_CLASS}`}
                   title="Convert & export selected invoices to Excel (.xls)"
                 >
                   <FileSpreadsheet className="w-3 h-3" />
@@ -2409,7 +2415,7 @@ export default function InvoicesView() {
                               setPreviewInvoice(getSampleInvoice())
                             }
                           >
-                            <Eye className="w-4 h-4 text-[#00A887]" />
+                            <Eye className={`w-4 h-4 ${ACCENT_ICON_CLASS}`} />
                             <span>Preview Template Design</span>
                           </Button>
                         </div>
@@ -2475,11 +2481,11 @@ export default function InvoicesView() {
                             <button
                               type="button"
                               onClick={() => setPreviewInvoice(inv)}
-                              className="record-meta hover:text-[#00A887] hover:underline font-mono cursor-pointer text-left inline-flex items-center gap-1.5"
+                              className="record-meta hover:!text-accent-deep-solid dark:hover:!text-accent hover:underline font-mono cursor-pointer text-left inline-flex items-center gap-1.5"
                               title={`View invoice design ${inv.code}`}
                             >
                               <span>{inv.code}</span>
-                              <Eye className="w-3 h-3 text-[#00A887]/70" />
+                              <Eye className={`w-3 h-3 ${ACCENT_ICON_CLASS}`} />
                               {!inv.clientId ? " · Temporary" : ""}
                             </button>
                             {inv.workflowStage && (
@@ -2609,7 +2615,7 @@ export default function InvoicesView() {
                             }}
                             title={`View invoice design ${inv.code}`}
                           >
-                            <Eye className="w-4 h-4 text-[#00A887]" />
+                            <Eye className={`w-4 h-4 ${ACCENT_ICON_CLASS}`} />
                           </Button>
                           <Button
                             variant="ghost"
@@ -3270,7 +3276,7 @@ export default function InvoicesView() {
                   }}
                   className="gap-1.5"
                 >
-                  <Eye className="w-3.5 h-3.5 text-[#00A887]" />
+                  <Eye className={`w-3.5 h-3.5 ${ACCENT_ICON_CLASS}`} />
                   <span>Preview Design</span>
                 </Button>
                 <Button
@@ -4677,7 +4683,7 @@ export default function InvoicesView() {
               }}
               className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors text-content-neutral-900 font-semibold"
             >
-              <Eye className="w-3.5 h-3.5 text-[#00A887]" />
+              <Eye className={`w-3.5 h-3.5 ${ACCENT_ICON_CLASS}`} />
               <span>View Invoice Design</span>
             </button>
 

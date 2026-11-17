@@ -62,6 +62,9 @@ interface OverdueSummaryDialogProps {
   showToast: (message: string, type?: "success" | "error") => void;
 }
 
+const ACCENT_EXPORT_BUTTON_CLASS =
+  "!border-border-accent !bg-accent-faint !text-accent-deep-solid enabled:hover:!bg-accent-soft enabled:hover:!border-accent/60 dark:!bg-accent-faint dark:!text-content-purple-950 dark:enabled:hover:!bg-accent-soft";
+
 type SummaryViewTab = "ledger" | "clients" | "template";
 
 export function OverdueSummaryDialog({
@@ -368,11 +371,12 @@ export function OverdueSummaryDialog({
             >
               <button
                 type="button"
+                aria-pressed={exportFormat === "csv"}
                 onClick={() => setExportFormat("csv")}
                 className={`relative isolate px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   exportFormat === "csv"
                     ? "text-white"
-                    : "text-content-neutral-500 hover:text-content-neutral-800"
+                    : "text-content-neutral-600 hover:text-content-neutral-950"
                 }`}
               >
                 {exportFormat === "csv" && (
@@ -386,11 +390,12 @@ export function OverdueSummaryDialog({
               </button>
               <button
                 type="button"
+                aria-pressed={exportFormat === "excel"}
                 onClick={() => setExportFormat("excel")}
                 className={`relative isolate px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   exportFormat === "excel"
                     ? "text-white"
-                    : "text-content-neutral-500 hover:text-content-neutral-800"
+                    : "text-content-neutral-600 hover:text-content-neutral-950"
                 }`}
               >
                 {exportFormat === "excel" && (
@@ -410,14 +415,18 @@ export function OverdueSummaryDialog({
               type="button"
               onClick={() => handleExportData(exportFormat, csvTemplateMode)}
               disabled={overdueList.length === 0}
-              className="!border-emerald-600/30 !bg-emerald-50 dark:!bg-emerald-950/60 !text-emerald-800 dark:!text-emerald-100 hover:!bg-emerald-100/70 dark:hover:!bg-emerald-900/50"
+              className={ACCENT_EXPORT_BUTTON_CLASS}
               title={
                 exportFormat === "excel"
                   ? "Convert and download multi-sheet Microsoft Excel Workbook (.xls)"
                   : "Download RFC 4180 CSV file (.csv)"
               }
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
+              {exportFormat === "excel" ? (
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
               <span>
                 {exportFormat === "excel"
                   ? "Export Excel (.xls)"
@@ -619,7 +628,7 @@ export function OverdueSummaryDialog({
                   className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-xs border border-line-neutral-200/70"
                 />
               )}
-              <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-600 relative z-10" />
+              <ArrowRightLeft className="w-3.5 h-3.5 text-accent relative z-10" />
               <span className="relative z-10">
                 CSV &harr; Excel Convert Engine
               </span>
@@ -995,18 +1004,19 @@ export function OverdueSummaryDialog({
                     <div className="inline-flex p-0.5 rounded-lg bg-surface border border-line-neutral-200 relative">
                       <button
                         type="button"
+                        aria-pressed={csvTemplateMode === "executive"}
                         onClick={() => setCsvTemplateMode("executive")}
                         className={`relative px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                           csvTemplateMode === "executive"
                             ? "text-white"
-                            : "text-content-neutral-600 hover:text-content-neutral-900"
+                            : "text-content-neutral-600 hover:text-content-neutral-950"
                         }`}
                       >
                         {csvTemplateMode === "executive" && (
                           <motion.span
                             layoutId="overdue-template-mode-pill"
                             transition={SPRING_NAV_GLIDE}
-                            className="absolute inset-0 rounded-md bg-accent"
+                            className="absolute inset-0 rounded-md bg-accent-solid"
                           />
                         )}
                         <span className="relative z-10">
@@ -1015,18 +1025,19 @@ export function OverdueSummaryDialog({
                       </button>
                       <button
                         type="button"
+                        aria-pressed={csvTemplateMode === "flat"}
                         onClick={() => setCsvTemplateMode("flat")}
                         className={`relative px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                           csvTemplateMode === "flat"
                             ? "text-white"
-                            : "text-content-neutral-600 hover:text-content-neutral-900"
+                            : "text-content-neutral-600 hover:text-content-neutral-950"
                         }`}
                       >
                         {csvTemplateMode === "flat" && (
                           <motion.span
                             layoutId="overdue-template-mode-pill"
                             transition={SPRING_NAV_GLIDE}
-                            className="absolute inset-0 rounded-md bg-accent"
+                            className="absolute inset-0 rounded-md bg-accent-solid"
                           />
                         )}
                         <span className="relative z-10">
@@ -1086,7 +1097,7 @@ export function OverdueSummaryDialog({
                 <span>
                   {exportFormat === "excel" ? (
                     <>
-                      <strong className="text-emerald-700 dark:text-emerald-400">
+                      <strong className="text-accent-deep-solid dark:text-accent">
                         Excel Convert Engine Active:
                       </strong>{" "}
                       Converts RFC 4180 CSV into a styled Microsoft Excel XML
@@ -1308,6 +1319,7 @@ export function OverdueSummaryDialog({
               type="button"
               onClick={() => handleExportData("csv", csvTemplateMode)}
               disabled={overdueList.length === 0}
+              className={ACCENT_EXPORT_BUTTON_CLASS}
               title="Download RFC 4180 CSV (.csv)"
             >
               <Download className="w-3.5 h-3.5" />
@@ -1320,7 +1332,7 @@ export function OverdueSummaryDialog({
               type="button"
               onClick={() => handleExportData("excel", csvTemplateMode)}
               disabled={overdueList.length === 0}
-              className="!border-emerald-600/30 !bg-emerald-50 dark:!bg-emerald-950/60 !text-emerald-800 dark:!text-emerald-100 hover:!bg-emerald-100/70 dark:hover:!bg-emerald-900/50"
+              className={ACCENT_EXPORT_BUTTON_CLASS}
               title="Convert & download Microsoft Excel Workbook (.xls)"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />

@@ -143,6 +143,7 @@ export function ProfileGateModal() {
   const [formRole, setFormRole] = useState<ProfileRole>("software-engineering");
   const [formCustomRoleText, setFormCustomRoleText] = useState("");
   const [formAvatar, setFormAvatar] = useState<ProfileAvatar>("code");
+  const [formPhotoData, setFormPhotoData] = useState<string | null>(null);
   const [formAccent, setFormAccent] = useState<AccentPreference>("blue");
   const [formCurrency, setFormCurrency] = useState<Currency>("USD");
   const [formInvoicePrefix, setFormInvoicePrefix] = useState("SE-");
@@ -191,6 +192,7 @@ export function ProfileGateModal() {
       setFormRole(profile.role);
       setFormCustomRoleText(profile.subtitle);
       setFormAvatar(profile.avatar);
+      setFormPhotoData(profile.photoData ?? null);
       setFormAccent(profile.accent);
       setFormCurrency(profile.defaultCurrency);
       setFormInvoicePrefix(profile.invoicePrefix);
@@ -208,6 +210,7 @@ export function ProfileGateModal() {
       setFormRole(nextPreset.role);
       setFormCustomRoleText(nextPreset.label);
       setFormAvatar(nextPreset.avatar);
+      setFormPhotoData(null);
       setFormAccent(nextPreset.accent);
       setFormCurrency(
         (settings?.defaultCurrency as Currency) ||
@@ -1013,6 +1016,7 @@ export function ProfileGateModal() {
                   <div className="flex flex-col items-center">
                     <ProfileAvatarTile
                       avatar={formAvatar}
+                      photoData={formPhotoData}
                       accent={formAccent}
                       size="xl"
                       hasPassword={formEnablePassword}

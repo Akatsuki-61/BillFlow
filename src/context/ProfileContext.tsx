@@ -53,6 +53,7 @@ const FALLBACK_DEFAULT_PROFILE: UserProfile = {
   role: "software-engineering",
   subtitle: "Full-Stack & Systems",
   avatar: "code",
+  photoData: null,
   accent: "blue",
   themePreference: "system",
   defaultCurrency: "USD",
@@ -158,6 +159,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   );
 
   const initialBootHandledRef = useRef(false);
+  const lastDispatchedProfileIdRef = useRef<string | null>(null);
 
   const applyProfileVisuals = useCallback(
     (profile: UserProfile, transition = false) => {
@@ -178,7 +180,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   );
 
   const applyResponse = useCallback(
-    (res: ProfileListResponse, isInitialBoot = false) => {
+    (
+      res: ProfileListResponse,
+      isInitialBoot = false,
+      forceVisuals = false,
+    ) => {
       setProfiles(res.profiles);
       setActiveProfileId(res.activeProfileId);
       setMaxProfiles(res.maxProfiles || MAX_PROFILES);
@@ -189,7 +195,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         res.profiles[0] ??
         FALLBACK_DEFAULT_PROFILE;
 
-      applyProfileVisuals(active, !isInitialBoot);
+      if (
+        isInitialBoot ||
+        forceVisuals ||
+        lastDispatchedProfileIdRef.current !== active.id
+      ) {
+        lastDispatchedProfileIdRef.current = active.id;
+        applyProfileVisuals(active, !isInitialBoot);
+      }
       if (res.isLocked) {
         setIsLocked(true);
         setIsGateOpen(true);
@@ -260,6 +273,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const lockCurrentProfile = useCallback(() => {
     if (window.billflow?.profiles)
       void window.billflow.profiles.lock().catch(console.error);
+    lastDispatchedProfileIdRef.current = null;
     window.dispatchEvent(new Event("billflow:workspace-locked"));
     if (typeof window !== "undefined") {
       sessionStorage.removeItem(SESSION_UNLOCKED_KEY);
@@ -294,7 +308,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         setIsGateOpen(false);
         setEditingProfile(null);
-        applyResponse(res, false);
+        applyResponse(res, false, true);
         await refreshData();
         return;
       }
@@ -323,7 +337,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setIsLocked(false);
       setIsGateOpen(false);
       setEditingProfile(null);
-      applyResponse(nextState, false);
+      applyResponse(nextState, false, true);
     },
     [applyResponse, refreshData],
   );
@@ -334,7 +348,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (api?.profiles) {
         const res = await api.profiles.create(input);
         applyResponse(res, false);
-        await refreshData();
         return;
       }
 
@@ -358,6 +371,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         role: input.role,
         subtitle: input.subtitle?.trim() || preset.subtitle,
         avatar: input.avatar || preset.avatar,
+        photoData: input.photoData ?? null,
         accent: input.accent || preset.accent,
         themePreference: input.themePreference || "system",
         defaultCurrency: input.defaultCurrency || "USD",
@@ -388,7 +402,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       saveBrowserFallbackState(nextState);
       applyResponse(nextState, false);
     },
-    [applyResponse, refreshData],
+    [applyResponse],
   );
 
   const updateProfile = useCallback(
@@ -397,7 +411,27 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (api?.profiles) {
         const res = await api.profiles.update(id, patch);
         applyResponse(res, false);
-        await refreshData();
+        const updatedActive = res.profiles.find(
+          (p) => p.id === res.activeProfileId,
+        );
+        if (updatedActive && id === res.activeProfileId) {
+          if (patch.accent !== undefined) {
+            setAccent(updatedActive.accent, { transition: true });
+          }
+          if (patch.themePreference !== undefined) {
+            setPreference(updatedActive.themePreference, {
+              transition: true,
+            });
+          }
+        }
+        if (
+          patch.role !== undefined ||
+          patch.subtitle !== undefined ||
+          patch.defaultCurrency !== undefined ||
+          patch.invoicePrefix !== undefined
+        ) {
+          await refreshData();
+        }
         return;
       }
 
@@ -426,6 +460,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           role: patch.role ?? p.role,
           subtitle: patch.subtitle ?? p.subtitle,
           avatar: patch.avatar ?? p.avatar,
+          photoData:
+            patch.photoData === undefined ? p.photoData : patch.photoData,
           accent: patch.accent ?? p.accent,
           themePreference: patch.themePreference ?? p.themePreference,
           defaultCurrency: patch.defaultCurrency ?? p.defaultCurrency,
@@ -452,8 +488,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       };
       saveBrowserFallbackState(nextState);
       applyResponse(nextState, false);
+      if (id === current.activeProfileId) {
+        if (patch.accent !== undefined) {
+          setAccent(patch.accent, { transition: true });
+        }
+        if (patch.themePreference !== undefined) {
+          setPreference(patch.themePreference, { transition: true });
+        }
+      }
     },
-    [applyResponse, refreshData],
+    [applyResponse, refreshData, setAccent, setPreference],
   );
 
   const deleteProfile = useCallback(
@@ -462,7 +506,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (api?.profiles) {
         const res = await api.profiles.remove(id, password);
         applyResponse(res, false);
-        await refreshData();
         return;
       }
 
@@ -494,7 +537,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       saveBrowserFallbackState(nextState);
       applyResponse(nextState, false);
     },
-    [applyResponse, refreshData],
+    [applyResponse],
   );
 
   const completeOnboarding = useCallback(
@@ -508,7 +551,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         setIsGateOpen(false);
         setEditingProfile(null);
-        applyResponse(res, false);
+        applyResponse(res, false, true);
         await refreshData();
         return;
       }
@@ -532,6 +575,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
             role: slot.role,
             subtitle: slot.subtitle,
             avatar: slot.avatar,
+            photoData: null,
             accent: slot.accent,
             themePreference: "system",
             defaultCurrency: slot.defaultCurrency || input.defaultCurrency,
@@ -563,7 +607,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setIsLocked(false);
       setIsGateOpen(false);
       setEditingProfile(null);
-      applyResponse(nextState, false);
+      applyResponse(nextState, false, true);
     },
     [applyResponse, refreshData],
   );
