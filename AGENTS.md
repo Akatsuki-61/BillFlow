@@ -141,3 +141,7 @@ BillFlow is built around interconnected workflows rather than isolated screens. 
    - Always run `npm test` before pushing changes. All test suites must pass 100%.
    - Run `npx tsc --noEmit` and resolve all TypeScript compiler diagnostics.
    - Use conventional commit messages (`feat:`, `fix:`, `docs:`, `test:`, `merge:`).
+6. **Preserve the UI Rework Branch:**
+   - `UI-Rework` is frozen. Do not push commits to `refs/heads/UI-Rework`, merge changes into it, rebase it, reset it, delete it, or move its local or remote branch reference unless the user explicitly requests a change to that branch.
+   - Requests to synchronize all branches with `main` always exclude `UI-Rework`. Use explicit branch names and destination refspecs; never use `git push --all`, `git push --mirror`, or wildcard pushes for synchronization.
+   - Record the local and remote `UI-Rework` commit IDs before branch synchronization and verify that both remain unchanged afterward.
