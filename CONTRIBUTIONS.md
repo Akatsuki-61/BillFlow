@@ -59,6 +59,7 @@ This document records the individual module ownership, development timeline, and
 - **Lead Quality Assurance & Exploratory Bug Hunting:**
   - Conducted end-to-end exploratory testing across desktop releases, uncovering and documenting 17 critical user-facing defects post-v0.1.0.
   - Conducted Windows and cross-surface QA testing on `v0.2.0` (Nov 15), identifying 18 additional UI, theme, and input bugs covering full-screen window sizing, accent-adaptive scrollbars, default Home widget row height and link clickability, invoice table corner radii, overdue export hover contrast, CSV/Excel toggle accent states, event badge swatch visibility, Choose/Edit Profile top-bar button clicks, Work Order due date picker support, click-anywhere date picker opening, and custom time selector scroll visibility.
+  - Reported 7 additional UI and UX bugs during post-`v0.2.0` QA (Nov 17): the Expenses Export Report file download vs. Print Report split, hardcoded green on Invoices template/eye triggers and CSV/Excel export controls (including the Overdue Summary dialog), misaligned Analytics Cashflow Forecast 3-column cards/tables with header highlights bleeding into data rows, missing Settings workspace profile photo upload/remove confirmation toasts, and missing avatar photos in the profile popover.
   - Verified z-index modal hierarchies, database foreign key constraints, and navigation route retention.
 - **Deliverable Submission Workflow (Post-Oct 08):**
   - Implemented the deliverable handoff workflow (`src/components/tasks/SubmitWorkModal.tsx`, `e794e22`, `7453c2e`).
@@ -168,6 +169,7 @@ This document records the individual module ownership, development timeline, and
 | **Nov 12** | Nipun | `Nipun` | ESLint cleanup, legacy backup import & PDF margin fixes, `v0.2.0` bump (`bab6fdb`), and IPC/profile/financial/filesystem security hardening + Playwright Electron E2E suite (`fc1953a`). |
 | **Nov 13** | Nipun | `Nipun` / `main` | Settings 5-column miniature template preview gallery (`51cccca`), unified UI motion & macOS trigger origin fixes (`7f2feb7`, `0fd3e47`), `README.md` overhaul (`98b68da`), Retina DMG background artwork, `CHANGELOG.md`, and production release `v0.2.0` (`bf66017`). |
 | **Nov 15** | Lahiru | `Lahiru` | Post-`v0.2.0` Windows and desktop QA pass uncovering 18 UI, theme, profile-gate, widget-layout, invoice toggle/table, and date/time picker bugs (all 18 resolved across CSS tokens, `ProfileGateModal`, `WidgetRenderer`, `OverdueSummaryDialog`, `InputPickerEnhancer`, and `TimePickerInput`). |
+| **Nov 17** | Lahiru / Nipun | `Nipun` / `main` | Post-`v0.2.0` QA follow-up fixing 7 UI/UX bugs: Expenses `Export Report` CSV download vs. `Print Report` split, Settings accent color consistency on Invoices and Overdue Summary controls, Analytics Cashflow Forecast 3-column alignment and header highlight containment, Settings workspace photo upload/remove toasts, and profile popover avatar photo rendering (`expenses/page.tsx`, `InvoicesView.tsx`, `OverdueSummaryDialog.tsx`, `CashflowForecast.tsx`, `analytics.css`, `settings/page.tsx`, `Sidebar.tsx`, `ProfileAvatarTile.tsx`, `ProfileGateModal.tsx`, `ProfileContext.tsx`). |
 
 ---
 
@@ -175,7 +177,7 @@ This document records the individual module ownership, development timeline, and
 
 BillFlow `v0.2.0` is verified with automated tests and desktop installers:
 - **Unit & Integration Framework:** Vitest (`vitest run`).
-- **Vitest Results:** `27` test files passed, `210` tests passed (100% pass rate).
+- **Vitest Results:** `29` test files passed, `220` tests passed (100% pass rate).
 - **Desktop End-to-End Tests:** `3` Playwright Electron specs (`tests/electron/desktop.spec.ts`) covering both billing loops, offline PDFs, multi-profile backups, bridge origin checks, and packaged runtime payload validation.
 - **Type Checking:** `npx tsc --noEmit` compiles cleanly with zero errors.
 - **Linter:** `npm run lint` passes cleanly with zero errors.
