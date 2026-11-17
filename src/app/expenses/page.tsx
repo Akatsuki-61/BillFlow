@@ -4,7 +4,7 @@ import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
-import { recentMonths } from "@/lib/visual-metrics";
+import { recentMonths, localDateKey } from "@/lib/visual-metrics";
 
 import {
   Button,
@@ -17,9 +17,10 @@ import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE, listRowTransition } from "@/lib/motion";
 
-import React, { useState, useMemo, Suspense } from "react";
+import React, { useState, useMemo, useRef, useEffect, Suspense } from "react";
 import {
   Download,
+  Printer,
   Plus,
   Plane,
   Code2,
@@ -30,6 +31,7 @@ import {
   ChevronRight,
   X,
   CheckCircle2,
+  AlertCircle,
   DollarSign,
   Cpu,
   Server,
@@ -42,6 +44,11 @@ import { useExpenses, useData } from "@/lib/data/DataProvider";
 import type { ExpenseItem } from "@/types/expenses";
 import type { Currency } from "@/types/billing";
 import { formatCents, formatDateDisplay } from "@/lib/format";
+import {
+  escapeCsvField,
+  centsToDecimalString,
+  downloadCsvFile,
+} from "@/lib/csv-export";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
 
 function AdobeBrandIcon({ className = "w-4 h-4" }: { className?: string }) {
@@ -120,6 +127,76 @@ const EXPENSE_CATEGORY_OPTIONS: SelectOption[] = [
   { value: "HARDWARE", label: "HARDWARE" },
 ];
 
+/** Builds an RFC 4180 CSV report for expenses with per-currency totals. */
+function generateExpensesCsv(items: ExpenseItem[]): string {
+  const headers = [
+    "Date",
+    "Merchant",
+    "Description",
+    "Category",
+    "Currency",
+    "Amount",
+    "Tax Deductible",
+    "Receipt Attached",
+    "Receipt File",
+  ];
+
+  const rows = items.map((item) => {
+    const hasReceipt = Boolean(item.attachments && item.attachments.length > 0);
+    const receiptFiles = (item.attachments ?? [])
+      .map((attachment) => attachment.originalName)
+      .filter(Boolean)
+      .join("; ");
+
+    return [
+      escapeCsvField(item.incurredAt || ""),
+      escapeCsvField(item.merchant),
+      escapeCsvField(item.description || ""),
+      escapeCsvField(item.category),
+      escapeCsvField(item.currency),
+      escapeCsvField(centsToDecimalString(item.amountCents)),
+      escapeCsvField(item.deductible ? "Yes" : "No"),
+      escapeCsvField(hasReceipt ? "Yes" : "No"),
+      escapeCsvField(receiptFiles),
+    ].join(",");
+  });
+
+  const currencies = [...new Set(items.map((item) => item.currency))];
+  for (const currency of currencies) {
+    const currencyItems = items.filter((item) => item.currency === currency);
+    const totalCents = currencyItems.reduce(
+      (sum, item) => sum + item.amountCents,
+      0,
+    );
+    const deductibleCents = currencyItems
+      .filter((item) => item.deductible)
+      .reduce((sum, item) => sum + item.amountCents, 0);
+    const receiptCount = currencyItems.filter(
+      (item) => (item.attachments?.length ?? 0) > 0,
+    ).length;
+
+    rows.push(
+      [
+        escapeCsvField("TOTALS"),
+        escapeCsvField(
+          `${currencyItems.length} ${currencyItems.length === 1 ? "expense" : "expenses"}`,
+        ),
+        escapeCsvField(
+          `Deductible: ${centsToDecimalString(deductibleCents)} ${currency}`,
+        ),
+        "",
+        escapeCsvField(currency),
+        escapeCsvField(centsToDecimalString(totalCents)),
+        "",
+        escapeCsvField(`${receiptCount} with receipts`),
+        "",
+      ].join(","),
+    );
+  }
+
+  return [headers.map(escapeCsvField).join(","), ...rows].join("\r\n");
+}
+
 export default function ExpensesPage() {
   return (
     <Suspense fallback={null}>
@@ -138,7 +215,19 @@ function ExpensesContent() {
     id: string;
     merchant: string;
   } | null>(null);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const {
     expenses,
@@ -225,9 +314,18 @@ function ExpensesContent() {
     return true;
   });
 
-  const showToast = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3500);
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setNotification({ message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setNotification(null);
+      toastTimerRef.current = null;
+    }, 3500);
   };
 
   const toggleDeductible = async (item: ExpenseItem) => {
@@ -236,7 +334,7 @@ function ExpensesContent() {
       showToast(`Updated tax deductible status for ${item.merchant}`);
     } catch (err) {
       console.error(err);
-      showToast("Failed to update expense");
+      showToast("Failed to update expense", "error");
     }
   };
 
@@ -248,7 +346,7 @@ function ExpensesContent() {
       setDeletingExpense(null);
     } catch (err) {
       console.error(err);
-      showToast("Failed to delete expense.");
+      showToast("Failed to delete expense.", "error");
     }
   };
 
@@ -317,7 +415,10 @@ function ExpensesContent() {
       );
     } catch (err) {
       console.error(err);
-      showToast(err instanceof Error ? err.message : "Failed to save expense");
+      showToast(
+        err instanceof Error ? err.message : "Failed to save expense",
+        "error",
+      );
     }
   };
 
@@ -329,6 +430,7 @@ function ExpensesContent() {
         console.error(err);
         showToast(
           err instanceof Error ? err.message : "Could not open receipt file",
+          "error",
         );
       }
     } else {
@@ -342,10 +444,6 @@ function ExpensesContent() {
         console.error(err);
       }
     }
-  };
-
-  const handleExportPdf = () => {
-    window.print();
   };
 
   const getCategoryIcon = (category: string, merchant?: string) => {
@@ -385,6 +483,34 @@ function ExpensesContent() {
     );
   }, [expenses, searchQuery, openedExpenseId, allExpenses]);
 
+  const handleExportReport = () => {
+    try {
+      const todayStr = localDateKey();
+      const csv = generateExpensesCsv(searchedExpenses);
+      const isFiltered =
+        Boolean(openedExpenseId) ||
+        selectedCategory !== "All Categories" ||
+        Boolean(searchQuery.trim());
+      const filename = isFiltered
+        ? `expenses-report-filtered-${todayStr}.csv`
+        : `expenses-report-${todayStr}.csv`;
+      downloadCsvFile(filename, csv);
+      const count = searchedExpenses.length;
+      showToast(
+        `Exported ${count} ${count === 1 ? "expense" : "expenses"} to ${filename}.`,
+      );
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to export expenses report.", "error");
+    }
+  };
+
+  const handlePrintReport = () => {
+    if (typeof window !== "undefined") {
+      window.print();
+    }
+  };
+
   const itemsPerPage = 8;
   const paginatedExpenses = useMemo(() => {
     return searchedExpenses.slice(
@@ -400,10 +526,18 @@ function ExpensesContent() {
         {notification && (
           <MotionSurface
             kind="toast"
-            className="fixed top-14 right-6 z-[9999] bg-surface-neutral-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border border-line-neutral-700"
+            className={`fixed top-14 right-6 z-[9999] px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
+              notification.type === "error"
+                ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
+                : "bg-surface-neutral-900 border-line-neutral-700 text-white"
+            }`}
           >
-            <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
-            <span>{notification}</span>
+            {notification.type === "error" ? (
+              <AlertCircle className="w-5 h-5 text-content-rose-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
+            )}
+            <span>{notification.message}</span>
           </MotionSurface>
         )}
       </MotionPresence>
@@ -451,7 +585,13 @@ function ExpensesContent() {
             menuClassName="w-48"
           />
 
-          <Button variant="secondary" onClick={handleExportPdf}>
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={handleExportReport}
+            title="Export expenses report to CSV (.csv)"
+            className="group"
+          >
             <div className="w-4 h-4 flex items-center justify-center">
               <Download
                 className="w-4 h-4 transition-transform duration-200 ease-out group-hover:scale-105 group-hover:translate-y-0.5"
@@ -459,6 +599,16 @@ function ExpensesContent() {
               />
             </div>
             <span>Export Report</span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={handlePrintReport}
+            title="Print expenses report"
+          >
+            <Printer className="w-4 h-4" strokeWidth={2.2} />
+            <span>Print Report</span>
           </Button>
         </div>
         <Button variant="primary" onClick={openLogExpenseModal}>

@@ -532,3 +532,170 @@
 .profit-trajectory-plot .analytics-floating-tag-text {
   fill: #ffffff;
 }
+
+/* ==========================================================================
+   Cashflow Forecast Cards & Tables
+   Scoped at >= (0, 2, 2) specificity so global `.workspace-page table th/td`
+   and `.ui-card :is(h2, h3)` rules do not bleed into forecast row headers.
+   ========================================================================== */
+
+.cashflow-forecast-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+@media (min-width: 1024px) {
+  .cashflow-forecast-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cashflow-forecast-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  padding: 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--theme-line-neutral-200);
+  background: var(--theme-surface-neutral-50);
+}
+
+.cashflow-forecast-card-header {
+  margin-bottom: 0.75rem;
+}
+
+.cashflow-forecast-card .cashflow-forecast-card-title {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--theme-content-neutral-950);
+}
+
+.cashflow-forecast-card-range {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  color: var(--ui-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cashflow-forecast-table-wrap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table {
+  width: 100%;
+  min-width: 248px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  text-align: left;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cashflow-forecast-col-currency {
+  width: 28%;
+}
+
+.cashflow-forecast-col-amount {
+  width: 36%;
+}
+
+/* Keep the header highlight strictly confined to the column header row. */
+.cashflow-forecast-card .cashflow-forecast-table thead th {
+  background: var(--ui-hover);
+  color: var(--ui-secondary);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.5rem;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table thead th.cashflow-forecast-num {
+  text-align: right;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table thead th:first-child {
+  padding-left: 0.625rem;
+  border-top-left-radius: 0.5rem;
+  border-bottom-left-radius: 0.5rem;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table thead th:last-child {
+  padding-right: 0.625rem;
+  border-top-right-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table tbody tr {
+  background: transparent;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table tbody th,
+.cashflow-forecast-card .cashflow-forecast-table tbody td {
+  background: transparent;
+  color: var(--theme-content-neutral-950);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  letter-spacing: normal;
+  padding: 0.5625rem 0.5rem;
+  vertical-align: middle;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table tbody th {
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table tbody td {
+  font-weight: 400;
+  overflow-wrap: break-word;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table tbody td.cashflow-forecast-num {
+  text-align: right;
+}
+
+.cashflow-forecast-card
+  .cashflow-forecast-table
+  tbody
+  :is(th, td):first-child:not(.cashflow-forecast-empty-cell) {
+  padding-left: 0.625rem;
+}
+
+.cashflow-forecast-card
+  .cashflow-forecast-table
+  tbody
+  :is(th, td):last-child:not(.cashflow-forecast-empty-cell) {
+  padding-right: 0.625rem;
+}
+
+.cashflow-forecast-card .cashflow-forecast-table tbody tr + tr > :is(th, td) {
+  border-top: 1px solid var(--theme-line-neutral-200);
+}
+
+.cashflow-forecast-card
+  .cashflow-forecast-table
+  tbody
+  td.cashflow-forecast-empty-cell {
+  padding: 1.25rem 0.75rem;
+  text-align: center;
+  color: var(--ui-muted);
+  font-weight: 400;
+}
