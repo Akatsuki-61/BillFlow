@@ -1,4 +1,10 @@
 "use client";
+import { workspaceDraft } from "@/lib/workspace-drafts";
+import {
+  useReportingData,
+  ReportingGuard,
+  ReportedMoney,
+} from "@/context/ReportingContext";
 
 import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { Dialog } from "@/components/ui/Dialog";
@@ -239,6 +245,7 @@ function ExpensesContent() {
   } = useExpenses({ category: selectedCategory });
 
   const { workflow, activeCurrency } = useData();
+  const reporting = useReportingData();
 
   const [formData, setFormData] = useState({
     merchant: "",
@@ -246,7 +253,7 @@ function ExpensesContent() {
     category: "SOFTWARE",
     amount: "",
     currency: activeCurrency || ("LKR" as Currency),
-    date: new Date().toISOString().slice(0, 10),
+    date: localDateKey(new Date()),
     deductible: true,
     receiptAttached: false,
   });
@@ -260,24 +267,24 @@ function ExpensesContent() {
     );
   };
 
-  const saveExpenseDraft = () => {
+  const saveExpenseDraft = async () => {
     if (!isExpenseFormDirty()) return;
     try {
-      localStorage.setItem("billflow_draft_expense", JSON.stringify(formData));
+      await workspaceDraft("billflow_draft_expense", JSON.stringify(formData));
       setHasExpenseDraft(true);
     } catch {}
   };
 
-  const clearExpenseDraft = () => {
+  const clearExpenseDraft = async () => {
     try {
-      localStorage.removeItem("billflow_draft_expense");
+      await workspaceDraft("billflow_draft_expense", null);
     } catch {}
     setHasExpenseDraft(false);
   };
 
-  const handleRestoreExpenseDraft = () => {
+  const handleRestoreExpenseDraft = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_expense");
+      const saved = await workspaceDraft("billflow_draft_expense");
       if (!saved) return;
       const draft = JSON.parse(saved);
       setFormData((prev) => ({ ...prev, ...draft }));
@@ -292,9 +299,9 @@ function ExpensesContent() {
     setIsLogModalOpen(false);
   };
 
-  const openLogExpenseModal = () => {
+  const openLogExpenseModal = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_expense");
+      const saved = await workspaceDraft("billflow_draft_expense");
       setHasExpenseDraft(Boolean(saved));
     } catch {
       setHasExpenseDraft(false);
@@ -406,7 +413,7 @@ function ExpensesContent() {
         category: "SOFTWARE",
         amount: "",
         currency: activeCurrency || "LKR",
-        date: new Date().toISOString().slice(0, 10),
+        date: localDateKey(new Date()),
         deductible: true,
         receiptAttached: false,
       });
@@ -632,99 +639,100 @@ function ExpensesContent() {
       {/* =====================================================================
           ZENTRA 3-CARD EXPENSES BENTO HEADER ROW
          ===================================================================== */}
-      {(() => {
-        const records = allExpenses.filter(
-          (expense) => expense.currency === activeCurrency,
-        );
-        const total = records.reduce(
-          (sum, expense) => sum + expense.amountCents,
-          0,
-        );
-        const deductible = records
-          .filter((expense) => expense.deductible)
-          .reduce((sum, expense) => sum + expense.amountCents, 0);
-        const receipts = records.filter(
-          (expense) => expense.attachments?.length,
-        ).length;
-        const money = (value: number) => formatCents(value, activeCurrency);
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <section className="ui-card p-6 space-y-5">
-              <h2>Operating Expenses</h2>
-              <div>
-                <div className="summary-value">{money(total)}</div>
-                <p className="summary-caption">
-                  {records.length} expenses · {activeCurrency}
-                </p>
-              </div>
-              <DataBreakdown
-                label="Expenses by deductibility"
-                total={total}
-                rows={[
-                  {
-                    label: "Marked deductible",
-                    value: deductible,
-                    display: money(deductible),
-                    tone: "green",
-                  },
-                  {
-                    label: "Other expenses",
-                    value: total - deductible,
-                    display: money(total - deductible),
-                  },
-                ]}
-              />
-            </section>
-            <section className="ui-card p-6 space-y-5">
-              <h2>Supporting Records</h2>
-              <div>
-                <div className="summary-value">
-                  {receipts}/{records.length}
+      <ReportingGuard>
+        {(() => {
+          const records = reporting.expenses;
+          const total = records.reduce(
+            (sum, expense) => sum + expense.amountCents,
+            0,
+          );
+          const deductible = records
+            .filter((expense) => expense.deductible)
+            .reduce((sum, expense) => sum + expense.amountCents, 0);
+          const receipts = records.filter(
+            (expense) => expense.attachments?.length,
+          ).length;
+          const money = (value: number) => formatCents(value, activeCurrency);
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <section className="ui-card p-6 space-y-5">
+                <h2>Operating Expenses</h2>
+                <div>
+                  <div className="summary-value">{money(total)}</div>
+                  <p className="summary-caption">
+                    {records.length} expense{records.length === 1 ? "" : "s"} ·{" "}
+                    {activeCurrency}
+                  </p>
                 </div>
+                <DataBreakdown
+                  label="Expenses by deductibility"
+                  total={total}
+                  rows={[
+                    {
+                      label: "Marked deductible",
+                      value: deductible,
+                      display: money(deductible),
+                      tone: "green",
+                    },
+                    {
+                      label: "Other expenses",
+                      value: total - deductible,
+                      display: money(total - deductible),
+                    },
+                  ]}
+                />
+              </section>
+              <section className="ui-card p-6 space-y-5">
+                <h2>Supporting Records</h2>
+                <div>
+                  <div className="summary-value">
+                    {receipts}/{records.length}
+                  </div>
+                  <p className="summary-caption">
+                    Expenses with an attached receipt
+                  </p>
+                </div>
+                <DataBreakdown
+                  label="Receipt coverage"
+                  total={records.length}
+                  rows={[
+                    {
+                      label: "With receipts",
+                      value: receipts,
+                      display: `${receipts} expense${receipts === 1 ? "" : "s"}`,
+                      tone: "green",
+                    },
+                    {
+                      label: "Without receipts",
+                      value: records.length - receipts,
+                      display: `${records.length - receipts} expense${records.length - receipts === 1 ? "" : "s"}`,
+                      tone: "pink",
+                    },
+                  ]}
+                />
+              </section>
+              <section className="ui-card p-6 space-y-5">
+                <h2>Monthly Spending</h2>
                 <p className="summary-caption">
-                  Expenses with an attached receipt
+                  Recorded by expense date · {activeCurrency}
                 </p>
-              </div>
-              <DataBreakdown
-                label="Receipt coverage"
-                total={records.length}
-                rows={[
-                  {
-                    label: "With receipts",
-                    value: receipts,
-                    display: `${receipts} expenses`,
-                    tone: "green",
-                  },
-                  {
-                    label: "Without receipts",
-                    value: records.length - receipts,
-                    display: `${records.length - receipts} expenses`,
-                    tone: "pink",
-                  },
-                ]}
-              />
-            </section>
-            <section className="ui-card p-6 space-y-5">
-              <h2>Monthly Spending</h2>
-              <p className="summary-caption">
-                Recorded by expense date · {activeCurrency}
-              </p>
-              <MonthlyBars
-                label="Expenses · last six months"
-                formatValue={money}
-                points={recentMonths().map((month) => ({
-                  ...month,
-                  value: records
-                    .filter((expense) =>
-                      expense.incurredAt.startsWith(month.key),
-                    )
-                    .reduce((sum, expense) => sum + expense.amountCents, 0),
-                }))}
-              />
-            </section>
-          </div>
-        );
-      })()}
+                <MonthlyBars
+                  label={`Expenses · last six months · ${activeCurrency}`}
+                  formatValue={money}
+                  points={recentMonths().map((month) => ({
+                    ...month,
+                    value: records
+                      .filter((expense) =>
+                        expense.incurredAt.startsWith(month.key),
+                      )
+                      .reduce((sum, expense) => sum + expense.amountCents, 0),
+                  }))}
+                />
+              </section>
+            </div>
+          );
+        })()}
+      </ReportingGuard>
 
       {/* Expenses Table */}
       <div className="ui-card overflow-hidden">
@@ -823,7 +831,10 @@ function ExpensesContent() {
                       {/* Amount */}
                       <td className="py-4 px-4 whitespace-nowrap">
                         <span className="font-bold text-sm text-content-neutral-900 font-mono">
-                          {formatCents(item.amountCents, item.currency)}
+                          <ReportedMoney
+                            cents={item.amountCents}
+                            currency={item.currency}
+                          />
                         </span>
                       </td>
 

@@ -7,8 +7,11 @@ import { reclaimUnreferencedReceipts } from "./receipt-cleanup";
 import { validateInvoiceAmounts } from "../src/lib/invoice-math";
 import Database from "better-sqlite3";
 import fs from "fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { atomicWrite } from "./managed-files";
 import { createHash } from "crypto";
-import { getTableColumns } from "drizzle-orm";
+import { getTableColumns, eq } from "drizzle-orm";
 import {
   imageDataSchema,
   invoiceWorkflowStage,
@@ -20,9 +23,17 @@ import {
 } from "./validation";
 import { payableAmount } from "../src/lib/payable-math";
 import { z } from "zod";
-import { getDb, getSqlite, migrateDatabase } from "./db";
+import {
+  getDb,
+  getSqlite,
+  migrateDatabase,
+  getDatabasePath,
+  getRootDb,
+  getActiveProfileId,
+} from "./db";
 import { assertWorkspaceIntegrity } from "./db/integrity";
 import {
+  userProfiles,
   clients,
   invoices,
   settings,
@@ -66,6 +77,7 @@ export const backupTables = [
   "invoice_pdf_exports",
   "work_order_pdf_exports",
   "task_time_slots",
+  "workspace_activity",
 ] as const;
 type Row = Record<string, string | number | null>;
 const backupSchema = z
@@ -356,12 +368,13 @@ export function assertBackupBudget(input: ExportDataPayload) {
 
 const newerFields: Partial<Record<(typeof backupTables)[number], Row>> = {
   clients: {
+    archived_at: null,
     whatsapp_phone: null,
     relationship_notes: null,
     billing_address: null,
     photo_data: null,
   },
-  vendors: { billing_address: null, photo_data: null },
+  vendors: { archived_at: null, billing_address: null, photo_data: null },
   invoices: { payment_url: null, workflow_stage: null },
   settings: {
     default_delivery_url: null,
@@ -388,6 +401,7 @@ const newerFields: Partial<Record<(typeof backupTables)[number], Row>> = {
 export function importWorkspace(
   input: ExportDataPayload,
   mode: "replace" | "merge" = "replace",
+  validateOnly = false,
 ) {
   if (input?.version !== "2")
     throw new Error(
@@ -416,6 +430,7 @@ export function importWorkspace(
         ? date
         : null;
   }
+  payload.records.workspace_activity ??= [];
   payload.records.calendar_events ??= [];
   payload.records.task_time_slots ??= [];
   payload.records.work_order_pdf_exports ??= [];
@@ -561,6 +576,73 @@ export function importWorkspace(
     sandbox.close();
   }
 
+  if (mode === "merge" && validateOnly) {
+    const preview = new Database(":memory:");
+    migrateDatabase(preview);
+    try {
+      preview.pragma("foreign_keys = ON");
+      preview.transaction(() => {
+        for (const table of backupTables) {
+          const existingRows = getSqlite()
+            .prepare(`SELECT * FROM "${table}"`)
+            .all() as Row[];
+          insertRows(preview, table, existingRows);
+        }
+        for (const table of backupTables) {
+          if (table === "settings") continue;
+          const key = (
+            preview.prepare(`PRAGMA table_info("${table}")`).all() as Array<{
+              name: string;
+              pk: number;
+            }>
+          ).find((column) => column.pk === 1)!.name;
+          const lookup = preview.prepare(
+            `SELECT * FROM "${table}" WHERE "${key}" = ?`,
+          );
+          const additions = payload.records[table].filter((row) => {
+            const existing = lookup.get(row[key]) as Row | undefined;
+            if (!existing) return true;
+            if (
+              Object.entries(row).some(
+                ([column, value]) => existing[column] !== value,
+              )
+            )
+              throw new Error(
+                `Backup merge conflict in ${table} for record ${row[key]}.`,
+              );
+            return false;
+          });
+          try {
+            insertRows(preview, table, additions);
+          } catch (error) {
+            throw new Error(
+              `Backup merge conflict in ${table}. Check duplicate codes, SKUs and linked records.`,
+              { cause: error },
+            );
+          }
+        }
+        assertWorkspaceIntegrity(preview);
+      })();
+    } finally {
+      preview.close();
+    }
+  }
+  if (validateOnly)
+    return {
+      success: true,
+      importedClients: payload.records.clients.length,
+      importedInvoices: payload.records.invoices.length,
+    };
+  if (mode === "replace") {
+    const directory = path.join(path.dirname(getDatabasePath()), "backups");
+    fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const file = path.join(
+      directory,
+      `before-restore-${Date.now()}-${randomUUID()}.json`,
+    );
+    atomicWrite(file, JSON.stringify(exportWorkspace()));
+    fs.chmodSync(file, 0o600);
+  }
   let importedClients = 0;
   let importedInvoices = 0;
   let skipped = 0;
@@ -626,6 +708,18 @@ export function importWorkspace(
     throw error;
   }
   reclaimUnreferencedReceipts();
+  if (mode === "replace") {
+    const restored = getOrCreateSettings();
+    getRootDb()
+      .update(userProfiles)
+      .set({
+        defaultCurrency: restored.defaultCurrency,
+        invoicePrefix: restored.invoicePrefix,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(userProfiles.id, getActiveProfileId()))
+      .run();
+  }
   return {
     success: true,
     importedClients,

@@ -1,3 +1,4 @@
+import { calendarDateKey } from "./visual-metrics";
 import type { InvoiceWithClient } from "../types/billing";
 
 export function daysToFullPayment(invoice: InvoiceWithClient): number | null {
@@ -8,7 +9,7 @@ export function daysToFullPayment(invoice: InvoiceWithClient): number | null {
     invoice.paidCents < invoice.amountCents
   )
     return null;
-  const issue = Date.parse(invoice.issueDate.slice(0, 10));
+  const issue = Date.parse(calendarDateKey(invoice.issueDate));
   if (!Number.isFinite(issue)) return null;
   const payments = (invoice.payments ?? [])
     .filter(
@@ -17,7 +18,7 @@ export function daysToFullPayment(invoice: InvoiceWithClient): number | null {
     .sort((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt));
   let received = 0;
   for (const payment of payments) {
-    const date = Date.parse(payment.receivedAt.slice(0, 10));
+    const date = Date.parse(calendarDateKey(payment.receivedAt));
     if (!Number.isFinite(date)) continue;
     received += payment.amountCents;
     if (received >= invoice.amountCents)

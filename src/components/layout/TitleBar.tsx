@@ -10,7 +10,6 @@ export default function TitleBar() {
       className={`h-6 w-full flex select-none shrink-0 bg-canvas z-40 ${
         isGateOpen ? "app-no-drag" : "app-drag-region"
       }`}
-      aria-label="Window Title Bar"
     />
   );
 }

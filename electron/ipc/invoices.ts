@@ -1,3 +1,4 @@
+import { recordActivity } from "../workspace-activity";
 import { localDateKey } from "../../src/lib/visual-metrics";
 import { validateInvoiceAmounts } from "../../src/lib/invoice-math";
 import { recordId } from "../workflow-validation";
@@ -94,6 +95,13 @@ export function getNextInvoiceCode(): string {
   return `${activePrefix}${padded}`;
 }
 
+function chunks<T>(values: T[], size = 500): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < values.length; i += size)
+    result.push(values.slice(i, i + size));
+  return result;
+}
+
 export function listInvoicesWithClient(
   clientId?: string,
   trash = false,
@@ -123,12 +131,14 @@ export function listInvoicesWithClient(
 
   const ids = allInvoices.map((row) => row.invoice.id);
   const allItems = ids.length
-    ? db
-        .select()
-        .from(invoiceItems)
-        .where(inArray(invoiceItems.invoiceId, ids))
-        .orderBy(asc(invoiceItems.position))
-        .all()
+    ? chunks(ids).flatMap((batch) =>
+        db
+          .select()
+          .from(invoiceItems)
+          .where(inArray(invoiceItems.invoiceId, batch))
+          .orderBy(asc(invoiceItems.position))
+          .all(),
+      )
     : [];
   const allPayments = ids.length ? readPayments(ids) : [];
   const itemMap = new Map<string, typeof allItems>();
@@ -213,7 +223,7 @@ export async function buildInvoicePdfPayloadAndBuffer(
       );
     const payload = {
       code: value.code || "DRAFT",
-      issueDate: value.issueDate || new Date().toISOString().slice(0, 10),
+      issueDate: value.issueDate || localDateKey(new Date()),
       dueDate: value.dueDate,
       currency: value.currency,
       status: "DRAFT",
@@ -238,8 +248,8 @@ export async function buildInvoicePdfPayloadAndBuffer(
   if (invoiceId === "sample-preview") {
     const payload = {
       code: "INV-2026-001",
-      issueDate: new Date().toISOString().split("T")[0],
-      dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+      issueDate: localDateKey(new Date()),
+      dueDate: localDateKey(new Date(Date.now() + 14 * 86400000)),
       currency: profile.defaultCurrency || "USD",
       status: "ADVANCE_PAID",
       template,
@@ -326,7 +336,10 @@ export async function buildInvoicePdfPayloadAndBuffer(
     try {
       const parsed = JSON.parse(invoice.businessSnapshot);
       if (parsed && typeof parsed === "object") {
-        businessSnapshot = parsed;
+        businessSnapshot = {
+          ...parsed,
+          signatureData: profile.signatureData,
+        };
       }
     } catch {
       // Fall back to live profile if legacy business snapshot JSON is malformed.
@@ -373,6 +386,12 @@ export function exportInvoicePdf(
   template?: string,
 ): Promise<string> {
   const workspace = captureWorkspace();
+  recordActivity({
+    kind: "pdf-pending",
+    recordId: invoiceId,
+    label: "Invoice PDF",
+    detail: "Waiting to export",
+  });
   const result = exportQueue
     .catch(() => {})
     .then(async () => {
@@ -395,10 +414,34 @@ export function exportInvoicePdf(
         throw new Error(
           "The invoice changed during PDF generation. Export it again.",
         );
-      return saveInvoicePdf(invoiceId, pdfBuffer);
+      const saved = saveInvoicePdf(invoiceId, pdfBuffer);
+      recordActivity({
+        kind: "pdf-saved",
+        recordId: invoiceId,
+        label: invoice.code || invoiceId,
+        detail: `PDF exported to ${saved}`.slice(0, 500),
+      });
+      return saved;
     });
-  exportQueue = result;
-  return result;
+  const tracked = result.catch((error) => {
+    try {
+      workspace.assertCurrent();
+      recordActivity({
+        kind: "pdf-failed",
+        recordId: invoiceId,
+        label: "Invoice PDF",
+        detail:
+          error instanceof Error
+            ? error.message.slice(0, 500)
+            : "PDF export failed",
+      });
+    } catch {
+      /* The originating profile is no longer active. */
+    }
+    throw error;
+  });
+  exportQueue = tracked;
+  return tracked;
 }
 export async function exportInvoiceBatch(idsInput: string[]) {
   const ids = [...new Set(z.array(recordId).min(1).parse(idsInput))];
@@ -704,6 +747,11 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
       );
     }
 
+    if (client?.archivedAt)
+      throw new AppError(
+        "CLIENT_ARCHIVED",
+        "Restore this client before creating a new invoice.",
+      );
     const taskIds = [
       ...(value.linkedTaskIds || []),
       ...(value.items || []).flatMap((item) =>
@@ -747,23 +795,14 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
           "TASK_MISMATCH",
           "Imported tasks must belong to the invoice client and currency.",
         );
-      if (
-        tx.select().from(workOrders).where(eq(workOrders.taskId, task.id)).get()
-      )
-        throw new AppError(
-          "TASK_MISMATCH",
-          "This task is already linked to contractor work.",
-        );
     }
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDateKey(new Date());
     const issueDate = value.issueDate || today;
     const profile = getOrCreateSettings();
-    const defaultDue = new Date(`${issueDate}T00:00:00Z`);
+    const defaultDue = new Date(`${issueDate}T00:00:00`);
     defaultDue.setUTCDate(defaultDue.getUTCDate() + profile.defaultDueDays);
     const dueDate =
-      value.dueDate === undefined
-        ? defaultDue.toISOString().slice(0, 10)
-        : value.dueDate;
+      value.dueDate === undefined ? localDateKey(defaultDue) : value.dueDate;
 
     const discountCents = value.discountCents || 0;
     const taxCents = value.taxCents || 0;
@@ -900,6 +939,12 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
         }
       }
     }
+    for (const taskId of new Set(taskIds)) {
+      tx.update(workOrders)
+        .set({ invoiceId: id })
+        .where(eq(workOrders.taskId, taskId))
+        .run();
+    }
   });
 
   // Attempt auto-exporting PDF after invoice is created
@@ -990,21 +1035,26 @@ export function recordPayment(input: RecordPaymentInput): {
 }
 
 function readPayments(invoiceIds: string[]): InvoicePayment[] {
-  return getDb()
-    .select({ payment: invoicePayments, correction: invoicePaymentCorrections })
-    .from(invoicePayments)
-    .leftJoin(
-      invoicePaymentCorrections,
-      eq(invoicePaymentCorrections.originalPaymentId, invoicePayments.id),
-    )
-    .where(inArray(invoicePayments.invoiceId, invoiceIds))
-    .orderBy(asc(invoicePayments.receivedAt), asc(invoicePayments.id))
-    .all()
-    .map(({ payment, correction }) => ({
-      ...payment,
-      currency: payment.currency as Currency,
-      ...(correction && { correction }),
-    }));
+  return chunks(invoiceIds).flatMap((batch) =>
+    getDb()
+      .select({
+        payment: invoicePayments,
+        correction: invoicePaymentCorrections,
+      })
+      .from(invoicePayments)
+      .leftJoin(
+        invoicePaymentCorrections,
+        eq(invoicePaymentCorrections.originalPaymentId, invoicePayments.id),
+      )
+      .where(inArray(invoicePayments.invoiceId, batch))
+      .orderBy(asc(invoicePayments.receivedAt), asc(invoicePayments.id))
+      .all()
+      .map(({ payment, correction }) => ({
+        ...payment,
+        currency: payment.currency as Currency,
+        ...(correction && { correction }),
+      })),
+  );
 }
 
 export function listPayments(invoiceId: string): InvoicePayment[] {
@@ -1032,6 +1082,11 @@ function refreshInvoiceCollection(
     throw new AppError(
       "AMOUNT_OVERFLOW",
       "Total payments exceed the supported amount.",
+    );
+  if (total > invoice.amountCents)
+    throw new AppError(
+      "PAYMENT_EXCEEDS_BALANCE",
+      "This payment exceeds the invoice balance. Enter the amount still outstanding.",
     );
   const overdue =
     invoice.status === "OVERDUE" ||
@@ -1447,6 +1502,14 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
           .where(eq(invoiceItems.invoiceId, id))
           .all();
         const newAmount = validated.amountCents ?? existing.amountCents;
+        if (
+          paymentRows.reduce((sum, payment) => sum + payment.amountCents, 0) >
+          newAmount
+        )
+          throw new AppError(
+            "PAYMENT_EXCEEDS_BALANCE",
+            "The invoice total cannot be less than payments already recorded. Correct the payment first.",
+          );
         validateInvoiceAmounts({
           amountCents: newAmount,
           discountCents: validated.discountCents ?? existing.discountCents,

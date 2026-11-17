@@ -1,4 +1,5 @@
 "use client";
+import { useReportingData, ReportingGuard } from "@/context/ReportingContext";
 import { calculateFinancials } from "@/lib/financials";
 
 import React, { useState, useMemo, useId } from "react";
@@ -10,7 +11,6 @@ import {
   sharePercent,
   taskProgress,
   recentMonths,
-  SHORT_MONTHS,
 } from "@/lib/visual-metrics";
 import { useRouter } from "next/navigation";
 import {
@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import {
   useData,
-  useInvoices,
   useClients,
   useVendors,
   useActiveCurrency,
@@ -72,7 +71,7 @@ interface WidgetRendererProps {
   onNavigateToInvoice?: (id: string) => void;
 }
 
-export function WidgetRenderer({
+function WidgetContent({
   widgetId,
   source,
   period = "quarter",
@@ -88,11 +87,11 @@ export function WidgetRenderer({
 }: WidgetRendererProps) {
   const router = useRouter();
   const pipelineId = useId();
-  const { invoices } = useInvoices();
+  const { invoices, expenses, workOrders } = useReportingData();
   const { clients } = useClients();
   const { vendors } = useVendors();
   const { activeCurrency } = useActiveCurrency();
-  const { tasks, expenses, workOrders } = useData();
+  const { tasks } = useData();
   const { draggedWidgetId, startWidgetDrag, endWidgetDrag } =
     useWidgetContext();
   const isBeingDragged = draggedWidgetId === widgetId;
@@ -297,76 +296,7 @@ export function WidgetRenderer({
     [filteredInvoices, displaySize],
   );
 
-  // 6-month historical/projected monthly points for charts
-  const monthlyStats = useMemo(() => {
-    const months: Array<{
-      key: string;
-      label: string;
-      revenueCents: number;
-      expensesCents: number;
-      profitCents: number;
-      marginPct: number;
-    }> = [];
-
-    const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = SHORT_MONTHS[d.getMonth()];
-      months.push({
-        key,
-        label,
-        revenueCents: 0,
-        expensesCents: 0,
-        profitCents: 0,
-        marginPct: 0,
-      });
-    }
-
-    invoices.forEach((inv) => {
-      if (
-        !inv.issueDate ||
-        inv.status === "DRAFT" ||
-        inv.currency !== activeCurrency
-      )
-        return;
-      const invKey = inv.issueDate.slice(0, 7);
-      const target = months.find((m) => m.key === invKey);
-      if (target) {
-        target.revenueCents += inv.amountCents;
-      }
-    });
-
-    workOrders
-      .filter((order) => order.currency === activeCurrency)
-      .forEach((order) => {
-        const sourceInvoice = invoices.find(
-          (invoice) => invoice.id === order.invoiceId,
-        );
-        const target = months.find(
-          (month) => month.key === sourceInvoice?.issueDate.slice(0, 7),
-        );
-        if (target) target.expensesCents += order.feeCents;
-      });
-    expenses
-      .filter((expense) => expense.currency === activeCurrency)
-      .forEach((expense) => {
-        const target = months.find(
-          (month) => month.key === expense.incurredAt?.slice(0, 7),
-        );
-        if (target) target.expensesCents += expense.amountCents;
-      });
-
-    months.forEach((m) => {
-      m.profitCents = m.revenueCents - m.expensesCents;
-      m.marginPct =
-        m.revenueCents > 0
-          ? Math.round((m.profitCents / m.revenueCents) * 100)
-          : 0;
-    });
-
-    return months;
-  }, [invoices, expenses, workOrders, activeCurrency]);
+  const monthlyStats = financials.monthlyTrends;
 
   // Task stage counts for Sprint Tasks visual breakdown
   const taskCounts = useMemo(() => {
@@ -847,7 +777,7 @@ export function WidgetRenderer({
               </p>
             </div>
             <MonthlyBars
-              label="Monthly profit · signed amounts"
+              label={`Monthly profit · signed amounts · ${activeCurrency}`}
               points={monthlyStats.map((month) => ({
                 ...month,
                 value: month.profitCents,
@@ -2298,5 +2228,13 @@ export function WidgetRenderer({
 
       {renderContent()}
     </div>
+  );
+}
+
+export function WidgetRenderer(props: WidgetRendererProps) {
+  return (
+    <ReportingGuard>
+      <WidgetContent {...props} />
+    </ReportingGuard>
   );
 }

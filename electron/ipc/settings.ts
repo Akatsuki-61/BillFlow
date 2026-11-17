@@ -263,6 +263,15 @@ export function registerSettingsHandlers(broadcastDataChanged: () => void) {
     }
   });
 
+  ipcMain.handle(
+    "settings:preflight",
+    (_event, payload: ExportDataPayload, mode?: "replace" | "merge") =>
+      importWorkspace(
+        payload,
+        z.enum(["replace", "merge"]).parse(mode || "replace"),
+        true,
+      ),
+  );
   ipcMain.handle("settings:export", async () => {
     try {
       return exportWorkspace();

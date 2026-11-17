@@ -116,6 +116,22 @@ export function MotionSurface({
     const panel = surfaceRef.current;
     if (!isDialog || !isPresent || !panel) return;
     dialogStack.push(panel);
+    const isolated: HTMLElement[] = [];
+    let branch: HTMLElement = panel;
+    while (branch.parentElement) {
+      for (const sibling of Array.from(branch.parentElement.children)) {
+        if (
+          sibling !== branch &&
+          sibling instanceof HTMLElement &&
+          !sibling.inert
+        ) {
+          sibling.inert = true;
+          isolated.push(sibling);
+        }
+      }
+      branch = branch.parentElement;
+      if (branch === document.body) break;
+    }
     const previousFocus =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -167,6 +183,7 @@ export function MotionSurface({
       document.removeEventListener("keydown", handleKey);
       const index = dialogStack.indexOf(panel);
       if (index !== -1) dialogStack.splice(index, 1);
+      for (const element of isolated) element.inert = false;
       if (previousFocus?.isConnected)
         previousFocus.focus({ preventScroll: true });
     };

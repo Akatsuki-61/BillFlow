@@ -92,6 +92,20 @@
       "when": 1791254000000,
       "tag": "0012_workspace_customization",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791255000000,
+      "tag": "0013_task_first_outsourcing",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1791256000000,
+      "tag": "0014_workspace_activity",
+      "breakpoints": true
     }
   ]
 }

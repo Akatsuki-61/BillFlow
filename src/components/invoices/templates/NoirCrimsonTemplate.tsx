@@ -235,9 +235,7 @@ export function NoirCrimsonTemplate({
                     <div className="font-black leading-tight text-white">
                       {item.description}
                     </div>
-                    <div className="text-[10px] text-white/80 leading-tight font-medium mt-0.5">
-                      Deliverable milestone &amp; software sprint scope
-                    </div>
+                    <div className="text-[10px] text-white/80 leading-tight font-medium mt-0.5"></div>
                   </div>
                   <div className="w-[18%] text-right font-bold text-white">
                     {formatMoney(item.unitPriceCents, invoice.currency)}
@@ -264,9 +262,7 @@ export function NoirCrimsonTemplate({
                   <div className="font-bold text-white leading-tight">
                     {item.description}
                   </div>
-                  <div className="text-[10px] text-zinc-400 leading-tight font-normal mt-0.5">
-                    Deliverable milestone &amp; software sprint scope
-                  </div>
+                  <div className="text-[10px] text-zinc-400 leading-tight font-normal mt-0.5"></div>
                 </div>
                 <div className="w-[18%] text-right text-zinc-200 font-medium">
                   {formatMoney(item.unitPriceCents, invoice.currency)}
@@ -386,21 +382,19 @@ export function NoirCrimsonTemplate({
       <div className="w-full bg-[#D9383A] h-[38px] mt-auto flex items-center justify-around px-6 text-white text-[10px] font-medium select-none shrink-0">
         <div className="flex items-center gap-1.5">
           <Phone className="w-3.5 h-3.5 fill-white text-transparent" />
-          <span>{settings?.phone || "+94 77 123 4567"}</span>
+          <span>{settings?.phone || ""}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <Mail className="w-3.5 h-3.5 text-white" />
-          <span>{settings?.email || "contact@chethaka.dev"}</span>
+          <span>{settings?.email || ""}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <Globe className="w-3.5 h-3.5 text-white" />
-          <span>{settings?.website || "www.chethaka.dev"}</span>
+          <span>{settings?.website || ""}</span>
         </div>
         <div className="flex items-center gap-1.5 truncate max-w-[200px]">
           <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
-          <span className="truncate">
-            {settings?.address || "Colombo, Sri Lanka"}
-          </span>
+          <span className="truncate">{settings?.address || ""}</span>
         </div>
       </div>
     </div>

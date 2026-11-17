@@ -1,12 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+} from "react";
 import { flushSync } from "react-dom";
 import { LayoutGroup, MotionConfig } from "motion/react";
-import {
-  ensureTriggerTracker,
-  ensureViewTransitionOrigin,
-} from "@/lib/motion";
+import { ensureTriggerTracker, ensureViewTransitionOrigin } from "@/lib/motion";
 import {
   isThemePreference,
   isAccentPreference,
@@ -20,6 +22,7 @@ import {
 
 export interface ThemeTransitionOptions {
   transition?: boolean;
+  persistProfile?: boolean;
   trigger?: EventTarget | null;
 }
 
@@ -43,9 +46,13 @@ let sessionAccent: AccentPreference | null = null;
 function getPreference(): ThemePreference {
   if (sessionPreference) return sessionPreference;
   try {
-    const saved = window.billflow?.theme?.initialPreference ?? localStorage.getItem(THEME_STORAGE_KEY);
+    const saved =
+      window.billflow?.theme?.initialPreference ??
+      localStorage.getItem(THEME_STORAGE_KEY);
     if (isThemePreference(saved)) return saved;
-  } catch { /* System preference still works when storage is blocked. */ }
+  } catch {
+    /* System preference still works when storage is blocked. */
+  }
   return "system";
 }
 
@@ -54,18 +61,24 @@ function getAccent(): AccentPreference {
   try {
     const saved = localStorage.getItem(ACCENT_STORAGE_KEY);
     if (isAccentPreference(saved)) return saved;
-  } catch { /* Default accent remains usable. */ }
+  } catch {
+    /* Default accent remains usable. */
+  }
   return DEFAULT_ACCENT;
 }
 
 function subscribe(callback: () => void) {
   const storage = (event: StorageEvent) => {
     if (event.key === THEME_STORAGE_KEY || event.key === null) {
-      sessionPreference = isThemePreference(event.newValue) ? event.newValue : "system";
+      sessionPreference = isThemePreference(event.newValue)
+        ? event.newValue
+        : "system";
       callback();
     }
     if (event.key === ACCENT_STORAGE_KEY || event.key === null) {
-      sessionAccent = isAccentPreference(event.newValue) ? event.newValue : DEFAULT_ACCENT;
+      sessionAccent = isAccentPreference(event.newValue)
+        ? event.newValue
+        : DEFAULT_ACCENT;
       callback();
     }
   };
@@ -97,10 +110,14 @@ function runMaskedColorChange(
     commitChange();
     return;
   }
-  const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  const startVT = (document as Document & {
-    startViewTransition?: (cb: () => void) => ViewTransitionLike | undefined;
-  }).startViewTransition;
+  const prefersReduced = window.matchMedia?.(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  const startVT = (
+    document as Document & {
+      startViewTransition?: (cb: () => void) => ViewTransitionLike | undefined;
+    }
+  ).startViewTransition;
 
   if (prefersReduced || typeof startVT !== "function") {
     commitChange();
@@ -127,12 +144,31 @@ function setPreference(
   options?: ThemeTransitionOptions,
 ) {
   if (!isThemePreference(value)) return;
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  if (options?.persistProfile !== false) {
+    const id = sessionStorage.getItem("billflow_active_profile_scope");
+    if (id)
+      void window.billflow?.profiles
+        .update(id, { themePreference: value })
+        .then((response) =>
+          window.dispatchEvent(
+            new CustomEvent("billflow:profile-appearance-changed", {
+              detail: response,
+            }),
+          ),
+        )
+        .catch(console.error);
+  }
+  const prefersDark =
+    window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
   const nextTheme = resolveTheme(value, prefersDark);
   const currentTheme = document.documentElement.dataset.theme;
   const applyPreference = () => {
     sessionPreference = value;
-    try { localStorage.setItem(THEME_STORAGE_KEY, value); } catch { /* Keep the current session usable. */ }
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, value);
+    } catch {
+      /* Keep the current session usable. */
+    }
     document.documentElement.dataset.theme = nextTheme;
     document.documentElement.style.colorScheme = nextTheme;
     window.dispatchEvent(new Event("billflow:theme"));
@@ -144,14 +180,29 @@ function setPreference(
   runMaskedColorChange(applyPreference, options);
 }
 
-function setAccent(
-  value: AccentPreference,
-  options?: ThemeTransitionOptions,
-) {
+function setAccent(value: AccentPreference, options?: ThemeTransitionOptions) {
   if (!isAccentPreference(value)) return;
+  if (options?.persistProfile !== false) {
+    const id = sessionStorage.getItem("billflow_active_profile_scope");
+    if (id)
+      void window.billflow?.profiles
+        .update(id, { accent: value })
+        .then((response) =>
+          window.dispatchEvent(
+            new CustomEvent("billflow:profile-appearance-changed", {
+              detail: response,
+            }),
+          ),
+        )
+        .catch(console.error);
+  }
   const applyAccent = () => {
     sessionAccent = value;
-    try { localStorage.setItem(ACCENT_STORAGE_KEY, value); } catch { /* Keep current session usable. */ }
+    try {
+      localStorage.setItem(ACCENT_STORAGE_KEY, value);
+    } catch {
+      /* Keep current session usable. */
+    }
     document.documentElement.dataset.accent = value;
     window.dispatchEvent(new Event("billflow:accent"));
   };
@@ -168,7 +219,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // The null server snapshot keeps the selector consistent during hydration.
   const saved = useSyncExternalStore(subscribe, getPreference, serverSnapshot);
   const preference = saved ?? "system";
-  const savedAccent = useSyncExternalStore(subscribe, getAccent, () => DEFAULT_ACCENT);
+  const savedAccent = useSyncExternalStore(
+    subscribe,
+    getAccent,
+    () => DEFAULT_ACCENT,
+  );
   const accent = savedAccent ?? DEFAULT_ACCENT;
 
   useEffect(() => {

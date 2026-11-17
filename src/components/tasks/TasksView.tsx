@@ -1,4 +1,6 @@
 "use client";
+import { localDateKey } from "@/lib/visual-metrics";
+import { workspaceDraft } from "@/lib/workspace-drafts";
 
 import { profileStorageKey } from "@/lib/profile-scope";
 import { compareBoardTasks } from "@/lib/task-order";
@@ -291,10 +293,13 @@ export default function TasksView({
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-  const [selectedEventToEdit, setSelectedEventToEdit] = useState<CalendarEventItem | null>(null);
+  const [selectedEventToEdit, setSelectedEventToEdit] =
+    useState<CalendarEventItem | null>(null);
   const [calendarTargetDate, setCalendarTargetDate] = useState<string>("");
   const [calendarTargetTaskId, setCalendarTargetTaskId] = useState<string>("");
-  const [taskForSubmitWork, setTaskForSubmitWork] = useState<TaskItem | null>(null);
+  const [taskForSubmitWork, setTaskForSubmitWork] = useState<TaskItem | null>(
+    null,
+  );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const selectedTaskForDetail =
     tasks.find((task) => task.id === selectedTaskId) || null;
@@ -321,7 +326,8 @@ export default function TasksView({
   const [newStartTime, setNewStartTime] = useState("10:00");
   const [newEndTime, setNewEndTime] = useState("11:00");
   const [newIsAllDay, setNewIsAllDay] = useState(false);
-  const [newEventCategory, setNewEventCategory] = useState<EventCategory>("meeting");
+  const [newEventCategory, setNewEventCategory] =
+    useState<EventCategory>("meeting");
   const [newEventColor, setNewEventColor] = useState<EventColor>("blue");
   const [newEventLocation, setNewEventLocation] = useState("");
   const [newClientName, setNewClientName] = useState("");
@@ -335,15 +341,15 @@ export default function TasksView({
   const isTaskFormDirty = () => {
     return Boolean(
       newTitle.trim() ||
-        newDescription.trim() ||
-        newDueDate.trim() ||
-        newClientName.trim() ||
-        newOutsourcedVendor.trim() ||
-        newOutsourceBudget.trim(),
+      newDescription.trim() ||
+      newDueDate.trim() ||
+      newClientName.trim() ||
+      newOutsourcedVendor.trim() ||
+      newOutsourceBudget.trim(),
     );
   };
 
-  const saveTaskDraft = () => {
+  const saveTaskDraft = async () => {
     if (!isTaskFormDirty()) return;
     const draft = {
       newTitle,
@@ -358,21 +364,21 @@ export default function TasksView({
       newOutsourceBudget,
     };
     try {
-      localStorage.setItem("billflow_draft_task", JSON.stringify(draft));
+      await workspaceDraft("billflow_draft_task", JSON.stringify(draft));
       setHasTaskDraft(true);
     } catch {}
   };
 
-  const clearTaskDraft = () => {
+  const clearTaskDraft = async () => {
     try {
-      localStorage.removeItem("billflow_draft_task");
+      await workspaceDraft("billflow_draft_task", null);
     } catch {}
     setHasTaskDraft(false);
   };
 
-  const handleRestoreTaskDraft = () => {
+  const handleRestoreTaskDraft = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_task");
+      const saved = await workspaceDraft("billflow_draft_task");
       if (!saved) return;
       const draft = JSON.parse(saved);
       if (draft.newTitle !== undefined) setNewTitle(draft.newTitle);
@@ -401,10 +407,10 @@ export default function TasksView({
     setIsAddModalOpen(false);
   };
 
-  const openAddTaskModal = (status: TaskStatus = "todo") => {
+  const openAddTaskModal = async (status: TaskStatus = "todo") => {
     setNewStatus(status);
     try {
-      const saved = localStorage.getItem("billflow_draft_task");
+      const saved = await workspaceDraft("billflow_draft_task");
       setHasTaskDraft(Boolean(saved));
     } catch {
       setHasTaskDraft(false);
@@ -670,7 +676,7 @@ export default function TasksView({
     const normalizedTime = normalizeAndAutoFixTimeRange(
       newStartTime,
       newEndTime,
-      newIsAllDay
+      newIsAllDay,
     );
 
     if (newRecordType === "event") {
@@ -678,9 +684,8 @@ export default function TasksView({
         await createEvent({
           title: newTitle.trim(),
           description: newDescription.trim(),
-          startDate:
-            normalizedDate || new Date().toISOString().split("T")[0],
-          endDate: normalizedDate || new Date().toISOString().split("T")[0],
+          startDate: normalizedDate || localDateKey(new Date()),
+          endDate: normalizedDate || localDateKey(new Date()),
           startTime: normalizedTime.isAllDay ? null : normalizedTime.startTime,
           endTime: normalizedTime.isAllDay ? null : normalizedTime.endTime,
           isAllDay: normalizedTime.isAllDay,
@@ -697,7 +702,7 @@ export default function TasksView({
         showToast(`Event "${newTitle.trim()}" scheduled in calendar`);
       } catch (error) {
         showToast(
-          error instanceof Error ? error.message : "Could not create event."
+          error instanceof Error ? error.message : "Could not create event.",
         );
       } finally {
         setSaving(false);
@@ -761,7 +766,9 @@ export default function TasksView({
     setNewTitle("");
     setNewDescription("");
     setNewIsOutsourced(false);
-    showToast(`Task "${createdTitle}" created in ${newStatus.replace("-", " ")}`);
+    showToast(
+      `Task "${createdTitle}" created in ${newStatus.replace("-", " ")}`,
+    );
   };
 
   // Toggle Subtask Completion in Detail Modal
@@ -915,7 +922,9 @@ export default function TasksView({
               <span className="bf-toast-add-badge w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/35 text-emerald-400 flex items-center justify-center shrink-0">
                 <i className="fa-solid fa-circle-plus" aria-hidden="true" />
               </span>
-            ) : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(toastMessage) ? (
+            ) : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(
+                toastMessage,
+              ) ? (
               <span className="bf-toast-update-badge w-6 h-6 rounded-lg bg-blue-500/20 border border-blue-500/35 text-blue-400 flex items-center justify-center shrink-0">
                 <i className="fa-solid fa-pen-to-square" aria-hidden="true" />
               </span>
@@ -939,7 +948,9 @@ export default function TasksView({
                   ? "bg-rose-500/80"
                   : /\b(created|added|scheduled)\b/i.test(toastMessage)
                     ? "bg-emerald-500/85"
-                    : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(toastMessage)
+                    : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(
+                          toastMessage,
+                        )
                       ? "bg-blue-500/85"
                       : "bg-accent"
               }`}
@@ -1002,7 +1013,7 @@ export default function TasksView({
           <Button
             variant="secondary"
             onClick={() => {
-              setCalendarTargetDate(new Date().toISOString().split("T")[0]);
+              setCalendarTargetDate(localDateKey(new Date()));
               setCalendarTargetTaskId("");
               setSelectedEventToEdit(null);
               setIsEventModalOpen(true);
@@ -1014,7 +1025,11 @@ export default function TasksView({
           </Button>
 
           {/* Create Task Button */}
-          <Button variant="primary" onClick={() => openAddTaskModal("todo")} className="flex items-center gap-1.5">
+          <Button
+            variant="primary"
+            onClick={() => openAddTaskModal("todo")}
+            className="flex items-center gap-1.5"
+          >
             <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
             <span>New Task</span>
           </Button>
@@ -1076,23 +1091,23 @@ export default function TasksView({
               {
                 label: "To do",
                 value: tasks.filter((task) => task.status === "todo").length,
-                display: `${tasks.filter((task) => task.status === "todo").length} tasks`,
+                display: `${tasks.filter((task) => task.status === "todo").length} ${tasks.filter((task) => task.status === "todo").length === 1 ? "task" : "tasks"}`,
               },
               {
                 label: "In progress",
                 value: stats.inProgress,
-                display: `${stats.inProgress} tasks`,
+                display: `${stats.inProgress} ${stats.inProgress === 1 ? "task" : "tasks"}`,
               },
               {
                 label: "Review",
                 value: tasks.filter((task) => task.status === "review").length,
-                display: `${tasks.filter((task) => task.status === "review").length} tasks`,
+                display: `${tasks.filter((task) => task.status === "review").length} ${tasks.filter((task) => task.status === "review").length === 1 ? "task" : "tasks"}`,
                 tone: "pink",
               },
               {
                 label: "Done",
                 value: stats.completed,
-                display: `${stats.completed} tasks`,
+                display: `${stats.completed} ${stats.completed === 1 ? "task" : "tasks"}`,
                 tone: "green",
               },
             ]}
@@ -1143,7 +1158,7 @@ export default function TasksView({
                 value: tasks.filter(
                   (task) => task.isOutsourced && task.status !== "done",
                 ).length,
-                display: `${tasks.filter((task) => task.isOutsourced && task.status !== "done").length} tasks`,
+                display: `${tasks.filter((task) => task.isOutsourced && task.status !== "done").length} ${tasks.filter((task) => task.isOutsourced && task.status !== "done").length === 1 ? "task" : "tasks"}`,
                 tone: "pink",
               },
               {
@@ -1151,7 +1166,7 @@ export default function TasksView({
                 value: tasks.filter(
                   (task) => task.isOutsourced && task.status === "done",
                 ).length,
-                display: `${tasks.filter((task) => task.isOutsourced && task.status === "done").length} tasks`,
+                display: `${tasks.filter((task) => task.isOutsourced && task.status === "done").length} ${tasks.filter((task) => task.isOutsourced && task.status === "done").length === 1 ? "task" : "tasks"}`,
                 tone: "green",
               },
             ]}
@@ -1316,7 +1331,10 @@ export default function TasksView({
                         aria-label={`Add task to ${col.title}`}
                         className="zentra-circle-btn zentra-circle-btn--sm flex items-center justify-center text-content-neutral-600 hover:text-accent"
                       >
-                        <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                        <i
+                          className="fa-solid fa-plus text-xs"
+                          aria-hidden="true"
+                        />
                       </button>
                     </div>
                   </div>
@@ -1389,7 +1407,10 @@ export default function TasksView({
                         onClick={() => openAddTaskModal(col.id)}
                         className="flex items-center gap-1.5"
                       >
-                        <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
+                        <i
+                          className="fa-solid fa-plus text-xs"
+                          aria-hidden="true"
+                        />
                         <span>Add a task</span>
                       </Button>
                     </EmptyState>
@@ -1416,8 +1437,8 @@ export default function TasksView({
                         : null;
                       const isInvoiceHoverLinked = Boolean(
                         hasLinkedInvoice &&
-                          hoveredInvoiceId &&
-                          hoveredInvoiceId === task.invoiceId,
+                        hoveredInvoiceId &&
+                        hoveredInvoiceId === task.invoiceId,
                       );
                       const resolvedInvoiceCode =
                         task.invoiceCode ||
@@ -1792,7 +1813,10 @@ export default function TasksView({
                                 aria-label={`Delete task ${task.title}`}
                                 className="p-1.5 rounded-lg text-content-neutral-400 hover:text-content-rose-600 hover:bg-surface-rose-50 transition-colors cursor-pointer"
                               >
-                                <i className="fa-solid fa-trash" aria-hidden="true" />
+                                <i
+                                  className="fa-solid fa-trash"
+                                  aria-hidden="true"
+                                />
                               </button>
                             </div>
                           </div>
@@ -1851,8 +1875,8 @@ export default function TasksView({
                     : null;
                   const isInvoiceHoverLinked = Boolean(
                     hasLinkedInvoice &&
-                      hoveredInvoiceId &&
-                      hoveredInvoiceId === task.invoiceId,
+                    hoveredInvoiceId &&
+                    hoveredInvoiceId === task.invoiceId,
                   );
                   const resolvedInvoiceCode =
                     task.invoiceCode ||
@@ -2025,7 +2049,10 @@ export default function TasksView({
                             aria-label={`Delete task ${task.title}`}
                             className="text-xs text-content-rose-600 hover:bg-surface-rose-50"
                           >
-                            <i className="fa-solid fa-trash" aria-hidden="true" />
+                            <i
+                              className="fa-solid fa-trash"
+                              aria-hidden="true"
+                            />
                           </Button>
                         </div>
                       </td>
@@ -2060,7 +2087,8 @@ export default function TasksView({
               </div>
             </div>
             <p className="text-xs text-content-neutral-500 dark:text-content-neutral-400 mt-1 pl-10.5">
-              Deliverable deadlines, client milestones, and scheduled work events linked with your tasks.
+              Deliverable deadlines, client milestones, and scheduled work
+              events linked with your tasks.
             </p>
           </div>
 
@@ -2068,7 +2096,7 @@ export default function TasksView({
             <Button
               variant="secondary"
               onClick={() => {
-                setCalendarTargetDate(new Date().toISOString().split("T")[0]);
+                setCalendarTargetDate(localDateKey(new Date()));
                 setCalendarTargetTaskId("");
                 setSelectedEventToEdit(null);
                 setIsEventModalOpen(true);
@@ -2116,7 +2144,7 @@ export default function TasksView({
               showToast("Calendar event removed");
             } catch (err) {
               showToast(
-                err instanceof Error ? err.message : "Could not delete event."
+                err instanceof Error ? err.message : "Could not delete event.",
               );
             }
           }}
@@ -2136,7 +2164,8 @@ export default function TasksView({
               id: taskId,
               title: input.title,
               description:
-                input.description || "Scheduled from Calendar & Local Schedule.",
+                input.description ||
+                "Scheduled from Calendar & Local Schedule.",
               status: input.status || "todo",
               priority: input.priority,
               category: input.category,
@@ -2148,12 +2177,14 @@ export default function TasksView({
             });
             setTimeSlotVersion((v) => v + 1);
             showToast(
-              `Added task "${input.title}" for ${input.dueDate}${input.startTime ? ` at ${input.startTime}` : ""}`
+              `Added task "${input.title}" for ${input.dueDate}${input.startTime ? ` at ${input.startTime}` : ""}`,
             );
           }}
           onQuickCreateEvent={async (input) => {
             await createEvent(input);
-            showToast(`Scheduled event "${input.title}" for ${input.startDate}`);
+            showToast(
+              `Scheduled event "${input.title}" for ${input.startDate}`,
+            );
           }}
           onNotify={(msg) => showToast(msg)}
         />
@@ -2442,8 +2473,9 @@ export default function TasksView({
                           <div>
                             <label className="block text-xs font-medium text-content-neutral-700 mb-1">
                               Estimated Budget (
-                              {clients.find((client) => client.id === newClientName)
-                                ?.currency ||
+                              {clients.find(
+                                (client) => client.id === newClientName,
+                              )?.currency ||
                                 settings?.defaultCurrency ||
                                 activeCurrency ||
                                 "LKR"}
@@ -2479,10 +2511,14 @@ export default function TasksView({
                           className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:border-accent cursor-pointer"
                         >
                           <option value="meeting">👥 Client Meeting</option>
-                          <option value="milestone">🚩 Project Milestone</option>
+                          <option value="milestone">
+                            🚩 Project Milestone
+                          </option>
                           <option value="review">🔍 Deliverable Review</option>
                           <option value="deadline">⏰ Hard Deadline</option>
-                          <option value="reminder">🔔 Follow-up Reminder</option>
+                          <option value="reminder">
+                            🔔 Follow-up Reminder
+                          </option>
                           <option value="general">📅 General Schedule</option>
                         </select>
                       </div>
@@ -2551,7 +2587,12 @@ export default function TasksView({
                 >
                   Cancel
                 </Button>
-                <Button variant="primary" type="submit" disabled={saving} className="flex items-center gap-1.5">
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={saving}
+                  className="flex items-center gap-1.5"
+                >
                   <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
                   <span>
                     {newRecordType === "task"
@@ -2899,7 +2940,9 @@ export default function TasksView({
                           void saveTask(selectedTaskForDetail.id, {
                             status: newStatus,
                           });
-                          showToast(`Updated task status to ${newStatus.replace("-", " ")}`);
+                          showToast(
+                            `Updated task status to ${newStatus.replace("-", " ")}`,
+                          );
                         }
                       }}
                       className="ui-field w-full px-2 border border-line-neutral-200 font-medium text-content-neutral-800"
@@ -2994,7 +3037,9 @@ export default function TasksView({
                       }
                       disabled={saving}
                       onChange={(e) => {
-                        const currentSlot = getTaskTimeSlot(selectedTaskForDetail.id);
+                        const currentSlot = getTaskTimeSlot(
+                          selectedTaskForDetail.id,
+                        );
                         saveTaskTimeSlot(selectedTaskForDetail.id, {
                           startTime: e.target.value || null,
                           endTime:
@@ -3021,7 +3066,9 @@ export default function TasksView({
                       }
                       disabled={saving}
                       onChange={(e) => {
-                        const currentSlot = getTaskTimeSlot(selectedTaskForDetail.id);
+                        const currentSlot = getTaskTimeSlot(
+                          selectedTaskForDetail.id,
+                        );
                         saveTaskTimeSlot(selectedTaskForDetail.id, {
                           startTime:
                             selectedTaskForDetail.startTime ??
@@ -3049,29 +3096,31 @@ export default function TasksView({
                 <span>Delete Task</span>
               </Button>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setCalendarTargetDate(selectedTaskForDetail.dueDate || new Date().toISOString().split("T")[0]);
-                      setCalendarTargetTaskId(selectedTaskForDetail.id);
-                      setSelectedEventToEdit(null);
-                      setIsEventModalOpen(true);
-                    }}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>Schedule Event</span>
-                  </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setCalendarTargetDate(
+                      selectedTaskForDetail.dueDate || localDateKey(new Date()),
+                    );
+                    setCalendarTargetTaskId(selectedTaskForDetail.id);
+                    setSelectedEventToEdit(null);
+                    setIsEventModalOpen(true);
+                  }}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Schedule Event</span>
+                </Button>
 
-                  <Button
-                    variant="primary"
-                    onClick={() => setSelectedTaskForDetail(null)}
-                  >
-                    Close
-                  </Button>
-                </div>
+                <Button
+                  variant="primary"
+                  onClick={() => setSelectedTaskForDetail(null)}
+                >
+                  Close
+                </Button>
               </div>
-            </Dialog>
+            </div>
+          </Dialog>
         )}
       </MotionPresence>
 

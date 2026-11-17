@@ -67,19 +67,49 @@ export interface WorkOrderPdfPayload {
 }
 
 export function buildInvoiceHtml(data: InvoicePdfPayload): string {
-  if (data.template === "executive-wave") {
-    return buildInvoiceHtmlExecutiveWave(data);
+  const builder =
+    data.template === "executive-wave"
+      ? buildInvoiceHtmlExecutiveWave
+      : data.template === "scarlet-modern"
+        ? buildInvoiceHtmlScarletModern
+        : data.template === "apex-orange"
+          ? buildInvoiceHtmlApexOrange
+          : data.template === "noir-crimson"
+            ? buildInvoiceHtmlNoirCrimson
+            : buildInvoiceHtmlGeometricTeal;
+  let html = builder(data);
+  const signature = data.business.signatureData;
+  const validSignature =
+    signature &&
+    /^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(signature);
+  const supplement = `<section class="invoice-supplement" style="position:relative;z-index:3;margin:20px 36px;break-inside:avoid;font-size:11px">
+    ${data.template === "noir-crimson" && data.client.billingAddress ? `<p><strong>Billing address</strong><br>${escapeHtml(data.client.billingAddress)}</p>` : ""}
+    ${data.template === "noir-crimson" && data.paymentUrl ? `<p><a style="color:inherit;text-decoration:underline" href="${escapeHtml(data.paymentUrl)}">Payment link: ${escapeHtml(data.paymentUrl)}</a></p>` : ""}
+    ${validSignature ? `<div><img alt="Authorized signature" src="${signature}" style="display:block;width:144px;height:44px;background:#fff;border-radius:4px;padding:4px;object-fit:contain"><small>Authorized signature</small></div>` : ""}
+  </section>`;
+  if (
+    validSignature ||
+    (data.template === "noir-crimson" &&
+      (data.client.billingAddress || data.paymentUrl))
+  ) {
+    const footer =
+      /<div class="(?:footer-row|footer-container|footer-bar|footer-contact|contact-footer)[^"]*"/;
+    html = footer.test(html)
+      ? html.replace(footer, supplement + "$&")
+      : html.replace("</body>", supplement + "</body>");
   }
-  if (data.template === "scarlet-modern") {
-    return buildInvoiceHtmlScarletModern(data);
-  }
-  if (data.template === "apex-orange") {
-    return buildInvoiceHtmlApexOrange(data);
-  }
-  if (data.template === "noir-crimson") {
-    return buildInvoiceHtmlNoirCrimson(data);
-  }
-  return buildInvoiceHtmlGeometricTeal(data);
+  if (data.items.length >= 10)
+    html = html.replace("<body>", '<body data-invoice-pagination="true">');
+  const printStyle = `<style data-invoice-print>@media print {
+    table { break-inside:auto; } thead { display:table-header-group; }
+    tr, .table-row { break-inside:avoid; page-break-inside:avoid; }
+    .totals, .totals-section, .totals-wrapper, .summary-section, .totals-grid, .summary-grid, .invoice-supplement { break-inside:avoid; }
+    body[data-invoice-pagination] { height:auto !important; min-height:1122px; max-height:none !important; overflow:visible !important; display:block !important; }
+    body[data-invoice-pagination] .body-content, body[data-invoice-pagination] .doc-content, body[data-invoice-pagination] .main-content, body[data-invoice-pagination] .content, body[data-invoice-pagination] .page { height:auto !important; min-height:0 !important; overflow:visible !important; display:block !important; }
+    body[data-invoice-pagination] .bottom-right-svg, body[data-invoice-pagination] .bottom-decoration, body[data-invoice-pagination] .bottom-shape, body[data-invoice-pagination] .footer-svg { display:none !important; }
+    body[data-invoice-pagination] .footer-row, body[data-invoice-pagination] .footer-container, body[data-invoice-pagination] .footer-bar, body[data-invoice-pagination] .footer-contact, body[data-invoice-pagination] .contact-footer, body[data-invoice-pagination] .footer-content { position:relative !important; bottom:auto !important; height:auto !important; margin-top:24px !important; break-inside:avoid; }
+  }</style>`;
+  return html.replace("</head>", printStyle + "</head>");
 }
 
 /**
@@ -121,6 +151,14 @@ export async function printLocalPdf(
     );
     await win.webContents.executeJavaScript(
       `Promise.all([document.fonts.ready, ...Array.from(document.images, image => image.complete ? Promise.resolve() : new Promise((resolve) => { image.onload=resolve; image.onerror=resolve; }))]).then(() => true)`,
+    );
+    await win.webContents.executeJavaScript(
+      `if (document.querySelector("[data-invoice-print]") && (document.body.scrollHeight > 1124 || document.body.dataset.invoicePagination)) {
+        document.body.dataset.invoicePagination = "true";
+        const continuation = document.createElement("style");
+        continuation.textContent = "@page { margin:12mm 0; } @page:first { margin:0; }";
+        document.head.append(continuation);
+      } true`,
     );
     const pdfBytes = await win.webContents.printToPDF({
       printBackground: true,
@@ -208,7 +246,7 @@ export async function generateInvoicePdfBuffer(
 
   // Business Name inside Banner
   const businessName = (
-    data.business.businessName || "CHETHAKA LAKSHITHA"
+    data.business.businessName || "Your business"
   ).toUpperCase();
   page.drawText(businessName.slice(0, 26), {
     x: 64,
@@ -704,13 +742,7 @@ function payableVoucherHtml(data: WorkOrderPdfPayload) {
 export async function generateWorkOrderPdfBuffer(
   data: WorkOrderPdfPayload,
 ): Promise<Buffer> {
-  if (
-    electron?.BrowserWindow &&
-    (data.items?.length ||
-      data.vendor.billingAddress ||
-      data.paypalUrl ||
-      data.stripeUrl)
-  )
+  if (electron?.BrowserWindow)
     return printLocalPdf(payableVoucherHtml(data), 0.55);
   const doc = await PDFDocument.create();
   const page = doc.addPage([595.28, 841.89]); // A4
@@ -768,7 +800,7 @@ export async function generateWorkOrderPdfBuffer(
 
   // Business Name inside Banner
   const businessName = (
-    data.business.businessName || "CHETHAKA LAKSHITHA"
+    data.business.businessName || "Your business"
   ).toUpperCase();
   page.drawText(businessName.slice(0, 26), {
     x: 64,

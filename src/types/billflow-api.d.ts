@@ -64,7 +64,29 @@ type SaveFileResult = {
 
 export interface BillFlowAPI extends WorkflowAPI {
   isElectron: boolean;
+  currency?: {
+    rates: () => Promise<
+      import("../lib/currency-conversion").ExchangeRateState
+    >;
+  };
   workspace?: {
+    quarantineDrafts?: (drafts: Record<string, string>) => Promise<void>;
+    activity?: () => Promise<import("./activity").WorkspaceActivity[]>;
+    recordActivity?: (
+      profileId: string,
+      input: import("./activity").ActivityInput,
+    ) => Promise<void>;
+    archive?: (
+      kind: "clients" | "vendors",
+      id: string,
+      archived: boolean,
+    ) => Promise<void>;
+    onActivityChanged?: (callback: () => void) => () => void;
+    draft?: (
+      profileId: string,
+      key: string,
+      value?: string | null,
+    ) => Promise<string | null>;
     snapshot: (datasets?: WorkspaceDataset[]) => Promise<WorkspaceSnapshot>;
   };
   platform?: string;
@@ -237,6 +259,14 @@ export interface BillFlowAPI extends WorkflowAPI {
     summary: () => Promise<DashboardSummary>;
   };
   settings: {
+    preflight?: (
+      payload: ExportDataPayload,
+      mode?: "replace" | "merge",
+    ) => Promise<{
+      success: boolean;
+      importedClients: number;
+      importedInvoices: number;
+    }>;
     exportCsv: () => Promise<SaveFileResult>;
     saveBackup: () => Promise<SaveFileResult>;
     get: () => Promise<AppSettings>;
@@ -255,6 +285,7 @@ export interface BillFlowAPI extends WorkflowAPI {
     }>;
     reset: () => Promise<{ success: boolean }>;
   };
+  onWorkspaceLocked?: (callback: () => void) => () => void;
   onDataChanged: (callback: (change?: WorkspaceChange) => void) => () => void;
   onNavigate?: (callback: (route: string) => void) => () => void;
 }

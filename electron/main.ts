@@ -1,5 +1,7 @@
 import { registerStatementHandlers } from "./ipc/statements";
+import { registerActivityHandlers } from "./workspace-activity";
 import { registerWorkspaceHandlers } from "./ipc/workspace";
+import { registerExchangeRateHandlers } from "./exchange-rates";
 import { affectedDatasets } from "../src/types/workspace";
 import { getActiveProfileId, getWorkspaceGeneration } from "./db";
 import { currentIpcChannel } from "./security";
@@ -16,6 +18,7 @@ import {
   Tray,
   nativeImage,
   nativeTheme,
+  powerMonitor,
   dialog,
   session,
 } from "electron";
@@ -252,7 +255,23 @@ app
     }
 
     // Register IPC handlers
+    const lockProtectedWorkspace = () => {
+      const state = listProfilesState();
+      if (
+        !state.profiles.find((profile) => profile.id === state.activeProfileId)
+          ?.hasPassword
+      )
+        return;
+      lockProfileSession();
+      mainWindow?.webContents.send("workspace:locked");
+    };
+    powerMonitor.on("lock-screen", lockProtectedWorkspace);
+    powerMonitor.on("suspend", lockProtectedWorkspace);
     registerWorkspaceHandlers();
+    registerActivityHandlers(() =>
+      mainWindow?.webContents.send("workspace:activity-changed"),
+    );
+    registerExchangeRateHandlers();
     registerStatementHandlers();
     registerProfileHandlers(broadcastDataChanged);
     registerClientHandlers(broadcastDataChanged);

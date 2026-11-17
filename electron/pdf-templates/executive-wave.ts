@@ -31,7 +31,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
         <td class="td-num">${idx + 1}</td>
         <td class="td-desc">
           <div class="desc-main">${escapeHtml(it.description)}</div>
-          <div class="desc-sub">Deliverable milestone &amp; software sprint scope</div>
+
         </td>
         <td class="td-price">${formatMoney(it.unitPriceCents, data.currency)}</td>
         <td class="td-qty">${it.quantity}</td>
@@ -398,7 +398,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       <div class="brand-side">
         ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" class="brand-logo" alt="Logo" />` : ""}
         <div>
-          <div class="brand-name">${escapeHtml(data.business.businessName || "CHETHAKA LAKSHITHA")}</div>
+          <div class="brand-name">${escapeHtml(data.business.businessName || "")}</div>
           <div class="brand-title">${escapeHtml(data.business.professionalTitle || "SOFTWARE FREELANCING & CONSULTING")}</div>
         </div>
       </div>
@@ -415,11 +415,11 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
         }
         <div class="contact-item">
           <span class="c-label">Web / Email:</span>
-          <span class="c-val">${escapeHtml(data.business.email || data.business.website || "chethaka.dev")}</span>
+          <span class="c-val">${escapeHtml(data.business.email || data.business.website || "")}</span>
         </div>
         <div class="contact-item">
           <span class="c-label">Area / Location:</span>
-          <span class="c-val">${escapeHtml(data.business.address || data.business.taxId || "Colombo, Sri Lanka")}</span>
+          <span class="c-val">${escapeHtml(data.business.address || data.business.taxId || "")}</span>
         </div>
       </div>
     </div>

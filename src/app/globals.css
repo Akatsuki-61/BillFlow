@@ -1199,7 +1199,8 @@ input[type="checkbox"] {
 
 /* Data graphics: every filled pixel has a stated measure. */
 .summary-value {
-  font-size: clamp(26px, 2.5vw, 38px);
+  font-size: clamp(1.35rem, 0.8rem + 5cqi, 2.375rem);
+  white-space: nowrap;
   font-weight: 500;
   line-height: 1.18;
   letter-spacing: -0.045em;
@@ -2946,7 +2947,15 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
 }
 
 :root[data-workspace-typeface] body,
-:root[data-workspace-typeface] :is(.page-header, .record-title, .record-meta, .ui-field, .ui-button, .app-dialog-header) {
+:root[data-workspace-typeface]
+  :is(
+    .page-header,
+    .record-title,
+    .record-meta,
+    .ui-field,
+    .ui-button,
+    .app-dialog-header
+  ) {
   font-family: var(--workspace-font, var(--font-inter), Inter, sans-serif);
 }
 
@@ -2960,25 +2969,44 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
   --workspace-field-height: 44px;
   --workspace-gap: 24px;
 }
-:root:is([data-workspace-density="compact"], [data-workspace-density="spacious"]) :is(.record-table th, .record-table td) {
+:root:is(
+    [data-workspace-density="compact"],
+    [data-workspace-density="spacious"]
+  )
+  :is(.record-table th, .record-table td) {
   padding-block: var(--workspace-row-block);
 }
-:root:is([data-workspace-density="compact"], [data-workspace-density="spacious"]) :is(.workspace-page, .app-dialog-body) {
+:root:is(
+    [data-workspace-density="compact"],
+    [data-workspace-density="spacious"]
+  )
+  :is(.workspace-page, .app-dialog-body) {
   gap: var(--workspace-gap);
 }
-:root:is([data-workspace-density="compact"], [data-workspace-density="spacious"]) :is(input.ui-field, select.ui-field, .ui-button) {
+:root:is(
+    [data-workspace-density="compact"],
+    [data-workspace-density="spacious"]
+  )
+  :is(input.ui-field, select.ui-field, .ui-button) {
   min-height: var(--workspace-field-height);
 }
 
 :root[data-notification-placement] [data-motion-surface="toast"] {
   position: fixed !important;
-  inset: var(--toast-top, auto) var(--toast-right, 24px) var(--toast-bottom, 24px) var(--toast-left, auto) !important;
+  inset: var(--toast-top, auto) var(--toast-right, 24px)
+    var(--toast-bottom, 24px) var(--toast-left, auto) !important;
 }
-:root:is([data-notification-placement="top-left"], [data-notification-placement="top-right"]) {
+:root:is(
+  [data-notification-placement="top-left"],
+  [data-notification-placement="top-right"]
+) {
   --toast-top: 84px;
   --toast-bottom: auto;
 }
-:root:is([data-notification-placement="top-left"], [data-notification-placement="bottom-left"]) {
+:root:is(
+  [data-notification-placement="top-left"],
+  [data-notification-placement="bottom-left"]
+) {
   --toast-left: 24px;
   --toast-right: auto;
 }
@@ -2993,5 +3021,47 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
   background: var(--theme-accent-solid);
   pointer-events: none;
 }
-[data-task-drop-edge="before"]::before { top: -3px; }
-[data-task-drop-edge="after"]::before { bottom: -3px; }
+[data-task-drop-edge="before"]::before {
+  top: -3px;
+}
+[data-task-drop-edge="after"]::before {
+  bottom: -3px;
+}
+
+/* Reporting keeps source amounts visible without letting money labels fragment. */
+.reported-money {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: inherit;
+  gap: 0.15rem;
+  white-space: nowrap;
+}
+.reported-money small {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 1;
+  color: var(--ui-secondary);
+}
+
+.data-month-value {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  font-size: clamp(0.625rem, 0.25rem + 0.5vw, 0.75rem);
+}
+.data-breakdown-label > strong {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.catalog-service-price .reported-money,
+.catalog-service-price .reported-money-primary {
+  font-size: inherit;
+  color: inherit;
+  margin: 0;
+  line-height: inherit;
+}
+.ui-card:has(> h2):has(.summary-value),
+.ui-card:has(> div > h2):has(.summary-value) {
+  container-type: inline-size;
+}

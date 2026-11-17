@@ -1,10 +1,14 @@
 "use client";
+import { localDateKey } from "@/lib/visual-metrics";
+import { workspaceDraft } from "@/lib/workspace-drafts";
+import { useReportingData, ReportingGuard } from "@/context/ReportingContext";
+
 import Image from "next/image";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { PhoneField } from "@/components/ui/PhoneField";
 
 import { useWorkspaceCommand } from "@/lib/use-workspace-command";
-import { formatClientBalance } from "@/lib/client-balances";
+import { clientBalanceInCurrency } from "@/lib/client-balances";
 
 import { Dialog } from "@/components/ui/Dialog";
 
@@ -14,7 +18,11 @@ import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import { AnimatePresence, motion } from "motion/react";
-import { SPRING_MENU_POPOVER, EXIT_MENU_POPOVER, POPOVER_INITIAL_SCALE } from "@/lib/motion";
+import {
+  SPRING_MENU_POPOVER,
+  EXIT_MENU_POPOVER,
+  POPOVER_INITIAL_SCALE,
+} from "@/lib/motion";
 import React, { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -49,10 +57,31 @@ import { openExternalLink } from "@/lib/deliveryUrl";
 import type { ClientWithStats, Currency } from "@/types/billing";
 
 function ClientsContent() {
+  const reporting = useReportingData();
+  const formatClientBalance = (
+    client: ClientWithStats,
+    field: "billed" | "paid" | "outstanding",
+  ) => {
+    const converted = clientBalanceInCurrency(
+      client,
+      field,
+      reporting.currency,
+      reporting.rates,
+    );
+    return converted === null
+      ? "Rates unavailable"
+      : formatCents(converted, reporting.currency);
+  };
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { clients, isLoading, createClient, updateClient, deleteClient } =
-    useClients();
+  const {
+    clients,
+    isLoading,
+    createClient,
+    updateClient,
+    deleteClient,
+    refresh,
+  } = useClients();
   const { createInvoice, invoices: allInvoices } = useInvoices();
   const { activeCurrency, settings, isElectron } = useData();
 
@@ -80,6 +109,7 @@ function ClientsContent() {
     useState<ClientWithStats | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   // Close active client dropdown menu on click outside or Escape
   React.useEffect(() => {
@@ -146,24 +176,24 @@ function ClientsContent() {
     );
   };
 
-  const saveClientDraft = () => {
+  const saveClientDraft = async () => {
     if (!isClientFormDirty()) return;
     try {
-      localStorage.setItem("billflow_draft_client", JSON.stringify(formData));
+      await workspaceDraft("billflow_draft_client", JSON.stringify(formData));
       setHasClientDraft(true);
     } catch {}
   };
 
-  const clearClientDraft = () => {
+  const clearClientDraft = async () => {
     try {
-      localStorage.removeItem("billflow_draft_client");
+      await workspaceDraft("billflow_draft_client", null);
     } catch {}
     setHasClientDraft(false);
   };
 
-  const handleRestoreClientDraft = () => {
+  const handleRestoreClientDraft = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_client");
+      const saved = await workspaceDraft("billflow_draft_client");
       if (!saved) return;
       const draft = JSON.parse(saved);
       setFormData((prev) => ({ ...prev, ...draft }));
@@ -178,9 +208,9 @@ function ClientsContent() {
     setIsAddModalOpen(false);
   };
 
-  const openAddClientModal = () => {
+  const openAddClientModal = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_client");
+      const saved = await workspaceDraft("billflow_draft_client");
       setHasClientDraft(Boolean(saved));
     } catch {
       setHasClientDraft(false);
@@ -421,9 +451,9 @@ function ClientsContent() {
     try {
       const amountCents = parseAmountToCents(quickBillAmount);
       const today = new Date();
-      const issueDate = today.toISOString().split("T")[0];
+      const issueDate = localDateKey(today);
       const dueDateObj = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const dueDate = dueDateObj.toISOString().split("T")[0];
+      const dueDate = localDateKey(dueDateObj);
 
       const created = await createInvoice({
         clientId: selectedClientForBill.id,
@@ -457,6 +487,7 @@ function ClientsContent() {
 
   // Filter clients by search query
   const filteredClients = clients.filter((c) => {
+    if (Boolean(c.archivedAt) !== showArchived) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.trim().toLowerCase();
     return (
@@ -520,114 +551,116 @@ function ClientsContent() {
       {/* =====================================================================
           ZENTRA 3-CARD CLIENTS BENTO HEADER ROW
          ===================================================================== */}
-      {(() => {
-        const issued = allInvoices.filter(
-          (invoice) =>
-            invoice.status !== "DRAFT" &&
-            invoice.currency === activeCurrency &&
-            invoice.clientId &&
-            clients.some((client) => client.id === invoice.clientId),
-        );
-        const billed = issued.reduce(
-          (sum, invoice) => sum + invoice.amountCents,
-          0,
-        );
-        const paid = issued.reduce(
-          (sum, invoice) => sum + (invoice.paidCents ?? 0),
-          0,
-        );
-        const active = clients.filter((client) =>
-          issued.some((invoice) => invoice.clientId === client.id),
-        ).length;
-        const linked = clients.filter((client) =>
-          Boolean(client.driveUrl),
-        ).length;
-        const money = (value: number) => formatCents(value, activeCurrency);
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <section className="ui-card p-6 space-y-5">
-              <h2>Client Portfolio</h2>
-              <div>
-                <div className="summary-value">{money(billed)}</div>
-                <p className="summary-caption">
-                  Issued to saved clients · {activeCurrency}
-                </p>
-              </div>
-              <DataBreakdown
-                label="Client portfolio billing"
-                total={billed}
-                rows={[
-                  {
-                    label: "Collected",
-                    value: paid,
-                    display: money(paid),
-                    tone: "green",
-                  },
-                  {
-                    label: "Outstanding",
-                    value: Math.max(0, billed - paid),
-                    display: money(Math.max(0, billed - paid)),
-                    tone: "pink",
-                  },
-                ]}
-              />
-            </section>
-            <section className="ui-card p-6 space-y-5">
-              <h2>Client Relationships</h2>
-              <div>
-                <div className="summary-value">{clients.length}</div>
-                <p className="summary-caption">Saved client profiles</p>
-              </div>
-              <DataBreakdown
-                label="Clients with issued invoices"
-                total={clients.length}
-                rows={[
-                  {
-                    label: `With invoices in ${activeCurrency}`,
-                    value: active,
-                    display: `${active} clients`,
-                  },
-                  {
-                    label: `Without invoices in ${activeCurrency}`,
-                    value: clients.length - active,
-                    display: `${clients.length - active} clients`,
-                    tone: "green",
-                  },
-                ]}
-              />
-            </section>
-            <section className="ui-card p-6 space-y-5">
-              <h2>Delivery Locations</h2>
-              <div>
-                <div className="summary-value">
-                  {linked}/{clients.length}
+      <ReportingGuard>
+        {(() => {
+          const issued = reporting.invoices.filter(
+            (invoice) =>
+              invoice.status !== "DRAFT" &&
+              invoice.currency === activeCurrency &&
+              invoice.clientId &&
+              clients.some((client) => client.id === invoice.clientId),
+          );
+          const billed = issued.reduce(
+            (sum, invoice) => sum + invoice.amountCents,
+            0,
+          );
+          const paid = issued.reduce(
+            (sum, invoice) => sum + (invoice.paidCents ?? 0),
+            0,
+          );
+          const active = clients.filter((client) =>
+            issued.some((invoice) => invoice.clientId === client.id),
+          ).length;
+          const linked = clients.filter((client) =>
+            Boolean(client.driveUrl),
+          ).length;
+          const money = (value: number) => formatCents(value, activeCurrency);
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <section className="ui-card p-6 space-y-5">
+                <h2>Client Portfolio</h2>
+                <div>
+                  <div className="summary-value">{money(billed)}</div>
+                  <p className="summary-caption">
+                    Issued to saved clients, converted to {activeCurrency}
+                  </p>
                 </div>
-                <p className="summary-caption">
-                  Client profiles with a saved delivery link
-                </p>
-              </div>
-              <DataBreakdown
-                label="Delivery link coverage"
-                total={clients.length}
-                rows={[
-                  {
-                    label: "Link saved",
-                    value: linked,
-                    display: `${linked} clients`,
-                    tone: "green",
-                  },
-                  {
-                    label: "No default link",
-                    value: clients.length - linked,
-                    display: `${clients.length - linked} clients`,
-                    tone: "pink",
-                  },
-                ]}
-              />
-            </section>
-          </div>
-        );
-      })()}
+                <DataBreakdown
+                  label="Client portfolio billing"
+                  total={billed}
+                  rows={[
+                    {
+                      label: "Collected",
+                      value: paid,
+                      display: money(paid),
+                      tone: "green",
+                    },
+                    {
+                      label: "Outstanding",
+                      value: Math.max(0, billed - paid),
+                      display: money(Math.max(0, billed - paid)),
+                      tone: "pink",
+                    },
+                  ]}
+                />
+              </section>
+              <section className="ui-card p-6 space-y-5">
+                <h2>Client Relationships</h2>
+                <div>
+                  <div className="summary-value">{clients.length}</div>
+                  <p className="summary-caption">Saved client profiles</p>
+                </div>
+                <DataBreakdown
+                  label="Clients with issued invoices"
+                  total={clients.length}
+                  rows={[
+                    {
+                      label: `With invoices in ${activeCurrency}`,
+                      value: active,
+                      display: `${active} client${active === 1 ? "" : "s"}`,
+                    },
+                    {
+                      label: `Without invoices in ${activeCurrency}`,
+                      value: clients.length - active,
+                      display: `${clients.length - active} client${clients.length - active === 1 ? "" : "s"}`,
+                      tone: "green",
+                    },
+                  ]}
+                />
+              </section>
+              <section className="ui-card p-6 space-y-5">
+                <h2>Delivery Locations</h2>
+                <div>
+                  <div className="summary-value">
+                    {linked}/{clients.length}
+                  </div>
+                  <p className="summary-caption">
+                    Client profiles with a saved delivery link
+                  </p>
+                </div>
+                <DataBreakdown
+                  label="Delivery link coverage"
+                  total={clients.length}
+                  rows={[
+                    {
+                      label: "Link saved",
+                      value: linked,
+                      display: `${linked} client${linked === 1 ? "" : "s"}`,
+                      tone: "green",
+                    },
+                    {
+                      label: "No default link",
+                      value: clients.length - linked,
+                      display: `${clients.length - linked} client${clients.length - linked === 1 ? "" : "s"}`,
+                      tone: "pink",
+                    },
+                  ]}
+                />
+              </section>
+            </div>
+          );
+        })()}
+      </ReportingGuard>
 
       {/* Search & Directory Summary */}
       {clients.length > 0 && (
@@ -654,7 +687,15 @@ function ClientsContent() {
             )}
           </div>
           <span className="zentra-pill-badge !px-3 !py-1 !text-[12px]">
-            Showing {filteredClients.length} of {clients.length} clients
+            <button
+              type="button"
+              className="underline mr-3"
+              onClick={() => setShowArchived(!showArchived)}
+            >
+              {showArchived ? "Show active clients" : "Show archived clients"}
+            </button>
+            Showing {filteredClients.length} of {clients.length} client
+            {clients.length === 1 ? "" : "s"}
           </span>
         </div>
       )}
@@ -707,19 +748,28 @@ function ClientsContent() {
         ) : (
           filteredClients.map((client) => {
             const letter = client.name.trim().charAt(0).toUpperCase();
+            const billed = clientBalanceInCurrency(
+              client,
+              "billed",
+              reporting.currency,
+              reporting.rates,
+            );
+            const paid = clientBalanceInCurrency(
+              client,
+              "paid",
+              reporting.currency,
+              reporting.rates,
+            );
             const clientPaidPct =
-              client.totalBilledCents > 0
-                ? Math.min(
-                    100,
-                    Math.round(
-                      (client.totalPaidCents / client.totalBilledCents) * 100,
-                    ),
-                  )
-                : 0;
+              billed === null || paid === null
+                ? null
+                : billed > 0
+                  ? Math.min(100, Math.round((paid / billed) * 100))
+                  : 0;
             const clientStripe =
-              clientPaidPct >= 100
+              (clientPaidPct ?? 0) >= 100
                 ? "zentra-stripe-green"
-                : clientPaidPct > 0
+                : (clientPaidPct ?? 0) > 0
                   ? "zentra-stripe-blue"
                   : "zentra-stripe-amber";
 
@@ -776,7 +826,11 @@ function ClientsContent() {
                         {activeMenuId === client.id && (
                           <motion.div
                             key={`client-menu-${client.id}`}
-                            initial={{ opacity: 0, scale: POPOVER_INITIAL_SCALE, y: -6 }}
+                            initial={{
+                              opacity: 0,
+                              scale: POPOVER_INITIAL_SCALE,
+                              y: -6,
+                            }}
                             animate={{
                               opacity: 1,
                               scale: 1,
@@ -840,6 +894,31 @@ function ClientsContent() {
                                 <span>Open Delivery Link</span>
                               </Button>
                             )}
+                            <Button
+                              variant="menu"
+                              onClick={async () => {
+                                try {
+                                  await window.billflow?.workspace?.archive?.(
+                                    "clients",
+                                    client.id,
+                                    !client.archivedAt,
+                                  );
+                                  await refresh();
+                                  setActiveMenuId(null);
+                                } catch (failure) {
+                                  showToast(
+                                    failure instanceof Error
+                                      ? failure.message
+                                      : "Could not update client.",
+                                    "error",
+                                  );
+                                }
+                              }}
+                            >
+                              {client.archivedAt
+                                ? "Restore client"
+                                : "Archive client"}
+                            </Button>
                             <div className="my-1 border-t border-line-neutral-100" />
                             <Button
                               variant="danger"
@@ -864,13 +943,15 @@ function ClientsContent() {
                         Collection progress
                       </span>
                       <span className="font-semibold tabular-nums text-content-neutral-900">
-                        {clientPaidPct}% settled
+                        {clientPaidPct === null
+                          ? "Rates unavailable"
+                          : `${clientPaidPct}% settled`}
                       </span>
                     </div>
                     <div className="w-full h-[18px] rounded-[6px] bg-surface-neutral-100 p-[2.5px] flex items-center overflow-hidden">
                       <div
                         style={{
-                          clipPath: `inset(0 ${Math.max(0, 100 - clientPaidPct)}% 0 0 round 4px)`,
+                          clipPath: `inset(0 ${Math.max(0, 100 - (clientPaidPct ?? 0))}% 0 0 round 4px)`,
                         }}
                         className={`w-full h-full rounded-[4px] ${clientStripe} transition-[clip-path] duration-300 ease-[cubic-bezier(0.42,0,0.58,1)]`}
                       />
@@ -907,7 +988,7 @@ function ClientsContent() {
                           Object.values(client.totalsByCurrency || {}).some(
                             (total) => Boolean(total?.outstanding),
                           )
-                            ? "text-rose-600 dark:text-rose-400"
+                            ? "text-rose-700 dark:text-rose-400"
                             : "text-content-neutral-400"
                         }`}
                       >

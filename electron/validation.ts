@@ -419,8 +419,8 @@ export const newWorkOrderSchema = z
     "Choose a directory vendor or enter a one-time vendor.",
   )
   .refine(
-    (value) => Boolean(value.taskId) === Boolean(value.invoiceId),
-    "Linked work orders require a task and its invoice.",
+    (value) => !value.invoiceId || Boolean(value.taskId),
+    "An invoice-linked work order requires a source task.",
   );
 
 /**

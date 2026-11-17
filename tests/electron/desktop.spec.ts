@@ -44,7 +44,7 @@ test.describe.configure({ mode: "serial" });
 const executable =
   process.env.BILLFLOW_APP_PATH ||
   path.resolve(
-    "release/preview-0.2.0/mac-arm64/BillFlow.app/Contents/MacOS/BillFlow",
+    "release/test-0.2.0/mac-arm64/BillFlow.app/Contents/MacOS/BillFlow",
   );
 async function launch() {
   const env = Object.fromEntries(
@@ -59,6 +59,7 @@ async function launch() {
       BILLFLOW_USER_DATA: directory,
       BILLFLOW_VERIFY_HIDDEN: "1",
       BILLFLOW_DISABLE_NATIVE_CALENDAR: "1",
+      BILLFLOW_DISABLE_RATE_FETCH: "1",
     },
   });
   page = await app.firstWindow();
@@ -70,6 +71,17 @@ test.beforeAll(async () => {
       "Build the local test app first, or set BILLFLOW_APP_PATH to its executable.",
     );
   directory = fs.mkdtempSync(path.join(os.tmpdir(), "billflow-desktop-e2e-"));
+  fs.writeFileSync(
+    path.join(directory, "exchange-rates.json"),
+    JSON.stringify({
+      base: "USD",
+      rates: { USD: 1, LKR: 300, EUR: 0.9, GBP: 0.75, CAD: 1.4 },
+      provider: "ExchangeRate-API",
+      updatedAt: new Date().toISOString(),
+      nextUpdateAt: new Date(Date.now() + 86400000).toISOString(),
+      fetchedAt: new Date().toISOString(),
+    }),
+  );
   await launch();
 });
 test.afterAll(async () => {
@@ -542,7 +554,7 @@ test("workspace operations connect search, alerts, ledgers, forecast, PDFs and b
   await expect(
     page
       .getByRole("table", { name: "Next 30 days by currency" })
-      .getByRole("row", { name: /USD.*100\.00.*30\.00/ }),
+      .getByRole("row", { name: /USD.*155\.56.*30\.00/ }),
   ).toBeVisible();
 
   const exportDir = path.join(directory, "exports");
@@ -755,12 +767,24 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     mimeType: "image/png",
     buffer: Buffer.from(png, "base64"),
   });
-  await expect(page.getByRole("img", { name: "Workspace profile photo" })).toBeVisible();
-  await expect.poll(() => page.evaluate((id) =>
-    window.billflow!.profiles.list().then((state) =>
-      Boolean(state.profiles.find((profile) => profile.id === id)?.photoData)),
-    created.profileId,
-  )).toBe(true);
+  await expect(
+    page.getByRole("img", { name: "Workspace profile photo" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (id) =>
+          window
+            .billflow!.profiles.list()
+            .then((state) =>
+              Boolean(
+                state.profiles.find((profile) => profile.id === id)?.photoData,
+              ),
+            ),
+        created.profileId,
+      ),
+    )
+    .toBe(true);
 
   await openSettings("appearance");
   await page

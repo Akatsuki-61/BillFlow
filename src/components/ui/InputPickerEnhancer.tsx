@@ -32,8 +32,34 @@ export function InputPickerEnhancer() {
       }
     };
 
+    let sequence = 0;
+    const associateLabels = () => {
+      for (const label of document.querySelectorAll<HTMLLabelElement>(
+        "label:not([for])",
+      )) {
+        if (label.querySelector("input, select, textarea")) continue;
+        const scope = label.parentElement;
+        const controls = scope?.querySelectorAll<HTMLInputElement>(
+          "input:not([type=hidden]), select, textarea",
+        );
+        if (controls?.length !== 1) continue;
+        const field = controls[0];
+        if (!field.id) {
+          let id: string;
+          do {
+            id = `billflow-field-${++sequence}`;
+          } while (document.getElementById(id));
+          field.id = id;
+        }
+        label.htmlFor = field.id;
+      }
+    };
+    associateLabels();
+    const observer = new MutationObserver(associateLabels);
+    observer.observe(document.body, { childList: true, subtree: true });
     document.addEventListener("click", handleClick);
     return () => {
+      observer.disconnect();
       document.removeEventListener("click", handleClick);
     };
   }, []);

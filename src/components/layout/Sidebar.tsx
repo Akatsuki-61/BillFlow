@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useId, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useId,
+  useCallback,
+} from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
@@ -35,6 +42,7 @@ import {
 
 import { isNavActive } from "@/lib/navigation";
 import { useData } from "@/lib/data/DataProvider";
+import { useReportingData } from "@/context/ReportingContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useWidgetContext } from "@/context/WidgetContext";
 import { useProfiles } from "@/context/ProfileContext";
@@ -135,6 +143,7 @@ export default function Sidebar() {
     workOrders,
   } = useData();
   const { preference, setPreference } = useTheme();
+  const { convert, currency: reportingCurrency } = useReportingData();
   const {
     profiles,
     activeProfile,
@@ -143,7 +152,8 @@ export default function Sidebar() {
     openProfileGate,
     lockCurrentProfile,
   } = useProfiles();
-  const ActiveProfileIcon = PROFILE_AVATAR_ICONS[activeProfile.avatar] ?? UsersRound;
+  const ActiveProfileIcon =
+    PROFILE_AVATAR_ICONS[activeProfile.avatar] ?? UsersRound;
   const activeProfileStyle =
     PROFILE_ACCENT_STYLES[activeProfile.accent] ?? PROFILE_ACCENT_STYLES.blue;
   const {
@@ -258,6 +268,14 @@ export default function Sidebar() {
   }, []);
 
   const activeAlerts = useMemo(() => {
+    const money = (cents: number, source: string) => {
+      if (source === reportingCurrency)
+        return `${reportingCurrency} ${formatCents(cents, source)}`;
+      const converted = convert(cents, source);
+      return converted === null
+        ? `${source} ${formatCents(cents, source)} · Conversion unavailable`
+        : `${formatCents(converted, reportingCurrency)} (${formatCents(cents, source)} ${source})`;
+    };
     const dueTasks = tasks.filter(
       (task) =>
         task.status !== "done" && task.dueDate?.slice(0, 10) === activityDay,
@@ -289,13 +307,16 @@ export default function Sidebar() {
           ? `${order.payoutDueDate < activityDay ? "Overdue payout" : "Payout due"} · ${order.payoutDueDate}`
           : "Unscheduled payout",
         href: recordLink("/outsourcing", "order", order.id),
-        amount: `${order.currency} ${formatCents(remainingPayout(order), order.currency)}`,
+        amount: money(remainingPayout(order), order.currency),
       })),
       ...unpaid.map((invoice) => ({
         title: `${invoice.code} · ${invoice.clientName}`,
         detail: invoice.status.replaceAll("_", " "),
         href: recordLink("/invoices", "record", invoice.id),
-        amount: `${invoice.currency} ${formatCents(invoice.amountCents - invoice.paidCents, invoice.currency)}`,
+        amount: money(
+          invoice.amountCents - invoice.paidCents,
+          invoice.currency,
+        ),
       })),
       ...inProgress.map((task) => ({
         title: task.title,
@@ -305,7 +326,7 @@ export default function Sidebar() {
         amount: "",
       })),
     ];
-  }, [activityDay, invoices, tasks, workOrders]);
+  }, [activityDay, invoices, tasks, workOrders, convert, reportingCurrency]);
 
   const searchIndex = useMemo<SearchResult[]>(
     () => [
@@ -452,8 +473,12 @@ export default function Sidebar() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <header className={`workspace-nav w-full shrink-0 bg-canvas select-none z-30 ${dragClass}`}>
-        <div className={`w-full px-8 h-[68px] grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4 ${dragClass}`}>
+      <header
+        className={`workspace-nav w-full shrink-0 bg-canvas select-none z-30 ${dragClass}`}
+      >
+        <div
+          className={`w-full px-8 h-[68px] grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4 ${dragClass}`}
+        >
           {/* Left: Brand Identity */}
           <div className={`flex items-center justify-self-start ${dragClass}`}>
             <Link
@@ -553,20 +578,22 @@ export default function Sidebar() {
                           : "text-content-neutral-700 hover:text-content-neutral-950"
                   }`}
                 >
-                  {isHovered && !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
-                    <motion.span
-                      className="absolute inset-0 -z-20 rounded-[15px] bg-black/[0.045] dark:bg-white/[0.065]"
-                      layoutId="main-nav-hover"
-                      transition={SPRING_NAV_GLIDE}
-                    />
-                  )}
-                  {isActive && !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
-                    <motion.span
-                      className="nav-active-pill absolute inset-0 -z-10 rounded-[12px] bg-[#1c1c1f] dark:bg-[#f4f4f6] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.22)]"
-                      layoutId="main-nav-active"
-                      transition={SPRING_NAV_GLIDE}
-                    />
-                  )}
+                  {isHovered &&
+                    !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
+                      <motion.span
+                        className="absolute inset-0 -z-20 rounded-[15px] bg-black/[0.045] dark:bg-white/[0.065]"
+                        layoutId="main-nav-hover"
+                        transition={SPRING_NAV_GLIDE}
+                      />
+                    )}
+                  {isActive &&
+                    !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
+                      <motion.span
+                        className="nav-active-pill absolute inset-0 -z-10 rounded-[12px] bg-[#1c1c1f] dark:bg-[#f4f4f6] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.22)]"
+                        layoutId="main-nav-active"
+                        transition={SPRING_NAV_GLIDE}
+                      />
+                    )}
                   <span className="relative z-10">{item.name}</span>
                 </Link>
               );
@@ -632,7 +659,8 @@ export default function Sidebar() {
                             !searchFocused && searchQuery.length === 0
                               ? "40px"
                               : "14px",
-                          paddingRight: searchQuery.length > 0 ? "34px" : "14px",
+                          paddingRight:
+                            searchQuery.length > 0 ? "34px" : "14px",
                         }}
                         className="ui-field w-full h-9 !min-h-[36px] rounded-[11px] bg-surface-neutral-100 border border-transparent focus:border-line-neutral-300 focus:bg-surface text-[13px] text-content-neutral-900 outline-none"
                       />
@@ -641,7 +669,10 @@ export default function Sidebar() {
                           <motion.button
                             key="clear-search"
                             type="button"
-                            initial={{ opacity: 0, scale: POPOVER_INITIAL_SCALE }}
+                            initial={{
+                              opacity: 0,
+                              scale: POPOVER_INITIAL_SCALE,
+                            }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: POPOVER_INITIAL_SCALE }}
                             transition={SPRING_LIQUID_BUTTON}
@@ -985,7 +1016,9 @@ export default function Sidebar() {
                                 />
                               )}
                               <ModeIcon className="w-3.5 h-3.5 relative z-10" />
-                              <span className="relative z-10">{mode.label}</span>
+                              <span className="relative z-10">
+                                {mode.label}
+                              </span>
                             </button>
                           );
                         })}

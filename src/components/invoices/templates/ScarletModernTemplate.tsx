@@ -197,9 +197,7 @@ export function ScarletModernTemplate({
                     <div className="text-xs font-bold text-slate-900">
                       {item.description}
                     </div>
-                    <div className="text-[10.5px] text-slate-500 mt-0.5">
-                      Deliverable milestone &amp; software sprint scope
-                    </div>
+                    <div className="text-[10.5px] text-slate-500 mt-0.5"></div>
                   </td>
                   <td className="py-3.5 px-4 text-right text-xs font-semibold text-slate-700 tabular-nums align-top">
                     {formatMoney(item.unitPriceCents, invoice.currency)}

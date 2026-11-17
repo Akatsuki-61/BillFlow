@@ -1,11 +1,13 @@
 "use client";
+import { localDateKey } from "@/lib/visual-metrics";
+import { useReportingData } from "@/context/ReportingContext";
 
 import { useMemo } from "react";
 import {
   EChartsAreaChart,
   type ChartConfig,
 } from "@/components/evilcharts/charts/echarts-area-chart";
-import { useData, useActiveCurrency } from "@/lib/data/DataProvider";
+import { useActiveCurrency } from "@/lib/data/DataProvider";
 import { formatCents } from "@/lib/format";
 
 const chartConfig = {
@@ -20,7 +22,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function PortfolioComparisonChart() {
-  const { invoices } = useData();
+  const { invoices } = useReportingData();
   const { activeCurrency } = useActiveCurrency();
 
   const { series, chartData, hasInvoices } = useMemo(() => {
@@ -89,7 +91,7 @@ export function PortfolioComparisonChart() {
 
     for (let i = 13; i >= 0; i--) {
       const d = new Date(now.getTime() - i * MS_PER_DAY);
-      const key = d.toISOString().split("T")[0];
+      const key = localDateKey(d);
       const dateLabel = `${d.toLocaleString("default", { month: "short" })} ${String(d.getDate()).padStart(2, "0")}`;
       days.push({ date: dateLabel, key, web: 0, ai: 0 });
     }

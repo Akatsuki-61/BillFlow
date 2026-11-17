@@ -1,3 +1,17 @@
+function compactDisplay(value: string) {
+  const match = value.match(/\d[\d,]*(?:\.\d+)?/);
+  if (!match) return value;
+  const amount = Number(match[0].replaceAll(",", ""));
+  const sign = value.startsWith("-") ? "-" : "";
+  return (
+    sign +
+    new Intl.NumberFormat("en-US", {
+      notation: amount >= 1000 ? "compact" : "standard",
+      maximumFractionDigits: amount >= 1000 ? 1 : 2,
+    }).format(amount)
+  );
+}
+
 import { sharePercent } from "@/lib/visual-metrics";
 
 export function DataBreakdown({
@@ -61,7 +75,12 @@ export function MonthlyBars({
             className="data-month"
             title={`${point.label}: ${formatValue(point.value)}`}
           >
-            <span className="data-month-value">{formatValue(point.value)}</span>
+            <span
+              className="data-month-value"
+              aria-label={formatValue(point.value)}
+            >
+              {compactDisplay(formatValue(point.value))}
+            </span>
             <div className="data-month-column">
               {hasNegative && <span className="data-zero-line" />}
               <div

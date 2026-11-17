@@ -1074,6 +1074,7 @@ export default function TaskCalendarView({
           {/* Task Status Dropdown (visible when tasks included) */}
           {scopeFilter !== "events" && (
             <select
+              aria-label="Filter tasks by status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="ui-field text-xs font-medium px-2.5 py-1.5 border border-line-neutral-200/90 rounded-xl bg-surface text-content-neutral-700 focus:outline-none focus:border-accent cursor-pointer"
@@ -1089,6 +1090,7 @@ export default function TaskCalendarView({
           {/* Event Category Dropdown (visible when events included) */}
           {scopeFilter !== "tasks" && (
             <select
+              aria-label="Filter events by category"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="ui-field text-xs font-medium px-2.5 py-1.5 border border-line-neutral-200/90 rounded-xl bg-surface text-content-neutral-700 focus:outline-none focus:border-accent cursor-pointer"

@@ -13,6 +13,11 @@ import { ProfileProvider } from "@/context/ProfileContext";
 import { ProfileGateModal } from "@/components/profiles/ProfileGateModal";
 import { InputPickerEnhancer } from "@/components/ui/InputPickerEnhancer";
 import { themeBootstrap } from "@/lib/theme";
+import {
+  CurrencyFeedback,
+  CurrencyAttribution,
+} from "@/components/ui/CurrencyFeedback";
+import { ReportingProvider } from "@/context/ReportingContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -48,19 +53,23 @@ export default function RootLayout({
             <DataProvider>
               <WorkspaceAppearance />
               <InputPickerEnhancer />
-              <ProfileProvider>
-                <ProfileWorkspace>
-                  <AdvanceTrackingPrompt />
-                  <WidgetProvider>
-                    <TitleBar />
-                    <Sidebar />
-                    <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
-                      {children}
-                    </main>
-                  </WidgetProvider>
-                </ProfileWorkspace>
-                <ProfileGateModal />
-              </ProfileProvider>
+              <ReportingProvider>
+                <ProfileProvider>
+                  <ProfileWorkspace>
+                    <AdvanceTrackingPrompt />
+                    <CurrencyFeedback />
+                    <WidgetProvider>
+                      <TitleBar />
+                      <Sidebar />
+                      <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
+                        {children}
+                        <CurrencyAttribution />
+                      </main>
+                    </WidgetProvider>
+                  </ProfileWorkspace>
+                  <ProfileGateModal />
+                </ProfileProvider>
+              </ReportingProvider>
             </DataProvider>
           </NavProvider>
         </ThemeProvider>

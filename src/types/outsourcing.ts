@@ -58,6 +58,7 @@ export interface PayableItem {
 }
 
 export interface VendorItem {
+  archivedAt?: string | null;
   id: string;
   name: string;
   service: string;

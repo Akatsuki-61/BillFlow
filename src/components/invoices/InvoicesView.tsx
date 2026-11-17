@@ -1,4 +1,11 @@
 "use client";
+import { WorkspaceActivityPanel } from "@/components/ui/WorkspaceActivityPanel";
+import { workspaceDraft } from "@/lib/workspace-drafts";
+import {
+  useReportingData,
+  ReportingGuard,
+  ReportedMoney,
+} from "@/context/ReportingContext";
 
 import { PhoneField } from "@/components/ui/PhoneField";
 import {
@@ -6,7 +13,6 @@ import {
   InvoiceWorkflowSelect,
   workflowStages,
 } from "./InvoiceStatusBulk";
-import { profileStorageKey } from "@/lib/profile-scope";
 
 import { InvoiceTrash } from "./InvoiceTrash";
 import { PaymentCorrectionForm } from "./PaymentCorrectionForm";
@@ -130,6 +136,7 @@ interface FloatingStatusMenuState {
 }
 
 export default function InvoicesView() {
+  const reporting = useReportingData();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -423,7 +430,14 @@ export default function InvoicesView() {
         }
       } else if (type === "overdue") {
         if (isExcel) {
-          const xls = generateOverdueExcelWorkbook(allInvoices, {
+          if (!reporting.ready) {
+            showToast(
+              "Load exchange rates before exporting a converted summary.",
+              "error",
+            );
+            return;
+          }
+          const xls = generateOverdueExcelWorkbook(reporting.invoices, {
             includeClientRollup: true,
           });
           downloadExcelFile(`overdue-invoices-summary-${todayStr}.xls`, xls);
@@ -559,11 +573,16 @@ export default function InvoicesView() {
           ci.category?.toLowerCase() === task.category.toLowerCase(),
       );
       if (matchingCatalog && matchingCatalog.price) {
-        return String(matchingCatalog.price);
+        const converted = reporting.convert(
+          matchingCatalog.priceCents,
+          matchingCatalog.currency,
+          task.currency,
+        );
+        return converted === null ? "0.00" : (converted / 100).toFixed(2);
       }
       return "0.00";
     },
-    [catalogItems],
+    [catalogItems, reporting],
   );
 
   // Auto-populate New Invoice modal when redirected with ?action=new&importTaskIds=id1,id2...
@@ -590,7 +609,7 @@ export default function InvoicesView() {
 
     const due = new Date();
     due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
-    const defaultDueStr = due.toISOString().slice(0, 10);
+    const defaultDueStr = localDateKey(due);
 
     // Pre-populate client from first task with a clientId or clientName
     const taskWithClient = matchedTasks.find((t) => t.clientId || t.clientName);
@@ -678,7 +697,7 @@ export default function InvoicesView() {
     return hasItems || hasClient || hasNotes;
   };
 
-  const saveInvoiceDraft = () => {
+  const saveInvoiceDraft = async () => {
     if (!isInvoiceFormDirty()) return;
     const draft = {
       clientMode,
@@ -703,26 +722,21 @@ export default function InvoicesView() {
       newNotes,
     };
     try {
-      localStorage.setItem(
-        profileStorageKey("billflow_draft_invoice"),
-        JSON.stringify(draft),
-      );
+      await workspaceDraft("billflow_draft_invoice", JSON.stringify(draft));
       setHasInvoiceDraft(true);
     } catch {}
   };
 
-  const clearInvoiceDraft = () => {
+  const clearInvoiceDraft = async () => {
     try {
-      localStorage.removeItem(profileStorageKey("billflow_draft_invoice"));
+      await workspaceDraft("billflow_draft_invoice", null);
     } catch {}
     setHasInvoiceDraft(false);
   };
 
-  const handleRestoreInvoiceDraft = () => {
+  const handleRestoreInvoiceDraft = async () => {
     try {
-      const saved = localStorage.getItem(
-        profileStorageKey("billflow_draft_invoice"),
-      );
+      const saved = await workspaceDraft("billflow_draft_invoice");
       if (!saved) return;
       const draft = JSON.parse(saved);
       if (draft.clientMode !== undefined) setClientMode(draft.clientMode);
@@ -822,7 +836,7 @@ export default function InvoicesView() {
     setNewCurrency(settings?.defaultCurrency || activeCurrency || "USD");
     const due = new Date();
     due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
-    setNewDueDate(due.toISOString().slice(0, 10));
+    setNewDueDate(localDateKey(due));
     setNewLineItems([{ id: "1", description: "", quantity: 1, unitPrice: "" }]);
     setLinkedTaskIds([]);
     setNewDiscount("");
@@ -847,16 +861,17 @@ export default function InvoicesView() {
         setNewCurrency(match.currency);
         if (match.driveUrl) setNewDeliveryUrl(match.driveUrl);
       }
-    } else if (clients.length > 0 && !newClientId) {
-      setNewClientId(clients[0].id);
-      setNewCurrency(clients[0].currency);
-      if (clients[0].driveUrl) setNewDeliveryUrl(clients[0].driveUrl);
+    } else if (!newClientId) {
+      const client = clients.find((record) => !record.archivedAt);
+      if (client) {
+        setNewClientId(client.id);
+        setNewCurrency(client.currency);
+        if (client.driveUrl) setNewDeliveryUrl(client.driveUrl);
+      }
     }
 
     try {
-      const saved = localStorage.getItem(
-        profileStorageKey("billflow_draft_invoice"),
-      );
+      const saved = await workspaceDraft("billflow_draft_invoice");
       setHasInvoiceDraft(Boolean(saved));
     } catch {
       setHasInvoiceDraft(false);
@@ -866,6 +881,7 @@ export default function InvoicesView() {
   };
 
   // Filter invoices according to selected client, search query and tabs
+  const [invoicePage, setInvoicePage] = useState(1);
   const filteredInvoices = allInvoices.filter((inv) => {
     if (clientFilterParam && inv.clientId !== clientFilterParam) {
       return false;
@@ -891,6 +907,13 @@ export default function InvoicesView() {
 
     return true;
   });
+
+  const invoicePageCount = Math.max(1, Math.ceil(filteredInvoices.length / 50));
+  const visibleInvoicePage = Math.min(invoicePage, invoicePageCount);
+  const visibleInvoices = filteredInvoices.slice(
+    (visibleInvoicePage - 1) * 50,
+    visibleInvoicePage * 50,
+  );
 
   const activeClientFilterObj = clientFilterParam
     ? clients.find((c) => c.id === clientFilterParam)
@@ -1156,6 +1179,18 @@ export default function InvoicesView() {
   const handleEditCatalogSelect = (catalogId: string) => {
     const item = catalogItems.find((ci) => ci.id === catalogId);
     if (!item) return;
+    const convertedPrice = reporting.convert(
+      item.priceCents,
+      item.currency,
+      editCurrency,
+    );
+    if (convertedPrice === null) {
+      showToast(
+        "Connect to load exchange rates before adding this catalog item.",
+        "error",
+      );
+      return;
+    }
     setEditLineItems((prev) => {
       if (prev.length === 1 && !prev[0].description && !prev[0].unitPrice) {
         return [
@@ -1164,7 +1199,7 @@ export default function InvoicesView() {
             catalogId: item.id,
             description: item.title,
             quantity: 1,
-            unitPrice: item.price,
+            unitPrice: (convertedPrice / 100).toFixed(2),
           },
         ];
       }
@@ -1175,13 +1210,10 @@ export default function InvoicesView() {
           catalogId: item.id,
           description: item.title,
           quantity: 1,
-          unitPrice: item.price,
+          unitPrice: (convertedPrice / 100).toFixed(2),
         },
       ];
     });
-    if (item.currency) {
-      setEditCurrency(item.currency);
-    }
   };
 
   // Math for Edit Invoice Modal
@@ -1353,6 +1385,18 @@ export default function InvoicesView() {
   const handleCatalogSelect = (catalogId: string) => {
     const item = catalogItems.find((ci) => ci.id === catalogId);
     if (!item) return;
+    const convertedPrice = reporting.convert(
+      item.priceCents,
+      item.currency,
+      newCurrency,
+    );
+    if (convertedPrice === null) {
+      showToast(
+        "Connect to load exchange rates before adding this catalog item.",
+        "error",
+      );
+      return;
+    }
     setNewLineItems((prev) => {
       if (prev.length === 1 && !prev[0].description && !prev[0].unitPrice) {
         return [
@@ -1361,7 +1405,7 @@ export default function InvoicesView() {
             catalogId: item.id,
             description: item.title,
             quantity: 1,
-            unitPrice: item.price,
+            unitPrice: (convertedPrice / 100).toFixed(2),
           },
         ];
       }
@@ -1372,13 +1416,10 @@ export default function InvoicesView() {
           catalogId: item.id,
           description: item.title,
           quantity: 1,
-          unitPrice: item.price,
+          unitPrice: (convertedPrice / 100).toFixed(2),
         },
       ];
     });
-    if (item.currency) {
-      setNewCurrency(item.currency);
-    }
   };
 
   // Unbilled completed tasks eligible for import (excluding any already added in the current draft)
@@ -1632,7 +1673,7 @@ export default function InvoicesView() {
 
     setIsSubmittingNew(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = localDateKey(new Date());
       const itemsPayload = validItems.map((it) => ({
         catalogId: it.catalogId || undefined,
         sourceTaskId: it.sourceTaskId || undefined,
@@ -1728,7 +1769,7 @@ export default function InvoicesView() {
     targetType?: "advance" | "full",
   ) => {
     setPaymentInvoice(inv);
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDateKey(new Date());
     setPaymentDate(today);
 
     const paid = inv.paidCents || 0;
@@ -1964,161 +2005,168 @@ export default function InvoicesView() {
       {/* =====================================================================
           ZENTRA 3-CARD INVOICES BENTO HEADER ROW
          ===================================================================== */}
-      {(() => {
-        const issued = allInvoices.filter(
-          (inv) => inv.status !== "DRAFT" && inv.currency === primaryCurrency,
-        );
-        const billed = issued.reduce((sum, inv) => sum + inv.amountCents, 0);
-        const collected = issued.reduce(
-          (sum, inv) => sum + (inv.paidCents ?? 0),
-          0,
-        );
-        const balance = (inv: (typeof issued)[number]) =>
-          Math.max(0, inv.amountCents - (inv.paidCents ?? 0));
-        const open = issued.filter((inv) => balance(inv) > 0);
-        const overdue = open.filter((inv) => isPastDue(inv));
-        const outstanding = open.reduce((sum, inv) => sum + balance(inv), 0);
-        const pastDue = overdue.reduce((sum, inv) => sum + balance(inv), 0);
-        const money = (value: number) => formatCents(value, primaryCurrency);
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <section className="lg:col-span-5 ui-card p-6 space-y-5">
-              <div className="flex items-center justify-between gap-3">
-                <h2>Billed & Collected</h2>
-                <button
-                  type="button"
-                  onClick={handleOpenAddModal}
-                  className="zentra-circle-btn zentra-circle-btn--sm"
-                  aria-label="Create new invoice"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-              <div>
-                <div className="summary-value">{money(billed)}</div>
-                <p className="summary-caption">
-                  {issued.length} issued invoices · {primaryCurrency}
-                </p>
-              </div>
-              <DataBreakdown
-                label="Share of total billed"
-                total={billed}
-                rows={[
-                  {
-                    label: "Collected",
-                    value: collected,
-                    display: money(collected),
-                    tone: "green",
-                  },
-                  {
-                    label: "Remaining balance",
-                    value: outstanding,
-                    display: money(outstanding),
-                    tone: "blue",
-                  },
-                ]}
-              />
-              <p className="summary-caption">
-                Bars show each amount as a share of total billed.
-              </p>
-            </section>
-            <section className="lg:col-span-4 ui-card p-6 space-y-5">
-              <div className="flex items-center justify-between gap-3">
-                <h2>Total Outstanding</h2>
-                <span className="zentra-pill-badge">{open.length} open</span>
-              </div>
-              <div>
-                <div className="summary-value">{money(outstanding)}</div>
-                <p className="summary-caption">
-                  {open.length
-                    ? "Balances still to collect"
-                    : "All issued invoices are settled"}
-                </p>
-              </div>
-              <DataBreakdown
-                label="Outstanding balance by due status"
-                total={outstanding}
-                rows={[
-                  {
-                    label: "Within payment terms",
-                    value: outstanding - pastDue,
-                    display: money(outstanding - pastDue),
-                    tone: "blue",
-                  },
-                  {
-                    label: "Past due",
-                    value: pastDue,
-                    display: money(pastDue),
-                    tone: "pink",
-                  },
-                ]}
-              />
-              <p className="summary-caption">
-                Share of outstanding balance by due status.
-              </p>
-            </section>
-            <section className="lg:col-span-3 ui-card p-6 space-y-5">
-              <div className="flex items-center justify-between gap-3">
-                <h2>Overdue</h2>
-                <div className="flex items-center gap-1.5">
+      <WorkspaceActivityPanel exportsOnly />
+      <ReportingGuard>
+        {(() => {
+          const issued = reporting.invoices.filter(
+            (inv) => inv.status !== "DRAFT",
+          );
+          const billed = issued.reduce((sum, inv) => sum + inv.amountCents, 0);
+          const collected = issued.reduce(
+            (sum, inv) => sum + (inv.paidCents ?? 0),
+            0,
+          );
+          const balance = (inv: (typeof issued)[number]) =>
+            Math.max(0, inv.amountCents - (inv.paidCents ?? 0));
+          const open = issued.filter((inv) => balance(inv) > 0);
+          const overdue = open.filter((inv) => isPastDue(inv));
+          const outstanding = open.reduce((sum, inv) => sum + balance(inv), 0);
+          const pastDue = overdue.reduce((sum, inv) => sum + balance(inv), 0);
+          const money = (value: number) => formatCents(value, primaryCurrency);
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <section className="lg:col-span-5 ui-card p-6 space-y-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h2>Billed & Collected</h2>
                   <button
                     type="button"
-                    onClick={() => handleExportInvoicesCsv("overdue", "csv")}
-                    className="zentra-circle-btn zentra-circle-btn--sm text-content-neutral-600 hover:text-content-neutral-900"
-                    aria-label="Export overdue invoices to CSV"
-                    title="Export Overdue Invoices to CSV (.csv)"
+                    onClick={handleOpenAddModal}
+                    className="zentra-circle-btn zentra-circle-btn--sm"
+                    aria-label="Create new invoice"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleExportInvoicesCsv("overdue", "excel")}
-                    className="zentra-circle-btn zentra-circle-btn--sm hover:!border-accent/50 !text-accent-deep-solid dark:!text-accent"
-                    aria-label="Export overdue invoices to Excel"
-                    title="Convert & Export Overdue Invoices to Excel (.xls)"
-                  >
-                    <FileSpreadsheet className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowOverdueSummary(true)}
-                    className="zentra-circle-btn zentra-circle-btn--sm text-rose-600 hover:text-rose-700 dark:text-rose-400"
-                    aria-label="View Overdue Summary and Aging"
-                    title="View Overdue Summary and Aging Breakdown"
-                  >
-                    <AlertCircle className="w-4 h-4" />
+                    <Plus className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-              <div>
-                <div className="summary-value">{money(pastDue)}</div>
-                <div className="flex items-center justify-between mt-1">
+                <div>
+                  <div className="summary-value">{money(billed)}</div>
                   <p className="summary-caption">
-                    {overdue.length} invoices with a past-due balance
+                    {issued.length} issued invoice
+                    {issued.length === 1 ? "" : "s"} · {primaryCurrency}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowOverdueSummary(true)}
-                    className="text-[11.5px] text-accent hover:underline font-medium cursor-pointer"
-                  >
-                    Breakdown →
-                  </button>
                 </div>
-              </div>
-              <MonthlyBars
-                label="Unpaid balance by due month"
-                formatValue={money}
-                points={recentMonths().map((month) => ({
-                  ...month,
-                  value: overdue
-                    .filter((inv) => inv.dueDate?.startsWith(month.key))
-                    .reduce((sum, inv) => sum + balance(inv), 0),
-                }))}
-              />
-            </section>
-          </div>
-        );
-      })()}
+                <DataBreakdown
+                  label="Share of total billed"
+                  total={billed}
+                  rows={[
+                    {
+                      label: "Collected",
+                      value: collected,
+                      display: money(collected),
+                      tone: "green",
+                    },
+                    {
+                      label: "Remaining balance",
+                      value: outstanding,
+                      display: money(outstanding),
+                      tone: "blue",
+                    },
+                  ]}
+                />
+                <p className="summary-caption">
+                  Bars show each amount as a share of total billed.
+                </p>
+              </section>
+              <section className="lg:col-span-4 ui-card p-6 space-y-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h2>Total Outstanding</h2>
+                  <span className="zentra-pill-badge">{open.length} open</span>
+                </div>
+                <div>
+                  <div className="summary-value">{money(outstanding)}</div>
+                  <p className="summary-caption">
+                    {open.length
+                      ? "Balances still to collect"
+                      : "All issued invoices are settled"}
+                  </p>
+                </div>
+                <DataBreakdown
+                  label="Outstanding balance by due status"
+                  total={outstanding}
+                  rows={[
+                    {
+                      label: "Within payment terms",
+                      value: outstanding - pastDue,
+                      display: money(outstanding - pastDue),
+                      tone: "blue",
+                    },
+                    {
+                      label: "Past due",
+                      value: pastDue,
+                      display: money(pastDue),
+                      tone: "pink",
+                    },
+                  ]}
+                />
+                <p className="summary-caption">
+                  Share of outstanding balance by due status.
+                </p>
+              </section>
+              <section className="lg:col-span-3 ui-card p-6 space-y-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h2>Overdue</h2>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleExportInvoicesCsv("overdue", "csv")}
+                      className="zentra-circle-btn zentra-circle-btn--sm text-content-neutral-600 hover:text-content-neutral-900"
+                      aria-label="Export overdue invoices to CSV"
+                      title="Export Overdue Invoices to CSV (.csv)"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleExportInvoicesCsv("overdue", "excel")
+                      }
+                      className="zentra-circle-btn zentra-circle-btn--sm hover:!border-accent/50 !text-accent-deep-solid dark:!text-accent"
+                      aria-label="Export overdue invoices to Excel"
+                      title="Convert & Export Overdue Invoices to Excel (.xls)"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowOverdueSummary(true)}
+                      className="zentra-circle-btn zentra-circle-btn--sm text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                      aria-label="View Overdue Summary and Aging"
+                      title="View Overdue Summary and Aging Breakdown"
+                    >
+                      <AlertCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <div className="summary-value">{money(pastDue)}</div>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="summary-caption">
+                      {overdue.length} invoice{overdue.length === 1 ? "" : "s"}{" "}
+                      with a past-due balance
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowOverdueSummary(true)}
+                      className="text-[11.5px] text-accent hover:underline font-medium cursor-pointer whitespace-nowrap shrink-0"
+                    >
+                      Breakdown →
+                    </button>
+                  </div>
+                </div>
+                <MonthlyBars
+                  label={`Unpaid balance by due month · ${primaryCurrency}`}
+                  formatValue={money}
+                  points={recentMonths().map((month) => ({
+                    ...month,
+                    value: overdue
+                      .filter((inv) => inv.dueDate?.startsWith(month.key))
+                      .reduce((sum, inv) => sum + balance(inv), 0),
+                  }))}
+                />
+              </section>
+            </div>
+          );
+        })()}
+      </ReportingGuard>
 
       {/* Filters, Search and Active Client Chip */}
       <div className="flex flex-wrap items-center justify-between gap-3 w-full pt-1">
@@ -2254,10 +2302,7 @@ export default function InvoicesView() {
             }
             className={`shrink-0 ${ACCENT_EXPORT_BUTTON_CLASS}`}
           >
-            <IconCrossfade
-              iconKey={exportFormat}
-              className="w-3.5 h-3.5"
-            >
+            <IconCrossfade iconKey={exportFormat} className="w-3.5 h-3.5">
               {exportFormat === "excel" ? (
                 <FileSpreadsheet className="w-3.5 h-3.5" />
               ) : (
@@ -2359,6 +2404,33 @@ export default function InvoicesView() {
         </div>
 
         <div className="record-table-scroll">
+          {invoicePageCount > 1 && (
+            <nav
+              aria-label="Invoice pages"
+              className="flex items-center justify-between gap-3 p-3 text-sm"
+            >
+              <button
+                type="button"
+                className="ui-button ui-button--secondary"
+                disabled={visibleInvoicePage === 1}
+                onClick={() => setInvoicePage(visibleInvoicePage - 1)}
+              >
+                Previous
+              </button>
+              <span>
+                Page {visibleInvoicePage} of {invoicePageCount} ·{" "}
+                {filteredInvoices.length} invoices
+              </span>
+              <button
+                type="button"
+                className="ui-button ui-button--secondary"
+                disabled={visibleInvoicePage === invoicePageCount}
+                onClick={() => setInvoicePage(visibleInvoicePage + 1)}
+              >
+                Next
+              </button>
+            </nav>
+          )}
           <table className="record-table invoice-register">
             <caption className="sr-only">
               Invoices, collections and payment status
@@ -2424,7 +2496,7 @@ export default function InvoicesView() {
                   </td>
                 </tr>
               ) : (
-                filteredInvoices.map((inv, idx) => {
+                visibleInvoices.map((inv, idx) => {
                   const isSelected = selectedIds.includes(inv.id);
                   const isHighlighted = highlightedInvoiceId === inv.id;
                   const paidCents =
@@ -2541,7 +2613,10 @@ export default function InvoicesView() {
                       <td className="invoice-register-collection">
                         <div className="record-collection-heading">
                           <strong className="record-amount">
-                            {formatCents(inv.amountCents, inv.currency)}
+                            <ReportedMoney
+                              cents={inv.amountCents}
+                              currency={inv.currency}
+                            />
                           </strong>
                           <span className="record-meta">{paidPct}% paid</span>
                         </div>
@@ -2830,11 +2905,13 @@ export default function InvoicesView() {
                         className="ui-field w-full px-3.5 border border-line-neutral-200 text-content-neutral-900 focus:outline-none focus:ring-2 focus:ring-accent/40 cursor-pointer"
                       >
                         <option value="">Select a client...</option>
-                        {clients.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.currency})
-                          </option>
-                        ))}
+                        {clients
+                          .filter((c) => !c.archivedAt)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.currency})
+                            </option>
+                          ))}
                       </select>
                     </div>
 
@@ -2928,6 +3005,7 @@ export default function InvoicesView() {
                       {catalogItems.length > 0 && (
                         <div className="w-52">
                           <select
+                            aria-label="Add service from catalog"
                             className="ui-field w-full px-3.5 text-xs"
                             defaultValue=""
                             onChange={(e) => {
@@ -4017,11 +4095,13 @@ export default function InvoicesView() {
                         className="ui-field w-full px-3.5 cursor-pointer"
                       >
                         <option value="">(Temporary / Unlinked Client)</option>
-                        {clients.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.currency})
-                          </option>
-                        ))}
+                        {clients
+                          .filter((c) => !c.archivedAt || c.id === editClientId)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.currency})
+                            </option>
+                          ))}
                       </select>
                     </div>
 
@@ -4097,6 +4177,7 @@ export default function InvoicesView() {
                       {catalogItems.length > 0 && (
                         <div className="w-52">
                           <select
+                            aria-label="Add service from catalog"
                             className="ui-field w-full px-3.5 text-xs"
                             defaultValue=""
                             onChange={(e) => {
@@ -4499,7 +4580,7 @@ export default function InvoicesView() {
         onClose={() => setShowOverdueSummary(false)}
         invoices={allInvoices}
         primaryCurrency={primaryCurrency}
-        freelancerName={settings?.businessName || "Chethaka"}
+        freelancerName={settings?.businessName || ""}
         paymentInstructions={settings?.paymentDetails}
         onFilterToOverdue={() => setActiveTab("Overdue")}
         onInspectInvoice={(inv) => setInspectingInvoice(inv)}

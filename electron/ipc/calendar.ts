@@ -444,7 +444,40 @@ function inferMacEventCategory(
   return "general";
 }
 
-function upsertNativeMacEventToBillFlowDb(raw: {
+export const NATIVE_CALENDAR_DATE_PARSER = `function parseLocal(dateStr, timeStr, addHours) {
+      var parts = dateStr.split('-');
+      var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, day = parseInt(parts[2], 10);
+      if (!timeStr) return new Date(y, m, day, addHours || 0, 0, 0);
+      var tparts = timeStr.split(':');
+      var hh = parseInt(tparts[0], 10) + (addHours || 0), mm = parseInt(tparts[1], 10);
+      return new Date(y, m, day, hh, mm, 0);
+    }`;
+
+function nativeMacEventId(raw: { uidKey: string; calendarName: string }) {
+  return `macos-cal-v2-${createHash("sha1").update(`${raw.uidKey}|${raw.calendarName}`).digest("hex").slice(0, 20)}`;
+}
+export function reconcileNativeMacEvents(
+  seen: Set<string>,
+  from: string,
+  to: string,
+) {
+  const db = getDb();
+  let removed = 0;
+  for (const row of db.select().from(calendarEvents).all()) {
+    if (
+      row.id.startsWith("macos-cal-") &&
+      row.startDate >= from &&
+      row.startDate <= to &&
+      !seen.has(row.id)
+    ) {
+      db.delete(calendarEvents).where(eq(calendarEvents.id, row.id)).run();
+      removed++;
+    }
+  }
+  return removed;
+}
+
+export function upsertNativeMacEventToBillFlowDb(raw: {
   uidKey: string;
   title: string;
   description: string;
@@ -468,11 +501,7 @@ function upsertNativeMacEventToBillFlowDb(raw: {
     return false;
   }
 
-  const hash = createHash("sha1")
-    .update(`${raw.uidKey}|${raw.startDate}|${raw.startTime || "allday"}`)
-    .digest("hex")
-    .slice(0, 20);
-  const deterministicId = `macos-cal-${hash}`;
+  const deterministicId = nativeMacEventId(raw);
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -502,7 +531,13 @@ function upsertNativeMacEventToBillFlowDb(raw: {
       existing.title !== cleanTitle ||
       existing.startDate !== fixedStart ||
       existing.startTime !== fixedTimes.startTime ||
-      existing.endTime !== fixedTimes.endTime
+      existing.endTime !== fixedTimes.endTime ||
+      existing.endDate !== fixedEnd ||
+      existing.description !== descWithSource ||
+      existing.location !== (raw.location || null) ||
+      existing.isAllDay !== fixedTimes.isAllDay ||
+      existing.category !== category ||
+      existing.color !== color
     ) {
       db.update(calendarEvents)
         .set({
@@ -622,11 +657,14 @@ const lastSqlitePullByProfile = new Map<string, number>();
  * Reads events directly from macOS Calendar.sqlitedb (OccurrenceCache + CalendarItem) if accessible.
  * All BillFlow SQLite writes are batched inside a single transaction for <3ms execution.
  */
-function pullFromMacOsCalendarSqliteDb(forcePull = false): {
+export function pullFromMacOsCalendarSqliteDb(
+  forcePull = false,
+  fixturePath?: string,
+): {
   accessible: boolean;
   changedCount: number;
 } {
-  if (process.platform !== "darwin") {
+  if (process.platform !== "darwin" && !fixturePath) {
     return { accessible: false, changedCount: 0 };
   }
   const nowMs = Date.now();
@@ -646,13 +684,15 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
     path.join(home, "Library/Calendars/Calendar.sqlitedb"),
   ];
 
-  const dbPath = candidatePaths.find((p) => {
-    try {
-      return fs.existsSync(p);
-    } catch {
-      return false;
-    }
-  });
+  const dbPath =
+    fixturePath ||
+    candidatePaths.find((p) => {
+      try {
+        return fs.existsSync(p);
+      } catch {
+        return false;
+      }
+    });
   if (!dbPath) {
     return { accessible: false, changedCount: 0 };
   }
@@ -660,6 +700,7 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
   let macDb: InstanceType<typeof Database> | null = null;
   let importedCount = 0;
   let accessible = false;
+  let successfulRead = false;
   try {
     macDb = new Database(dbPath, {
       readonly: true,
@@ -676,6 +717,7 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
 
     type RawCalendarRow = {
       itemRowId: number;
+      occurrenceId?: number;
       uid: string | null;
       summary: string;
       description: string | null;
@@ -695,6 +737,7 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
           `
           SELECT
             ci.ROWID as itemRowId,
+            oc.ROWID as occurrenceId,
             ci.unique_identifier as uid,
             ci.summary as summary,
             ci.description as description,
@@ -710,10 +753,11 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
           WHERE oc.occurrence_start_date >= ? AND oc.occurrence_start_date <= ?
             AND ci.summary IS NOT NULL
           ORDER BY oc.occurrence_start_date ASC
-          LIMIT 600
+          LIMIT 601
         `,
         )
         .all(minSec, maxSec) as RawCalendarRow[];
+      successfulRead = true;
     } catch {
       // Fallback to direct CalendarItem query below
     }
@@ -740,14 +784,21 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
             WHERE ci.start_date >= ? AND ci.start_date <= ?
               AND ci.summary IS NOT NULL
             ORDER BY ci.start_date ASC
-            LIMIT 500
+            LIMIT 501
           `,
           )
           .all(minSec, maxSec) as RawCalendarRow[];
+        successfulRead = true;
       } catch {}
     }
 
-    if (rowsToImport.length > 0) {
+    if (successfulRead) {
+      const counts = new Map<string, number>();
+      for (const row of rowsToImport) {
+        const uid = row.uid || `row-${row.itemRowId}`;
+        counts.set(uid, (counts.get(uid) || 0) + 1);
+      }
+      const seen = new Set<string>();
       const bfDb = getDb();
       bfDb.transaction(() => {
         for (const r of rowsToImport) {
@@ -757,8 +808,8 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
             r.endSec != null
               ? coreDataSecondsToLocalDateAndTime(r.endSec, isAllDay)
               : { dateStr: start.dateStr, timeStr: null };
-          const changed = upsertNativeMacEventToBillFlowDb({
-            uidKey: r.uid || `row-${r.itemRowId}`,
+          const rawEvent = {
+            uidKey: `${r.uid || `row-${r.itemRowId}`}${(counts.get(r.uid || `row-${r.itemRowId}`) || 0) > 1 ? `:occurrence-${r.occurrenceId ?? r.startSec}` : ""}`,
             title: r.summary,
             description: r.description || "",
             calendarName: r.calendarTitle || "Apple Calendar",
@@ -768,9 +819,17 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
             endTime: end.timeStr,
             isAllDay,
             location: r.locationTitle || null,
-          });
+          };
+          seen.add(nativeMacEventId(rawEvent));
+          const changed = upsertNativeMacEventToBillFlowDb(rawEvent);
           if (changed) importedCount++;
         }
+        if (rowsToImport.length < 500)
+          importedCount += reconcileNativeMacEvents(
+            seen,
+            coreDataSecondsToLocalDateAndTime(minSec + 86400, true).dateStr,
+            coreDataSecondsToLocalDateAndTime(maxSec - 86400, true).dateStr,
+          );
       });
     }
   } catch {
@@ -780,7 +839,11 @@ function pullFromMacOsCalendarSqliteDb(forcePull = false): {
       macDb?.close();
     } catch {}
   }
-  return { accessible, changedCount: importedCount };
+  if (!successfulRead) lastSqlitePullByProfile.delete(getActiveProfileId());
+  return {
+    accessible: accessible && successfulRead,
+    changedCount: importedCount,
+  };
 }
 
 function isMacCalendarAppRunning(): boolean {
@@ -829,6 +892,9 @@ function syncWithMacOsCalendarAppViaJxa(
   }>;
   pushedCount: number;
   deletedCount: number;
+  pulledComplete?: boolean;
+  rangeFrom?: string;
+  rangeTo?: string;
 }> {
   if (process.platform !== "darwin") {
     return Promise.resolve({
@@ -843,14 +909,8 @@ function syncWithMacOsCalendarAppViaJxa(
     function pad(n) { return n < 10 ? '0' + n : '' + n; }
     function fmtDate(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
     function fmtTime(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
-    function parseLocal(dateStr, timeStr, addHours) {
-      var parts = dateStr.split('-');
-      var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, day = parseInt(parts[2], 10);
-      if (!timeStr) return new Date(y, m, day, 0, 0, 0);
-      var tparts = timeStr.split(':');
-      var hh = parseInt(tparts[0], 10) + (addHours || 0), mm = parseInt(tparts[1], 10);
-      return new Date(y, m, day, hh, mm, 0);
-    }
+    ${NATIVE_CALENDAR_DATE_PARSER}
+
 
     function run(argv) {
       var itemsToPush = JSON.parse(argv[0] || "[]");
@@ -963,6 +1023,9 @@ function syncWithMacOsCalendarAppViaJxa(
 
       // 4. PULL MODE: Only runs when explicitly requested for external calendars
       var pulledEvents = [];
+      var pulledComplete = Boolean(pullMode);
+      var rangeFrom = fmtDate(new Date(Date.now() - 34 * 86400 * 1000));
+      var rangeTo = fmtDate(new Date(Date.now() + 89 * 86400 * 1000));
       if (pullMode) {
         var allCals = Cal.calendars();
         var minDate = new Date(Date.now() - 35 * 86400 * 1000);
@@ -984,7 +1047,7 @@ function syncWithMacOsCalendarAppViaJxa(
                 var eDate = eObj.endDate() || sDate;
                 var isAll = Boolean(eObj.alldayEvent());
                 pulledEvents.push({
-                  uidKey: eObj.uid() + "-" + fmtDate(sDate),
+                  uidKey: eObj.uid(),
                   title: eObj.summary() || "Local Calendar Event",
                   description: eObj.description() || "",
                   calendarName: cName,
@@ -995,9 +1058,10 @@ function syncWithMacOsCalendarAppViaJxa(
                   isAllDay: isAll,
                   location: eObj.location() || null
                 });
-              } catch (innerErr) {}
+              } catch (innerErr) { pulledComplete = false; }
             }
-          } catch (calErr) {}
+            if (pulledEvents.length >= 250) pulledComplete = false;
+          } catch (calErr) { pulledComplete = false; }
         }
       }
 
@@ -1007,7 +1071,7 @@ function syncWithMacOsCalendarAppViaJxa(
         } catch (qErr) {}
       }
 
-      return JSON.stringify({ pushedCount: pushedCount, deletedCount: deletedCount, pulledEvents: pulledEvents });
+      return JSON.stringify({ pushedCount: pushedCount, deletedCount: deletedCount, pulledEvents: pulledEvents, pulledComplete: pulledComplete, rangeFrom: rangeFrom, rangeTo: rangeTo });
     }
   `;
 
@@ -1039,6 +1103,13 @@ function syncWithMacOsCalendarAppViaJxa(
             pulledEvents: Array.isArray(parsed.pulledEvents)
               ? parsed.pulledEvents
               : [],
+            pulledComplete: parsed.pulledComplete === true,
+            rangeFrom:
+              typeof parsed.rangeFrom === "string"
+                ? parsed.rangeFrom
+                : undefined,
+            rangeTo:
+              typeof parsed.rangeTo === "string" ? parsed.rangeTo : undefined,
             pushedCount: Number(parsed.pushedCount) || 0,
             deletedCount: Number(parsed.deletedCount) || 0,
           });
@@ -1287,14 +1358,36 @@ export async function syncNativeLocalCalendar(
     );
 
     workspace.assertCurrent();
-    if (jxaResult.pulledEvents.length > 0) {
+    if (jxaResult.pulledEvents.length > 0 || jxaResult.pulledComplete) {
       let jxaImported = 0;
+      const seen = new Set<string>();
+      const counts = new Map<string, number>();
+      for (const event of jxaResult.pulledEvents)
+        counts.set(event.uidKey, (counts.get(event.uidKey) || 0) + 1);
       db.transaction(() => {
-        for (const ev of jxaResult.pulledEvents) {
+        for (const source of jxaResult.pulledEvents) {
+          const ev =
+            (counts.get(source.uidKey) || 0) > 1
+              ? {
+                  ...source,
+                  uidKey: `${source.uidKey}:occurrence-${source.startDate}-${source.startTime || "all-day"}`,
+                }
+              : source;
+          seen.add(nativeMacEventId(ev));
           if (upsertNativeMacEventToBillFlowDb(ev)) {
             jxaImported++;
           }
         }
+        if (
+          jxaResult.pulledComplete &&
+          jxaResult.rangeFrom &&
+          jxaResult.rangeTo
+        )
+          jxaImported += reconcileNativeMacEvents(
+            seen,
+            jxaResult.rangeFrom,
+            jxaResult.rangeTo,
+          );
       });
       if (jxaImported > 0) {
         totalSyncedFromMac += jxaImported;

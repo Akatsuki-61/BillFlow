@@ -9,6 +9,7 @@ import {
 import { sql } from "drizzle-orm";
 
 export const clients = sqliteTable("clients", {
+  archivedAt: text("archived_at"),
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   category: text("category").notNull().default("Enterprise"),
@@ -155,6 +156,7 @@ export const settings = sqliteTable("settings", {
 export const vendors = sqliteTable(
   "vendors",
   {
+    archivedAt: text("archived_at"),
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     service: text("service").notNull(),
@@ -403,7 +405,7 @@ export const workOrders = sqliteTable(
     check("work_order_amount", sql`${t.feeCents} >= 0`),
     check(
       "work_order_source",
-      sql`(${t.taskId} IS NULL) = (${t.invoiceId} IS NULL)`,
+      sql`${t.invoiceId} IS NULL OR ${t.taskId} IS NOT NULL`,
     ),
     check(
       "work_order_vendor",

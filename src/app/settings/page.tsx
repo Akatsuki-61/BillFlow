@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceActivityPanel } from "@/components/ui/WorkspaceActivityPanel";
+import { localDateKey } from "@/lib/visual-metrics";
+import { CurrencyRateSettings } from "@/context/ReportingContext";
 import { AppearanceFields } from "@/components/settings/WorkspaceAppearance";
 import { SignatureEditor } from "@/components/settings/SignatureEditor";
 import { PhoneField } from "@/components/ui/PhoneField";
@@ -20,7 +23,11 @@ import React, {
   useRef,
   Suspense,
 } from "react";
-import { IconCrossfade, MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import {
+  IconCrossfade,
+  MotionPresence,
+  MotionSurface,
+} from "@/components/ui/MotionSurface";
 import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
@@ -488,14 +495,7 @@ function InvoiceTemplateMiniPreview({
           fill="#FFFFFF"
           fillOpacity="0.9"
         />
-        <rect
-          x="144"
-          y="223.5"
-          width="22"
-          height="3"
-          rx="1"
-          fill="#94A3B8"
-        />
+        <rect x="144" y="223.5" width="22" height="3" rx="1" fill="#94A3B8" />
       </svg>
     );
   }
@@ -524,14 +524,7 @@ function InvoiceTemplateMiniPreview({
           fillOpacity="0.2"
         />
         <rect x="26" y="10" width="38" height="4" rx="1" fill="#FFFFFF" />
-        <rect
-          x="26"
-          y="16"
-          width="28"
-          height="2.5"
-          rx="1"
-          fill="#FFEDD5"
-        />
+        <rect x="26" y="16" width="28" height="2.5" rx="1" fill="#FFEDD5" />
         <rect x="126" y="9" width="40" height="6" rx="1.5" fill="#FFFFFF" />
         <rect
           x="132"
@@ -621,22 +614,8 @@ function InvoiceTemplateMiniPreview({
               rx="1"
               fill="#0F172A"
             />
-            <rect
-              x="110"
-              y={y}
-              width="18"
-              height="3.5"
-              rx="1"
-              fill="#475569"
-            />
-            <rect
-              x="142"
-              y={y}
-              width="18"
-              height="3.5"
-              rx="1"
-              fill="#0F172A"
-            />
+            <rect x="110" y={y} width="18" height="3.5" rx="1" fill="#475569" />
+            <rect x="142" y={y} width="18" height="3.5" rx="1" fill="#0F172A" />
           </g>
         ))}
         {/* Left numbered terms + Right orange total bar */}
@@ -662,14 +641,7 @@ function InvoiceTemplateMiniPreview({
           fill="#FFFFFF"
           fillOpacity="0.9"
         />
-        <rect
-          x="144"
-          y="223.5"
-          width="22"
-          height="3"
-          rx="1"
-          fill="#94A3B8"
-        />
+        <rect x="144" y="223.5" width="22" height="3" rx="1" fill="#94A3B8" />
       </svg>
     );
   }
@@ -685,34 +657,10 @@ function InvoiceTemplateMiniPreview({
     >
       <rect width="180" height="232" fill="#111215" />
       {/* Centered brand + INVOICE title */}
-      <circle
-        cx="58"
-        cy="15"
-        r="2"
-        stroke="#FFFFFF"
-        strokeWidth="1.2"
-      />
-      <circle
-        cx="63"
-        cy="15"
-        r="2"
-        stroke="#FFFFFF"
-        strokeWidth="1.2"
-      />
-      <circle
-        cx="58"
-        cy="20"
-        r="2"
-        stroke="#FFFFFF"
-        strokeWidth="1.2"
-      />
-      <circle
-        cx="63"
-        cy="20"
-        r="2"
-        stroke="#FFFFFF"
-        strokeWidth="1.2"
-      />
+      <circle cx="58" cy="15" r="2" stroke="#FFFFFF" strokeWidth="1.2" />
+      <circle cx="63" cy="15" r="2" stroke="#FFFFFF" strokeWidth="1.2" />
+      <circle cx="58" cy="20" r="2" stroke="#FFFFFF" strokeWidth="1.2" />
+      <circle cx="63" cy="20" r="2" stroke="#FFFFFF" strokeWidth="1.2" />
       <rect x="70" y="13" width="52" height="4" rx="1" fill="#FFFFFF" />
       <rect x="70" y="19" width="38" height="2.5" rx="1" fill="#71717A" />
       <rect x="56" y="29" width="68" height="8" rx="1.5" fill="#FFFFFF" />
@@ -926,6 +874,8 @@ function SettingsContent() {
   );
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isValidatingImport, setIsValidatingImport] = useState(false);
+  const importReadVersion = useRef(0);
   const [importMode, setImportMode] = useState<"replace" | "merge">("replace");
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -1140,9 +1090,27 @@ function SettingsContent() {
       );
     }
   };
+  const handleImportMode = async (mode: "replace" | "merge") => {
+    setImportMode(mode);
+    if (!parsedImport) return;
+    const version = ++importReadVersion.current;
+    setIsValidatingImport(true);
+    try {
+      await window.billflow?.settings.preflight?.(parsedImport, mode);
+      if (version === importReadVersion.current) setImportError(null);
+    } catch (error) {
+      if (version === importReadVersion.current)
+        setImportError(
+          error instanceof Error ? error.message : "Backup validation failed.",
+        );
+    } finally {
+      if (version === importReadVersion.current) setIsValidatingImport(false);
+    }
+  };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const version = ++importReadVersion.current;
 
     setParsedImport(null);
     if (file.size > MAX_BACKUP_BYTES) {
@@ -1153,7 +1121,7 @@ function SettingsContent() {
     setImportError(null);
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (!parsed || typeof parsed !== "object") {
@@ -1168,8 +1136,14 @@ function SettingsContent() {
         if (!Array.isArray(parsed.clients) || !Array.isArray(parsed.invoices)) {
           throw new Error("Backup file does not contain clients or invoices.");
         }
+        await window.billflow?.settings.preflight?.(
+          parsed as ExportDataPayload,
+          importMode,
+        );
+        if (version !== importReadVersion.current) return;
         setParsedImport(parsed as ExportDataPayload);
       } catch (err: unknown) {
+        if (version !== importReadVersion.current) return;
         setImportError(
           err instanceof Error ? err.message : "Failed to read backup file.",
         );
@@ -1260,11 +1234,9 @@ function SettingsContent() {
     const amountCents = subtotalCents + taxCents;
     const dueDays = formState.defaultDueDays ?? 14;
     const today = new Date();
-    const dueDate = new Date(
-      today.getTime() + dueDays * 24 * 60 * 60 * 1000,
-    )
-      .toISOString()
-      .slice(0, 10);
+    const due = new Date(today);
+    due.setDate(due.getDate() + dueDays);
+    const dueDate = localDateKey(due);
 
     return {
       id: "sample-preview",
@@ -1279,20 +1251,20 @@ function SettingsContent() {
       advanceCents: Math.round(amountCents * 0.5),
       paidCents: 0,
       status: "UNPAID",
-      issueDate: today.toISOString().slice(0, 10),
+      issueDate: localDateKey(today),
       dueDate,
       notes:
         formState.defaultNotes ||
         "Payment is due within the agreed timeframe. Thank you for working together.",
       businessSnapshot: JSON.stringify({
-        businessName: formState.businessName || "CHETHAKA LAKSHITHA",
+        businessName: formState.businessName || "Your business",
         professionalTitle:
           formState.professionalTitle || "SOFTWARE FREELANCING & CONSULTING",
-        email: formState.email || "contact@chethaka.dev",
-        phone: formState.phone || "+94 77 123 4567",
-        website: formState.website || "www.chethaka.dev",
+        email: formState.email || "",
+        phone: formState.phone || "",
+        website: formState.website || "",
         taxId: formState.taxId || "",
-        address: formState.address || "Colombo, Sri Lanka",
+        address: formState.address || "",
         paymentDetails: formState.paymentDetails || "",
       }),
       items,
@@ -2263,6 +2235,8 @@ function SettingsContent() {
                     </div>
                   </div>
 
+                  <CurrencyRateSettings />
+                  <WorkspaceActivityPanel />
                   {/* Currency & Payment Due */}
                   <div className="ui-card p-6 space-y-4">
                     <div>
@@ -2270,9 +2244,10 @@ function SettingsContent() {
                         Currency &amp; Payment Terms
                       </h2>
                       <p className="text-xs text-content-neutral-500 mt-0.5">
-                        Choose the currency for new invoices and workspace
-                        financial summaries. Existing records keep their
-                        original currencies.
+                        Choose this profile’s primary currency for all financial
+                        statistics. Foreign invoices, expenses and payables are
+                        converted using cached daily exchange rates. Each record
+                        and PDF keeps its original currency.
                       </p>
                     </div>
 
@@ -2280,7 +2255,7 @@ function SettingsContent() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="block text-xs font-medium text-content-neutral-700">
-                            Default Currency
+                            Primary currency
                           </label>
                           <span className="text-[11px] font-semibold text-accent">
                             Active: {formState.defaultCurrency || "USD"} (
@@ -2291,6 +2266,7 @@ function SettingsContent() {
                           </span>
                         </div>
                         <select
+                          aria-label="Primary currency"
                           value={formState.defaultCurrency || "USD"}
                           onChange={async (e) => {
                             const newCurrency = e.target.value as Currency;
@@ -2303,7 +2279,7 @@ function SettingsContent() {
                                 defaultCurrency: newCurrency,
                               });
                               showToast(
-                                `System currency updated to ${newCurrency} (${getCurrencySymbol(newCurrency).trim()}). All pages now use this currency.`,
+                                `Primary currency saved as ${newCurrency}. Financial statistics now convert to ${newCurrency}.`,
                                 "success",
                               );
                             } catch (err: unknown) {
@@ -2817,7 +2793,7 @@ function SettingsContent() {
                       type="radio"
                       name="backup-import-mode"
                       checked={importMode === "replace"}
-                      onChange={() => setImportMode("replace")}
+                      onChange={() => void handleImportMode("replace")}
                     />{" "}
                     Replace workspace records
                   </label>
@@ -2826,7 +2802,7 @@ function SettingsContent() {
                       type="radio"
                       name="backup-import-mode"
                       checked={importMode === "merge"}
-                      onChange={() => setImportMode("merge")}
+                      onChange={() => void handleImportMode("merge")}
                     />{" "}
                     Merge into this workspace
                   </label>
@@ -2839,7 +2815,7 @@ function SettingsContent() {
                 {parsedImport && (
                   <div className="p-3.5 rounded-xl bg-surface-purple-50 border border-line-purple-100 text-xs text-content-purple-950 space-y-1">
                     <div className="font-semibold text-accent">
-                      File Verified
+                      Records, links and receipt hashes verified
                     </div>
                     <div className="text-content-neutral-700">
                       Contains{" "}
@@ -2852,6 +2828,22 @@ function SettingsContent() {
                       </strong>
                       .
                     </div>
+                    <p>
+                      {parsedImport.files?.length || 0} receipts · Currencies:{" "}
+                      {[
+                        ...new Set(
+                          [
+                            ...(parsedImport.records?.invoices || []),
+                            ...(parsedImport.records?.expenses || []),
+                            ...(parsedImport.records?.work_orders || []),
+                          ].map((row) => String(row.currency)),
+                        ),
+                      ].join(", ") || "No financial records"}
+                    </p>
+                    <p>
+                      A complete recovery backup is saved locally before
+                      replacing this workspace.
+                    </p>
                   </div>
                 )}
               </div>
@@ -2867,7 +2859,12 @@ function SettingsContent() {
               <Button
                 variant="primary"
                 type="button"
-                disabled={!parsedImport || isImporting}
+                disabled={
+                  !parsedImport ||
+                  isImporting ||
+                  isValidatingImport ||
+                  Boolean(importError)
+                }
                 onClick={handleConfirmImport}
               >
                 {isImporting

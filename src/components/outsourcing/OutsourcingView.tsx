@@ -1,4 +1,10 @@
 "use client";
+import { workspaceDraft } from "@/lib/workspace-drafts";
+import {
+  useReportingData,
+  ReportingGuard,
+  ReportedMoney,
+} from "@/context/ReportingContext";
 
 import Image from "next/image";
 import { PayableForm } from "./PayableForm";
@@ -69,10 +75,11 @@ import "./outsourcing.css";
 export type { VendorItem, WorkOrderItem };
 
 export default function OutsourcingView() {
+  const reporting = useReportingData();
   const searchParams = useSearchParams();
   const { clients, createClient } = useClients();
   const { invoices } = useInvoices();
-  const { tasks, isElectron, settings } = useData();
+  const { tasks, isElectron, settings, refresh } = useData();
   const { vendors, createVendor, updateVendor, setVendorStatus } = useVendors();
   const {
     workOrders,
@@ -90,6 +97,7 @@ export default function OutsourcingView() {
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
+  const [showArchivedVendors, setShowArchivedVendors] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "PAID">(
     "ALL",
   );
@@ -190,7 +198,7 @@ export default function OutsourcingView() {
     );
   };
 
-  const saveWorkOrderDraft = () => {
+  const saveWorkOrderDraft = async () => {
     if (!isWorkOrderFormDirty()) return;
     const draft = {
       woVendorId,
@@ -215,21 +223,21 @@ export default function OutsourcingView() {
       woNotes,
     };
     try {
-      localStorage.setItem("billflow_draft_workorder", JSON.stringify(draft));
+      await workspaceDraft("billflow_draft_workorder", JSON.stringify(draft));
       setHasWorkOrderDraft(true);
     } catch {}
   };
 
-  const clearWorkOrderDraft = () => {
+  const clearWorkOrderDraft = async () => {
     try {
-      localStorage.removeItem("billflow_draft_workorder");
+      await workspaceDraft("billflow_draft_workorder", null);
     } catch {}
     setHasWorkOrderDraft(false);
   };
 
-  const handleRestoreWorkOrderDraft = () => {
+  const handleRestoreWorkOrderDraft = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_workorder");
+      const saved = await workspaceDraft("billflow_draft_workorder");
       if (!saved) return;
       const draft = JSON.parse(saved);
       if (draft.woVendorId !== undefined) setWoVendorId(draft.woVendorId);
@@ -271,9 +279,9 @@ export default function OutsourcingView() {
     setIsWorkOrderModalOpen(false);
   };
 
-  const openWorkOrderModal = () => {
+  const openWorkOrderModal = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_workorder");
+      const saved = await workspaceDraft("billflow_draft_workorder");
       setHasWorkOrderDraft(Boolean(saved));
     } catch {
       setHasWorkOrderDraft(false);
@@ -356,8 +364,8 @@ export default function OutsourcingView() {
           setNewVendorInlineName(paramVendor);
           setNewVendorInlineService(paramTaskTitle || "Outsourced Development");
         }
-      } else if (vendors.length > 0) {
-        setWoVendorId(vendors[0].id);
+      } else if (vendors.some((vendor) => !vendor.archivedAt)) {
+        setWoVendorId(vendors.find((vendor) => !vendor.archivedAt)!.id);
         setIsCreatingNewVendorInline(false);
       } else {
         setWoVendorId("__new__");
@@ -366,7 +374,7 @@ export default function OutsourcingView() {
 
       // Resolve invoice code for display
       const inv = invoices.find((i) => i.id === paramInvoiceId);
-      if (inv) setWoInvoiceCode(inv.code);
+      setWoInvoiceCode(inv?.code || "");
 
       setActiveTab("work-orders");
       setWoFormErrors({});
@@ -380,7 +388,11 @@ export default function OutsourcingView() {
       setWoTaskId(firstTask.id);
       setWoTaskTitle(firstTask.title);
       setWoScope(firstTask.title);
-      setWoInvoiceId(firstTask.invoiceId || invoices[0]?.id || "");
+      setWoInvoiceId(firstTask.invoiceId || "");
+      setWoInvoiceCode(
+        invoices.find((invoice) => invoice.id === firstTask.invoiceId)?.code ||
+          "",
+      );
       setWoClientId(firstTask.clientId || "");
       setWoClientName(firstTask.clientName || "");
       setWoDeliveryUrl(firstTask.deliveryUrl || "");
@@ -388,10 +400,10 @@ export default function OutsourcingView() {
         (firstTask.currency as Currency) || activeCurrency || "LKR",
       );
     }
-    if (vendors.length > 0 && !woVendorId) {
-      setWoVendorId(vendors[0].id);
+    if (vendors.some((vendor) => !vendor.archivedAt) && !woVendorId) {
+      setWoVendorId(vendors.find((vendor) => !vendor.archivedAt)!.id);
       setIsCreatingNewVendorInline(false);
-    } else if (vendors.length === 0) {
+    } else if (!vendors.some((vendor) => !vendor.archivedAt)) {
       setWoVendorId("__new__");
       setIsCreatingNewVendorInline(true);
     }
@@ -688,9 +700,6 @@ export default function OutsourcingView() {
     if (!woTaskId) {
       errors.task = "Source task is required to link this work order";
     }
-    if (!woInvoiceId) {
-      errors.invoice = "Parent invoice is required to link this work order";
-    }
     if (!woScope.trim()) {
       errors.scope = "Scope description cannot be blank";
     }
@@ -716,8 +725,8 @@ export default function OutsourcingView() {
           iconType: newVendorInlineCategory,
           email: newVendorInlineEmail.trim() || undefined,
           phone: newVendorInlinePhone.trim() || undefined,
-          balanceCents: Math.round(numFee * 100),
-          currentBalance: numFee,
+          balanceCents: 0,
+          currentBalance: 0,
           status: "PENDING",
           linkedClientId: woClientId || undefined,
           linkedClientName: woClientName || undefined,
@@ -729,7 +738,7 @@ export default function OutsourcingView() {
       await createWorkOrder({
         vendorId: targetVendorId,
         taskId: woTaskId,
-        invoiceId: woInvoiceId,
+        invoiceId: woInvoiceId || undefined,
         scope: woScope.trim(),
         feeCents: Math.round(numFee * 100),
         currency: woCurrency,
@@ -808,6 +817,7 @@ export default function OutsourcingView() {
   // Filter vendors
   const filteredVendors = useMemo(() => {
     return vendors.filter((v) => {
+      if (Boolean(v.archivedAt) !== showArchivedVendors) return false;
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -820,10 +830,21 @@ export default function OutsourcingView() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [vendors, searchQuery, statusFilter]);
+  }, [vendors, searchQuery, statusFilter, showArchivedVendors]);
 
   return (
     <div className="workspace-page motion-page outsourcing-page-container">
+      {activeTab === "vendors" && (
+        <button
+          type="button"
+          className="ui-button ui-button--secondary mb-3"
+          onClick={() => setShowArchivedVendors(!showArchivedVendors)}
+        >
+          {showArchivedVendors
+            ? "Show active vendors"
+            : "Show archived vendors"}
+        </button>
+      )}
       {/* Toast Feedback Notification */}
       <MotionPresence>
         {toastNotification && (
@@ -896,101 +917,101 @@ export default function OutsourcingView() {
       {/* =====================================================================
           ZENTRA 3-CARD OUTSOURCING & PAYABLES BENTO HEADER ROW
          ===================================================================== */}
-      {(() => {
-        const orders = workOrders.filter(
-          (order) => order.currency === activeCurrency,
-        );
-        const committed = orders.reduce(
-          (sum, order) => sum + order.feeCents,
-          0,
-        );
-        const paid = orders.reduce(
-          (sum, order) => sum + (order.payoutAmountCents ?? 0),
-          0,
-        );
-        const pending = orders.reduce(
-          (sum, order) => sum + remainingPayout(order),
-          0,
-        );
-        const done = orders.filter((order) => order.status === "done").length;
-        const money = (value: number) => formatCents(value, activeCurrency);
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <section className="ui-card p-6 space-y-5">
-              <h2>Subcontractor Payables</h2>
-              <div>
-                <div className="summary-value">{money(committed)}</div>
-                <p className="summary-caption">
-                  Agreed fees across {orders.length} work orders ·{" "}
-                  {activeCurrency}
-                </p>
-              </div>
-              <DataBreakdown
-                label="Contractor fee settlement"
-                total={committed}
-                rows={[
-                  {
-                    label: "Paid out",
-                    value: paid,
-                    display: money(paid),
-                    tone: "green",
-                  },
-                  {
-                    label: "Still payable",
-                    value: pending,
-                    display: money(pending),
-                    tone: "pink",
-                  },
-                ]}
-              />
-            </section>
-            <section className="ui-card p-6 space-y-5">
-              <h2>Contractor Delivery</h2>
-              <div>
-                <div className="summary-value">
-                  {done}/{orders.length}
+      <ReportingGuard>
+        {(() => {
+          const orders = reporting.workOrders;
+          const committed = orders.reduce(
+            (sum, order) => sum + order.feeCents,
+            0,
+          );
+          const paid = orders.reduce(
+            (sum, order) => sum + (order.payoutAmountCents ?? 0),
+            0,
+          );
+          const pending = orders.reduce(
+            (sum, order) => sum + remainingPayout(order),
+            0,
+          );
+          const done = orders.filter((order) => order.status === "done").length;
+          const money = (value: number) => formatCents(value, activeCurrency);
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <section className="ui-card p-6 space-y-5">
+                <h2>Subcontractor Payables</h2>
+                <div>
+                  <div className="summary-value">{money(committed)}</div>
+                  <p className="summary-caption">
+                    Agreed fees across {orders.length} work orders ·{" "}
+                    {activeCurrency}
+                  </p>
                 </div>
+                <DataBreakdown
+                  label="Contractor fee settlement"
+                  total={committed}
+                  rows={[
+                    {
+                      label: "Paid out",
+                      value: paid,
+                      display: money(paid),
+                      tone: "green",
+                    },
+                    {
+                      label: "Still payable",
+                      value: pending,
+                      display: money(pending),
+                      tone: "pink",
+                    },
+                  ]}
+                />
+              </section>
+              <section className="ui-card p-6 space-y-5">
+                <h2>Contractor Delivery</h2>
+                <div>
+                  <div className="summary-value">
+                    {done}/{orders.length}
+                  </div>
+                  <p className="summary-caption">
+                    Completed work orders. Payouts are tracked separately.
+                  </p>
+                </div>
+                <DataBreakdown
+                  label="Work order delivery status"
+                  total={orders.length}
+                  rows={[
+                    {
+                      label: "In delivery or review",
+                      value: orders.length - done,
+                      display: `${orders.length - done} orders`,
+                    },
+                    {
+                      label: "Complete",
+                      value: done,
+                      display: `${done} orders`,
+                      tone: "green",
+                    },
+                  ]}
+                />
+              </section>
+              <section className="ui-card p-6 space-y-5">
+                <h2>Scheduled Contractor Fees</h2>
                 <p className="summary-caption">
-                  Completed work orders. Payouts are tracked separately.
+                  Agreed fees by contractor delivery due month
                 </p>
-              </div>
-              <DataBreakdown
-                label="Work order delivery status"
-                total={orders.length}
-                rows={[
-                  {
-                    label: "In delivery or review",
-                    value: orders.length - done,
-                    display: `${orders.length - done} orders`,
-                  },
-                  {
-                    label: "Complete",
-                    value: done,
-                    display: `${done} orders`,
-                    tone: "green",
-                  },
-                ]}
-              />
-            </section>
-            <section className="ui-card p-6 space-y-5">
-              <h2>Scheduled Contractor Fees</h2>
-              <p className="summary-caption">
-                Agreed fees by contractor delivery due month
-              </p>
-              <MonthlyBars
-                label="Fees due · last six months"
-                formatValue={money}
-                points={recentMonths().map((month) => ({
-                  ...month,
-                  value: orders
-                    .filter((order) => order.dueDate?.startsWith(month.key))
-                    .reduce((sum, order) => sum + order.feeCents, 0),
-                }))}
-              />
-            </section>
-          </div>
-        );
-      })()}
+                <MonthlyBars
+                  label="Fees due · last six months"
+                  formatValue={money}
+                  points={recentMonths().map((month) => ({
+                    ...month,
+                    value: orders
+                      .filter((order) => order.dueDate?.startsWith(month.key))
+                      .reduce((sum, order) => sum + order.feeCents, 0),
+                  }))}
+                />
+              </section>
+            </div>
+          );
+        })()}
+      </ReportingGuard>
 
       {/* Main Directory & Payables Card */}
       <div className="ui-card vendor-directory-card">
@@ -1222,7 +1243,10 @@ export default function OutsourcingView() {
                           </td>
                           <td className="record-align-right">
                             <strong className="record-amount">
-                              {formatCents(wo.feeCents, wo.currency)}
+                              <ReportedMoney
+                                cents={wo.feeCents}
+                                currency={wo.currency}
+                              />
                             </strong>
                             <button
                               type="button"
@@ -1276,17 +1300,17 @@ export default function OutsourcingView() {
           filteredVendors.length === 0 ? (
             <EmptyState
               title={
-                vendors.length === 0
+                !vendors.some((vendor) => !vendor.archivedAt)
                   ? "No vendor profiles registered"
                   : "No matching vendors found"
               }
               description={
-                vendors.length === 0
+                !vendors.some((vendor) => !vendor.archivedAt)
                   ? "Add reusable profiles for contractors and agencies you collaborate with."
                   : "Try adjusting your search query or status filter."
               }
             >
-              {vendors.length === 0 && (
+              {!vendors.some((vendor) => !vendor.archivedAt) && (
                 <div className="mt-4 flex items-center justify-center gap-2">
                   <Button
                     variant="primary"
@@ -1342,6 +1366,29 @@ export default function OutsourcingView() {
                   </div>
 
                   <div className="vendor-actions-group">
+                    <button
+                      type="button"
+                      className="ui-button ui-button--secondary"
+                      onClick={async () => {
+                        try {
+                          await window.billflow?.workspace?.archive?.(
+                            "vendors",
+                            vendor.id,
+                            !vendor.archivedAt,
+                          );
+                          await refresh();
+                        } catch (failure) {
+                          showToast(
+                            failure instanceof Error
+                              ? failure.message
+                              : "Could not update vendor.",
+                            "error",
+                          );
+                        }
+                      }}
+                    >
+                      {vendor.archivedAt ? "Restore" : "Archive"}
+                    </button>
                     <Button
                       variant="secondary"
                       size="small"
@@ -2171,11 +2218,13 @@ export default function OutsourcingView() {
                       className="ui-field w-full text-[13px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
                     >
                       <option value="">-- Choose Subcontractor --</option>
-                      {vendors.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.name} ({v.service})
-                        </option>
-                      ))}
+                      {vendors
+                        .filter((v) => !v.archivedAt)
+                        .map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name} ({v.service})
+                          </option>
+                        ))}
                       <option value="__new__">
                         + Register New Subcontractor...
                       </option>
@@ -2283,6 +2332,17 @@ export default function OutsourcingView() {
                   )}
                 </div>
 
+                {woFormErrors.task && (
+                  <p role="alert" className="text-content-rose-600 text-sm">
+                    {woFormErrors.task}
+                  </p>
+                )}
+                {woTaskId && !woInvoiceId && (
+                  <p className="text-sm text-text-secondary">
+                    This task has not been invoiced. Contractor costs will be
+                    tracked now and linked when you invoice the completed task.
+                  </p>
+                )}
                 {/* If opened manually, allow selecting Task */}
                 {!searchParams.get("taskId") && tasks.length > 0 && (
                   <div>
@@ -2310,7 +2370,7 @@ export default function OutsourcingView() {
                           const inv = invoices.find(
                             (i) => i.id === t.invoiceId,
                           );
-                          if (inv) setWoInvoiceCode(inv.code);
+                          setWoInvoiceCode(inv?.code || "");
                         }
                       }}
                       className="ui-field w-full text-[13px] px-3 py-2 border border-border-muted rounded-xl focus:outline-none focus:ring-2 focus:ring-focus"
@@ -2400,7 +2460,11 @@ export default function OutsourcingView() {
                     <input
                       id="wo-due-date"
                       type="date"
-                      value={/^\d{4}-\d{2}-\d{2}/.test(woDueDate) ? woDueDate.slice(0, 10) : ""}
+                      value={
+                        /^\d{4}-\d{2}-\d{2}/.test(woDueDate)
+                          ? woDueDate.slice(0, 10)
+                          : ""
+                      }
                       onChange={(e) => setWoDueDate(e.target.value)}
                       onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();

@@ -1,4 +1,5 @@
 "use client";
+import { localDateKey } from "@/lib/visual-metrics";
 import { activeProfileScope } from "@/lib/profile-scope";
 import type { WorkspaceDataset, WorkspaceSnapshot } from "@/types/workspace";
 import { calculateFinancials } from "@/lib/financials";
@@ -637,7 +638,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const code =
         input.code ||
         `INV-${new Date().getFullYear()}-${String(memoryInvoices.length + 1).padStart(3, "0")}`;
-      const today = new Date().toISOString().split("T")[0];
+      const today = localDateKey(new Date());
       const newInv: InvoiceWithClient = {
         id,
         code,

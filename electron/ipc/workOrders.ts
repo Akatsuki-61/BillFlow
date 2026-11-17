@@ -162,6 +162,14 @@ export function createWorkOrder(
   broadcastDataChanged?: () => void,
 ): WorkOrderItem {
   const validated = newWorkOrderSchema.parse(input);
+  if (validated.taskId && !validated.invoiceId) {
+    const source = getDb()
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, validated.taskId))
+      .get();
+    validated.invoiceId = source?.invoiceId || null;
+  }
   const db = getDb();
 
   // Validate relationships exist
@@ -170,6 +178,11 @@ export function createWorkOrder(
     : undefined;
   if (validated.vendorId && !vendor)
     throw new AppError("NOT_FOUND", "Vendor not found.");
+  if (vendor?.archivedAt)
+    throw new AppError(
+      "VENDOR_ARCHIVED",
+      "Restore this vendor before creating a new work order.",
+    );
   const task = validated.taskId
     ? db.select().from(tasks).where(eq(tasks.id, validated.taskId)).get()
     : undefined;
@@ -215,14 +228,14 @@ export function createWorkOrder(
         deliveryUrl: validated.deliveryUrl || task?.deliveryUrl || null,
       })
       .run();
-    if (task && invoice) {
+    if (task) {
       tx.update(tasks)
         .set({
           isOutsourced: true,
           outsourcedVendor: vendor?.name ?? validated.vendorSnapshot?.name,
           outsourceBudgetCents: fee,
-          invoiceId: invoice.id,
-          clientId: invoice.clientId,
+          invoiceId: invoice?.id || task.invoiceId,
+          clientId: invoice?.clientId || task.clientId,
           deliveryUrl: validated.deliveryUrl || task.deliveryUrl,
           updatedAt: new Date().toISOString(),
         })

@@ -25,7 +25,8 @@
     "prepare:native": "electron-builder install-app-deps",
     "postinstall": "electron-builder install-app-deps",
     "test:desktop": "playwright test --config playwright.config.ts",
-    "pack:mac": "npm run build && electron-builder --mac --arm64 --dir --config.directories.output=release/preview-0.2.0 && codesign --force --deep --sign - release/preview-0.2.0/mac-arm64/BillFlow.app"
+    "pack:mac": "npm run build && electron-builder --mac --arm64 --dir --config.directories.output=release/preview-0.2.0 && codesign --force --deep --sign - release/preview-0.2.0/mac-arm64/BillFlow.app",
+    "pack:mac:test": "npm run build && electron-builder --mac --arm64 --dir --config.directories.output=release/test-0.2.0 --config.electronFuses.enableNodeCliInspectArguments=true && codesign --force --deep --sign - release/test-0.2.0/mac-arm64/BillFlow.app"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3"

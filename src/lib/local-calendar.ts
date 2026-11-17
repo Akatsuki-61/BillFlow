@@ -1,3 +1,4 @@
+import { localDateKey } from "./visual-metrics";
 import { profileStorageKey, activeProfileScope } from "./profile-scope";
 import type {
   CalendarEventItem,
@@ -41,7 +42,7 @@ export function normalizeAndAutoFixDate(
   const defaultDate =
     fallbackDate && /^\d{4}-\d{2}-\d{2}$/.test(fallbackDate)
       ? fallbackDate
-      : new Date().toISOString().slice(0, 10);
+      : localDateKey(new Date());
 
   if (!rawDate || !String(rawDate).trim()) {
     return defaultDate;
@@ -438,7 +439,7 @@ function formatIcsDateOnly(dateStr: string): string {
   const clean = normalizeAndAutoFixDate(dateStr).replace(/-/g, "");
   return clean.length === 8
     ? clean
-    : new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    : localDateKey(new Date()).replace(/-/g, "");
 }
 
 function addOneDayDateOnly(dateStr: string): string {

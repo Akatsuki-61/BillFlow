@@ -1,11 +1,13 @@
 "use client";
+import { calendarDateKey } from "@/lib/visual-metrics";
+import { useReportingData } from "@/context/ReportingContext";
 
 import { useMemo } from "react";
 import {
   EChartsAreaChart,
   type ChartConfig,
 } from "@/components/evilcharts/charts/echarts-area-chart";
-import { useData, useActiveCurrency } from "@/lib/data/DataProvider";
+import { useActiveCurrency } from "@/lib/data/DataProvider";
 import { formatCents } from "@/lib/format";
 
 const chartConfig = {
@@ -26,7 +28,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function AudienceGrowthChart() {
-  const { invoices, expenses, workOrders } = useData();
+  const { invoices, expenses, workOrders } = useReportingData();
   const { activeCurrency } = useActiveCurrency();
 
   const { chartData, totalCollectedCents, totalExpenseCents, netProfitCents } =
@@ -60,7 +62,8 @@ export function AudienceGrowthChart() {
             )
             .forEach((payment) => {
               const target = months.find(
-                (month) => month.key === payment.receivedAt.slice(0, 7),
+                (month) =>
+                  month.key === calendarDateKey(payment.receivedAt).slice(0, 7),
               );
               if (target) target.collections += payment.amountCents / 100;
             });
@@ -69,7 +72,8 @@ export function AudienceGrowthChart() {
         .filter((expense) => expense.currency === activeCurrency)
         .forEach((expense) => {
           const target = months.find(
-            (month) => month.key === expense.incurredAt.slice(0, 7),
+            (month) =>
+              month.key === calendarDateKey(expense.incurredAt).slice(0, 7),
           );
           if (target) target.expenses += expense.amountCents / 100;
         });
@@ -88,7 +92,8 @@ export function AudienceGrowthChart() {
               : []);
           for (const payout of payouts) {
             const target = months.find(
-              (month) => month.key === payout.paidAt.slice(0, 7),
+              (month) =>
+                month.key === calendarDateKey(payout.paidAt).slice(0, 7),
             );
             if (target) target.expenses += payout.amountCents / 100;
           }

@@ -1,4 +1,5 @@
 "use client";
+import { activeProfileScope } from "@/lib/profile-scope";
 import {
   openMessageDraft,
   smsDraft,
@@ -16,6 +17,7 @@ import {
   Mail,
   MessageSquare,
   Check,
+  AlertCircle,
   ChevronDown,
   LayoutTemplate,
 } from "lucide-react";
@@ -106,11 +108,11 @@ const TEMPLATES: Array<{
 export default function InvoiceDocumentSheet({
   invoice,
   onClose,
-  onOpenPdf,
   onRecordPayment,
   initialTemplate,
   onSelectTemplate,
 }: InvoiceDocumentSheetProps) {
+  const activityProfile = activeProfileScope();
   const { settings: currentSettings } = useSettings();
   const settings = (() => {
     try {
@@ -169,7 +171,7 @@ export default function InvoiceDocumentSheet({
     }
   };
 
-  const businessName = settings?.businessName || "CHETHAKA LAKSHITHA";
+  const businessName = settings?.businessName || "Your business";
   const professionalTitle =
     settings?.professionalTitle || "SOFTWARE FREELANCING & CONSULTING";
 
@@ -274,6 +276,7 @@ export default function InvoiceDocumentSheet({
           setTimeout(() => setSavedNotice(null), 4500);
           return;
         }
+        return;
       } else if (saveInvoicePdfAs) {
         const result = await saveInvoicePdfAs(
           invoice.id,
@@ -289,13 +292,13 @@ export default function InvoiceDocumentSheet({
         }
       }
 
-      if (onOpenPdf) {
-        onOpenPdf();
-      } else {
-        window.print();
-      }
+      return;
     } catch (err) {
-      console.error("Failed to save PDF:", err);
+      setSavedNotice(
+        err instanceof Error
+          ? `Could not save PDF: ${err.message}`
+          : "Could not save PDF. Try again.",
+      );
     } finally {
       setIsSavingPdf(false);
     }
@@ -352,6 +355,14 @@ export default function InvoiceDocumentSheet({
           target,
         ),
       );
+      void window.billflow?.workspace
+        ?.recordActivity?.(activityProfile, {
+          kind: "communication",
+          recordId: invoice.id,
+          label: invoice.code,
+          detail: "WhatsApp draft requested",
+        })
+        .catch(console.error);
       setSavedNotice(
         pdfExported ? "PDF ready to attach." : "WhatsApp draft opened.",
       );
@@ -370,6 +381,14 @@ export default function InvoiceDocumentSheet({
       await openMessageDraft(
         smsDraft(client?.phone || invoice.clientPhone, body),
       );
+      void window.billflow?.workspace
+        ?.recordActivity?.(activityProfile, {
+          kind: "communication",
+          recordId: invoice.id,
+          label: invoice.code,
+          detail: "SMS draft requested",
+        })
+        .catch(console.error);
       setSavedNotice("SMS draft opened.");
     } catch (error) {
       setSavedNotice(
@@ -418,6 +437,14 @@ export default function InvoiceDocumentSheet({
       businessName,
     });
     window.open(link);
+    void window.billflow?.workspace
+      ?.recordActivity?.(activityProfile, {
+        kind: "communication",
+        recordId: invoice.id,
+        label: invoice.code,
+        detail: "Email draft requested",
+      })
+      .catch(console.error);
     setSavedNotice(
       pdfExported
         ? "Invoice PDF ready in Explorer to attach to your email!"
@@ -652,12 +679,17 @@ export default function InvoiceDocumentSheet({
             {savedNotice && (
               <motion.span
                 key={savedNotice}
+                role={savedNotice.startsWith("Could not") ? "alert" : "status"}
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0, transition: ENTER_DETAILS }}
                 exit={{ opacity: 0, y: 2, transition: EXIT_DETAILS }}
-                className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold"
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold ${savedNotice.startsWith("Could not") ? "text-content-rose-600" : "text-emerald-600 dark:text-emerald-400"}`}
               >
-                <Check className="w-4 h-4 success-confirm-pulse rounded-full" />
+                {savedNotice.startsWith("Could not") ? (
+                  <AlertCircle className="w-4 h-4" />
+                ) : (
+                  <Check className="w-4 h-4 success-confirm-pulse rounded-full" />
+                )}
                 <span>{savedNotice}</span>
               </motion.span>
             )}

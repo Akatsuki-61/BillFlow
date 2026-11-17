@@ -1,4 +1,6 @@
 "use client";
+import { activeProfileScope } from "@/lib/profile-scope";
+import { localDateKey } from "@/lib/visual-metrics";
 
 import React, { useState, useMemo } from "react";
 import { Dialog } from "@/components/ui/Dialog";
@@ -48,7 +50,10 @@ export default function SubmitWorkModal({
     [task, clients, invoices],
   );
 
-  const [deliveryUrlInput, setDeliveryUrlInput] = useState(() => task.deliveryUrl?.trim() || resolved.url || "");
+  const activityProfile = activeProfileScope();
+  const [deliveryUrlInput, setDeliveryUrlInput] = useState(
+    () => task.deliveryUrl?.trim() || resolved.url || "",
+  );
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [completeAllSubtasks, setCompleteAllSubtasks] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -139,7 +144,7 @@ export default function SubmitWorkModal({
     // Append notes to description if provided
     let updatedDescription = task.description;
     if (deliveryNotes.trim()) {
-      const timestamp = new Date().toISOString().slice(0, 10);
+      const timestamp = localDateKey(new Date());
       const noteEntry = `\n\n[Delivery Handover — ${timestamp}]: ${deliveryNotes.trim()}`;
       if (!updatedDescription.includes(noteEntry.trim())) {
         updatedDescription = `${updatedDescription.trim()}${noteEntry}`;
@@ -154,6 +159,14 @@ export default function SubmitWorkModal({
     };
 
     await onSubmit(patch);
+    void window.billflow?.workspace
+      ?.recordActivity?.(activityProfile, {
+        kind: "delivery",
+        recordId: task.id,
+        label: task.title,
+        detail: "Work marked done with a delivery handoff",
+      })
+      .catch(console.error);
   };
 
   return (
@@ -425,9 +438,9 @@ export default function SubmitWorkModal({
               <strong className="text-content-neutral-900 dark:text-content-neutral-100 font-semibold">
                 Done
               </strong>{" "}
-              logs the deliverable completion timestamp in the background. Client
-              invoice payment progress remains separate until the client approves
-              the work and settles the remaining balance.
+              logs the deliverable completion timestamp in the background.
+              Client invoice payment progress remains separate until the client
+              approves the work and settles the remaining balance.
             </p>
           </div>
         </div>

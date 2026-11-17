@@ -76,6 +76,13 @@ export function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+/** Preserve date-only fields; interpret timestamped receipts in the local calendar. */
+export function calendarDateKey(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? localDateKey(date) : "";
+}
+
 export function isPastDue(
   invoice: Pick<Invoice, "status" | "dueDate" | "amountCents" | "paidCents">,
   today = localDateKey(),

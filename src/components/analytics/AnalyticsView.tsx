@@ -1,6 +1,6 @@
 "use client";
+import { useReportingData, ReportingGuard } from "@/context/ReportingContext";
 
-import { useData } from "@/lib/data/DataProvider";
 import { calculateFinancials } from "@/lib/financials";
 import { formatCents } from "@/lib/format";
 
@@ -86,7 +86,7 @@ export default function AnalyticsView() {
 
   // Selected timeframe filter state: Month, Quarter, or Year
   const [timeframe, setTimeframe] = useState<Timeframe>("Quarter");
-  const { invoices, activeCurrency } = useData();
+  const { invoices, currency: activeCurrency } = useReportingData();
   const { averageBilledPerClientCents, billedClientCount } = React.useMemo(
     () =>
       calculateFinancials({
@@ -240,16 +240,20 @@ export default function AnalyticsView() {
         </div>
       </PageHeader>
 
-      <section className="ui-card p-5">
-        <h2 className="text-sm font-medium">Average billed value per client</h2>
-        <p className="summary-value mt-2">
-          {formatCents(averageBilledPerClientCents, activeCurrency)}
-        </p>
-        <p className="summary-caption">
-          This {timeframe.toLowerCase()} · {billedClientCount} billed{" "}
-          {billedClientCount === 1 ? "client" : "clients"} · {activeCurrency}
-        </p>
-      </section>
+      <ReportingGuard>
+        <section className="ui-card p-5">
+          <h2 className="text-sm font-medium">
+            Average billed value per client
+          </h2>
+          <p className="summary-value mt-2">
+            {formatCents(averageBilledPerClientCents, activeCurrency)}
+          </p>
+          <p className="summary-caption">
+            This {timeframe.toLowerCase()} · {billedClientCount} billed{" "}
+            {billedClientCount === 1 ? "client" : "clients"} · {activeCurrency}
+          </p>
+        </section>
+      </ReportingGuard>
       <CashflowForecast />
 
       {/* Empty State when all widgets are hidden */}

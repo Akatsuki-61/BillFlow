@@ -85,6 +85,20 @@ export function createExpense(
 
   const existing = db.select().from(expenses).where(eq(expenses.id, id)).get();
   if (existing) {
+    if (
+      existing.invoiceId !== (parsed.invoiceId || null) ||
+      existing.merchant !== parsed.merchant ||
+      existing.description !== (parsed.description || "") ||
+      existing.category !== parsed.category ||
+      existing.amountCents !== parsed.amountCents ||
+      existing.currency !== parsed.currency ||
+      existing.incurredAt !== parsed.incurredAt ||
+      Boolean(existing.deductible) !== (parsed.deductible ?? false)
+    )
+      throw new AppError(
+        "REQUEST_CONFLICT",
+        "This expense request was already used with different details.",
+      );
     const atts = db
       .select()
       .from(attachments)

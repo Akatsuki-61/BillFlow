@@ -71,6 +71,7 @@ import { createExpense, removeExpense } from "../ipc/expenses";
 import { getAnalyticsSummary } from "../ipc/analytics";
 import { listClientsWithStats } from "../ipc/clients";
 import {
+  NATIVE_CALENDAR_DATE_PARSER,
   savePersistedTaskTimeSlots,
   loadPersistedTaskTimeSlots,
 } from "../ipc/calendar";
@@ -585,12 +586,12 @@ it("validates payout currency and protects paid voucher history", () => {
   expect(() => updateWorkOrder(wo.id, { currency: "EUR" })).toThrow(/currency/);
   expect(() => removeWorkOrder(wo.id)).toThrow(/payout history/);
 });
-it("uses actual payout amounts and returns zero for an empty currency period", () => {
+it("uses actual payouts and refuses to silently omit foreign currencies without rates", () => {
   const wo = order();
   expect(getAnalyticsSummary("all", "USD").netProfitCents).toBe(10000);
   recordWorkOrderPayout({ workOrderId: wo.id, amountCents: 1500 });
   expect(getAnalyticsSummary("all", "USD").netProfitCents).toBe(8500);
-  expect(getAnalyticsSummary("month", "EUR").totalRevenueCents).toBe(0);
+  expect(() => getAnalyticsSummary("month", "EUR")).toThrow("Exchange rates");
 });
 it("reports ambiguous legacy financial conflicts without changing their records", () => {
   client();
@@ -787,7 +788,7 @@ it("limits the shipped calendar deletion loop to its initiating profile", () => 
     ts.forEachChild(n, visit);
   }
   visit(sf);
-  const script = vm.runInNewContext(literal);
+  const script = vm.runInNewContext(literal, { NATIVE_CALENDAR_DATE_PARSER });
   const events = [
     { description: "[BF-SYNC:profile-a:evt-one]", summary: "A" },
     { description: "[BF-SYNC:profile-b:evt-old]", summary: "B" },

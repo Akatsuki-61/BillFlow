@@ -136,7 +136,7 @@
   --foreground: #0d0d12;
   --ui-surface: #ffffff;
   --ui-text: #0d0d12;
-  --ui-muted: #6e6e77;
+  --ui-muted: #62626c;
   --ui-secondary: #383842;
   --ui-subtle: #f7f7f9;
   --ui-hover: #ededf1;
@@ -178,8 +178,8 @@
   --theme-content-emerald-800: var(--color-emerald-800);
   --theme-content-emerald-900: var(--color-emerald-900);
   --theme-content-neutral-300: var(--color-neutral-300);
-  --theme-content-neutral-400: var(--color-neutral-400);
-  --theme-content-neutral-500: var(--color-neutral-500);
+  --theme-content-neutral-400: #62626c;
+  --theme-content-neutral-500: #62626c;
   --theme-content-neutral-600: var(--color-neutral-600);
   --theme-content-neutral-700: var(--color-neutral-700);
   --theme-content-neutral-800: var(--color-neutral-800);
@@ -279,8 +279,16 @@
   --theme-text-secondary: #27272a;
   --theme-text-subtle: #8e8e93;
   --theme-toast: #18181b;
-  --scrollbar-thumb: color-mix(in srgb, var(--theme-accent-solid) 52%, rgba(255, 255, 255, 0.22));
-  --scrollbar-thumb-hover: color-mix(in srgb, var(--theme-accent-solid) 80%, rgba(0, 0, 0, 0.08));
+  --scrollbar-thumb: color-mix(
+    in srgb,
+    var(--theme-accent-solid) 52%,
+    rgba(255, 255, 255, 0.22)
+  );
+  --scrollbar-thumb-hover: color-mix(
+    in srgb,
+    var(--theme-accent-solid) 80%,
+    rgba(0, 0, 0, 0.08)
+  );
 }
 
 :root[data-theme="dark"] {
@@ -432,8 +440,16 @@
   --theme-text-secondary: #d4d4d8;
   --theme-text-subtle: #9ca3af;
   --theme-toast: #18181b;
-  --scrollbar-thumb: color-mix(in srgb, var(--ui-accent) 44%, rgba(0, 0, 0, 0.28));
-  --scrollbar-thumb-hover: color-mix(in srgb, var(--ui-accent) 72%, rgba(255, 255, 255, 0.12));
+  --scrollbar-thumb: color-mix(
+    in srgb,
+    var(--ui-accent) 44%,
+    rgba(0, 0, 0, 0.28)
+  );
+  --scrollbar-thumb-hover: color-mix(
+    in srgb,
+    var(--ui-accent) 72%,
+    rgba(255, 255, 255, 0.12)
+  );
 }
 
 @media print {

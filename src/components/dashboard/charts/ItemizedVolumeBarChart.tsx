@@ -1,11 +1,11 @@
 "use client";
+import { useReportingData } from "@/context/ReportingContext";
 
 import { useMemo } from "react";
 import {
   EChartsBarChart,
   type ChartConfig,
 } from "@/components/evilcharts/charts/echarts-bar-chart";
-import { useData } from "@/lib/data/DataProvider";
 
 const chartConfig = {
   web: {
@@ -25,7 +25,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function ItemizedVolumeBarChart() {
-  const { invoices, activeCurrency } = useData();
+  const { invoices, currency: activeCurrency } = useReportingData();
 
   const { chartData, hasData } = useMemo(() => {
     const months: Array<{

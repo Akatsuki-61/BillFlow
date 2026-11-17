@@ -158,14 +158,30 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     null,
   );
 
+  useEffect(() => {
+    const changed = (event: Event) => {
+      const response = (event as CustomEvent<ProfileListResponse>).detail;
+      if (response.activeProfileId === activeProfileId)
+        setProfiles(response.profiles);
+    };
+    window.addEventListener("billflow:profile-appearance-changed", changed);
+    return () =>
+      window.removeEventListener(
+        "billflow:profile-appearance-changed",
+        changed,
+      );
+  }, [activeProfileId]);
   const initialBootHandledRef = useRef(false);
   const lastDispatchedProfileIdRef = useRef<string | null>(null);
 
   const applyProfileVisuals = useCallback(
     (profile: UserProfile, transition = false) => {
-      setAccent(profile.accent, { transition });
+      setAccent(profile.accent, { transition, persistProfile: false });
       if (profile.themePreference) {
-        setPreference(profile.themePreference, { transition });
+        setPreference(profile.themePreference, {
+          transition,
+          persistProfile: false,
+        });
       }
       if (typeof window !== "undefined") {
         sessionStorage.setItem("billflow_active_profile_scope", profile.id);
@@ -180,11 +196,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   );
 
   const applyResponse = useCallback(
-    (
-      res: ProfileListResponse,
-      isInitialBoot = false,
-      forceVisuals = false,
-    ) => {
+    (res: ProfileListResponse, isInitialBoot = false, forceVisuals = false) => {
       setProfiles(res.profiles);
       setActiveProfileId(res.activeProfileId);
       setMaxProfiles(res.maxProfiles || MAX_PROFILES);
@@ -283,6 +295,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     setEditingProfile(null);
     setIsGateOpen(true);
   }, []);
+
+  useEffect(() => {
+    return window.billflow?.onWorkspaceLocked?.(lockCurrentProfile);
+  }, [lockCurrentProfile]);
 
   const verifyPassword = useCallback(
     async (id: string, password: string): Promise<boolean> => {

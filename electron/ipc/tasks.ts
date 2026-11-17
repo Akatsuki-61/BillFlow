@@ -433,6 +433,7 @@ export function pendingTracking(): TrackingOffer[] {
       .from(invoices)
       .where(and(isNull(invoices.trackingChoice), isNull(invoices.trashedAt)))
       .all()) {
+      if (row.advanceCents <= 0 || row.paidCents < row.advanceCents) continue;
       let result: ReturnType<typeof qualifyingInvoice>;
       try {
         result = qualifyingInvoice(row.id);

@@ -31,6 +31,7 @@ export function listVendors(): VendorItem[] {
 
   return allVendors.map((v) => ({
     id: v.id,
+    archivedAt: v.archivedAt,
     name: v.name,
     service: v.service,
     currentBalance: Math.round(v.balanceCents / 100),

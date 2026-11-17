@@ -8,6 +8,8 @@ import { listWorkOrders } from "./workOrders";
 import { listExpenses } from "./expenses";
 import { listTasks } from "./tasks";
 import { getOrCreateSettings } from "./settings";
+import { cachedExchangeRates } from "../exchange-rates";
+import { reportingRecords } from "../../src/lib/currency-conversion";
 import { calculateFinancials } from "../../src/lib/financials";
 export type { AnalyticsSummaryPayload } from "../../src/types/analytics";
 export function getAnalyticsSummary(
@@ -22,10 +24,21 @@ export function getAnalyticsSummary(
       : getOrCreateSettings().defaultCurrency;
   z.enum(["all", "all-time", "year", "quarter", "month"]).parse(period);
   z.enum(["accrual", "cash"]).parse(accountingMethod);
+  const records = reportingRecords(
+    {
+      invoices: listInvoicesWithClient(),
+      workOrders: listWorkOrders(),
+      expenses: listExpenses(),
+    },
+    selected,
+    cachedExchangeRates(),
+  );
+  if (records.missingCurrencies.length)
+    throw new Error(
+      "Exchange rates are required to report foreign-currency records. Connect once to load rates.",
+    );
   return calculateFinancials({
-    invoices: listInvoicesWithClient(),
-    workOrders: listWorkOrders(),
-    expenses: listExpenses(),
+    ...records,
     tasks: listTasks(),
     clientCount: db.select({ id: clients.id }).from(clients).all().length,
     vendorCount: db.select({ id: vendors.id }).from(vendors).all().length,

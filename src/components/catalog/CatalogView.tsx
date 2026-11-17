@@ -1,4 +1,11 @@
 "use client";
+import { localDateKey } from "@/lib/visual-metrics";
+import { workspaceDraft } from "@/lib/workspace-drafts";
+import {
+  useReportingData,
+  ReportingGuard,
+  ReportedMoney,
+} from "@/context/ReportingContext";
 
 import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import {
@@ -89,6 +96,7 @@ export default function CatalogView() {
   const { clients } = useClients();
   const { createInvoice } = useInvoices();
   const { activeCurrency, settings } = useData();
+  const reporting = useReportingData();
 
   const [saving, setSaving] = useState(false);
   const createRequest = useRef<string | null>(null);
@@ -194,7 +202,7 @@ export default function CatalogView() {
     return Boolean(newTitle.trim() || newPrice.trim() || newDescription.trim());
   };
 
-  const saveCatalogDraft = () => {
+  const saveCatalogDraft = async () => {
     if (!isCatalogFormDirty()) return;
     const draft = {
       newTitle,
@@ -206,21 +214,21 @@ export default function CatalogView() {
       newDescription,
     };
     try {
-      localStorage.setItem("billflow_draft_catalog", JSON.stringify(draft));
+      await workspaceDraft("billflow_draft_catalog", JSON.stringify(draft));
       setHasCatalogDraft(true);
     } catch {}
   };
 
-  const clearCatalogDraft = () => {
+  const clearCatalogDraft = async () => {
     try {
-      localStorage.removeItem("billflow_draft_catalog");
+      await workspaceDraft("billflow_draft_catalog", null);
     } catch {}
     setHasCatalogDraft(false);
   };
 
-  const handleRestoreCatalogDraft = () => {
+  const handleRestoreCatalogDraft = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_catalog");
+      const saved = await workspaceDraft("billflow_draft_catalog");
       if (!saved) return;
       const draft = JSON.parse(saved);
       if (draft.newTitle !== undefined) setNewTitle(draft.newTitle);
@@ -242,9 +250,9 @@ export default function CatalogView() {
     setShowNewItemModal(false);
   };
 
-  const openNewItemModal = () => {
+  const openNewItemModal = async () => {
     try {
-      const saved = localStorage.getItem("billflow_draft_catalog");
+      const saved = await workspaceDraft("billflow_draft_catalog");
       setHasCatalogDraft(Boolean(saved));
     } catch {
       setHasCatalogDraft(false);
@@ -421,9 +429,10 @@ export default function CatalogView() {
     setInvoiceCurrency(item.currency || "LKR");
     const d = new Date();
     d.setDate(d.getDate() + 14);
-    setInvoiceDueDate(d.toISOString().split("T")[0]);
-    if (clients.length > 0) {
-      setInvoiceClientId(clients[0].id);
+    setInvoiceDueDate(localDateKey(d));
+    const defaultClient = clients.find((client) => !client.archivedAt);
+    if (defaultClient) {
+      setInvoiceClientId(defaultClient.id);
     } else {
       setInvoiceClientId("");
     }
@@ -587,90 +596,90 @@ export default function CatalogView() {
       {/* =====================================================================
           ZENTRA 3-CARD CATALOG BENTO HEADER ROW
          ===================================================================== */}
-      {(() => {
-        const items = catalogItems.filter(
-          (item) => item.currency === activeCurrency,
-        );
-        const categories = [...new Set(items.map((item) => item.category))];
-        const rates = items.map((item) =>
-          Math.round(
-            (parseFloat(item.price.replace(/[^0-9.]/g, "")) || 0) * 100,
-          ),
-        );
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <section className="ui-card p-6 space-y-5">
-              <h2>Service Catalog</h2>
-              <div>
-                <div className="summary-value">{items.length}</div>
-                <p className="summary-caption">
-                  Reusable services priced in {activeCurrency}
-                </p>
-              </div>
-              <DataBreakdown
-                label="Services by category"
-                total={items.length}
-                rows={categories.map((category) => ({
-                  label: category,
-                  value: items.filter((item) => item.category === category)
-                    .length,
-                  display: `${items.filter((item) => item.category === category).length} services`,
-                }))}
-              />
-              {!items.length && (
-                <p className="summary-caption">
-                  Add a service to see its category breakdown.
-                </p>
-              )}
-            </section>
-            <section className="ui-card p-6 space-y-5">
-              <h2>Average Listed Price</h2>
-              <div>
-                <div className="summary-value">
-                  {formatCents(
-                    rates.length
-                      ? Math.round(
-                          rates.reduce((sum, rate) => sum + rate, 0) /
-                            rates.length,
-                        )
-                      : 0,
-                    activeCurrency,
-                  )}
+      <ReportingGuard>
+        {(() => {
+          const items = reporting.catalogItems;
+          const categories = [...new Set(items.map((item) => item.category))];
+          const rates = items.map((item) =>
+            Math.round(
+              (parseFloat(item.price.replace(/[^0-9.]/g, "")) || 0) * 100,
+            ),
+          );
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <section className="ui-card p-6 space-y-5">
+                <h2>Service Catalog</h2>
+                <div>
+                  <div className="summary-value">{items.length}</div>
+                  <p className="summary-caption">
+                    Reusable prices converted to {activeCurrency}
+                  </p>
+                </div>
+                <DataBreakdown
+                  label="Services by category"
+                  total={items.length}
+                  rows={categories.map((category) => ({
+                    label: category,
+                    value: items.filter((item) => item.category === category)
+                      .length,
+                    display: `${items.filter((item) => item.category === category).length} services`,
+                  }))}
+                />
+                {!items.length && (
+                  <p className="summary-caption">
+                    Add a service to see its category breakdown.
+                  </p>
+                )}
+              </section>
+              <section className="ui-card p-6 space-y-5">
+                <h2>Average Listed Price</h2>
+                <div>
+                  <div className="summary-value">
+                    {formatCents(
+                      rates.length
+                        ? Math.round(
+                            rates.reduce((sum, rate) => sum + rate, 0) /
+                              rates.length,
+                          )
+                        : 0,
+                      activeCurrency,
+                    )}
+                  </div>
+                  <p className="summary-caption">
+                    Mean default price across {items.length} services
+                  </p>
                 </div>
                 <p className="summary-caption">
-                  Mean default price across {items.length} services
+                  You can customize a service’s price on each invoice.
                 </p>
-              </div>
-              <p className="summary-caption">
-                You can customize a service’s price on each invoice.
-              </p>
-            </section>
-            <section className="ui-card p-6 space-y-5">
-              <h2>Price Range</h2>
-              <div>
-                <div className="summary-value">
-                  {formatCents(
-                    rates.length ? Math.min(...rates) : 0,
-                    activeCurrency,
-                  )}
+              </section>
+              <section className="ui-card p-6 space-y-5">
+                <h2>Price Range</h2>
+                <div>
+                  <div className="summary-value">
+                    {formatCents(
+                      rates.length ? Math.min(...rates) : 0,
+                      activeCurrency,
+                    )}
+                  </div>
+                  <p className="summary-caption">Lowest listed price</p>
                 </div>
-                <p className="summary-caption">Lowest listed price</p>
-              </div>
-              <div>
-                <div className="text-xl font-medium text-content-neutral-950">
-                  {formatCents(
-                    rates.length ? Math.max(...rates) : 0,
-                    activeCurrency,
-                  )}
+                <div>
+                  <div className="text-xl font-medium text-content-neutral-950">
+                    {formatCents(
+                      rates.length ? Math.max(...rates) : 0,
+                      activeCurrency,
+                    )}
+                  </div>
+                  <p className="summary-caption">
+                    Highest listed price · {activeCurrency}
+                  </p>
                 </div>
-                <p className="summary-caption">
-                  Highest listed price · {activeCurrency}
-                </p>
-              </div>
-            </section>
-          </div>
-        );
-      })()}
+              </section>
+            </div>
+          );
+        })()}
+      </ReportingGuard>
 
       {/* Search & Category Filter Bar across the top */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shrink-0">
@@ -734,7 +743,7 @@ export default function CatalogView() {
                 )}
                 <span className="relative z-10">
                   {category}{" "}
-                  <span className="opacity-75 font-normal">
+                  <span className="opacity-100 font-normal">
                     ({categoryCounts[category]})
                   </span>
                 </span>
@@ -793,7 +802,10 @@ export default function CatalogView() {
               <div className="catalog-service-price">
                 <div>
                   <strong>
-                    {formatPriceWithCurrency(item.price, item.currency)}
+                    <ReportedMoney
+                      cents={item.priceCents}
+                      currency={item.currency}
+                    />
                   </strong>
                   <span>
                     {item.currency}

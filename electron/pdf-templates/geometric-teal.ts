@@ -352,7 +352,7 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
   <div class="brand-banner">
     ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" class="brand-logo" alt="Logo" />` : ""}
     <div>
-      <div class="brand-name">${escapeHtml(data.business.businessName || "CHETHAKA LAKSHITHA")}</div>
+      <div class="brand-name">${escapeHtml(data.business.businessName || "")}</div>
       <div class="brand-title">${escapeHtml(data.business.professionalTitle || "SOFTWARE FREELANCING & CONSULTING")}</div>
     </div>
   </div>

@@ -43,5 +43,6 @@ export interface InvoicePdfPayload {
     address?: string | null;
     taxId?: string | null;
     paymentDetails?: string | null;
+    signatureData?: string | null;
   };
 }

@@ -103,7 +103,30 @@ const trustedDocument =
 if (process.isMainFrame && trustedDocument)
   contextBridge.exposeInMainWorld("billflow", {
     isElectron: true,
+    currency: { rates: () => invoke("currency:rates") },
     workspace: {
+      quarantineDrafts: (drafts: Record<string, string>) =>
+        invoke("workspace:quarantineDrafts", drafts),
+      activity: () => invoke("workspace:activity"),
+      recordActivity: (
+        profileId: string,
+        input: import("../src/types/activity").ActivityInput,
+      ) => invoke("workspace:recordActivity", profileId, input),
+      archive: (kind: "clients" | "vendors", id: string, archived: boolean) =>
+        invoke("workspace:archive", kind, id, archived),
+      onActivityChanged: (callback: () => void) => {
+        const listener = () => callback();
+        ipcRenderer.on("workspace:activity-changed", listener);
+        return () => {
+          ipcRenderer.removeListener("workspace:activity-changed", listener);
+        };
+      },
+      draft: (
+        profileId: string,
+        key: string,
+        value?: string | null,
+      ): Promise<string | null> =>
+        invoke("workspace:draft", profileId, key, value),
       snapshot: (datasets?: WorkspaceDataset[]): Promise<WorkspaceSnapshot> =>
         invoke("workspace:snapshot", datasets),
     },
@@ -332,6 +355,8 @@ if (process.isMainFrame && trustedDocument)
       getDbPath: (): Promise<string> => invoke("settings:getDbPath"),
       revealDbFile: (): Promise<{ success: boolean }> =>
         invoke("settings:revealDbFile"),
+      preflight: (payload: ExportDataPayload, mode?: "replace" | "merge") =>
+        invoke("settings:preflight", payload, mode),
       export: (): Promise<ExportDataPayload> => invoke("settings:export"),
       import: (payload: ExportDataPayload, mode?: "replace" | "merge") =>
         invoke("settings:import", payload, mode),
@@ -366,6 +391,16 @@ if (process.isMainFrame && trustedDocument)
       selectPdfDirectory: () => invoke("files:selectPdfDirectory"),
       openInvoicePdf: (id: string, reveal?: boolean) =>
         invoke("files:openInvoicePdf", id, reveal),
+    },
+    onWorkspaceLocked: (callback: () => void) => {
+      const listener = () => {
+        operationEpoch++;
+        callback();
+      };
+      ipcRenderer.on("workspace:locked", listener);
+      return () => {
+        ipcRenderer.removeListener("workspace:locked", listener);
+      };
     },
     onDataChanged: (callback: (change?: WorkspaceChange) => void) => {
       const handler = (

@@ -1,6 +1,9 @@
 "use client";
+import { activeProfileScope } from "@/lib/profile-scope";
 
-import { useMemo, useState } from "react";
+import { useReportingData } from "@/context/ReportingContext";
+import { reportingRecords } from "@/lib/currency-conversion";
+import { useCallback, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -72,12 +75,30 @@ export function OverdueSummaryDialog({
   onClose,
   invoices,
   primaryCurrency,
-  freelancerName = "Chethaka",
+  freelancerName = "",
   paymentInstructions,
   onFilterToOverdue,
   onInspectInvoice,
   showToast,
 }: OverdueSummaryDialogProps) {
+  const activityProfile = activeProfileScope();
+  const reporting = useReportingData();
+  const convertedInvoices = useMemo(
+    () =>
+      reportingRecords(
+        { invoices, expenses: [], workOrders: [] },
+        reporting.currency,
+        reporting.rates,
+      ).invoices,
+    [invoices, reporting.currency, reporting.rates],
+  );
+  const convertedAmount = useCallback(
+    (cents: number, currency: string) =>
+      reporting.convert(cents, currency) ?? 0,
+    [reporting],
+  );
+  const reportingMoney = (cents: number) =>
+    reporting.ready ? formatCents(cents, primaryCurrency) : "Rates unavailable";
   const [selectedBucket, setSelectedBucket] = useState<string>("All");
   const [activeViewTab, setActiveViewTab] = useState<SummaryViewTab>("ledger");
   const [exportFormat, setExportFormat] = useState<ExportFileFormat>("excel");
@@ -118,8 +139,12 @@ export function OverdueSummaryDialog({
 
   // Aggregate stats
   const totalOverdueCents = useMemo(() => {
-    return overdueList.reduce((sum, inv) => sum + inv.overdueBalanceCents, 0);
-  }, [overdueList]);
+    return overdueList.reduce(
+      (sum, inv) =>
+        sum + convertedAmount(inv.overdueBalanceCents, inv.currency),
+      0,
+    );
+  }, [overdueList, convertedAmount]);
 
   const maxDaysOverdue = useMemo(() => {
     if (overdueList.length === 0) return 0;
@@ -163,7 +188,10 @@ export function OverdueSummaryDialog({
 
     return buckets.map((b) => {
       const matching = overdueList.filter((i) => i.agingBucket === b.id);
-      const sumCents = matching.reduce((s, i) => s + i.overdueBalanceCents, 0);
+      const sumCents = matching.reduce(
+        (s, i) => s + convertedAmount(i.overdueBalanceCents, i.currency),
+        0,
+      );
       const count = matching.length;
       const share =
         totalOverdueCents > 0 ? (sumCents / totalOverdueCents) * 100 : 0;
@@ -174,7 +202,7 @@ export function OverdueSummaryDialog({
         share: Math.round(share * 10) / 10,
       };
     });
-  }, [overdueList, totalOverdueCents]);
+  }, [overdueList, totalOverdueCents, convertedAmount]);
 
   // Filtered list by chosen aging bucket
   const displayedInvoices = useMemo(() => {
@@ -184,26 +212,38 @@ export function OverdueSummaryDialog({
 
   // Displayed totals for the footer row
   const displayedTotals = useMemo(() => {
-    const billed = displayedInvoices.reduce((s, i) => s + i.amountCents, 0);
-    const paid = displayedInvoices.reduce((s, i) => s + (i.paidCents ?? 0), 0);
+    const billed = displayedInvoices.reduce(
+      (s, i) => s + convertedAmount(i.amountCents, i.currency),
+      0,
+    );
+    const paid = displayedInvoices.reduce(
+      (s, i) => s + convertedAmount(i.paidCents ?? 0, i.currency),
+      0,
+    );
     const overdue = displayedInvoices.reduce(
-      (s, i) => s + i.overdueBalanceCents,
+      (s, i) => s + convertedAmount(i.overdueBalanceCents, i.currency),
       0,
     );
     const paidPct = billed > 0 ? Math.round((paid / billed) * 100) : 0;
     return { billed, paid, overdue, paidPct };
-  }, [displayedInvoices]);
+  }, [displayedInvoices, convertedAmount]);
 
   // Live CSV preview text
   const previewCsvText = useMemo(() => {
     if (csvTemplateMode === "executive") {
-      return generateProfessionalOverdueTemplateCsv(overdueList, {
+      return generateProfessionalOverdueTemplateCsv(convertedInvoices, {
         businessName: freelancerName,
         primaryCurrency,
       });
     }
     return generateOverdueSummaryCsv(overdueList);
-  }, [overdueList, csvTemplateMode, freelancerName, primaryCurrency]);
+  }, [
+    overdueList,
+    convertedInvoices,
+    csvTemplateMode,
+    freelancerName,
+    primaryCurrency,
+  ]);
 
   // Unified Export Dispatcher (CSV or Excel via Convert Engine)
   const handleExportData = (
@@ -211,12 +251,19 @@ export function OverdueSummaryDialog({
     mode: ExportTemplateMode = csvTemplateMode,
   ) => {
     try {
+      if (mode === "executive" && !reporting.ready) {
+        showToast(
+          "Load exchange rates before exporting the converted summary.",
+          "error",
+        );
+        return;
+      }
       const suffix = mode === "executive" ? "executive-statement" : "register";
 
       if (format === "excel") {
         const workbookXml =
           mode === "executive"
-            ? generateOverdueExcelWorkbook(overdueList, {
+            ? generateOverdueExcelWorkbook(convertedInvoices, {
                 businessName: freelancerName,
                 primaryCurrency,
               })
@@ -234,7 +281,7 @@ export function OverdueSummaryDialog({
       } else {
         const csv =
           mode === "executive"
-            ? generateProfessionalOverdueTemplateCsv(overdueList, {
+            ? generateProfessionalOverdueTemplateCsv(convertedInvoices, {
                 businessName: freelancerName,
                 primaryCurrency,
               })
@@ -252,6 +299,13 @@ export function OverdueSummaryDialog({
 
   // Copy for Excel / Google Sheets (TSV) or Raw CSV
   const handleCopyClipboard = async (type: "tsv" | "csv") => {
+    if (type === "csv" && csvTemplateMode === "executive" && !reporting.ready) {
+      showToast(
+        "Load exchange rates before copying the converted summary.",
+        "error",
+      );
+      return;
+    }
     try {
       const text =
         type === "tsv"
@@ -293,6 +347,14 @@ export function OverdueSummaryDialog({
       paymentInstructions,
     });
     openExternalLink(link);
+    void window.billflow?.workspace
+      ?.recordActivity?.(activityProfile, {
+        kind: "communication",
+        recordId: inv.code,
+        label: inv.code,
+        detail: "WhatsApp reminder draft requested",
+      })
+      .catch(console.error);
     showToast(`Opening WhatsApp payment reminder for ${inv.clientName}...`);
   };
 
@@ -330,7 +392,15 @@ export function OverdueSummaryDialog({
     );
     const mailto = `mailto:${inv.clientEmail}?subject=${subject}&body=${body}`;
     if (typeof window !== "undefined") {
-      window.location.href = mailto;
+      window.open(mailto, "_blank", "noopener,noreferrer");
+      void window.billflow?.workspace
+        ?.recordActivity?.(activityProfile, {
+          kind: "communication",
+          recordId: inv.code,
+          label: inv.code,
+          detail: "Email reminder draft requested",
+        })
+        .catch(console.error);
     }
   };
 
@@ -443,7 +513,7 @@ export function OverdueSummaryDialog({
               Total Overdue Balance
             </span>
             <div className="text-[20px] font-bold tabular-nums text-rose-600 dark:text-rose-400 font-newspaper">
-              {formatCents(totalOverdueCents, primaryCurrency)}
+              {reportingMoney(totalOverdueCents)}
             </div>
             <p className="text-[11px] text-content-neutral-500">
               Net past-due receivable
@@ -515,7 +585,7 @@ export function OverdueSummaryDialog({
                     key={stat.id}
                     className={`${stat.bg} h-full transition-all duration-300`}
                     style={{ width: `${stat.share}%` }}
-                    title={`${stat.label}: ${stat.share}% (${formatCents(stat.sumCents, primaryCurrency)})`}
+                    title={`${stat.label}: ${stat.share}% (${reportingMoney(stat.sumCents)})`}
                   />
                 ) : null,
               )
@@ -551,7 +621,7 @@ export function OverdueSummaryDialog({
                     </span>
                   </div>
                   <div className="mt-1 text-[13px] font-bold text-content-neutral-950 tabular-nums">
-                    {formatCents(stat.sumCents, primaryCurrency)}
+                    {reportingMoney(stat.sumCents)}
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-content-neutral-400 mt-0.5">
                     <span>{stat.priority}</span>
@@ -781,7 +851,11 @@ export function OverdueSummaryDialog({
                                 type="button"
                                 onClick={() => {
                                   onClose();
-                                  onInspectInvoice(inv);
+                                  onInspectInvoice(
+                                    invoices.find(
+                                      (original) => original.id === inv.id,
+                                    ) || inv,
+                                  );
                                 }}
                                 title="Inspect invoice details"
                                 className="text-content-neutral-500 hover:text-content-neutral-800 w-7 h-7"
@@ -810,16 +884,16 @@ export function OverdueSummaryDialog({
                       Max {maxDaysOverdue}d overdue
                     </td>
                     <td className="py-3 px-3 text-right tabular-nums text-[12.5px]">
-                      {formatCents(displayedTotals.billed, primaryCurrency)}
+                      {reportingMoney(displayedTotals.billed)}
                     </td>
                     <td className="py-3 px-3 text-right tabular-nums text-[12.5px] text-emerald-700 dark:text-emerald-400">
-                      {formatCents(displayedTotals.paid, primaryCurrency)}{" "}
+                      {reportingMoney(displayedTotals.paid)}{" "}
                       <span className="text-[10.5px] font-normal text-content-neutral-500">
                         ({displayedTotals.paidPct}%)
                       </span>
                     </td>
                     <td className="py-3 px-3.5 text-right tabular-nums text-[13.5px] font-bold text-rose-600 dark:text-rose-400">
-                      {formatCents(displayedTotals.overdue, primaryCurrency)}
+                      {reportingMoney(displayedTotals.overdue)}
                     </td>
                     <td className="py-3 px-3" />
                   </tr>
@@ -1198,7 +1272,22 @@ export function OverdueSummaryDialog({
                     </tr>
 
                     {/* Data Rows */}
-                    {overdueList.map((inv, idx) => (
+                    {(csvTemplateMode === "executive"
+                      ? overdueList.map((row) => {
+                          const converted = convertedInvoices.find(
+                            (invoice) => invoice.id === row.id,
+                          );
+                          return {
+                            ...row,
+                            ...converted,
+                            overdueBalanceCents: convertedAmount(
+                              row.overdueBalanceCents,
+                              row.currency,
+                            ),
+                          };
+                        })
+                      : overdueList
+                    ).map((inv, idx) => (
                       <tr key={inv.id} className="hover:bg-surface-neutral-50">
                         <td className="py-1.5 px-2 text-center bg-surface-neutral-100 border-r border-line-neutral-300 text-[10px] text-content-neutral-500">
                           {idx + 2}
@@ -1302,7 +1391,7 @@ export function OverdueSummaryDialog({
               <span>
                 Grand Total Overdue:{" "}
                 <strong className="text-content-neutral-950 font-semibold tabular-nums">
-                  {formatCents(totalOverdueCents, primaryCurrency)}
+                  {reportingMoney(totalOverdueCents)}
                 </strong>{" "}
                 across {affectedClients.length}{" "}
                 {affectedClients.length === 1 ? "client" : "clients"}

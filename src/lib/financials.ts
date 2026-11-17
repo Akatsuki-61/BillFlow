@@ -1,3 +1,4 @@
+import { calendarDateKey } from "./visual-metrics";
 import type { InvoiceWithClient } from "../types/billing";
 import type { WorkOrderItem } from "../types/outsourcing";
 import type { ExpenseItem } from "../types/expenses";
@@ -10,9 +11,10 @@ export function financialDateInPeriod(
   now = new Date(),
 ): boolean {
   if (!value || !Number.isFinite(Date.parse(value))) return false;
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  const day = calendarDateKey(value);
+  const date = new Date(`${day}T12:00:00`);
   if (["all", "all-time"].includes(period)) return true;
-  if (/^\d{4}-\d{2}$/.test(period)) return value.slice(0, 7) === period;
+  if (/^\d{4}-\d{2}$/.test(period)) return day.slice(0, 7) === period;
   if (date.getFullYear() !== now.getFullYear()) return false;
   if (period === "year") return true;
   if (period === "month") return date.getMonth() === now.getMonth();
@@ -122,20 +124,23 @@ export function calculateFinancials(input: {
         ? payments
             .filter(
               (p) =>
-                p.currency === currency && p.receivedAt.slice(0, 7) === key,
+                p.currency === currency &&
+                calendarDateKey(p.receivedAt).slice(0, 7) === key,
             )
             .reduce((s, p) => s + p.amountCents, 0)
         : issued
-            .filter((i) => i.issueDate.slice(0, 7) === key)
+            .filter((i) => calendarDateKey(i.issueDate).slice(0, 7) === key)
             .reduce((s, i) => s + i.amountCents, 0);
     const expensesCents =
       expenses
         .filter(
-          (e) => e.currency === currency && e.incurredAt.slice(0, 7) === key,
+          (e) =>
+            e.currency === currency &&
+            calendarDateKey(e.incurredAt).slice(0, 7) === key,
         )
         .reduce((s, e) => s + e.amountCents, 0) +
       payouts
-        .filter((p) => p.paidAt.slice(0, 7) === key)
+        .filter((p) => calendarDateKey(p.paidAt).slice(0, 7) === key)
         .reduce((s, p) => s + p.amountCents, 0);
     return {
       key,

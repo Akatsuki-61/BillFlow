@@ -10,6 +10,7 @@ export type InvoiceTemplateId =
 export type ClientCategory = "Enterprise" | "Startup" | "Agency" | string;
 
 export interface Client {
+  archivedAt?: string | null;
   id: string;
   name: string;
   category: ClientCategory;
