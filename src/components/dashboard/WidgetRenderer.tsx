@@ -314,7 +314,7 @@ function WidgetContent({
   const [activeInsightIndex, setActiveInsightIndex] = useState(0);
 
   const insightSlides = useMemo(() => {
-    if (widgetId !== "ai-insights") return [];
+    if (widgetId !== "workspace-insights") return [];
 
     return [
       {
