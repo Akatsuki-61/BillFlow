@@ -501,3 +501,72 @@ it("falls back from a native Calendar database whose schema cannot be read", asy
     changedCount: 0,
   });
 });
+
+it("contains zero hardcoded client or university personal identifiers in runtime source files", () => {
+  const forbidden = /\b(chethaka|lakshitha|dheeraj|ousl)\b/i;
+  const collectFiles = (dir: string, skipDir: string): string[] => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const out: string[] = [];
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (full.endsWith(skipDir)) continue;
+        out.push(...collectFiles(full, skipDir));
+      } else if (/\.(ts|tsx)$/.test(entry.name)) {
+        out.push(full);
+      }
+    }
+    return out;
+  };
+  const files = [
+    ...collectFiles(path.resolve("src"), path.join("src", "lib", "test")),
+    ...collectFiles(path.resolve("electron"), path.join("electron", "test")),
+  ];
+  const violations = files.filter((file) =>
+    forbidden.test(fs.readFileSync(file, "utf8")),
+  );
+  expect(violations).toEqual([]);
+});
+
+it("resolves dynamic assignee for advance-tracked tasks from settings instead of hardcoded names", async () => {
+  const { updateSettings } = await import("../ipc/settings");
+  const { decideTracking, listTasks } = await import("../ipc/tasks");
+
+  const first = createInvoice({
+    newClient: {
+      name: "Client A",
+      email: "a@example.test",
+      currency: "USD",
+    },
+    currency: "USD",
+    amountCents: 10000,
+    advanceCents: 5000,
+    items: [{ description: "API Setup", quantity: 1, unitPriceCents: 10000 }],
+  });
+  recordPayment({ invoiceId: first.id, amountCents: 5000 });
+  decideTracking(first.id, "yes");
+
+  updateSettings({ businessName: "Northwind Studio" });
+  const second = createInvoice({
+    newClient: {
+      name: "Client B",
+      email: "b@example.test",
+      currency: "USD",
+    },
+    currency: "USD",
+    amountCents: 10000,
+    advanceCents: 5000,
+    items: [{ description: "Schema Design", quantity: 1, unitPriceCents: 10000 }],
+  });
+  recordPayment({ invoiceId: second.id, amountCents: 5000 });
+  decideTracking(second.id, "yes");
+
+  const tasks = listTasks();
+  const blankTask = tasks.find((t) => t.title === "API Setup");
+  const brandedTask = tasks.find((t) => t.title === "Schema Design");
+  expect(blankTask?.assignee.name).not.toBe("Chethaka");
+  expect(brandedTask?.assignee).toMatchObject({
+    name: "Northwind Studio",
+    avatarLetter: "N",
+  });
+});

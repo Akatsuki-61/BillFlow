@@ -15,6 +15,8 @@ import {
   calendarEvents,
   workOrders,
   taskTimeSlots,
+  settings,
+  userProfiles,
 } from "../db/schema";
 import {
   createTaskSchema,
@@ -32,12 +34,27 @@ import type {
 import { AppError } from "./errors";
 import { scheduleBackgroundNativeCalendarSync } from "./calendar";
 
-const defaultAssignee = {
-  name: "Chethaka",
-  avatarLetter: "C",
-  bgColor: "bg-surface-purple-100",
-  textColor: "text-content-purple-700",
-};
+function resolveDefaultAssignee(tx: ReturnType<typeof getDb>) {
+  const bizName = tx
+    .select({ businessName: settings.businessName })
+    .from(settings)
+    .where(eq(settings.id, "default"))
+    .get()
+    ?.businessName?.trim();
+  const profileName = tx
+    .select({ name: userProfiles.name })
+    .from(userProfiles)
+    .where(eq(userProfiles.isActive, true))
+    .get()
+    ?.name?.trim();
+  const resolvedName = bizName || profileName || "Workspace Owner";
+  return {
+    name: resolvedName,
+    avatarLetter: (resolvedName[0] || "W").toUpperCase(),
+    bgColor: "bg-surface-purple-100",
+    textColor: "text-content-purple-700",
+  };
+}
 
 export function listTasks(): TaskItem[] {
   const db = getDb();
@@ -520,7 +537,7 @@ export function decideTracking(idInput: string, choiceInput: "yes" | "no") {
               clientId: invoice.clientId,
               title: item.description,
               description: item.description,
-              assignee: defaultAssignee,
+              assignee: resolveDefaultAssignee(tx),
               clientName: snapshot?.name || client?.name,
               deliveryUrl: deliveryLink.parse(
                 invoice.deliveryUrl ||

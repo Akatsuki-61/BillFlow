@@ -1840,7 +1840,7 @@ function SettingsContent() {
                               businessName: e.target.value,
                             })
                           }
-                          placeholder="e.g. Chethaka or Chethaka Studio"
+                          placeholder="e.g. Alex Rivera or Apex Studio"
                           className="ui-field w-full px-3.5 border border-line-neutral-200 focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-colors"
                         />
                       </div>

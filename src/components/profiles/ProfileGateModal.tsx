@@ -171,7 +171,7 @@ export function ProfileGateModal() {
   const [deletePassword, setDeletePassword] = useState("");
 
   // Onboarding state
-  const [studioName, setStudioName] = useState("Chethaka Lakshitha");
+  const [studioName, setStudioName] = useState("");
   const [studioCurrency, setStudioCurrency] = useState<Currency>("USD");
   const [onboardingSlots, setOnboardingSlots] = useState<
     Array<OnboardingProfileSlot & { enabled: boolean }>
@@ -234,7 +234,7 @@ export function ProfileGateModal() {
       setBusy(false);
 
       if (modalMode === "onboarding") {
-        setStudioName(settings?.businessName?.trim() || "Chethaka Lakshitha");
+        setStudioName(settings?.businessName?.trim() || "");
         const initialCurr =
           (settings?.defaultCurrency as Currency) || "USD";
         setStudioCurrency(initialCurr);
@@ -672,7 +672,7 @@ export function ProfileGateModal() {
               type="button"
               onClick={() => {
                 setStudioName(
-                  settings?.businessName?.trim() || "Chethaka Lakshitha",
+                  settings?.businessName?.trim() || "",
                 );
                 setView("onboarding");
               }}
@@ -1136,7 +1136,7 @@ export function ProfileGateModal() {
                         type="text"
                         value={formName}
                         onChange={(e) => setFormName(e.target.value)}
-                        placeholder="e.g. Chethaka — AI"
+                        placeholder="e.g. Studio — AI Systems"
                         maxLength={60}
                         className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm text-white placeholder:text-zinc-500 outline-none transition-colors"
                       />
@@ -1456,7 +1456,7 @@ export function ProfileGateModal() {
                     type="text"
                     value={studioName}
                     onChange={(e) => setStudioName(e.target.value)}
-                    placeholder="Chethaka Lakshitha"
+                    placeholder="e.g. Alex Rivera or Apex Studio"
                     className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm text-white outline-none"
                   />
                 </div>

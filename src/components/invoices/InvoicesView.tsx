@@ -209,7 +209,7 @@ export default function InvoicesView() {
     discountCents: 1000000,
     notes:
       "Milestone 1 (Website staging) begins upon advance receipt. Full code and deployment upon final settlement.",
-    deliveryUrl: "https://github.com/Chethaka/acme-web-platform",
+    deliveryUrl: "https://github.com/acme-cloud/web-platform",
     items: [
       {
         id: "it-1",

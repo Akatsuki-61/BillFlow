@@ -390,8 +390,9 @@ function inferMacCalendarColor(calendarTitle: string): EventColor {
   if (lower.includes("holiday") || lower.includes("family")) return "emerald";
   if (
     lower.includes("work") ||
-    lower.includes("university") ||
-    lower.includes("ousl")
+    lower.includes("academic") ||
+    lower.includes("campus") ||
+    lower.includes("lecture")
   )
     return "purple";
   if (
