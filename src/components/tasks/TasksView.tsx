@@ -37,7 +37,9 @@ import {
   CheckCircle2,
   Receipt,
   ListChecks,
+  ArrowRight,
 } from "lucide-react";
+import { nextTaskStage } from "@/lib/payment-summary";
 import {
   TaskItem,
   TaskStatus,
@@ -577,6 +579,18 @@ export default function TasksView({
     void saveTask(taskId, { status: targetStatus });
     showToast(`Updated task status to ${targetStatus.replace("-", " ")}`);
     setDraggedTaskId(null);
+  };
+
+  const handleAdvanceStage = (task: TaskItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const transition = nextTaskStage(task.status);
+    if (!transition) return;
+    if (transition.next === "done") {
+      setTaskForSubmitWork(task);
+      return;
+    }
+    void saveTask(task.id, { status: transition.next });
+    showToast(`Moved "${task.title}" to ${transition.next.replace("-", " ")}`);
   };
 
   // Outsource navigation handler
@@ -1726,6 +1740,24 @@ export default function TasksView({
                                   <span>Bill Task</span>
                                 </Button>
                               )}
+                              {(() => {
+                                const transition = nextTaskStage(task.status);
+                                if (!transition || transition.next === "done") {
+                                  return null;
+                                }
+                                return (
+                                  <Button
+                                    variant="ghost"
+                                    size="small"
+                                    onClick={(e) => handleAdvanceStage(task, e)}
+                                    title={`Move task to ${transition.next.replace("-", " ")}`}
+                                    className="text-[11px] text-content-neutral-700 hover:text-content-neutral-950 flex items-center gap-1 font-medium"
+                                  >
+                                    <span>{transition.label}</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </Button>
+                                );
+                              })()}
                               {task.status !== "done" ? (
                                 <Button
                                   variant="ghost"

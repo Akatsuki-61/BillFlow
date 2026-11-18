@@ -43,7 +43,9 @@ import {
   FileCheck,
   RotateCcw,
   MessageCircle,
+  Copy,
 } from "lucide-react";
+import { formatWorkOrderPaymentSummary } from "@/lib/payment-summary";
 
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
@@ -1759,6 +1761,26 @@ export default function OutsourcingView() {
                               onClick={() => setPayableForm(order)}
                             >
                               Edit payable
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="small"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(
+                                    formatWorkOrderPaymentSummary(
+                                      order,
+                                      settings,
+                                    ),
+                                  );
+                                  showToast("Copied work order summary");
+                                } catch {
+                                  showToast("Could not copy summary", "error");
+                                }
+                              }}
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                              Copy summary
                             </Button>
                             {order.paypalUrl && (
                               <Button

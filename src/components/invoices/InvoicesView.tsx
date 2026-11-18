@@ -69,7 +69,9 @@ import {
   FileSpreadsheet,
   CheckSquare,
   ListChecks,
+  Copy,
 } from "lucide-react";
+import { formatInvoicePaymentSummary } from "@/lib/payment-summary";
 import { OverdueSummaryDialog } from "./OverdueSummaryDialog";
 import {
   generateInvoicesCsv,
@@ -878,6 +880,98 @@ export default function InvoicesView() {
     }
 
     setShowAddInvoiceModal(true);
+  };
+
+  const handleDuplicateInvoice = async (inv: InvoiceWithClient) => {
+    requestId.current = null;
+    if (inv.clientId && clients.some((c) => c.id === inv.clientId && !c.archivedAt)) {
+      setClientMode("existing");
+      setNewClientId(inv.clientId);
+    } else {
+      setClientMode("new");
+      setClientName(inv.clientName || "");
+      setClientEmail(inv.clientEmail || "");
+      setClientContact(inv.clientContactPerson || "");
+      setClientPhone(inv.clientPhone || "");
+      setClientWhatsApp("");
+      setClientCategory(inv.clientCategory || "Enterprise");
+      setSaveAsPermanentClient(false);
+    }
+    setNewCurrency(inv.currency);
+    const due = new Date();
+    due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
+    setNewDueDate(localDateKey(due));
+    setNewStatus("DRAFT");
+    const clonedItems: LineItemDraft[] =
+      inv.items && inv.items.length > 0
+        ? inv.items.map((item, idx) => ({
+            id: `${Date.now()}-${idx}`,
+            description: item.description,
+            quantity: item.quantity || 1,
+            unitPrice: ((item.unitPriceCents || 0) / 100).toFixed(2),
+          }))
+        : [
+            {
+              id: "1",
+              description: inv.title || "Freelance services",
+              quantity: 1,
+              unitPrice: ((inv.amountCents || 0) / 100).toFixed(2),
+            },
+          ];
+    setNewLineItems(clonedItems);
+    setLinkedTaskIds([]);
+    const discountCents = inv.discountCents ?? 0;
+    const taxCents = inv.taxCents ?? 0;
+    const advanceCents = inv.advanceCents ?? 0;
+    setNewDiscount(
+      discountCents > 0 ? (discountCents / 100).toFixed(2) : "",
+    );
+    const subtotalCents = clonedItems.reduce(
+      (sum, it) =>
+        sum +
+        Math.round(parseFloat(it.unitPrice || "0") * 100) * (it.quantity || 1),
+      0,
+    );
+    const netBeforeTax = Math.max(0, subtotalCents - discountCents);
+    setNewTaxRate(
+      taxCents > 0 && netBeforeTax > 0
+        ? String(Math.round((taxCents / netBeforeTax) * 1000) / 10)
+        : "",
+    );
+    if (advanceCents > 0 && inv.amountCents > 0) {
+      setRequireAdvance(true);
+      setAdvancePercent(
+        Math.min(
+          100,
+          Math.max(1, Math.round((advanceCents / inv.amountCents) * 100)),
+        ),
+      );
+    } else {
+      setRequireAdvance(false);
+    }
+    setNewDeliveryUrl(inv.deliveryUrl || "");
+    setNewPaymentUrl(inv.paymentUrl || "");
+    setNewWorkflowStage(null);
+    setNewNotes(inv.notes || "");
+    setHasInvoiceDraft(false);
+
+    try {
+      const code = await getNextInvoiceCode();
+      setNewCode(code);
+    } catch {
+      setNewCode(`INV-${new Date().getFullYear()}-001`);
+    }
+    setShowAddInvoiceModal(true);
+  };
+
+  const handleCopyInvoiceSummary = async (inv: InvoiceWithClient) => {
+    try {
+      const text = formatInvoicePaymentSummary(inv, settings);
+      await navigator.clipboard.writeText(text);
+      showToast(`Copied payment summary for ${inv.code}`);
+    } catch {
+      showToast("Could not copy payment summary", "error");
+    }
   };
 
   // Filter invoices according to selected client, search query and tabs
@@ -4844,6 +4938,34 @@ export default function InvoicesView() {
                 <span>Save as Permanent Client</span>
               </button>
             )}
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                void handleCopyInvoiceSummary(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Copy className="w-3.5 h-3.5 text-content-neutral-400" />
+              <span>Copy Payment Summary</span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                void handleDuplicateInvoice(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Receipt className="w-3.5 h-3.5 text-content-neutral-400" />
+              <span>Duplicate as Draft</span>
+            </button>
 
             <button
               type="button"
