@@ -1,13 +1,12 @@
 "use client";
-import { calendarDateKey } from "@/lib/visual-metrics";
-import { useReportingData } from "@/context/ReportingContext";
 
 import { useMemo } from "react";
 import {
   EChartsAreaChart,
   type ChartConfig,
 } from "@/components/evilcharts/charts/echarts-area-chart";
-import { useActiveCurrency } from "@/lib/data/DataProvider";
+import { useReportingData } from "@/context/ReportingContext";
+import { buildAudienceGrowthData } from "@/lib/widgets/chartData";
 import { formatCents } from "@/lib/format";
 
 const chartConfig = {
@@ -28,118 +27,37 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function AudienceGrowthChart() {
-  const { invoices, expenses, workOrders } = useReportingData();
-  const { activeCurrency } = useActiveCurrency();
+  const { invoices, expenses, workOrders, currency: activeCurrency } =
+    useReportingData();
 
   const { chartData, totalCollectedCents, totalExpenseCents, netProfitCents } =
-    useMemo(() => {
-      const months: Array<{
-        month: string;
-        key: string;
-        collections: number;
-        expenses: number;
-        profit: number;
-      }> = [];
-      const now = new Date();
-
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-        const month = d.toLocaleString("default", { month: "short" });
-        months.push({ month, key, collections: 0, expenses: 0, profit: 0 });
-      }
-
-      (invoices || [])
-        .filter(
-          (invoice) =>
-            invoice.status !== "DRAFT" && invoice.currency === activeCurrency,
-        )
-        .forEach((invoice) => {
-          (invoice.payments || [])
-            .filter(
-              (payment) =>
-                payment.currency === activeCurrency && !payment.correction,
-            )
-            .forEach((payment) => {
-              const target = months.find(
-                (month) =>
-                  month.key === calendarDateKey(payment.receivedAt).slice(0, 7),
-              );
-              if (target) target.collections += payment.amountCents / 100;
-            });
-        });
-      expenses
-        .filter((expense) => expense.currency === activeCurrency)
-        .forEach((expense) => {
-          const target = months.find(
-            (month) =>
-              month.key === calendarDateKey(expense.incurredAt).slice(0, 7),
-          );
-          if (target) target.expenses += expense.amountCents / 100;
-        });
-      workOrders
-        .filter((order) => order.currency === activeCurrency)
-        .forEach((order) => {
-          const payouts =
-            order.payouts?.filter((payout) => !payout.voidedAt) ??
-            (order.paidAt
-              ? [
-                  {
-                    paidAt: order.paidAt,
-                    amountCents: order.payoutAmountCents ?? 0,
-                  },
-                ]
-              : []);
-          for (const payout of payouts) {
-            const target = months.find(
-              (month) =>
-                month.key === calendarDateKey(payout.paidAt).slice(0, 7),
-            );
-            if (target) target.expenses += payout.amountCents / 100;
-          }
-        });
-      months.forEach((month) => {
-        month.profit = month.collections - month.expenses;
-      });
-      const totalCollected = Math.round(
-        months.reduce((sum, month) => sum + month.collections, 0) * 100,
-      );
-      const totalExpense = Math.round(
-        months.reduce((sum, month) => sum + month.expenses, 0) * 100,
-      );
-
-      return {
-        chartData: months.map(({ month, collections, profit }) => ({
-          month,
-          collections,
-          profit,
-        })),
-        totalCollectedCents: totalCollected,
-        totalExpenseCents: totalExpense,
-        netProfitCents: totalCollected - totalExpense,
-      };
-    }, [invoices, expenses, workOrders, activeCurrency]);
+    useMemo(
+      () =>
+        buildAudienceGrowthData(invoices, expenses, workOrders, activeCurrency),
+      [invoices, expenses, workOrders, activeCurrency],
+    );
 
   const hasData = totalCollectedCents > 0 || totalExpenseCents > 0;
+  const hasNegative = chartData.some((point) => point.profit < 0);
 
   return (
-    <div className="flex h-full w-full min-h-[300px] flex-col">
-      <div className="flex items-start justify-between gap-4 px-4 pt-4">
+    <div className="flex h-full w-full min-h-[260px] flex-col">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <span className="text-content-neutral-900 text-base font-semibold tracking-tight sm:text-lg">
-            Delivered Solutions Financial Growth
+          <span className="text-content-neutral-900 text-sm font-semibold tracking-tight sm:text-base">
+            7-Month Collections vs Net Cashflow
           </span>
           <span className="text-content-neutral-500 max-w-[34ch] text-xs leading-snug">
             {hasData
-              ? "Seven months of dated payments less recorded expenses and contractor payouts"
-              : "No collections or expenses recorded in this period"}
+              ? "Dated payments less recorded expenses and contractor payouts"
+              : "No collections or expenses recorded in the last 7 months"}
           </span>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="text-content-neutral-900 text-2xl font-semibold tracking-tight sm:text-3xl">
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <span className="text-content-neutral-900 text-xl font-semibold tracking-tight sm:text-2xl tabular-nums">
             {formatCents(totalCollectedCents, activeCurrency)}
           </span>
-          <span className="text-content-neutral-500 text-xs">
+          <span className="text-content-neutral-500 text-xs tabular-nums">
             {netProfitCents >= 0 ? "Net cashflow: " : "Net outflow: "}
             {formatCents(Math.abs(netProfitCents), activeCurrency)}
           </span>
@@ -147,13 +65,12 @@ export function AudienceGrowthChart() {
       </div>
 
       {!hasData && (
-        <div className="mt-2 mx-4 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
-          No transaction activity recorded. Collections and profits update as
-          client payments and expenses are logged.
+        <div className="mt-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No transaction activity recorded. Updates as client payments and expenses are logged.
         </div>
       )}
 
-      <div className="relative mt-2 min-h-[220px] w-full flex-1">
+      <div className="relative mt-2 min-h-[195px] w-full flex-1">
         <EChartsAreaChart
           data={chartData}
           config={chartConfig}
@@ -164,11 +81,16 @@ export function AudienceGrowthChart() {
             grid: {
               left: 8,
               right: 8,
-              top: 16,
-              bottom: 28,
+              top: 14,
+              bottom: 26,
               outerBoundsMode: "none",
             },
-            yAxis: { type: "value", show: false, scale: false, min: 0 },
+            yAxis: {
+              type: "value",
+              show: false,
+              scale: false,
+              min: hasNegative ? undefined : 0,
+            },
           }}
         >
           <EChartsAreaChart.Tooltip variant="frosted-glass" />
@@ -190,7 +112,7 @@ export function AudienceGrowthChart() {
           </EChartsAreaChart.Area>
         </EChartsAreaChart>
 
-        <div className="text-content-neutral-500 pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-4 pb-2 text-[10px] sm:text-xs">
+        <div className="text-content-neutral-500 pointer-events-none absolute inset-x-0 bottom-0 flex justify-between px-2 pb-1 text-[10px] sm:text-xs">
           {chartData.map(({ month }) => (
             <span key={month}>{month}</span>
           ))}

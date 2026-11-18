@@ -27,7 +27,6 @@ import {
   useData,
   useClients,
   useVendors,
-  useActiveCurrency,
 } from "@/lib/data/DataProvider";
 import {
   formatCents,
@@ -37,6 +36,7 @@ import {
 import { DashboardPeriod } from "@/types/dashboard";
 import { WidgetDisplaySize } from "@/types/widgets";
 import { useWidgetContext } from "@/context/WidgetContext";
+import { computeCashflowRunwayCard } from "@/lib/widgets/chartData";
 import "../analytics/analytics.css";
 import { LatencyPercentilesChart } from "./charts/LatencyPercentilesChart";
 import { PortfolioComparisonChart } from "./charts/PortfolioComparisonChart";
@@ -87,10 +87,9 @@ function WidgetContent({
 }: WidgetRendererProps) {
   const router = useRouter();
   const pipelineId = useId();
-  const { invoices, expenses, workOrders } = useReportingData();
+  const { invoices, expenses, workOrders, currency: activeCurrency } = useReportingData();
   const { clients } = useClients();
   const { vendors } = useVendors();
-  const { activeCurrency } = useActiveCurrency();
   const { tasks } = useData();
   const { draggedWidgetId, startWidgetDrag, endWidgetDrag } =
     useWidgetContext();
@@ -113,10 +112,11 @@ function WidgetContent({
         invoices,
         workOrders,
         expenses,
+        tasks,
         period,
         currency: activeCurrency,
       }),
-    [invoices, workOrders, expenses, period, activeCurrency],
+    [invoices, workOrders, expenses, tasks, period, activeCurrency],
   );
   const totalOutsourcedCents = financials.paidCostCents;
 
@@ -135,6 +135,7 @@ function WidgetContent({
     pendingCents,
     pendingCount,
     paidRatioPct,
+    avgInvoiceCents,
     avgInvoiceStr,
   } = useMemo(() => {
     if (filteredInvoices.length === 0) {
@@ -373,7 +374,8 @@ function WidgetContent({
     value,
     badgeText,
     subtitle,
-    barPct,
+    footerLabel,
+    barPct = 0,
     stripeTone = "blue",
     href = "/analytics",
     actionLabel,
@@ -382,6 +384,7 @@ function WidgetContent({
     value: React.ReactNode;
     badgeText: string;
     subtitle: string;
+    footerLabel?: string;
     barPct?: number;
     stripeTone?: "blue" | "green" | "pink" | "amber";
     href?: string;
@@ -405,6 +408,8 @@ function WidgetContent({
             ? "bg-[#f59e0b]"
             : "bg-accent-solid";
 
+    const clampedPct = Math.max(0, Math.min(100, Math.round(barPct)));
+
     return (
       <div
         role="link"
@@ -414,8 +419,8 @@ function WidgetContent({
             router.push(href);
         }}
         onClick={() => router.push(href)}
-        className={`ui-card cursor-pointer flex flex-col justify-between ${
-          isCompact ? "p-4 min-h-[155px]" : "p-6 min-h-[195px]"
+        className={`ui-card cursor-pointer flex flex-col justify-between h-full ${
+          isCompact ? "p-4 min-h-[195px]" : "p-6 min-h-[248px]"
         }`}
       >
         <div>
@@ -429,7 +434,7 @@ function WidgetContent({
             <div className="min-w-0">
               <div
                 className={`${
-                  isCompact ? "text-[26px]" : "text-[36px]"
+                  isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
                 } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
               >
                 {value}
@@ -445,29 +450,26 @@ function WidgetContent({
             </div>
           </div>
 
-          {barPct !== undefined && (
-            <div className="pt-2.5 border-t border-line-neutral-100 space-y-2">
-              <div className="flex items-center justify-between text-[12px] text-content-neutral-500">
-                <span className="truncate">{subtitle}</span>
-                <span className="font-semibold tabular-nums text-content-neutral-800">
-                  {Math.round(barPct)}%
-                </span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-surface-neutral-100 p-[1.5px] overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${stripeClass} transition-all duration-500`}
-                  style={{ width: `${Math.round(barPct)}%` }}
-                />
-              </div>
+          <div className="pt-2.5 border-t border-line-neutral-100 space-y-2">
+            <div className="flex items-center justify-between text-[12px] text-content-neutral-500 gap-2">
+              <span className="truncate">{subtitle}</span>
+              <span className="font-semibold tabular-nums text-content-neutral-800 shrink-0">
+                {clampedPct}%
+              </span>
             </div>
-          )}
-          {barPct === undefined && (
-            <p className="summary-caption">{subtitle}</p>
-          )}
+            <div className="w-full h-2 rounded-full bg-surface-neutral-100 p-[1.5px] overflow-hidden">
+              <div
+                className={`h-full rounded-full ${stripeClass} transition-[width] duration-500`}
+                style={{ width: `${clampedPct}%` }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-          <span className="truncate text-[12px]">{subtitle}</span>
+          <span className="truncate text-[12px]">
+            {footerLabel || badgeText}
+          </span>
           <Link
             href={href}
             onClick={(e) => e.stopPropagation()}
@@ -668,7 +670,7 @@ function WidgetContent({
         );
       }
 
-      // 1. Total Revenue — Zentra Pattern B (Big Metric + Trend Pill + 3 Diagonal-Striped Breakdown Bars)
+      // 1. Total Revenue — Zentra Pattern B (Big Metric + Trend Pill + 3 Compact Diagonal-Striped Breakdown Bars)
       case "total-revenue": {
         const settledPct = sharePercent(paidFullCents, totalRevenueCents);
         const advancePct = sharePercent(
@@ -678,84 +680,92 @@ function WidgetContent({
         const pendingPct = sharePercent(pendingCents, totalRevenueCents);
 
         return (
-          <div className="ui-card p-6 flex flex-col justify-between h-full">
+          <div
+            className={`ui-card flex flex-col justify-between h-full ${
+              isCompact ? "p-4 min-h-[195px]" : "p-6 min-h-[248px]"
+            }`}
+          >
             <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
                   Gross Volume & Revenue
                 </h3>
               </div>
 
-              <div className="mt-4 flex items-center gap-3 flex-wrap">
-                <span className="text-[40px] sm:text-[44px] font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums">
+              <div className="mt-3 flex items-center gap-2.5 flex-wrap">
+                <span
+                  className={`${
+                    isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
+                  } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                >
                   {totalRevenueStr}
                 </span>
-                <span className="zentra-pill-badge">
+                <span className="zentra-pill-badge !py-0.5 !px-2.5 !text-[11.5px]">
                   <span>{paidRatioPct}% collected</span>
                 </span>
               </div>
+
+              <div className="my-3 border-t border-line-neutral-200/70" />
+
+              <div className="space-y-2">
+                <div>
+                  <div className="flex items-center justify-between text-[11.5px] mb-1">
+                    <span className="text-content-neutral-500 font-medium">
+                      Settled ({paidCount})
+                    </span>
+                    <span className="font-semibold text-content-neutral-950 tabular-nums">
+                      {formatCents(paidFullCents, activeCurrency)}
+                    </span>
+                  </div>
+                  <div className="w-full h-[6px] rounded-full bg-surface-neutral-100 p-[1px] overflow-hidden">
+                    <div
+                      className="h-full rounded-full zentra-stripe-green transition-[width] duration-500"
+                      style={{ width: `${settledPct}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-[11.5px] mb-1">
+                    <span className="text-content-neutral-500 font-medium">
+                      Advance ({advancePaidCount})
+                    </span>
+                    <span className="font-semibold text-content-neutral-950 tabular-nums">
+                      {formatCents(advanceCentsCollected, activeCurrency)}
+                    </span>
+                  </div>
+                  <div className="w-full h-[6px] rounded-full bg-surface-neutral-100 p-[1px] overflow-hidden">
+                    <div
+                      className="h-full rounded-full zentra-stripe-blue transition-[width] duration-500"
+                      style={{ width: `${advancePct}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-[11.5px] mb-1">
+                    <span className="text-content-neutral-500 font-medium">
+                      Pending ({pendingCount})
+                    </span>
+                    <span className="font-semibold text-content-neutral-950 tabular-nums">
+                      {pendingReceivablesStr}
+                    </span>
+                  </div>
+                  <div className="w-full h-[6px] rounded-full bg-surface-neutral-100 p-[1px] overflow-hidden">
+                    <div
+                      className="h-full rounded-full zentra-stripe-pink transition-[width] duration-500"
+                      style={{ width: `${pendingPct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="my-4 border-t border-line-neutral-200/80" />
-
-            <div className="space-y-3.5">
-              <div>
-                <div className="flex items-center justify-between text-[13px] mb-1.5">
-                  <span className="text-content-neutral-500 font-medium">
-                    Settled Invoices ({paidCount})
-                  </span>
-                  <span className="font-semibold text-content-neutral-950 tabular-nums">
-                    {formatCents(paidFullCents, activeCurrency)}
-                  </span>
-                </div>
-                <div className="w-full h-[10px] rounded-full bg-surface-neutral-100 p-[1.5px] overflow-hidden">
-                  <div
-                    className="h-full rounded-full zentra-stripe-green transition-all duration-500"
-                    style={{ width: `${settledPct}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between text-[13px] mb-1.5">
-                  <span className="text-content-neutral-500 font-medium">
-                    Advance Deposits ({advancePaidCount})
-                  </span>
-                  <span className="font-semibold text-content-neutral-950 tabular-nums">
-                    {formatCents(advanceCentsCollected, activeCurrency)}
-                  </span>
-                </div>
-                <div className="w-full h-[10px] rounded-full bg-surface-neutral-100 p-[1.5px] overflow-hidden">
-                  <div
-                    className="h-full rounded-full zentra-stripe-blue transition-all duration-500"
-                    style={{ width: `${advancePct}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between text-[13px] mb-1.5">
-                  <span className="text-content-neutral-500 font-medium">
-                    Pending Balance ({pendingCount})
-                  </span>
-                  <span className="font-semibold text-content-neutral-950 tabular-nums">
-                    {pendingReceivablesStr}
-                  </span>
-                </div>
-                <div className="w-full h-[10px] rounded-full bg-surface-neutral-100 p-[1.5px] overflow-hidden">
-                  <div
-                    className="h-full rounded-full zentra-stripe-pink transition-all duration-500"
-                    style={{ width: `${pendingPct}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span>{paidRatioPct}% collected</span>
+            <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span className="truncate text-[12px]">{paidRatioPct}% collected</span>
               <Link
                 href="/invoices"
-                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
               >
                 <span>Open Invoices</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -768,27 +778,41 @@ function WidgetContent({
       // 2. Net Profit & Margin — Zentra Pattern C (Stepped Pink Pinstripe Area Chart + Peak Pill)
       case "net-profit": {
         return (
-          <div className="ui-card p-6 flex flex-col justify-between h-full gap-5">
+          <div
+            className={`ui-card flex flex-col justify-between h-full ${
+              isCompact ? "p-4 min-h-[195px]" : "p-6 min-h-[248px]"
+            }`}
+          >
             <div>
-              <h3>{isLoss ? "Net Loss & Margin" : "Net Profit & Margin"}</h3>
-              <div className="summary-value mt-3">{netProfitStr}</div>
+              <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+                {isLoss ? "Net Loss & Margin" : "Net Profit & Margin"}
+              </h3>
+              <div
+                className={`mt-3 ${
+                  isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
+                } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+              >
+                {netProfitStr}
+              </div>
               <p className="summary-caption">
                 {marginPct}% margin · billed less {opexStr} costs
               </p>
+              <div className="mt-2">
+                <MonthlyBars
+                  label={`Monthly profit · ${activeCurrency}`}
+                  points={monthlyStats.map((month) => ({
+                    ...month,
+                    value: month.profitCents,
+                  }))}
+                  formatValue={(value) => formatCents(value, activeCurrency)}
+                />
+              </div>
             </div>
-            <MonthlyBars
-              label={`Monthly profit · signed amounts · ${activeCurrency}`}
-              points={monthlyStats.map((month) => ({
-                ...month,
-                value: month.profitCents,
-              }))}
-              formatValue={(value) => formatCents(value, activeCurrency)}
-            />
             <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span>{marginPct}% net margin</span>
+              <span className="truncate text-[12px]">{marginPct}% net margin</span>
               <Link
                 href="/analytics"
-                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
               >
                 <span>Open Analytics</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -801,20 +825,28 @@ function WidgetContent({
       // 3. Pending Receivables — Zentra Pattern D (Big Metric + Green Dot-Matrix Histogram)
       case "pending-receivables": {
         return (
-          <div className="ui-card receivables-card p-6 flex flex-col justify-between h-full">
+          <div
+            className={`ui-card receivables-card flex flex-col justify-between h-full ${
+              isCompact ? "p-4 min-h-[195px]" : "p-6 min-h-[248px]"
+            }`}
+          >
             <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
                   Pending Receivables
                 </h3>
               </div>
 
-              <div className="mt-4 flex items-end justify-between gap-4">
-                <div>
-                  <div className="text-[38px] font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums">
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div
+                    className={`${
+                      isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
+                    } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                  >
                     {pendingReceivablesStr}
                   </div>
-                  <div className="mt-2 text-[12.5px] text-content-neutral-500">
+                  <div className="mt-2 text-[12px] text-content-neutral-500 truncate">
                     {pendingCount}{" "}
                     {pendingCount === 1
                       ? "invoice awaiting payment"
@@ -823,10 +855,10 @@ function WidgetContent({
                 </div>
 
                 <div className="text-right shrink-0 hidden sm:block">
-                  <div className="text-[11.5px] text-content-neutral-400">
+                  <div className="text-[11px] text-content-neutral-400">
                     paid ratio
                   </div>
-                  <div className="text-[18px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
+                  <div className="text-[16px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
                     {paidRatioPct}%
                   </div>
                 </div>
@@ -850,13 +882,13 @@ function WidgetContent({
             </div>
 
             <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span>
+              <span className="truncate text-[12px]">
                 {pendingCount}{" "}
                 {pendingCount === 1 ? "invoice awaiting" : "invoices awaiting"}
               </span>
               <Link
                 href="/invoices"
-                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
               >
                 <span>Open Invoices</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -874,29 +906,37 @@ function WidgetContent({
             : 0;
 
         return (
-          <div className="ui-card p-6 flex flex-col justify-between h-full">
+          <div
+            className={`ui-card flex flex-col justify-between h-full ${
+              isCompact ? "p-4 min-h-[195px]" : "p-6 min-h-[248px]"
+            }`}
+          >
             <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
                   Customers & Clients
                 </h3>
               </div>
 
-              <div className="mt-4 flex items-end justify-between gap-4">
-                <div>
-                  <div className="text-[40px] font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums">
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div
+                    className={`${
+                      isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
+                    } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                  >
                     {totalClientsCount.toLocaleString()}
                   </div>
-                  <div className="mt-2 text-[12.5px] text-content-neutral-500">
+                  <div className="mt-2 text-[12px] text-content-neutral-500 truncate">
                     {activeClientsCount} active accounts
                   </div>
                 </div>
 
                 <div className="text-right shrink-0 hidden sm:block">
-                  <div className="text-[11.5px] text-content-neutral-400">
+                  <div className="text-[11px] text-content-neutral-400">
                     active share
                   </div>
-                  <div className="text-[18px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
+                  <div className="text-[16px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
                     {activeRatio}%
                   </div>
                 </div>
@@ -915,10 +955,10 @@ function WidgetContent({
             </div>
 
             <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span>{activeClientsCount} active accounts</span>
+              <span className="truncate text-[12px]">{activeClientsCount} active accounts</span>
               <Link
                 href="/clients"
-                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1"
+                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
               >
                 <span>Open Clients</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -974,7 +1014,11 @@ function WidgetContent({
         });
 
       // 8. Average Invoice Value
-      case "average-invoice-value":
+      case "average-invoice-value": {
+        const maxInvoiceCents = filteredInvoices.reduce(
+          (max, inv) => Math.max(max, inv.amountCents),
+          0,
+        );
         return renderZentraMetric({
           title: "Average Contract Value",
           value:
@@ -982,11 +1026,20 @@ function WidgetContent({
               ? avgInvoiceStr
               : formatCents(0, activeCurrency),
           badgeText: `${filteredInvoices.length} invoices`,
-          subtitle: "Mean contract ticket size",
+          subtitle: "Share vs largest issued invoice",
+          footerLabel:
+            maxInvoiceCents > 0
+              ? `Peak ${formatCents(maxInvoiceCents, activeCurrency)}`
+              : "No issued invoices",
+          barPct:
+            maxInvoiceCents > 0
+              ? Math.round((avgInvoiceCents / maxInvoiceCents) * 100)
+              : 0,
           stripeTone: "blue",
           href: "/invoices",
           actionLabel: "Open Invoices",
         });
+      }
 
       // 9. Overdue Receivables
       case "overdue-receivables":
@@ -1007,17 +1060,19 @@ function WidgetContent({
         });
 
       // 10. Cashflow Runway
-      case "cashflow-runway":
+      case "cashflow-runway": {
+        const runway = computeCashflowRunwayCard(financials, activeCurrency);
         return renderZentraMetric({
           title: "Cashflow Runway",
-          value: "Not tracked",
-          badgeText: "Cash balance unavailable",
-          subtitle:
-            "Runway needs a cash reserve balance, which BillFlow does not record.",
+          value: runway.value,
+          badgeText: runway.badgeText,
+          subtitle: runway.subtitle,
+          barPct: runway.barPct,
           stripeTone: "green",
           href: "/analytics",
           actionLabel: "Open Analytics",
         });
+      }
 
       // 11. Top Client Concentration
       case "client-concentration":
@@ -1044,7 +1099,9 @@ function WidgetContent({
             totalTrackedHours > 0
               ? `${Math.round(totalTrackedHours * 10) / 10} hrs tracked`
               : "Track sprint hours",
-          subtitle: "Billed profit divided by recorded active hours",
+          subtitle: "Task completion vs active time yield",
+          footerLabel: `${taskCounts.done} of ${taskCounts.total} tasks done`,
+          barPct: taskCounts.donePct,
           stripeTone: "green",
           href: "/tasks",
           actionLabel: "Open Sprint Board",
@@ -1064,7 +1121,7 @@ function WidgetContent({
         );
 
         return (
-          <div className="ui-card p-6 flex flex-col justify-between h-full">
+          <div className="ui-card p-6 flex flex-col justify-between h-full min-h-[330px]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
@@ -1244,7 +1301,7 @@ function WidgetContent({
       // 14. Billing pipeline follows the Overview period.
       case "profit-trajectory-chart": {
         return (
-          <div className="ui-card p-6 flex flex-col justify-between h-full">
+          <div className="ui-card p-6 flex flex-col justify-between h-full min-h-[330px]">
             {/* Top Card Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1459,7 +1516,24 @@ function WidgetContent({
 
                 <div>
                   <div className="flex justify-between text-[12px] mb-1">
-                    <span className="text-content-neutral-500">Pending</span>
+                    <span className="text-content-neutral-500">Advance Paid</span>
+                    <span className="font-semibold text-content-neutral-900 tabular-nums">
+                      {advancePaidCount}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-surface-neutral-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full zentra-stripe-amber"
+                      style={{
+                        width: `${sharePercent(advancePaidCount, filteredInvoices.length)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[12px] mb-1">
+                    <span className="text-content-neutral-500">Open Balance</span>
                     <span className="font-semibold text-content-neutral-900 tabular-nums">
                       {pendingCount}
                     </span>

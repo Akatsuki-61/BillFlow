@@ -212,21 +212,25 @@ export default function DashboardPage() {
     if (widgetId === "workspace-insights") {
       return isCompact ? "col-span-12 lg:col-span-6" : "col-span-12";
     }
-    if (widgetId === "profit-trajectory-chart") {
-      return isCompact ? "col-span-12" : "col-span-12 lg:col-span-8";
-    }
     if (baseSize === "metric") {
       return isCompact
         ? "col-span-12 sm:col-span-6 lg:col-span-3"
-        : "col-span-12 md:col-span-6 lg:col-span-4";
+        : "col-span-12 sm:col-span-6 lg:col-span-3";
     }
     if (baseSize === "full") {
       return isCompact
         ? "col-span-12 lg:col-span-6"
-        : "col-span-12 lg:col-span-8";
+        : "col-span-12";
+    }
+    if (baseSize === "medium") {
+      return isCompact
+        ? "col-span-12 sm:col-span-6 lg:col-span-3"
+        : "col-span-12 md:col-span-6 lg:col-span-4";
     }
     if (baseSize === "wide") {
-      return isCompact ? "col-span-12" : "col-span-12 lg:col-span-6";
+      return isCompact
+        ? "col-span-12 md:col-span-6 lg:col-span-4"
+        : "col-span-12 lg:col-span-6";
     }
     return isCompact
       ? "col-span-12 md:col-span-6 lg:col-span-4"

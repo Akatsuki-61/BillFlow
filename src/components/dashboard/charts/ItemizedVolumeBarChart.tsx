@@ -1,22 +1,23 @@
 "use client";
-import { useReportingData } from "@/context/ReportingContext";
 
 import { useMemo } from "react";
 import {
   EChartsBarChart,
   type ChartConfig,
 } from "@/components/evilcharts/charts/echarts-bar-chart";
+import { useReportingData } from "@/context/ReportingContext";
+import { buildItemizedVolumeData } from "@/lib/widgets/chartData";
 
 const chartConfig = {
   web: {
-    label: "Web Deliverables",
+    label: "Core Deliverables",
     colors: {
       light: ["#0284c7"],
       dark: ["#38bdf8"],
     },
   },
   ai: {
-    label: "AI Solutions",
+    label: "AI & Consulting",
     colors: {
       light: ["#e11d48"],
       dark: ["#fb7185"],
@@ -25,88 +26,24 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function ItemizedVolumeBarChart() {
-  const { invoices, currency: activeCurrency } = useReportingData();
+  const { invoices, catalogItems, currency: activeCurrency } = useReportingData();
 
-  const { chartData, hasData } = useMemo(() => {
-    const months: Array<{
-      month: string;
-      key: string;
-      web: number;
-      ai: number;
-    }> = [];
-    const now = new Date();
-
-    // 6 rolling months
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const month = d.toLocaleString("default", { month: "long" });
-      months.push({ month, key, web: 0, ai: 0 });
-    }
-
-    let count = 0;
-    (invoices || []).forEach((inv) => {
-      if (
-        inv.status === "DRAFT" ||
-        inv.currency !== activeCurrency ||
-        !inv.issueDate
-      )
-        return;
-      const key = inv.issueDate.slice(0, 7);
-      const target = months.find((m) => m.key === key);
-      if (!target) return;
-
-      if (inv.items && inv.items.length > 0) {
-        inv.items.forEach((item) => {
-          const desc = `${item.description || ""}`.toLowerCase();
-          const isWeb = /web|software|site|development|frontend|backend/i.test(
-            desc,
-          );
-          const isAi = /\bai\b|consulting|automation|agent/i.test(desc);
-          if (isWeb && !isAi) {
-            target.web += 1;
-            count += 1;
-          }
-          if (isAi) {
-            target.ai += 1;
-            count += 1;
-          }
-        });
-        return;
-      }
-
-      const title = (inv.title || inv.clientName || "").toLowerCase();
-      const isWeb = /web|software|site/i.test(title);
-      const isAi = /ai|consulting|automation/i.test(title);
-
-      if (isWeb && !isAi) {
-        target.web += 1;
-        count += 1;
-      }
-      if (isAi) {
-        target.ai += 1;
-        count += 1;
-      }
-    });
-
-    return {
-      chartData: months.map(({ month, web, ai }) => ({ month, web, ai })),
-      hasData: count > 0,
-    };
-  }, [invoices, activeCurrency]);
+  const { chartData, hasData } = useMemo(
+    () => buildItemizedVolumeData(invoices, catalogItems, activeCurrency),
+    [invoices, catalogItems, activeCurrency],
+  );
 
   return (
-    <div className="flex h-full w-full min-h-[300px] flex-col p-4">
+    <div className="flex h-full w-full min-h-[260px] flex-col">
       {!hasData && (
         <div className="mb-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
-          No contract deliverables recorded. Counts issued invoice items by
-          month; groups are inferred from descriptions.
+          No issued contract items recorded yet. Line items appear by invoice month.
         </div>
       )}
       <EChartsBarChart
         data={chartData}
         config={chartConfig}
-        className="h-full min-h-[240px] w-full"
+        className="h-full min-h-[235px] w-full flex-1"
         xDataKey="month"
       >
         <EChartsBarChart.Grid />

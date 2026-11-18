@@ -34,7 +34,7 @@ import type {
 import { AppError } from "./errors";
 import { scheduleBackgroundNativeCalendarSync } from "./calendar";
 
-function resolveDefaultAssignee(tx: ReturnType<typeof getDb>) {
+function resolveDefaultAssignee(tx: Pick<ReturnType<typeof getDb>, "select">) {
   const bizName = tx
     .select({ businessName: settings.businessName })
     .from(settings)

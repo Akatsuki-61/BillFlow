@@ -241,20 +241,26 @@ export default function AnalyticsView() {
       </PageHeader>
 
       <ReportingGuard>
-        <section className="ui-card p-5">
-          <h2 className="text-sm font-medium">
-            Average billed value per client
-          </h2>
-          <p className="summary-value mt-2">
-            {formatCents(averageBilledPerClientCents, activeCurrency)}
-          </p>
-          <p className="summary-caption">
-            This {timeframe.toLowerCase()} · {billedClientCount} billed{" "}
-            {billedClientCount === 1 ? "client" : "clients"} · {activeCurrency}
-          </p>
-        </section>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+          <section className="ui-card p-5 flex flex-col justify-between lg:col-span-3">
+            <div>
+              <h2 className="text-sm font-medium">
+                Average billed value per client
+              </h2>
+              <p className="summary-value mt-2">
+                {formatCents(averageBilledPerClientCents, activeCurrency)}
+              </p>
+            </div>
+            <p className="summary-caption mt-3 pt-3 border-t border-line-neutral-100">
+              This {timeframe.toLowerCase()} · {billedClientCount} billed{" "}
+              {billedClientCount === 1 ? "client" : "clients"} · {activeCurrency}
+            </p>
+          </section>
+          <div className="lg:col-span-9 min-w-0">
+            <CashflowForecast />
+          </div>
+        </div>
       </ReportingGuard>
-      <CashflowForecast />
 
       {/* Empty State when all widgets are hidden */}
       {visibleWidgets.length === 0 ? (
@@ -289,12 +295,13 @@ export default function AnalyticsView() {
                   Right-click or drag any widget to pin it to your Overview
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
                 {metricWidgets.map((w) => (
                   <motion.div
                     key={w.id}
                     layout="position"
                     transition={SPRING_NAV_GLIDE}
+                    className="h-full"
                     onDragOver={(e) => handleTileDragOver(e, w.id)}
                     onDrop={(e) => handleTileDrop(e, w.id)}
                   >
@@ -334,7 +341,7 @@ export default function AnalyticsView() {
                   retained net earnings
                 </p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 {chartWidgets.map((w) => (
                   <motion.div
                     key={w.id}
@@ -342,9 +349,7 @@ export default function AnalyticsView() {
                     transition={SPRING_NAV_GLIDE}
                     onDragOver={(e) => handleTileDragOver(e, w.id)}
                     onDrop={(e) => handleTileDrop(e, w.id)}
-                    className={
-                      w.id === "profit-trajectory-chart" ? "lg:col-span-2" : ""
-                    }
+                    className="h-full"
                   >
                     <WidgetRenderer
                       widgetId={w.id}
@@ -378,12 +383,13 @@ export default function AnalyticsView() {
                   </span>
                 </div>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 {otherWidgets.map((w) => (
                   <motion.div
                     key={w.id}
                     layout="position"
                     transition={SPRING_NAV_GLIDE}
+                    className="h-full"
                     onDragOver={(e) => handleTileDragOver(e, w.id)}
                     onDrop={(e) => handleTileDrop(e, w.id)}
                   >
