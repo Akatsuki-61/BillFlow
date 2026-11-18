@@ -15,7 +15,9 @@ import {
 } from "./InvoiceStatusBulk";
 
 import { InvoiceTrash } from "./InvoiceTrash";
-import { PaymentCorrectionForm } from "./PaymentCorrectionForm";
+import { buildSampleInvoice } from "./sample-invoice";
+import { ImportCompletedTasksModal } from "./ImportCompletedTasksModal";
+import { PaymentInspectionModal } from "./PaymentInspectionModal";
 import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { Dialog } from "@/components/ui/Dialog";
 
@@ -67,7 +69,6 @@ import {
   AlertTriangle,
   Download,
   FileSpreadsheet,
-  CheckSquare,
   ListChecks,
   Copy,
 } from "lucide-react";
@@ -194,56 +195,8 @@ export default function InvoicesView() {
   const [previewInvoice, setPreviewInvoice] =
     useState<InvoiceWithClient | null>(null);
 
-  const getSampleInvoice = (): InvoiceWithClient => ({
-    id: "sample-preview",
-    code: "INV-2026-001",
-    clientName: "Acme Cloud Corp",
-    clientEmail: "billing@acmecloud.com",
-    clientId: null,
-    currency: (settings?.defaultCurrency as Currency) || "USD",
-    status: "ADVANCE_PAID",
-    issueDate: new Date().toISOString(),
-    dueDate: new Date(Date.now() + 14 * 86400000).toISOString(),
-    amountCents: 9000000,
-    advanceCents: 4500000,
-    paidCents: 4500000,
-    taxCents: 0,
-    discountCents: 1000000,
-    notes:
-      "Milestone 1 (Website staging) begins upon advance receipt. Full code and deployment upon final settlement.",
-    deliveryUrl: "https://github.com/acme-cloud/web-platform",
-    items: [
-      {
-        id: "it-1",
-        invoiceId: "sample-preview",
-        description: "Business Website Development & Integration",
-        quantity: 1,
-        unitPriceCents: 8000000,
-        position: 0,
-      },
-      {
-        id: "it-2",
-        invoiceId: "sample-preview",
-        description: "AI Consulting Session & Support Automation Roadmap",
-        quantity: 1,
-        unitPriceCents: 2000000,
-        position: 1,
-      },
-    ],
-    payments: [
-      {
-        id: "pay-1",
-        invoiceId: "sample-preview",
-        amountCents: 4500000,
-        currency: (settings?.defaultCurrency as Currency) || "USD",
-        receivedAt: new Date().toISOString(),
-        reference: "50% upfront project deposit",
-        requestId: "req-1",
-      },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
+  const getSampleInvoice = (): InvoiceWithClient =>
+    buildSampleInvoice(settings);
 
   // Add Invoice Modal state
   const [showAddInvoiceModal, setShowAddInvoiceModal] =
@@ -3469,219 +3422,26 @@ export default function InvoicesView() {
       {/* Import Completed Tasks Modal */}
       <MotionPresence>
         {showImportTasksModal && (
-          <Dialog onClose={() => setShowImportTasksModal(false)} width={680}>
-            <div className="app-dialog-header">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
-                  <ListChecks className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-content-neutral-900">
-                    Import Completed Tasks
-                  </h3>
-                  <p className="text-xs text-content-neutral-400">
-                    Select unbilled completed deliverables to add as line items
-                    and link to this invoice.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="app-dialog-body">
-              <div className="app-dialog-section p-5 space-y-4">
-                {/* Filter & Bulk Selection Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line-neutral-100">
-                  <div className="flex items-center gap-2">
-                    {(activeDraftClientObj ||
-                      (clientMode === "new" && clientName.trim())) && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setImportTasksShowAllClients((prev) => !prev)
-                        }
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
-                          !importTasksShowAllClients
-                            ? "bg-accent/10 border-accent/30 text-accent"
-                            : "bg-surface-neutral-100 border-line-neutral-200 text-content-neutral-600 hover:text-content-neutral-900"
-                        }`}
-                      >
-                        {importTasksShowAllClients
-                          ? `Showing all clients (${allUnbilledTasks.length}) · Filter by ${activeDraftClientObj?.name || clientName.trim()}`
-                          : `Filtered: ${activeDraftClientObj?.name || clientName.trim()} (${clientFilteredUnbilledTasks.length}) · Show all clients`}
-                      </button>
-                    )}
-                  </div>
-
-                  {displayedImportTasks.length > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        type="button"
-                        onClick={handleSelectAllImportTasks}
-                        className="text-xs h-7 px-2.5"
-                      >
-                        Select All ({displayedImportTasks.length})
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        type="button"
-                        onClick={handleDeselectAllImportTasks}
-                        disabled={selectedImportTaskIds.length === 0}
-                        className="text-xs h-7 px-2.5"
-                      >
-                        Deselect All
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Task Rows */}
-                {displayedImportTasks.length === 0 ? (
-                  <div className="py-10 text-center space-y-2">
-                    <CheckSquare className="w-8 h-8 text-content-neutral-300 mx-auto" />
-                    <p className="text-sm font-semibold text-content-neutral-700">
-                      No unbilled completed tasks found
-                    </p>
-                    <p className="text-xs text-content-neutral-400 max-w-md mx-auto">
-                      {!importTasksShowAllClients && allUnbilledTasks.length > 0
-                        ? `No completed unbilled tasks match "${activeDraftClientObj?.name || clientName.trim()}", but ${allUnbilledTasks.length} completed task(s) exist across other clients.`
-                        : "Move tasks to the Done column on the Kanban board to import them into an invoice."}
-                    </p>
-                    {!importTasksShowAllClients &&
-                      allUnbilledTasks.length > 0 && (
-                        <div className="pt-2">
-                          <Button
-                            variant="secondary"
-                            size="small"
-                            type="button"
-                            onClick={() => setImportTasksShowAllClients(true)}
-                          >
-                            Show All Clients ({allUnbilledTasks.length})
-                          </Button>
-                        </div>
-                      )}
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
-                    {displayedImportTasks.map((task) => {
-                      const isChecked = selectedImportTaskIds.includes(task.id);
-                      const feeVal =
-                        importTaskFees[task.id] ?? getTaskDefaultFee(task);
-                      const loggedHours =
-                        task.activeMilliseconds && task.activeMilliseconds > 0
-                          ? (task.activeMilliseconds / 3600000).toFixed(1)
-                          : null;
-
-                      return (
-                        <div
-                          key={task.id}
-                          onClick={() => handleToggleImportTask(task)}
-                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                            isChecked
-                              ? "border-accent bg-accent/5 ring-1 ring-accent/25"
-                              : "border-line-neutral-200 bg-surface-neutral-50/60 hover:border-line-neutral-300"
-                          }`}
-                        >
-                          <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {}}
-                              className="mt-0.5 w-4 h-4 rounded text-accent focus:ring-accent cursor-pointer shrink-0"
-                              aria-label={`Select task ${task.title}`}
-                            />
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-semibold text-content-neutral-900 truncate">
-                                  {task.title}
-                                </span>
-                                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface border border-line-neutral-200 text-content-neutral-600">
-                                  {task.category}
-                                </span>
-                                {task.clientName && (
-                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent">
-                                    {task.clientName}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 text-[11px] text-content-neutral-400">
-                                <span>
-                                  Completed:{" "}
-                                  {task.completedAt
-                                    ? formatDateDisplay(task.completedAt)
-                                    : task.dueDate || "Done"}
-                                </span>
-                                {loggedHours && (
-                                  <span>Logged: {loggedHours}h</span>
-                                )}
-                                {task.outsourceBudget ? (
-                                  <span>
-                                    Est. Budget:{" "}
-                                    {formatCents(
-                                      Math.round(task.outsourceBudget * 100),
-                                      task.currency || newCurrency,
-                                    )}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Editable Fee Input */}
-                          <div
-                            className="flex items-center gap-2 shrink-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <label className="text-[10px] uppercase font-bold text-content-neutral-400">
-                              Fee ({newCurrency})
-                            </label>
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
-                              aria-label={`Fee for ${task.title}`}
-                              value={feeVal}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setImportTaskFees((prev) => ({
-                                  ...prev,
-                                  [task.id]: val,
-                                }));
-                                if (!isChecked) {
-                                  handleToggleImportTask(task);
-                                }
-                              }}
-                              className="ui-field w-28 px-2.5 py-1 text-xs text-right font-mono"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="app-dialog-footer">
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={() => setShowImportTasksModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                type="button"
-                disabled={selectedImportTaskIds.length === 0}
-                onClick={handleImportSelectedTasks}
-              >
-                Import Selected Tasks ({selectedImportTaskIds.length})
-              </Button>
-            </div>
-          </Dialog>
+          <ImportCompletedTasksModal
+            activeDraftClientObj={activeDraftClientObj}
+            clientMode={clientMode}
+            clientName={clientName}
+            newCurrency={newCurrency}
+            allUnbilledTasks={allUnbilledTasks}
+            clientFilteredUnbilledTasks={clientFilteredUnbilledTasks}
+            displayedImportTasks={displayedImportTasks}
+            importTasksShowAllClients={importTasksShowAllClients}
+            setImportTasksShowAllClients={setImportTasksShowAllClients}
+            selectedImportTaskIds={selectedImportTaskIds}
+            importTaskFees={importTaskFees}
+            setImportTaskFees={setImportTaskFees}
+            getTaskDefaultFee={getTaskDefaultFee}
+            onToggleTask={handleToggleImportTask}
+            onSelectAll={handleSelectAllImportTasks}
+            onDeselectAll={handleDeselectAllImportTasks}
+            onImportSelected={handleImportSelectedTasks}
+            onClose={() => setShowImportTasksModal(false)}
+          />
         )}
       </MotionPresence>
 
@@ -3976,156 +3736,18 @@ export default function InvoicesView() {
       {/* Payment Inspection & Receipts Modal */}
       <MotionPresence>
         {inspectingInvoice && (
-          <Dialog onClose={() => setInspectingInvoice(null)} width={620}>
-            <div className="app-dialog-header">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-surface-purple-100 text-content-purple-700 flex items-center justify-center">
-                  <Paperclip className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-content-neutral-900">
-                    Payments & Attached Receipts
-                  </h3>
-                  <p className="text-xs text-content-neutral-400">
-                    {inspectingInvoice.code} · {inspectingInvoice.clientName}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="app-dialog-body">
-              <div className="app-dialog-section p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                {isLoadingAttachments ? (
-                  <p className="text-xs text-content-neutral-500">
-                    Loading payment receipts...
-                  </p>
-                ) : !inspectingInvoice.payments ||
-                  inspectingInvoice.payments.length === 0 ? (
-                  <p className="text-xs text-content-neutral-500">
-                    No payments have been recorded for this invoice yet.
-                  </p>
-                ) : (
-                  inspectingInvoice.payments.map((payment, idx) => {
-                    const slips = paymentAttachments[payment.id] || [];
-
-                    return (
-                      <div
-                        key={payment.id || idx}
-                        className="p-3.5 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/60 space-y-2 text-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-content-neutral-900 text-sm">
-                            {formatCents(payment.amountCents, payment.currency)}
-                          </span>
-                          <span className="text-[11px] text-content-neutral-500">
-                            {formatDateDisplay(payment.receivedAt)}
-                          </span>
-                        </div>
-
-                        {payment.reference && (
-                          <div className="text-[11px] text-content-neutral-600 font-mono">
-                            Ref: {payment.reference}
-                          </div>
-                        )}
-
-                        {payment.correction ? (
-                          <div className="rounded-lg bg-surface-neutral-100 p-2 text-content-neutral-800">
-                            <p className="font-medium">
-                              {payment.correction.replacementPaymentId
-                                ? "Corrected"
-                                : "Reversed"}{" "}
-                              ·{" "}
-                              {formatDateDisplay(
-                                payment.correction.correctedAt,
-                              )}
-                            </p>
-                            <p className="mt-1 break-words">
-                              {payment.correction.reason}
-                            </p>
-                          </div>
-                        ) : (
-                          isElectron && (
-                            <PaymentCorrectionForm
-                              payment={payment}
-                              onSubmit={async (input) => {
-                                const updated =
-                                  await window.billflow!.invoices.correctPayment(
-                                    input,
-                                  );
-                                setInspectingInvoice(updated);
-                                await refresh();
-                                showToast(
-                                  input.replacement
-                                    ? "Payment corrected."
-                                    : "Payment reversed.",
-                                );
-                              }}
-                            />
-                          )
-                        )}
-
-                        {/* Attached slips */}
-                        <div className="pt-2 border-t border-line-neutral-200/60">
-                          {slips.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {slips.map((att) => (
-                                <div
-                                  key={att.id}
-                                  className="flex items-center justify-between p-2 rounded-lg bg-surface border border-line-neutral-200 text-xs"
-                                >
-                                  <div className="flex items-center gap-1.5 truncate">
-                                    <Paperclip className="w-3.5 h-3.5 text-accent" />
-                                    <span className="truncate">
-                                      {att.originalName}
-                                    </span>
-                                    <span className="text-[10px] text-content-neutral-400">
-                                      ({Math.round(att.sizeBytes / 1024)} KB)
-                                    </span>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="small"
-                                    onClick={() =>
-                                      workflow?.attachments.open(att.id)
-                                    }
-                                  >
-                                    View Slip
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] text-content-neutral-400 italic">
-                                No payment slip attached.
-                              </span>
-                              <Button
-                                variant="secondary"
-                                size="small"
-                                onClick={() =>
-                                  handleAttachReceiptToPayment(payment.id)
-                                }
-                              >
-                                Attach Slip
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-            <div className="app-dialog-footer">
-              <Button
-                variant="primary"
-                type="button"
-                onClick={() => setInspectingInvoice(null)}
-              >
-                Done
-              </Button>
-            </div>
-          </Dialog>
+          <PaymentInspectionModal
+            invoice={inspectingInvoice}
+            paymentAttachments={paymentAttachments}
+            isLoadingAttachments={isLoadingAttachments}
+            isElectron={isElectron}
+            workflow={workflow}
+            onClose={() => setInspectingInvoice(null)}
+            onUpdateInvoice={(updated) => setInspectingInvoice(updated)}
+            onRefresh={refresh}
+            onAttachReceipt={(paymentId) => handleAttachReceiptToPayment(paymentId)}
+            onToast={(msg) => showToast(msg)}
+          />
         )}
       </MotionPresence>
 

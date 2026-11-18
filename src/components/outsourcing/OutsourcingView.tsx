@@ -20,6 +20,7 @@ import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { remainingPayout } from "@/lib/cashflow-forecast";
 import { PayoutLedger } from "./PayoutLedger";
 import { Dialog } from "@/components/ui/Dialog";
+import { ReviewDeliverableModal } from "./ReviewDeliverableModal";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
 import { recentMonths } from "@/lib/visual-metrics";
@@ -1968,195 +1969,20 @@ export default function OutsourcingView() {
       {/* Modal Dialog: Review Contractor Deliverable & Sync to Task */}
       <MotionPresence>
         {reviewingWorkOrder && (
-          <Dialog onClose={() => setReviewingWorkOrder(null)} width={620}>
-            <div className="app-dialog-header">
-              <div className="flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-accent" />
-                <h3 className="outsourcing-modal-title">
-                  Review Contractor Deliverable
-                </h3>
-              </div>
-            </div>
-            <form onSubmit={handleSaveReview} className="app-dialog-form">
-              <div className="app-dialog-body">
-                <div className="deliverable-review-box">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-content-neutral-500 font-medium">
-                      Work Order Scope
-                    </span>
-                    <span className="font-semibold text-content-neutral-900">
-                      {reviewingWorkOrder.scope}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-content-neutral-500 font-medium">
-                      Subcontractor
-                    </span>
-                    <span className="font-medium text-content-neutral-800">
-                      {reviewingWorkOrder.vendorName}
-                    </span>
-                  </div>
-                  {reviewingWorkOrder.taskTitle && (
-                    <div className="flex justify-between items-center text-xs pt-1 border-t border-line-neutral-200">
-                      <span className="text-content-neutral-500 font-medium">
-                        Original Task
-                      </span>
-                      <span className="font-mono text-content-neutral-900">
-                        {reviewingWorkOrder.taskTitle}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center text-xs pt-1 border-t border-line-neutral-200">
-                    <span className="text-content-neutral-500 font-medium">
-                      Agreed Fee
-                    </span>
-                    <span className="font-mono font-bold text-content-neutral-900">
-                      {formatCents(
-                        reviewingWorkOrder.feeCents,
-                        reviewingWorkOrder.currency,
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Contractor Progress Status */}
-                <div className="outsourcing-form-group">
-                  <label className="outsourcing-label">
-                    Contractor Work Status
-                  </label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {[
-                      { id: "todo", label: "Assigned" },
-                      { id: "in-progress", label: "In Progress" },
-                      { id: "review", label: "Under Review" },
-                      { id: "done", label: "Completed" },
-                    ].map((s) => {
-                      const isActive = reviewStatus === s.id;
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() =>
-                            setReviewStatus(
-                              s.id as
-                                "todo" | "in-progress" | "review" | "done",
-                            )
-                          }
-                          className={`relative px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors text-center active:scale-[0.97] ${
-                            isActive
-                              ? "text-white border-accent"
-                              : "bg-surface-neutral-50 border-line-neutral-200 text-content-neutral-700 hover:bg-surface-neutral-100"
-                          }`}
-                        >
-                          {isActive && (
-                            <motion.span
-                              layoutId="review-status-pill"
-                              transition={SPRING_NAV_GLIDE}
-                              className="absolute inset-0 rounded-lg bg-accent shadow-xs"
-                            />
-                          )}
-                          <span className="relative z-10">{s.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Deliverable URL */}
-                <div className="outsourcing-form-group">
-                  <div className="flex justify-between items-center">
-                    <label className="outsourcing-label">
-                      Deliverable URL / Repository / Staging
-                    </label>
-                    {reviewDeliveryUrl &&
-                      formatExternalUrl(reviewDeliveryUrl) && (
-                        <a
-                          href={formatExternalUrl(reviewDeliveryUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) =>
-                            openExternalLink(reviewDeliveryUrl, e)
-                          }
-                          className="text-xs text-accent hover:underline inline-flex items-center gap-1"
-                        >
-                          <span>Open Link</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </a>
-                      )}
-                  </div>
-                  <input
-                    type="url"
-                    value={reviewDeliveryUrl}
-                    onChange={(e) => setReviewDeliveryUrl(e.target.value)}
-                    placeholder="https://github.com/org/repo or staging URL"
-                    className="outsourcing-input font-mono text-xs"
-                  />
-                  <p className="text-[11px] text-content-neutral-400">
-                    Retained with this work order and accessible to the
-                    freelancer and client.
-                  </p>
-                </div>
-
-                {/* Delivery Notes */}
-                <div className="outsourcing-form-group">
-                  <label className="outsourcing-label">
-                    Handover Notes / Verification Summary
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={reviewNotes}
-                    onChange={(e) => setReviewNotes(e.target.value)}
-                    placeholder="Contractor delivery notes, PR summary, or review verification feedback..."
-                    className="outsourcing-textarea text-xs"
-                  />
-                </div>
-
-                {reviewingWorkOrder.taskId && (
-                  <div className="p-3 rounded-xl bg-surface-purple-50/50 border border-line-purple-200/70">
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={reviewUpdateTask}
-                        onChange={(e) => setReviewUpdateTask(e.target.checked)}
-                        className="mt-0.5 rounded border-line-purple-300 text-accent focus:ring-accent"
-                      />
-                      <div className="text-xs">
-                        <span className="font-semibold text-content-purple-900 block">
-                          Update original task in Kanban board after review
-                        </span>
-                        <span className="text-content-purple-700 text-[11px] mt-0.5 block">
-                          Syncs the delivered URL and sets the linked task to{" "}
-                          {reviewStatus === "done" ? "Done" : "Under Review"}{" "}
-                          automatically.
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                )}
-              </div>
-              <div className="app-dialog-footer">
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setReviewingWorkOrder(null)}
-                  disabled={isSubmittingReview}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  type="submit"
-                  disabled={isSubmittingReview}
-                >
-                  {isSubmittingReview
-                    ? "Saving..."
-                    : reviewStatus === "done"
-                      ? "Accept & Complete Work"
-                      : "Save Review"}
-                </Button>
-              </div>
-            </form>
-          </Dialog>
+          <ReviewDeliverableModal
+            workOrder={reviewingWorkOrder}
+            reviewStatus={reviewStatus}
+            setReviewStatus={setReviewStatus}
+            reviewDeliveryUrl={reviewDeliveryUrl}
+            setReviewDeliveryUrl={setReviewDeliveryUrl}
+            reviewNotes={reviewNotes}
+            setReviewNotes={setReviewNotes}
+            reviewUpdateTask={reviewUpdateTask}
+            setReviewUpdateTask={setReviewUpdateTask}
+            isSubmittingReview={isSubmittingReview}
+            onSubmit={handleSaveReview}
+            onClose={() => setReviewingWorkOrder(null)}
+          />
         )}
       </MotionPresence>
 
