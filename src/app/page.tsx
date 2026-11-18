@@ -30,6 +30,7 @@ import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { useWidgetContext } from "@/context/WidgetContext";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
+import { WorkflowQuickStartBar } from "@/components/onboarding/WorkflowQuickStartBar";
 import { DashboardPeriod } from "@/types/dashboard";
 
 const PERIOD_OPTIONS: SelectOption<DashboardPeriod>[] = [
@@ -413,6 +414,7 @@ export default function DashboardPage() {
       {/* =====================================================================
           UNIFIED BILLFLOW ZENTRA BENTO GRID
          ===================================================================== */}
+      <WorkflowQuickStartBar />
       {pinnedWidgets.length === 0 ? (
         <div className="p-12 text-center ui-card">
           <Layers className="w-10 h-10 text-content-neutral-400 mx-auto mb-3" />

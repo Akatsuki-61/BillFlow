@@ -603,6 +603,11 @@ export function ProfileGateModal() {
           seedRoleCatalog: s.seedRoleCatalog,
         })),
       });
+      if (typeof window !== "undefined") {
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("billflow:start-tour"));
+        }, 350);
+      }
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Failed to complete onboarding.",

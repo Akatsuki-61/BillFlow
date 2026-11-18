@@ -18,6 +18,8 @@ import {
   CurrencyAttribution,
 } from "@/components/ui/CurrencyFeedback";
 import { ReportingProvider } from "@/context/ReportingContext";
+import { WorkspaceTour } from "@/components/onboarding/WorkspaceTour";
+import { KeyboardShortcutsModal } from "@/components/onboarding/KeyboardShortcutsModal";
 import "./globals.css";
 
 const inter = Inter({
@@ -61,6 +63,8 @@ export default function RootLayout({
                     <WidgetProvider>
                       <TitleBar />
                       <Sidebar />
+                      <WorkspaceTour />
+                      <KeyboardShortcutsModal />
                       <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
                         {children}
                         <CurrencyAttribution />

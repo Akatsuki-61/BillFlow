@@ -38,6 +38,8 @@ import {
   X,
   Lock,
   UsersRound,
+  Compass,
+  Keyboard,
 } from "lucide-react";
 
 import { isNavActive } from "@/lib/navigation";
@@ -526,6 +528,7 @@ export default function Sidebar() {
                 <Link
                   key={item.id}
                   href={item.href}
+                  data-tour={`nav-${item.id}`}
                   aria-current={isActive ? "page" : undefined}
                   onMouseEnter={() => setHoveredNavId(item.id)}
                   onDragOver={
@@ -606,6 +609,7 @@ export default function Sidebar() {
             <div className="relative" ref={searchRef}>
               <button
                 type="button"
+                data-tour="cmd-search"
                 onClick={toggleSearch}
                 aria-expanded={searchOpen}
                 aria-controls="search-popover"
@@ -1089,6 +1093,35 @@ export default function Sidebar() {
                         </span>
                         <ArrowUpRight className="w-3.5 h-3.5 text-content-neutral-400" />
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          window.dispatchEvent(new CustomEvent("billflow:start-tour"));
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13px] font-medium text-content-neutral-700 hover:bg-surface-neutral-100 text-left cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Compass className="w-4 h-4 text-content-neutral-500" />
+                          Interactive Tour
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          window.dispatchEvent(new CustomEvent("billflow:open-shortcuts"));
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13px] font-medium text-content-neutral-700 hover:bg-surface-neutral-100 text-left cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Keyboard className="w-4 h-4 text-content-neutral-500" />
+                          Keyboard Shortcuts
+                        </span>
+                        <kbd className="text-[11px] font-mono text-content-neutral-400">
+                          ⌘/
+                        </kbd>
+                      </button>
                     </div>
                   </MotionSurface>
                 )}
