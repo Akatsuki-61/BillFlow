@@ -26,9 +26,11 @@ import { motion } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
+import { DashboardMetricsProvider } from "@/components/dashboard/DashboardMetricsContext";
 import { useWidgetContext } from "@/context/WidgetContext";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { Timeframe } from "@/types/analytics";
+import type { DashboardPeriod } from "@/types/dashboard";
 import "./analytics.css";
 import { CashflowForecast } from "./CashflowForecast";
 
@@ -86,6 +88,12 @@ export default function AnalyticsView() {
 
   // Selected timeframe filter state: Month, Quarter, or Year
   const [timeframe, setTimeframe] = useState<Timeframe>("Quarter");
+  const analyticsPeriod: DashboardPeriod =
+    timeframe === "Month"
+      ? "month"
+      : timeframe === "Year"
+        ? "year"
+        : "quarter";
   const { invoices, currency: activeCurrency } = useReportingData();
   const { averageBilledPerClientCents, billedClientCount } = React.useMemo(
     () =>
@@ -278,8 +286,9 @@ export default function AnalyticsView() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-6">
-          {/* Section 1: KPI Metrics Bento Grid */}
+        <DashboardMetricsProvider period={analyticsPeriod}>
+          <div className="space-y-6">
+            {/* Section 1: KPI Metrics Bento Grid */}
           {metricWidgets.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -411,7 +420,8 @@ export default function AnalyticsView() {
               </div>
             </div>
           )}
-        </div>
+          </div>
+        </DashboardMetricsProvider>
       )}
 
       {/* CUSTOMIZE ANALYTICS WIDGETS MODAL */}

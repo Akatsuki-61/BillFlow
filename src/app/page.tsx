@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
+import { DashboardMetricsProvider } from "@/components/dashboard/DashboardMetricsContext";
 import { useWidgetContext } from "@/context/WidgetContext";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
@@ -447,8 +448,9 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : (
-        <div className="dashboard-grid grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4">
-          {pinnedWidgets.map((w, index) => {
+        <DashboardMetricsProvider period={period}>
+          <div className="dashboard-grid grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4">
+            {pinnedWidgets.map((w, index) => {
             const colSpan = getColSpanClass(w.id, w.size);
             const isCompact = (widgetSizes[w.id] || "normal") === "compact";
             const isOver = dragOverIndex === index;
@@ -520,7 +522,8 @@ export default function DashboardPage() {
               </motion.div>
             );
           })}
-        </div>
+          </div>
+        </DashboardMetricsProvider>
       )}
     </div>
   );

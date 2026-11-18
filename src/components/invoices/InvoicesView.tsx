@@ -72,8 +72,14 @@ import {
   ListChecks,
   Copy,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { formatInvoicePaymentSummary } from "@/lib/payment-summary";
-import { OverdueSummaryDialog } from "./OverdueSummaryDialog";
+
+const OverdueSummaryDialog = dynamic(
+  () =>
+    import("./OverdueSummaryDialog").then((m) => m.OverdueSummaryDialog),
+  { ssr: false, loading: () => null },
+);
 import {
   generateInvoicesCsv,
   generateInvoicesExcelWorkbook,
@@ -106,7 +112,11 @@ import type { AttachmentItem } from "@/types/workflow";
 import type { TaskItem } from "@/types/tasks";
 
 import "./invoices.css";
-import InvoiceDocumentSheet from "./InvoiceDocumentSheet";
+
+const InvoiceDocumentSheet = dynamic(
+  () => import("./InvoiceDocumentSheet"),
+  { ssr: false, loading: () => null },
+);
 
 const ACCENT_ICON_CLASS = "text-accent-deep-solid dark:text-accent";
 const ACCENT_EXPORT_BUTTON_CLASS =
@@ -4291,17 +4301,19 @@ export default function InvoicesView() {
       </MotionPresence>
 
       {/* Overdue Invoices Summary & Collections Modal */}
-      <OverdueSummaryDialog
-        isOpen={showOverdueSummary}
-        onClose={() => setShowOverdueSummary(false)}
-        invoices={allInvoices}
-        primaryCurrency={primaryCurrency}
-        freelancerName={settings?.businessName || ""}
-        paymentInstructions={settings?.paymentDetails}
-        onFilterToOverdue={() => setActiveTab("Overdue")}
-        onInspectInvoice={(inv) => setInspectingInvoice(inv)}
-        showToast={showToast}
-      />
+      {showOverdueSummary && (
+        <OverdueSummaryDialog
+          isOpen={showOverdueSummary}
+          onClose={() => setShowOverdueSummary(false)}
+          invoices={allInvoices}
+          primaryCurrency={primaryCurrency}
+          freelancerName={settings?.businessName || ""}
+          paymentInstructions={settings?.paymentDetails}
+          onFilterToOverdue={() => setActiveTab("Overdue")}
+          onInspectInvoice={(inv) => setInspectingInvoice(inv)}
+          showToast={showToast}
+        />
+      )}
 
       {/* Floating Backdrop for outside clicks */}
       {(actionMenu || statusMenu) && (

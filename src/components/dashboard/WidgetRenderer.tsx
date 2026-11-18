@@ -1,13 +1,11 @@
 "use client";
-import { useReportingData, ReportingGuard } from "@/context/ReportingContext";
-import { calculateFinancials } from "@/lib/financials";
+import { ReportingGuard } from "@/context/ReportingContext";
+import dynamic from "next/dynamic";
 
 import React, { useState, useMemo, useId } from "react";
 import Link from "next/link";
 import { MonthlyBars, DataDots } from "@/components/ui/DataGraphic";
 import {
-  issuedInPeriod,
-  isPastDue,
   sharePercent,
   taskProgress,
   recentMonths,
@@ -38,12 +36,70 @@ import { WidgetDisplaySize } from "@/types/widgets";
 import { useWidgetContext } from "@/context/WidgetContext";
 import { computeCashflowRunwayCard } from "@/lib/widgets/chartData";
 import "../analytics/analytics.css";
-import { LatencyPercentilesChart } from "./charts/LatencyPercentilesChart";
-import { PortfolioComparisonChart } from "./charts/PortfolioComparisonChart";
-import { GrowthBenchmarkChart } from "./charts/GrowthBenchmarkChart";
-import { AudienceGrowthChart } from "./charts/AudienceGrowthChart";
-import { ServiceTrendsLineChart } from "./charts/ServiceTrendsLineChart";
-import { ItemizedVolumeBarChart } from "./charts/ItemizedVolumeBarChart";
+import { useDashboardMetrics } from "./DashboardMetricsContext";
+
+function ChartLoadingSkeleton() {
+  return (
+    <div
+      className="min-h-[260px] w-full flex flex-col justify-between p-1 animate-pulse"
+      aria-hidden="true"
+    >
+      <div className="flex items-center justify-between">
+        <div className="h-4 w-28 rounded-md bg-surface-neutral-100" />
+        <div className="h-4 w-14 rounded-md bg-surface-neutral-100" />
+      </div>
+      <div className="h-[190px] w-full rounded-xl bg-surface-neutral-100/70" />
+    </div>
+  );
+}
+
+const LatencyPercentilesChart = dynamic(
+  () =>
+    import("./charts/LatencyPercentilesChart").then(
+      (m) => m.LatencyPercentilesChart,
+    ),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> },
+);
+
+const PortfolioComparisonChart = dynamic(
+  () =>
+    import("./charts/PortfolioComparisonChart").then(
+      (m) => m.PortfolioComparisonChart,
+    ),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> },
+);
+
+const GrowthBenchmarkChart = dynamic(
+  () =>
+    import("./charts/GrowthBenchmarkChart").then(
+      (m) => m.GrowthBenchmarkChart,
+    ),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> },
+);
+
+const AudienceGrowthChart = dynamic(
+  () =>
+    import("./charts/AudienceGrowthChart").then(
+      (m) => m.AudienceGrowthChart,
+    ),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> },
+);
+
+const ServiceTrendsLineChart = dynamic(
+  () =>
+    import("./charts/ServiceTrendsLineChart").then(
+      (m) => m.ServiceTrendsLineChart,
+    ),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> },
+);
+
+const ItemizedVolumeBarChart = dynamic(
+  () =>
+    import("./charts/ItemizedVolumeBarChart").then(
+      (m) => m.ItemizedVolumeBarChart,
+    ),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> },
+);
 
 let sharedTransparentDragCanvas: HTMLCanvasElement | null = null;
 function getTransparentDragCanvas(): HTMLCanvasElement | null {
@@ -87,45 +143,13 @@ function WidgetContent({
 }: WidgetRendererProps) {
   const router = useRouter();
   const pipelineId = useId();
-  const { invoices, expenses, workOrders, currency: activeCurrency } = useReportingData();
-  const { clients } = useClients();
-  const { vendors } = useVendors();
-  const { tasks } = useData();
-  const { draggedWidgetId, startWidgetDrag, endWidgetDrag } =
-    useWidgetContext();
-  const isBeingDragged = draggedWidgetId === widgetId;
-
-  const [hoveredFunnelIdx, setHoveredFunnelIdx] = useState<number | null>(null);
-
-  const activeTasks = useMemo(() => {
-    return tasks.filter((t) => t.status !== "done");
-  }, [tasks]);
-
-  const filteredInvoices = useMemo(
-    () => issuedInPeriod(invoices, activeCurrency, period),
-    [invoices, activeCurrency, period],
-  );
-
-  const financials = useMemo(
-    () =>
-      calculateFinancials({
-        invoices,
-        workOrders,
-        expenses,
-        tasks,
-        period,
-        currency: activeCurrency,
-      }),
-    [invoices, workOrders, expenses, tasks, period, activeCurrency],
-  );
-  const totalOutsourcedCents = financials.paidCostCents;
-
-  const outsourcedCostsStr = useMemo(() => {
-    return formatCents(totalOutsourcedCents, activeCurrency);
-  }, [totalOutsourcedCents, activeCurrency]);
-
-  // Aggregate metrics from live invoices
   const {
+    activeCurrency,
+    activeTasks,
+    filteredInvoices,
+    financials,
+    totalOutsourcedCents,
+    outsourcedCostsStr,
     totalRevenueCents,
     paidCount,
     paidCents,
@@ -137,234 +161,38 @@ function WidgetContent({
     paidRatioPct,
     avgInvoiceCents,
     avgInvoiceStr,
-  } = useMemo(() => {
-    if (filteredInvoices.length === 0) {
-      return {
-        totalRevenueCents: 0,
-        paidCount: 0,
-        paidCents: 0,
-        paidFullCents: 0,
-        advanceCentsCollected: 0,
-        advancePaidCount: 0,
-        pendingCents: 0,
-        pendingCount: 0,
-        paidRatioPct: 0,
-        avgInvoiceCents: 0,
-        avgInvoiceStr: formatCents(0, activeCurrency),
-      };
-    }
+    totalRevenueStr,
+    pendingReceivablesStr,
+    opexStr,
+    opexRatioPct,
+    isLoss,
+    netProfitStr,
+    marginPct,
+    totalClientsCount,
+    activeClientsCount,
+    topClient,
+    topClientPct,
+    effectiveHourlyRate,
+    totalTrackedHours,
+    overdueInvoices,
+    overdueTotalStr,
+    monthlyStats,
+    taskCounts,
+    pipelineStages,
+  } = useDashboardMetrics(period);
+  const { clients } = useClients();
+  const { vendors } = useVendors();
+  const { tasks } = useData();
+  const { draggedWidgetId, startWidgetDrag, endWidgetDrag } =
+    useWidgetContext();
+  const isBeingDragged = draggedWidgetId === widgetId;
 
-    let total = 0;
-    let paid = 0;
-    let paidAmt = 0;
-    let paidFull = 0;
-    let advAmt = 0;
-    let advCount = 0;
-    let pendingAmt = 0;
-    let pendingCnt = 0;
-
-    filteredInvoices.forEach((inv) => {
-      total += inv.amountCents;
-      const collected =
-        inv.paidCents ?? (inv.status === "PAID" ? inv.amountCents : 0);
-      paidAmt += collected;
-      if (inv.status === "PAID") {
-        paid += 1;
-        paidFull += inv.amountCents;
-      } else {
-        pendingCnt += 1;
-        if (inv.status === "ADVANCE_PAID" || collected > 0) {
-          advCount += 1;
-          advAmt += collected;
-        }
-        pendingAmt += Math.max(0, inv.amountCents - collected);
-      }
-    });
-
-    const ratio = total > 0 ? Math.round((paidAmt / total) * 100) : 0;
-    const avg =
-      filteredInvoices.length > 0
-        ? Math.round(total / filteredInvoices.length)
-        : 0;
-
-    return {
-      totalRevenueCents: total,
-      paidCount: paid,
-      paidCents: paidAmt,
-      paidFullCents: paidFull,
-      advanceCentsCollected: advAmt,
-      advancePaidCount: advCount,
-      pendingCents: pendingAmt,
-      pendingCount: pendingCnt,
-      paidRatioPct: ratio,
-      avgInvoiceCents: avg,
-      avgInvoiceStr: formatCents(avg, activeCurrency),
-    };
-  }, [filteredInvoices, activeCurrency]);
-
-  const totalRevenueStr = useMemo(() => {
-    return formatCents(totalRevenueCents, activeCurrency);
-  }, [totalRevenueCents, activeCurrency]);
-
-  const pendingReceivablesStr = useMemo(() => {
-    return formatCents(pendingCents, activeCurrency);
-  }, [pendingCents, activeCurrency]);
-
-  const opexCents = financials.totalOperatingCostsCents;
-
-  const opexStr = useMemo(() => {
-    return formatCents(opexCents, activeCurrency);
-  }, [opexCents, activeCurrency]);
-
-  const opexRatioPct = useMemo(() => {
-    if (totalRevenueCents <= 0) return 0;
-    return Math.round((opexCents / totalRevenueCents) * 100);
-  }, [opexCents, totalRevenueCents]);
-
-  const netProfitCents = useMemo(() => {
-    return financials.netProfitCents;
-  }, [financials.netProfitCents]);
-
-  const isLoss = netProfitCents < 0;
-
-  const netProfitStr = useMemo(() => {
-    return formatCents(netProfitCents, activeCurrency);
-  }, [netProfitCents, activeCurrency]);
-
-  const marginPct = useMemo(() => {
-    if (totalRevenueCents <= 0) return 0;
-    return Math.round((netProfitCents / totalRevenueCents) * 100);
-  }, [totalRevenueCents, netProfitCents]);
-
-  const totalClientsCount = clients.length;
-  const activeClientsCount = useMemo(() => {
-    return clients.filter(
-      (c) => c.invoicesCount > 0 || c.outstandingBalanceCents > 0,
-    ).length;
-  }, [clients]);
-
-  const topClient = useMemo(() => {
-    const totals = new Map<
-      string,
-      { name: string; totalBilledCents: number }
-    >();
-    filteredInvoices.forEach((invoice) => {
-      const key = invoice.clientId || `invoice:${invoice.id}`;
-      const current = totals.get(key) || {
-        name: invoice.clientName,
-        totalBilledCents: 0,
-      };
-      current.totalBilledCents += invoice.amountCents;
-      totals.set(key, current);
-    });
-    return [...totals.values()].sort(
-      (a, b) => b.totalBilledCents - a.totalBilledCents,
-    )[0];
-  }, [filteredInvoices]);
-  const topClientPct = sharePercent(
-    topClient?.totalBilledCents ?? 0,
-    totalRevenueCents,
-  );
-
-  const { effectiveHourlyRate, totalTrackedHours } = useMemo(() => {
-    const totalActiveMs = tasks.reduce(
-      (sum, t) => sum + (t.activeMilliseconds || 0),
-      0,
-    );
-    const hours = totalActiveMs / 3600000;
-    if (hours <= 0) {
-      return { effectiveHourlyRate: 0, totalTrackedHours: 0 };
-    }
-    const rate = Math.round(netProfitCents / 100 / hours);
-    return { effectiveHourlyRate: rate, totalTrackedHours: hours };
-  }, [tasks, netProfitCents]);
-
-  const overdueInvoices = useMemo(
-    () => filteredInvoices.filter((invoice) => isPastDue(invoice)),
-    [filteredInvoices],
-  );
-
-  const overdueTotalStr = useMemo(() => {
-    const cents = overdueInvoices.reduce(
-      (acc, inv) => acc + Math.max(0, inv.amountCents - (inv.paidCents ?? 0)),
-      0,
-    );
-    return formatCents(cents, activeCurrency);
-  }, [overdueInvoices, activeCurrency]);
+  const [hoveredFunnelIdx, setHoveredFunnelIdx] = useState<number | null>(null);
 
   const displayInvoices = useMemo(
     () => filteredInvoices.slice(0, displaySize === "compact" ? 2 : 4),
     [filteredInvoices, displaySize],
   );
-
-  const monthlyStats = financials.monthlyTrends;
-
-  // Task stage counts for Sprint Tasks visual breakdown
-  const taskCounts = useMemo(() => {
-    const todo = tasks.filter((t) => t.status === "todo").length;
-    const inProgress = tasks.filter((t) => t.status === "in-progress").length;
-    const review = tasks.filter((t) => t.status === "review").length;
-    const done = tasks.filter((t) => t.status === "done").length;
-    const total = tasks.length;
-    const donePct = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { todo, inProgress, review, done, total, donePct };
-  }, [tasks]);
-
-  // Independent measures on one zero-based scale; no simulated conversion stages.
-  const pipelineStages = useMemo(() => {
-    const values = [
-      totalRevenueCents,
-      paidCents,
-      pendingCents,
-      opexCents,
-      netProfitCents,
-    ];
-    const scale = Math.max(...values.map(Math.abs), 1);
-    return [
-      {
-        label: "Billed",
-        href: "/invoices",
-        value: totalRevenueCents,
-        sub: `${filteredInvoices.length} issued invoices`,
-      },
-      {
-        label: "Collected",
-        href: "/invoices",
-        value: paidCents,
-        sub: "Recorded payments",
-      },
-      {
-        label: "Outstanding",
-        href: "/invoices",
-        value: pendingCents,
-        sub: "Remaining client balances",
-      },
-      {
-        label: "Costs",
-        href: "/expenses",
-        value: opexCents,
-        sub: "Contractor fees + expenses",
-      },
-      {
-        label: "Net profit",
-        href: "/analytics",
-        value: netProfitCents,
-        sub: "Billed less recorded costs",
-      },
-    ].map((stage) => ({
-      ...stage,
-      valueStr: formatCents(stage.value, activeCurrency),
-      heightPct: (Math.abs(stage.value) / scale) * 100,
-    }));
-  }, [
-    totalRevenueCents,
-    paidCents,
-    pendingCents,
-    opexCents,
-    netProfitCents,
-    filteredInvoices.length,
-    activeCurrency,
-  ]);
 
   const isCompact = displaySize === "compact";
 
@@ -486,31 +314,11 @@ function WidgetContent({
   const [activeInsightIndex, setActiveInsightIndex] = useState(0);
 
   const insightSlides = useMemo(() => {
-    let totalBilledCents = 0;
-    let collectedCents = 0;
-
-    filteredInvoices.forEach((inv) => {
-      totalBilledCents += inv.amountCents;
-      const collected =
-        inv.paidCents ?? (inv.status === "PAID" ? inv.amountCents : 0);
-      collectedCents += collected;
-    });
-
-    const billedProfitCents = financials.netProfitCents;
-
-    const collectionRatePct =
-      totalBilledCents > 0
-        ? Math.round((collectedCents / totalBilledCents) * 100)
-        : 0;
-
-    const completedTasksCount = tasks.filter((t) => t.status === "done").length;
-    const activeClientsCount = clients.filter(
-      (c) => c.invoicesCount > 0 || c.outstandingBalanceCents > 0,
-    ).length;
+    if (widgetId !== "ai-insights") return [];
 
     return [
       {
-        metric: `${collectionRatePct}%`,
+        metric: `${paidRatioPct}%`,
         title:
           "Advance payment collection keeps project cashflow positive from day one",
         description:
@@ -519,8 +327,8 @@ function WidgetContent({
         actionHref: "/invoices",
       },
       {
-        metric: `${completedTasksCount}/${tasks.length}`,
-        title: `${completedTasksCount} of ${tasks.length} linked deliverables completed on the sprint board`,
+        metric: `${taskCounts.done}/${taskCounts.total}`,
+        title: `${taskCounts.done} of ${taskCounts.total} linked deliverables completed on the sprint board`,
         description:
           "Invoice line items convert into trackable Kanban deliverables with independent subcontractor outsourcing.",
         actionLabel: "Open Sprint Board",
@@ -535,7 +343,7 @@ function WidgetContent({
         actionHref: "/clients",
       },
       {
-        metric: formatCents(billedProfitCents, activeCurrency),
+        metric: netProfitStr,
         title: "Billed profit after recorded payouts and operating expenses",
         description:
           "Issued invoice totals less actual contractor payouts and recorded operating expenses, in the selected currency and period.",
@@ -544,11 +352,12 @@ function WidgetContent({
       },
     ];
   }, [
-    filteredInvoices,
-    financials.netProfitCents,
-    tasks,
-    clients,
-    activeCurrency,
+    widgetId,
+    paidRatioPct,
+    taskCounts.done,
+    taskCounts.total,
+    activeClientsCount,
+    netProfitStr,
   ]);
 
   // Render individual widget based on ID

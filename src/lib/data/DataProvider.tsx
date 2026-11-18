@@ -1763,75 +1763,211 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return getSystemCurrency(settings?.defaultCurrency, invoices, "USD");
   }, [settings?.defaultCurrency, invoices]);
 
+  const latestActions = {
+    workflow,
+    createCatalogItem,
+    updateCatalogItem,
+    deleteCatalogItem,
+    bulkImportCatalogItems,
+    createClient,
+    updateClient,
+    deleteClient,
+    createInvoice,
+    updateInvoice,
+    promoteInvoiceClient,
+    setInvoiceStatus,
+    recordPayment,
+    listPayments,
+    exportInvoicePdf,
+    saveInvoicePdfAs,
+    openInvoicePdf,
+    deleteInvoice,
+    getNextInvoiceCode,
+    createVendor,
+    updateVendor,
+    setVendorStatus,
+    deleteVendor,
+    createExpense,
+    updateExpense,
+    deleteExpense,
+    attachExpenseReceipt,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    createWorkOrder,
+    updateWorkOrder,
+    reviewWorkOrder,
+    recordWorkOrderPayout,
+    removeWorkOrderPayout,
+    setWorkOrderPayoutStatus,
+    deleteWorkOrder,
+    exportWorkOrderPdf,
+    openWorkOrderPdf,
+    updateSettings,
+    getDbPath,
+    revealDbFile,
+    exportData,
+    importData,
+    resetData,
+  };
+  const actionsRef = useRef(latestActions);
+  useEffect(() => {
+    actionsRef.current = latestActions;
+  });
+
+  const stableActions = useMemo<typeof latestActions>(
+    () => ({
+      workflow: {
+        tasks: {
+          reorder: (...args) =>
+            actionsRef.current.workflow.tasks.reorder(...args),
+          removeMany: (...args) =>
+            actionsRef.current.workflow.tasks.removeMany(...args),
+          undoRemove: (...args) =>
+            actionsRef.current.workflow.tasks.undoRemove(...args),
+          list: () => actionsRef.current.workflow.tasks.list(),
+          create: (...args) => actionsRef.current.workflow.tasks.create(...args),
+          update: (...args) => actionsRef.current.workflow.tasks.update(...args),
+          remove: (...args) => actionsRef.current.workflow.tasks.remove(...args),
+          history: (...args) =>
+            actionsRef.current.workflow.tasks.history(...args),
+        },
+        tracking: {
+          pending: () => actionsRef.current.workflow.tracking.pending(),
+          decide: (...args) =>
+            actionsRef.current.workflow.tracking.decide(...args),
+        },
+        attachments: {
+          list: (...args) =>
+            actionsRef.current.workflow.attachments.list(...args),
+          select: (...args) =>
+            actionsRef.current.workflow.attachments.select(...args),
+          chooseFile: () =>
+            actionsRef.current.workflow.attachments.chooseFile?.() ??
+            Promise.resolve(null),
+          open: (...args) =>
+            actionsRef.current.workflow.attachments.open(...args),
+        },
+        files: {
+          openDraft: (...args) =>
+            actionsRef.current.workflow.files.openDraft(...args),
+          selectPdfDirectory: () =>
+            actionsRef.current.workflow.files.selectPdfDirectory(),
+          openInvoicePdf: (...args) =>
+            actionsRef.current.workflow.files.openInvoicePdf(...args),
+        },
+      },
+      createCatalogItem: (...args) =>
+        actionsRef.current.createCatalogItem(...args),
+      updateCatalogItem: (...args) =>
+        actionsRef.current.updateCatalogItem(...args),
+      deleteCatalogItem: (...args) =>
+        actionsRef.current.deleteCatalogItem(...args),
+      bulkImportCatalogItems: (...args) =>
+        actionsRef.current.bulkImportCatalogItems(...args),
+      createClient: (...args) => actionsRef.current.createClient(...args),
+      updateClient: (...args) => actionsRef.current.updateClient(...args),
+      deleteClient: (...args) => actionsRef.current.deleteClient(...args),
+      createInvoice: (...args) => actionsRef.current.createInvoice(...args),
+      updateInvoice: (...args) => actionsRef.current.updateInvoice(...args),
+      promoteInvoiceClient: (...args) =>
+        actionsRef.current.promoteInvoiceClient(...args),
+      setInvoiceStatus: (...args) =>
+        actionsRef.current.setInvoiceStatus(...args),
+      recordPayment: (...args) => actionsRef.current.recordPayment(...args),
+      listPayments: (...args) => actionsRef.current.listPayments(...args),
+      exportInvoicePdf: (...args) =>
+        actionsRef.current.exportInvoicePdf(...args),
+      saveInvoicePdfAs: (...args) =>
+        actionsRef.current.saveInvoicePdfAs(...args),
+      openInvoicePdf: (...args) => actionsRef.current.openInvoicePdf(...args),
+      deleteInvoice: (...args) => actionsRef.current.deleteInvoice(...args),
+      getNextInvoiceCode: () => actionsRef.current.getNextInvoiceCode(),
+      createVendor: (...args) => actionsRef.current.createVendor(...args),
+      updateVendor: (...args) => actionsRef.current.updateVendor(...args),
+      setVendorStatus: (...args) => actionsRef.current.setVendorStatus(...args),
+      deleteVendor: (...args) => actionsRef.current.deleteVendor(...args),
+      createExpense: (...args) => actionsRef.current.createExpense(...args),
+      updateExpense: (...args) => actionsRef.current.updateExpense(...args),
+      deleteExpense: (...args) => actionsRef.current.deleteExpense(...args),
+      attachExpenseReceipt: (...args) =>
+        actionsRef.current.attachExpenseReceipt(...args),
+      createEvent: (...args) => actionsRef.current.createEvent(...args),
+      updateEvent: (...args) => actionsRef.current.updateEvent(...args),
+      deleteEvent: (...args) => actionsRef.current.deleteEvent(...args),
+      createWorkOrder: (...args) => actionsRef.current.createWorkOrder(...args),
+      updateWorkOrder: (...args) => actionsRef.current.updateWorkOrder(...args),
+      reviewWorkOrder: (...args) => actionsRef.current.reviewWorkOrder(...args),
+      recordWorkOrderPayout: (...args) =>
+        actionsRef.current.recordWorkOrderPayout(...args),
+      removeWorkOrderPayout: (...args) =>
+        actionsRef.current.removeWorkOrderPayout(...args),
+      setWorkOrderPayoutStatus: (...args) =>
+        actionsRef.current.setWorkOrderPayoutStatus(...args),
+      deleteWorkOrder: (...args) => actionsRef.current.deleteWorkOrder(...args),
+      exportWorkOrderPdf: (...args) =>
+        actionsRef.current.exportWorkOrderPdf(...args),
+      openWorkOrderPdf: (...args) =>
+        actionsRef.current.openWorkOrderPdf(...args),
+      updateSettings: (...args) => actionsRef.current.updateSettings(...args),
+      getDbPath: () => actionsRef.current.getDbPath(),
+      revealDbFile: () => actionsRef.current.revealDbFile(),
+      exportData: () => actionsRef.current.exportData(),
+      importData: (...args) => actionsRef.current.importData(...args),
+      resetData: () => actionsRef.current.resetData(),
+    }),
+    [],
+  );
+
+  const contextValue = useMemo(
+    () => ({
+      tasks,
+      trackingOffers,
+      getUnbilledCompletedTasks,
+      clients,
+      invoices,
+      vendors,
+      expenses,
+      workOrders,
+      events,
+      catalogItems,
+      dashboard,
+      settings,
+      backupStatus,
+      activeCurrency,
+      isLoading,
+      isElectron,
+      error,
+      refresh,
+      getAnalyticsSummary,
+      ...stableActions,
+    }),
+    [
+      tasks,
+      trackingOffers,
+      getUnbilledCompletedTasks,
+      clients,
+      invoices,
+      vendors,
+      expenses,
+      workOrders,
+      events,
+      catalogItems,
+      dashboard,
+      settings,
+      backupStatus,
+      activeCurrency,
+      isLoading,
+      isElectron,
+      error,
+      refresh,
+      getAnalyticsSummary,
+      stableActions,
+    ],
+  );
+
   return (
-    <DataContext.Provider
-      value={{
-        tasks,
-        trackingOffers,
-        workflow,
-        getUnbilledCompletedTasks,
-        clients,
-        invoices,
-        vendors,
-        expenses,
-        workOrders,
-        events,
-        catalogItems,
-        createCatalogItem,
-        updateCatalogItem,
-        deleteCatalogItem,
-        bulkImportCatalogItems,
-        dashboard,
-        settings,
-        backupStatus,
-        activeCurrency,
-        isLoading,
-        isElectron,
-        error,
-        refresh,
-        createClient,
-        updateClient,
-        deleteClient,
-        createInvoice,
-        updateInvoice,
-        promoteInvoiceClient,
-        setInvoiceStatus,
-        recordPayment,
-        listPayments,
-        exportInvoicePdf,
-        saveInvoicePdfAs,
-        openInvoicePdf,
-        deleteInvoice,
-        getNextInvoiceCode,
-        createVendor,
-        updateVendor,
-        setVendorStatus,
-        deleteVendor,
-        createExpense,
-        updateExpense,
-        deleteExpense,
-        attachExpenseReceipt,
-        createEvent,
-        updateEvent,
-        deleteEvent,
-        createWorkOrder,
-        updateWorkOrder,
-        reviewWorkOrder,
-        recordWorkOrderPayout,
-        removeWorkOrderPayout,
-        setWorkOrderPayoutStatus,
-        deleteWorkOrder,
-        exportWorkOrderPdf,
-        openWorkOrderPdf,
-        getAnalyticsSummary,
-        updateSettings,
-        getDbPath,
-        revealDbFile,
-        exportData,
-        importData,
-        resetData,
-      }}
-    >
+    <DataContext.Provider value={contextValue}>
       {children}
     </DataContext.Provider>
   );
@@ -1891,9 +2027,14 @@ export function useInvoices(filter?: { clientId?: string }) {
     refresh,
   } = useData();
 
-  const filteredInvoices = filter?.clientId
-    ? invoices.filter((i) => i.clientId === filter.clientId)
-    : invoices;
+  const clientId = filter?.clientId;
+  const filteredInvoices = useMemo(
+    () =>
+      clientId
+        ? invoices.filter((i) => i.clientId === clientId)
+        : invoices,
+    [invoices, clientId],
+  );
 
   return {
     invoices: filteredInvoices,

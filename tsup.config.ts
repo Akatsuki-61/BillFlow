@@ -11,6 +11,7 @@ export default defineConfig({
   external: ["electron", "better-sqlite3"],
   noExternal: [/^drizzle-orm(?:\/|$)/, /^pdf-lib(?:\/|$)/, /^zod(?:\/|$)/],
   clean: true,
-  sourcemap: true,
+  sourcemap: false,
+  minify: true,
   dts: false,
 });

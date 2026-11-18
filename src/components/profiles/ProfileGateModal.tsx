@@ -640,8 +640,8 @@ export function ProfileGateModal() {
           className="fixed inset-0 z-[120] flex flex-col overflow-y-auto select-none text-white app-no-drag"
           style={{
             backgroundColor: "rgba(8, 9, 13, 0.985)",
-            backdropFilter: "blur(64px) saturate(140%)",
-            WebkitBackdropFilter: "blur(64px) saturate(140%)",
+            backdropFilter: "blur(20px) saturate(140%)",
+            WebkitBackdropFilter: "blur(20px) saturate(140%)",
           }}
         >
           {/* Subtle Ambient Radial Glow that responds to active/hovered profile */}

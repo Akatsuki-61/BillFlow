@@ -64,7 +64,6 @@ import {
 import { formatCents } from "@/lib/format";
 import {
   resolveDeliveryUrl,
-  formatExternalUrl,
   openExternalLink,
 } from "@/lib/deliveryUrl";
 import type { VendorItem, WorkOrderItem } from "@/types/outsourcing";
