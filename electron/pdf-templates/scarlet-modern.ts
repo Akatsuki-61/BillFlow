@@ -3,10 +3,12 @@ import {
   escapeHtml,
   formatMoney,
   getBase64Logo,
+  getDocumentLabels,
   invoiceFontCss,
 } from "./helpers";
 
 export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
+  const labels = getDocumentLabels(data);
   const logoBase64 = getBase64Logo();
   const subtotalCents =
     data.items && data.items.length > 0
@@ -452,9 +454,9 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
       </div>
 
       <div class="meta-side">
-        <div class="invoice-title">INVOICE</div>
+        <div class="invoice-title">${escapeHtml(labels.title)}</div>
         <div class="meta-row">
-          <span class="meta-label">Invoice No.:</span>
+          <span class="meta-label">${escapeHtml(labels.codeLabel)}</span>
           <span class="meta-val">${escapeHtml(data.code)}</span>
         </div>
         <div class="meta-row">
@@ -465,7 +467,7 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
           data.dueDate
             ? `
         <div class="meta-row">
-          <span class="meta-label">Due Date:</span>
+          <span class="meta-label">${escapeHtml(labels.dueDateLabel)}</span>
           <span class="meta-val">${escapeHtml(data.dueDate)}</span>
         </div>`
             : ""
@@ -478,7 +480,7 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
   <div class="body-content">
     <div class="sub-header-grid">
       <div>
-        <div class="section-label">INVOICE TO:</div>
+        <div class="section-label">${escapeHtml(labels.recipientHeadingUpper)}</div>
         <div class="client-name">${escapeHtml(data.client.name)}</div>
         ${data.client.billingAddress ? `<div style="white-space:pre-line">${escapeHtml(data.client.billingAddress)}</div>` : ""}
         ${data.paymentUrl ? `<div><a href="${escapeHtml(data.paymentUrl)}">Pay online</a></div>` : ""}
@@ -508,10 +510,10 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
     <!-- TOTALS & SUMMARY -->
     <div class="totals-grid">
       <div>
-        <div class="due-box-label">${balanceDueCents > 0 ? "Total Due" : "Amount Settled"}</div>
-        <div class="due-amount">${formatMoney(balanceDueCents > 0 ? balanceDueCents : data.amountCents, data.currency)} ${escapeHtml(data.currency)}</div>
+        <div class="due-box-label">${labels.isQuote ? "Proposal Estimate" : balanceDueCents > 0 ? "Total Due" : "Amount Settled"}</div>
+        <div class="due-amount">${formatMoney(labels.isQuote ? data.amountCents : balanceDueCents > 0 ? balanceDueCents : data.amountCents, data.currency)} ${escapeHtml(data.currency)}</div>
         ${data.advanceCents ? `<div class="due-subtext">Required Advance: <strong>${formatMoney(data.advanceCents, data.currency)}</strong></div>` : ""}
-        ${paidCents > 0 ? `<div class="due-subtext" style="color: #059669;">Paid to date: <strong>${formatMoney(paidCents, data.currency)}</strong></div>` : ""}
+        ${!labels.isQuote && paidCents > 0 ? `<div class="due-subtext" style="color: #059669;">Paid to date: <strong>${formatMoney(paidCents, data.currency)}</strong></div>` : ""}
       </div>
 
       <div class="breakdown-box">
@@ -544,7 +546,7 @@ export function buildInvoiceHtmlScarletModern(data: InvoicePdfPayload): string {
 
     <!-- Solid Crimson Grand Total Bar -->
     <div class="grand-total-banner">
-      <span>Total:</span>
+      <span>${escapeHtml(labels.totalLabel)}</span>
       <span class="gt-amount">${formatMoney(data.amountCents, data.currency)}</span>
     </div>
 

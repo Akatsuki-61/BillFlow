@@ -2,7 +2,7 @@
 
 import { InvoiceSupplement } from "./InvoiceSupplement";
 import { ExternalLink, Phone, Mail, MapPin } from "lucide-react";
-import type { InvoiceTemplateProps } from "./types";
+import { getTemplateDocumentLabels, type InvoiceTemplateProps } from "./types";
 
 export function ApexOrangeTemplate({
   invoice,
@@ -11,10 +11,12 @@ export function ApexOrangeTemplate({
   delivery,
   businessName,
   professionalTitle,
+  documentKind,
   openExternalLink,
   formatMoney,
   formatDate,
 }: InvoiceTemplateProps) {
+  const labels = getTemplateDocumentLabels(documentKind);
   const subtotalCents =
     invoice.items && invoice.items.length > 0
       ? invoice.items.reduce(
@@ -90,11 +92,11 @@ export function ApexOrangeTemplate({
           {/* Right: INVOICE Title & Metadata inside Black Polygon (height 125px) */}
           <div className="text-right h-[125px] flex flex-col justify-center">
             <div className="text-[30px] font-black tracking-[2.5px] text-white uppercase leading-none mb-2">
-              INVOICE
+              {labels.title}
             </div>
             <div className="space-y-1.5 text-xs text-white/90">
               <div className="flex justify-end gap-4">
-                <span className="text-white/75 font-bold">Invoice No.:</span>
+                <span className="text-white/75 font-bold">{labels.codeLabel}</span>
                 <span className="font-extrabold text-white tabular-nums min-w-[95px] text-right">
                   {invoice.code}
                 </span>
@@ -107,7 +109,7 @@ export function ApexOrangeTemplate({
               </div>
               {invoice.dueDate && (
                 <div className="flex justify-end gap-4">
-                  <span className="text-white/75 font-bold">Due Date:</span>
+                  <span className="text-white/75 font-bold">{labels.dueDateLabel}</span>
                   <span className="font-semibold text-white min-w-[95px] text-right">
                     {formatDate(invoice.dueDate)}
                   </span>
@@ -125,7 +127,7 @@ export function ApexOrangeTemplate({
           {/* Left: INVOICE TO */}
           <div>
             <div className="text-[11px] font-black text-[#F25C05] uppercase tracking-wider mb-1">
-              INVOICE TO:
+              {labels.recipientHeadingUpper}
             </div>
             <h2 className="text-lg font-black text-slate-900 tracking-tight">
               {invoice.clientName}
@@ -279,7 +281,7 @@ export function ApexOrangeTemplate({
                 </div>
               ) : null}
 
-              {paidCents > 0 ? (
+              {!labels.isQuote && paidCents > 0 ? (
                 <div className="flex justify-between text-emerald-600 py-0.5">
                   <span className="font-semibold">Amount Paid:</span>
                   <span className="font-bold tabular-nums">
@@ -292,7 +294,7 @@ export function ApexOrangeTemplate({
             {/* Solid Orange Grand Total Bar */}
             <div className="w-full bg-[#F25C05] text-white px-4 py-2.5 rounded-sm flex justify-between items-center shadow-sm">
               <span className="text-sm font-black uppercase tracking-wider text-white">
-                Total:
+                {labels.totalLabel}
               </span>
               <span className="text-lg font-black text-white tabular-nums tracking-wide">
                 {formatMoney(invoice.amountCents, invoice.currency)}

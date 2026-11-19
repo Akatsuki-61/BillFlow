@@ -23,8 +23,34 @@ let activeProfileId = "default";
 let activeCustomMigrations: string | null = null;
 let startupError: Error | null = null;
 let workspaceGeneration = 0;
+let lastQuickCheckAt: string | null = null;
+let lastQuickCheckOk = false;
 export function getWorkspaceGeneration() {
   return workspaceGeneration;
+}
+export function getDatabaseHealth() {
+  return {
+    quickCheckOk: lastQuickCheckOk,
+    checkedAt: lastQuickCheckAt,
+  };
+}
+export function assertDatabaseQuickCheck(sqlite: Database.Database) {
+  const rows = sqlite.pragma("quick_check") as Array<{ quick_check: string }>;
+  const ok = rows.length === 1 && rows[0]?.quick_check === "ok";
+  if (!ok) {
+    lastQuickCheckOk = false;
+    lastQuickCheckAt = new Date().toISOString();
+    const details = rows
+      .map((row) => row.quick_check)
+      .filter(Boolean)
+      .slice(0, 5)
+      .join("; ");
+    throw new Error(
+      `SQLite quick_check failed (${details || "unknown corruption"}). Restore a known-good backup before continuing.`,
+    );
+  }
+  lastQuickCheckOk = true;
+  lastQuickCheckAt = new Date().toISOString();
 }
 
 export function getRootDatabasePath(): string {
@@ -533,6 +559,7 @@ export function initDatabase(customPath?: string, customMigrations?: string) {
     sqlite.pragma("synchronous = NORMAL");
     sqlite.pragma("temp_store = MEMORY");
     sqlite.pragma("foreign_keys = ON");
+    assertDatabaseQuickCheck(sqlite);
     hardenSqliteFiles(dbPath);
     backupBeforeUpgrade(sqlite, dbPath, customMigrations);
     migrateDatabase(sqlite, customMigrations);
@@ -610,6 +637,7 @@ export function switchWorkspaceDatabase(profileId: string) {
     sqlite.pragma("synchronous = NORMAL");
     sqlite.pragma("temp_store = MEMORY");
     sqlite.pragma("foreign_keys = ON");
+    assertDatabaseQuickCheck(sqlite);
     hardenSqliteFiles(targetDbPath);
     backupBeforeUpgrade(
       sqlite,
@@ -691,6 +719,8 @@ export function closeAllDatabases() {
   activeProfileId = "default";
   activeCustomMigrations = null;
   startupError = null;
+  lastQuickCheckAt = null;
+  lastQuickCheckOk = false;
 }
 
 export function closeDatabaseForTesting() {

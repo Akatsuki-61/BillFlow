@@ -2,7 +2,7 @@
 
 import { InvoiceSupplement } from "./InvoiceSupplement";
 import { ExternalLink } from "lucide-react";
-import type { InvoiceTemplateProps } from "./types";
+import { getTemplateDocumentLabels, type InvoiceTemplateProps } from "./types";
 
 export function GeometricTealTemplate({
   invoice,
@@ -11,10 +11,12 @@ export function GeometricTealTemplate({
   delivery,
   businessName,
   professionalTitle,
+  documentKind,
   openExternalLink,
   formatMoney,
   formatDate,
 }: InvoiceTemplateProps) {
+  const labels = getTemplateDocumentLabels(documentKind);
   const subtotalCents =
     invoice.items && invoice.items.length > 0
       ? invoice.items.reduce(
@@ -120,11 +122,11 @@ export function GeometricTealTemplate({
 
           <div className="sm:text-right pt-6">
             <div className="text-[38px] sm:text-[42px] font-black tracking-wide text-[#00A887] uppercase leading-none">
-              INVOICE
+              {labels.title}
             </div>
             <div className="mt-4 space-y-1.5 text-xs">
               <div className="flex sm:justify-end gap-4">
-                <span className="font-bold text-[#718096]">Invoice No.:</span>
+                <span className="font-bold text-[#718096]">{labels.codeLabel}</span>
                 <span className="font-extrabold text-[#1f262e] tabular-nums min-w-[95px] sm:text-right">
                   {invoice.code}
                 </span>
@@ -137,7 +139,7 @@ export function GeometricTealTemplate({
               </div>
               {invoice.dueDate && (
                 <div className="flex sm:justify-end gap-4">
-                  <span className="font-bold text-[#718096]">Due Date:</span>
+                  <span className="font-bold text-[#718096]">{labels.dueDateLabel}</span>
                   <span className="font-semibold text-[#1f262e] min-w-[95px] sm:text-right">
                     {formatDate(invoice.dueDate)}
                   </span>
@@ -201,7 +203,7 @@ export function GeometricTealTemplate({
           <div className="space-y-6">
             <div>
               <h3 className="text-sm font-extrabold text-[#00A887] mb-2">
-                Invoice to:
+                {labels.recipientHeading}
               </h3>
               <div className="text-xs text-[#1f262e] space-y-1 font-medium">
                 <p className="font-bold text-sm text-[#1f262e]">
@@ -268,7 +270,7 @@ export function GeometricTealTemplate({
 
             <div className="flex sm:justify-end items-baseline gap-6">
               <span className="text-base font-black text-[#00A887] uppercase tracking-wide">
-                Total:
+                {labels.totalLabel}
               </span>
               <span className="text-2xl font-black text-[#00A887] tabular-nums min-w-[120px]">
                 {formatMoney(invoice.amountCents, invoice.currency)}
@@ -284,7 +286,7 @@ export function GeometricTealTemplate({
               </div>
             ) : null}
 
-            {paidCents > 0 ? (
+            {!labels.isQuote && paidCents > 0 ? (
               <div className="flex sm:justify-end gap-8 text-emerald-600 font-bold">
                 <span>Amount Paid:</span>
                 <span className="tabular-nums min-w-[90px]">
@@ -293,12 +295,14 @@ export function GeometricTealTemplate({
               </div>
             ) : null}
 
-            <div className="flex sm:justify-end gap-8 text-[#1f262e] font-black pt-1">
-              <span>Balance Due:</span>
-              <span className="tabular-nums min-w-[90px]">
-                {formatMoney(balanceDueCents, invoice.currency)}
-              </span>
-            </div>
+            {!labels.isQuote && (
+              <div className="flex sm:justify-end gap-8 text-[#1f262e] font-black pt-1">
+                <span>Balance Due:</span>
+                <span className="tabular-nums min-w-[90px]">
+                  {formatMoney(balanceDueCents, invoice.currency)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -150,6 +150,21 @@ export const settings = sqliteTable("settings", {
   notificationPlacement: text("notification_placement"),
   typeface: text("typeface"),
   layoutDensity: text("layout_density"),
+  digestEnabled: integer("digest_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  digestLastSentDate: text("digest_last_sent_date"),
+  rollingBackupEnabled: integer("rolling_backup_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  rollingBackupDirectory: text("rolling_backup_directory"),
+  rollingBackupRetention: integer("rolling_backup_retention")
+    .notNull()
+    .default(10),
+  rollingBackupIntervalHours: integer("rolling_backup_interval_hours")
+    .notNull()
+    .default(24),
+  rollingBackupLastAt: text("rolling_backup_last_at"),
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(CURRENT_TIMESTAMP)`),
@@ -584,3 +599,120 @@ export const taskTimeSlots = sqliteTable("task_time_slots", {
   endTime: text("end_time"),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const recurringRules = sqliteTable(
+  "recurring_rules",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    cadence: text("cadence", {
+      enum: ["weekly", "biweekly", "monthly", "quarterly", "yearly"],
+    })
+      .notNull()
+      .default("monthly"),
+    dayOfMonth: integer("day_of_month"),
+    currency: text("currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
+      .notNull()
+      .default("USD"),
+    itemsJson: text("items_json").notNull(),
+    discountCents: integer("discount_cents").notNull().default(0),
+    taxCents: integer("tax_cents").notNull().default(0),
+    advanceCents: integer("advance_cents").notNull().default(0),
+    amountCents: integer("amount_cents").notNull(),
+    dueDays: integer("due_days").notNull().default(14),
+    autoStatus: text("auto_status", { enum: ["DRAFT", "UNPAID"] })
+      .notNull()
+      .default("DRAFT"),
+    autoExportPdf: integer("auto_export_pdf", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    notes: text("notes"),
+    deliveryUrl: text("delivery_url"),
+    paymentUrl: text("payment_url"),
+    template: text("template"),
+    nextRunDate: text("next_run_date").notNull(),
+    lastRunDate: text("last_run_date"),
+    lastInvoiceId: text("last_invoice_id").references(() => invoices.id, {
+      onDelete: "set null",
+    }),
+    isActive: integer("is_active", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (t) => [
+    index("recurring_rules_client_id_idx").on(t.clientId),
+    index("recurring_rules_active_next_idx").on(t.isActive, t.nextRunDate),
+  ],
+);
+
+export const quotes = sqliteTable(
+  "quotes",
+  {
+    id: text("id").primaryKey(),
+    code: text("code").notNull().unique(),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "restrict",
+    }),
+    clientSnapshot: text("client_snapshot"),
+    businessSnapshot: text("business_snapshot"),
+    title: text("title"),
+    currency: text("currency", { enum: ["USD", "LKR", "EUR", "GBP", "CAD"] })
+      .notNull()
+      .default("USD"),
+    discountCents: integer("discount_cents").notNull().default(0),
+    taxCents: integer("tax_cents").notNull().default(0),
+    advanceCents: integer("advance_cents").notNull().default(0),
+    amountCents: integer("amount_cents").notNull(),
+    issueDate: text("issue_date").notNull(),
+    validUntil: text("valid_until"),
+    status: text("status", {
+      enum: ["DRAFT", "SENT", "APPROVED", "DECLINED", "CONVERTED"],
+    })
+      .notNull()
+      .default("DRAFT"),
+    template: text("template"),
+    deliveryUrl: text("delivery_url"),
+    notes: text("notes"),
+    convertedInvoiceId: text("converted_invoice_id")
+      .unique()
+      .references(() => invoices.id, { onDelete: "set null" }),
+    convertedAt: text("converted_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (t) => [
+    index("quotes_client_id_idx").on(t.clientId),
+    index("quotes_status_idx").on(t.status),
+  ],
+);
+
+export const quoteItems = sqliteTable(
+  "quote_items",
+  {
+    id: text("id").primaryKey(),
+    quoteId: text("quote_id")
+      .notNull()
+      .references(() => quotes.id, { onDelete: "cascade" }),
+    catalogId: text("catalog_id").references(() => catalogItems.id, {
+      onDelete: "set null",
+    }),
+    description: text("description").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [index("quote_items_quote_id_idx").on(t.quoteId)],
+);

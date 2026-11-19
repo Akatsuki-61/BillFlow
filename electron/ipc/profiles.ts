@@ -1084,7 +1084,10 @@ function completeOnboardingTransaction(
   return listProfilesState();
 }
 
-export function registerProfileHandlers(broadcast: () => void) {
+export function registerProfileHandlers(
+  broadcast: () => void,
+  onWorkspaceUnlocked?: () => void,
+) {
   ipcMain.handle("profiles:lock", () => {
     lockProfileSession();
     broadcast();
@@ -1125,6 +1128,7 @@ export function registerProfileHandlers(broadcast: () => void) {
     try {
       const result = switchProfile(id, password);
       broadcast();
+      onWorkspaceUnlocked?.();
       return result;
     } catch (error) {
       throw formatError(error);
@@ -1158,6 +1162,7 @@ export function registerProfileHandlers(broadcast: () => void) {
       try {
         const result = completeProfileOnboarding(input);
         broadcast();
+        onWorkspaceUnlocked?.();
         return result;
       } catch (error) {
         throw formatError(error);

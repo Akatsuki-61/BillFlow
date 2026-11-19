@@ -52,6 +52,24 @@ export function formatMoney(cents: number, currency: string = "USD"): string {
   return `${symbol}${val}`;
 }
 
+export function getDocumentLabels(data: {
+  documentKind?: "invoice" | "quote";
+  documentTitle?: string;
+}) {
+  const isQuote = data.documentKind === "quote";
+  return {
+    isQuote,
+    title: data.documentTitle || (isQuote ? "PROPOSAL" : "INVOICE"),
+    codeLabel: isQuote ? "Quote No.:" : "Invoice No.:",
+    dueDateLabel: isQuote ? "Valid Until:" : "Due Date:",
+    recipientHeading: isQuote ? "Prepared for:" : "Invoice to:",
+    recipientHeadingUpper: isQuote ? "PREPARED FOR:" : "INVOICE TO:",
+    recipientToPrefix: isQuote ? "Prepared for:" : "To:",
+    totalLabel: isQuote ? "Estimated Total:" : "Total:",
+    grandTotalBannerLabel: isQuote ? "ESTIMATED TOTAL" : "GRAND TOTAL",
+  };
+}
+
 let cachedFontCss: string | undefined;
 export function invoiceFontCss(): string {
   if (cachedFontCss) return cachedFontCss;

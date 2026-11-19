@@ -56,6 +56,21 @@ import { registerTaskHandlers } from "./ipc/tasks";
 import { registerFileHandlers } from "./ipc/files";
 import { registerExpenseHandlers } from "./ipc/expenses";
 import { registerCalendarHandlers } from "./ipc/calendar";
+import {
+  registerEncryptedBackupHandlers,
+  runRollingEncryptedBackup,
+} from "./encrypted-backup";
+import {
+  registerRecurringHandlers,
+  runDueRecurringRules,
+} from "./ipc/recurring";
+import {
+  registerDigestHandlers,
+  maybeSendDailyDigest,
+  syncAppBadgeCount,
+} from "./digest";
+import { registerQuoteHandlers } from "./ipc/quotes";
+import { localDateKey } from "../src/lib/visual-metrics";
 
 import { registerThemeHandlers, windowThemeColors } from "./theme";
 import { registerCatalogHandlers } from "./ipc/catalog";
@@ -107,6 +122,9 @@ if (!gotSingleInstanceLock) {
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let maintenanceTimer: ReturnType<typeof setInterval> | null = null;
+let startupMaintenanceTimer: ReturnType<typeof setTimeout> | null = null;
+let maintenanceInFlight = false;
 const rendererCrashTimestamps: number[] = [];
 
 function appIconPath() {
@@ -140,6 +158,7 @@ function navigateToRoute(route: string) {
 
 function lockWorkspaceNow() {
   lockProfileSession();
+  syncAppBadgeCount({ tray });
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("workspace:locked");
   }
@@ -186,12 +205,40 @@ function createTray() {
 }
 
 function broadcastDataChanged() {
+  syncAppBadgeCount({ tray });
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("data:changed", {
       profileId: getActiveProfileId(),
       generation: getWorkspaceGeneration(),
       datasets: affectedDatasets(currentIpcChannel()),
     });
+  }
+}
+
+async function runBackgroundMaintenance() {
+  if (maintenanceInFlight || !isWorkspaceUnlocked()) return;
+  maintenanceInFlight = true;
+  try {
+    syncAppBadgeCount({ tray });
+    const recurringResult = await runDueRecurringRules(localDateKey(new Date()), {
+      autoExport: true,
+      notify: true,
+      navigate: navigateToRoute,
+    });
+    if (recurringResult.generated.length > 0 && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("data:changed", {
+        profileId: getActiveProfileId(),
+        generation: getWorkspaceGeneration(),
+        datasets: ["invoices", "clients", "dashboard", "recurringRules", "backupStatus"],
+      });
+    }
+    syncAppBadgeCount({ tray });
+    maybeSendDailyDigest({ navigate: navigateToRoute });
+    runRollingEncryptedBackup();
+  } catch (err) {
+    console.warn("Background maintenance warning:", err);
+  } finally {
+    maintenanceInFlight = false;
   }
 }
 
@@ -416,12 +463,16 @@ if (gotSingleInstanceLock) {
         )
           return;
         lockProfileSession();
+        syncAppBadgeCount({ tray });
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send("workspace:locked");
         }
       };
       powerMonitor.on("lock-screen", lockProtectedWorkspace);
       powerMonitor.on("suspend", lockProtectedWorkspace);
+      powerMonitor.on("resume", () => {
+        void runBackgroundMaintenance();
+      });
       registerWorkspaceHandlers(broadcastDataChanged);
       registerActivityHandlers(() => {
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -430,12 +481,18 @@ if (gotSingleInstanceLock) {
       });
       registerExchangeRateHandlers();
       registerStatementHandlers();
-      registerProfileHandlers(broadcastDataChanged);
+      registerProfileHandlers(broadcastDataChanged, () => {
+        void runBackgroundMaintenance();
+      });
       registerClientHandlers(broadcastDataChanged);
       registerInvoiceHandlers(broadcastDataChanged);
       registerDashboardHandlers();
       registerThemeHandlers();
       registerSettingsHandlers(broadcastDataChanged);
+      registerEncryptedBackupHandlers(broadcastDataChanged);
+      registerRecurringHandlers(broadcastDataChanged, navigateToRoute);
+      registerDigestHandlers(navigateToRoute, () => syncAppBadgeCount({ tray }));
+      registerQuoteHandlers(broadcastDataChanged);
       registerVendorHandlers(broadcastDataChanged);
       registerWorkOrderHandlers(broadcastDataChanged);
       registerAnalyticsHandlers();
@@ -475,6 +532,15 @@ if (gotSingleInstanceLock) {
       createTray();
       setupAboutPanel();
       createApplicationMenu(() => mainWindow, showMainWindow);
+      syncAppBadgeCount({ tray });
+      startupMaintenanceTimer = setTimeout(() => {
+        startupMaintenanceTimer = null;
+        void runBackgroundMaintenance();
+      }, 2000);
+      maintenanceTimer = setInterval(
+        () => void runBackgroundMaintenance(),
+        15 * 60 * 1000,
+      );
       if (process.platform === "darwin") {
         app.dock?.setMenu(
           Menu.buildFromTemplate(
@@ -509,6 +575,14 @@ if (gotSingleInstanceLock) {
   });
 
   app.on("before-quit", () => {
+    if (startupMaintenanceTimer) {
+      clearTimeout(startupMaintenanceTimer);
+      startupMaintenanceTimer = null;
+    }
+    if (maintenanceTimer) {
+      clearInterval(maintenanceTimer);
+      maintenanceTimer = null;
+    }
     destroyPdfWindowPool();
     tray?.destroy();
     tray = null;

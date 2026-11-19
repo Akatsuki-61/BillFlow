@@ -10,6 +10,8 @@ import type { ExpenseItem } from "./expenses";
 import type { TaskItem } from "./tasks";
 import type { CalendarEventItem } from "./calendar";
 import type { TrackingOffer } from "./workflow";
+import type { RecurringRuleItem } from "./recurring";
+import type { QuoteWithClient } from "./quotes";
 export const WORKSPACE_DATASETS = [
   "clients",
   "invoices",
@@ -23,6 +25,8 @@ export const WORKSPACE_DATASETS = [
   "workOrders",
   "events",
   "backupStatus",
+  "recurringRules",
+  "quotes",
 ] as const;
 export type WorkspaceDataset = (typeof WORKSPACE_DATASETS)[number];
 export interface WorkspaceSnapshot {
@@ -40,6 +44,8 @@ export interface WorkspaceSnapshot {
   workOrders?: WorkOrderItem[];
   events?: CalendarEventItem[];
   backupStatus?: BackupStatus;
+  recurringRules?: RecurringRuleItem[];
+  quotes?: QuoteWithClient[];
 }
 export interface WorkspaceChange {
   profileId: string;
@@ -73,6 +79,22 @@ function domainDatasets(channel: string): WorkspaceDataset[] {
       "trackingOffers",
       "workOrders",
       "expenses",
+      "quotes",
+      "recurringRules",
+    ];
+  if (domain === "recurring")
+    return [
+      "recurringRules",
+      "invoices",
+      "clients",
+      "dashboard",
+    ];
+  if (domain === "quotes")
+    return [
+      "quotes",
+      "invoices",
+      "clients",
+      "dashboard",
     ];
   if (domain === "clients") return ["clients", "invoices", "dashboard"];
   if (domain === "tasks" || domain === "tracking")

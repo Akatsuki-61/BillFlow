@@ -2,7 +2,7 @@
 
 import { InvoiceSupplement } from "./InvoiceSupplement";
 import { ExternalLink, Phone, Mail, MapPin } from "lucide-react";
-import type { InvoiceTemplateProps } from "./types";
+import { getTemplateDocumentLabels, type InvoiceTemplateProps } from "./types";
 
 export function ScarletModernTemplate({
   invoice,
@@ -11,10 +11,12 @@ export function ScarletModernTemplate({
   delivery,
   businessName,
   professionalTitle,
+  documentKind,
   openExternalLink,
   formatMoney,
   formatDate,
 }: InvoiceTemplateProps) {
+  const labels = getTemplateDocumentLabels(documentKind);
   const subtotalCents =
     invoice.items && invoice.items.length > 0
       ? invoice.items.reduce(
@@ -90,11 +92,11 @@ export function ScarletModernTemplate({
           {/* Right: INVOICE Title & Metadata */}
           <div className="text-right">
             <div className="text-[32px] font-black tracking-[2px] text-white uppercase leading-none mb-2">
-              INVOICE
+              {labels.title}
             </div>
             <div className="space-y-1.5 text-xs text-white/90">
               <div className="flex justify-end gap-4">
-                <span className="text-white/75 font-bold">Invoice No.:</span>
+                <span className="text-white/75 font-bold">{labels.codeLabel}</span>
                 <span className="font-extrabold text-white tabular-nums min-w-[95px] text-right">
                   {invoice.code}
                 </span>
@@ -107,7 +109,7 @@ export function ScarletModernTemplate({
               </div>
               {invoice.dueDate && (
                 <div className="flex justify-end gap-4">
-                  <span className="text-white/75 font-bold">Due Date:</span>
+                  <span className="text-white/75 font-bold">{labels.dueDateLabel}</span>
                   <span className="font-semibold text-white min-w-[95px] text-right">
                     {formatDate(invoice.dueDate)}
                   </span>
@@ -125,7 +127,7 @@ export function ScarletModernTemplate({
           {/* Left: INVOICE TO */}
           <div>
             <div className="text-[11px] font-black text-[#E5252A] uppercase tracking-wider mb-1">
-              INVOICE TO:
+              {labels.recipientHeadingUpper}
             </div>
             <h2 className="text-lg font-black text-slate-900 tracking-tight">
               {invoice.clientName}
@@ -222,11 +224,19 @@ export function ScarletModernTemplate({
           {/* Left: Big Total Due */}
           <div>
             <div className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
-              {balanceDueCents > 0 ? "Total Due" : "Amount Settled"}
+              {labels.isQuote
+                ? "Proposal Estimate"
+                : balanceDueCents > 0
+                  ? "Total Due"
+                  : "Amount Settled"}
             </div>
             <div className="text-[28px] font-black text-[#E5252A] tabular-nums mt-1 leading-none tracking-tight">
               {formatMoney(
-                balanceDueCents > 0 ? balanceDueCents : invoice.amountCents,
+                labels.isQuote
+                  ? invoice.amountCents
+                  : balanceDueCents > 0
+                    ? balanceDueCents
+                    : invoice.amountCents,
                 invoice.currency,
               )}{" "}
               {invoice.currency}
@@ -239,7 +249,7 @@ export function ScarletModernTemplate({
                 </span>
               </div>
             ) : null}
-            {paidCents > 0 ? (
+            {!labels.isQuote && paidCents > 0 ? (
               <div className="text-xs text-emerald-600 font-semibold mt-0.5">
                 Paid to date:{" "}
                 <span className="font-bold">
@@ -281,7 +291,7 @@ export function ScarletModernTemplate({
         {/* Solid Crimson Grand Total Bar */}
         <div className="w-full bg-[#E5252A] text-white px-5 py-2.5 rounded-sm flex justify-between items-center mb-6 shadow-sm">
           <span className="text-sm font-black uppercase tracking-wider text-white">
-            Total:
+            {labels.totalLabel}
           </span>
           <span className="text-lg font-black text-white tabular-nums tracking-wide">
             {formatMoney(invoice.amountCents, invoice.currency)}

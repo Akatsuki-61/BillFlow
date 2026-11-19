@@ -72,6 +72,7 @@ import {
   FileSpreadsheet,
   ListChecks,
   Copy,
+  TrendingUp,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { formatInvoicePaymentSummary } from "@/lib/payment-summary";
@@ -116,6 +117,21 @@ import "./invoices.css";
 
 const InvoiceDocumentSheet = dynamic(
   () => import("./InvoiceDocumentSheet"),
+  { ssr: false, loading: () => null },
+);
+const QuotesTab = dynamic(
+  () => import("./QuotesTab").then((m) => m.QuotesTab),
+  { ssr: false, loading: () => null },
+);
+const RecurringRulesTab = dynamic(
+  () => import("./RecurringRulesTab").then((m) => m.RecurringRulesTab),
+  { ssr: false, loading: () => null },
+);
+const ProjectMarginDrawer = dynamic(
+  () =>
+    import("@/components/analytics/ProjectMarginDrawer").then(
+      (m) => m.ProjectMarginDrawer,
+    ),
   { ssr: false, loading: () => null },
 );
 
@@ -205,6 +221,25 @@ export default function InvoicesView() {
   // Document Design Preview Sheet Modal
   const [previewInvoice, setPreviewInvoice] =
     useState<InvoiceWithClient | null>(null);
+  const [marginDrawerInvoice, setMarginDrawerInvoice] =
+    useState<InvoiceWithClient | null>(null);
+
+  const requestedViewParam = searchParams.get("view");
+  const resolvedViewMode =
+    requestedViewParam === "quotes"
+      ? "quotes"
+      : requestedViewParam === "recurring"
+        ? "recurring"
+        : "invoices";
+  const [viewMode, setViewMode] = useState<
+    "invoices" | "quotes" | "recurring"
+  >(resolvedViewMode);
+  const [prevRequestedViewParam, setPrevRequestedViewParam] =
+    useState(requestedViewParam);
+  if (prevRequestedViewParam !== requestedViewParam) {
+    setPrevRequestedViewParam(requestedViewParam);
+    setViewMode(resolvedViewMode);
+  }
 
   const getSampleInvoice = (): InvoiceWithClient =>
     buildSampleInvoice(settings);
@@ -2100,10 +2135,31 @@ export default function InvoicesView() {
         </div>
       </PageHeader>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegmentedControl
+          label="Billing section switcher"
+          value={viewMode}
+          onChange={(val) =>
+            setViewMode(val as "invoices" | "quotes" | "recurring")
+          }
+          options={[
+            { value: "invoices", label: "Invoices" },
+            { value: "quotes", label: "Proposals & Quotes" },
+            { value: "recurring", label: "Recurring Retainers" },
+          ]}
+        />
+      </div>
+
       {/* =====================================================================
           ZENTRA 3-CARD INVOICES BENTO HEADER ROW
          ===================================================================== */}
       <WorkspaceActivityPanel exportsOnly />
+      {viewMode === "quotes" ? (
+        <QuotesTab onConvertedToInvoice={() => setViewMode("invoices")} />
+      ) : viewMode === "recurring" ? (
+        <RecurringRulesTab onInvoiceGenerated={() => setViewMode("invoices")} />
+      ) : (
+        <>
       <ReportingGuard>
         {(() => {
           const issued = reporting.invoices.filter(
@@ -2822,6 +2878,8 @@ export default function InvoicesView() {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* Add Invoice Modal with Itemized Services, Advance & PDF Export */}
       <MotionPresence>
@@ -4543,6 +4601,20 @@ export default function InvoicesView() {
               onClick={() => {
                 const inv = actionMenu.invoice;
                 setActionMenu(null);
+                setMarginDrawerInvoice(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors text-content-neutral-900 font-semibold"
+            >
+              <TrendingUp className={`w-3.5 h-3.5 ${ACCENT_ICON_CLASS}`} />
+              <span>Project Margin (P&amp;L)</span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
                 void handleOpenPdf(inv);
               }}
               className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
@@ -4728,6 +4800,15 @@ export default function InvoicesView() {
                 handleOpenPayment(inv);
               }
             }}
+          />
+        )}
+      </MotionPresence>
+      <MotionPresence>
+        {marginDrawerInvoice && (
+          <ProjectMarginDrawer
+            mode="invoice"
+            invoice={marginDrawerInvoice}
+            onClose={() => setMarginDrawerInvoice(null)}
           />
         )}
       </MotionPresence>

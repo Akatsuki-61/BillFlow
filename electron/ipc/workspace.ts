@@ -26,6 +26,8 @@ import { listTasks, pendingTracking } from "./tasks";
 import { listExpenses } from "./expenses";
 import { listWorkOrders } from "./workOrders";
 import { listCalendarEvents } from "./calendar";
+import { listRecurringRules } from "./recurring";
+import { listQuotes } from "./quotes";
 export function loadWorkspaceSnapshot(
   requested: WorkspaceDataset[] = [...WORKSPACE_DATASETS],
 ): WorkspaceSnapshot {
@@ -81,6 +83,12 @@ export function loadWorkspaceSnapshot(
           break;
         case "events":
           snapshot.events = listCalendarEvents();
+          break;
+        case "recurringRules":
+          snapshot.recurringRules = listRecurringRules();
+          break;
+        case "quotes":
+          snapshot.quotes = listQuotes();
           break;
       }
     }

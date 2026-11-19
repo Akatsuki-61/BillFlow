@@ -3,10 +3,12 @@ import {
   escapeHtml,
   formatMoney,
   getBase64Logo,
+  getDocumentLabels,
   invoiceFontCss,
 } from "./helpers";
 
 export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
+  const labels = getDocumentLabels(data);
   const logoBase64 = getBase64Logo();
   const subtotalCents =
     data.items && data.items.length > 0
@@ -374,10 +376,10 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
       </div>
 
       <div class="invoice-title-block">
-        <div class="invoice-title">INVOICE</div>
+        <div class="invoice-title">${escapeHtml(labels.title)}</div>
         <div class="meta-table">
           <div class="meta-row">
-            <span class="meta-label">Invoice No.:</span>
+            <span class="meta-label">${escapeHtml(labels.codeLabel)}</span>
             <span class="meta-val">${escapeHtml(data.code)}</span>
           </div>
           <div class="meta-row">
@@ -388,7 +390,7 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
             data.dueDate
               ? `
           <div class="meta-row">
-            <span class="meta-label">Due Date:</span>
+            <span class="meta-label">${escapeHtml(labels.dueDateLabel)}</span>
             <span class="meta-val">${escapeHtml(data.dueDate)}</span>
           </div>`
               : ""
@@ -417,7 +419,7 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
     <!-- 2-Column Info -->
     <div class="two-columns">
       <div>
-        <div class="col-heading">Invoice to:</div>
+        <div class="col-heading">${escapeHtml(labels.recipientHeading)}</div>
         <div class="client-name">${escapeHtml(data.client.name)}</div>
         ${data.client.billingAddress ? `<div style="white-space:pre-line">${escapeHtml(data.client.billingAddress)}</div>` : ""}
         ${data.paymentUrl ? `<div><a href="${escapeHtml(data.paymentUrl)}">Pay online</a></div>` : ""}
@@ -454,7 +456,7 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
           }
           <div class="totals-divider"></div>
           <div class="final-total-row">
-            <span class="final-total-label">Total:</span>
+            <span class="final-total-label">${escapeHtml(labels.totalLabel)}</span>
             <span class="final-total-amount">${formatMoney(data.amountCents, data.currency)}</span>
           </div>
           ${
@@ -467,7 +469,7 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
               : ""
           }
           ${
-            paidCents > 0
+            !labels.isQuote && paidCents > 0
               ? `
           <div class="totals-row" style="color: #059669;">
             <span style="font-weight: 700;">Amount Paid:</span>
@@ -475,10 +477,15 @@ export function buildInvoiceHtmlGeometricTeal(data: InvoicePdfPayload): string {
           </div>`
               : ""
           }
+          ${
+            !labels.isQuote
+              ? `
           <div class="totals-row">
             <span style="font-weight: 800; color: #1F262E;">Balance Due:</span>
             <span class="val" style="font-weight: 900; color: #1F262E;">${formatMoney(balanceDueCents, data.currency)}</span>
-          </div>
+          </div>`
+              : ""
+          }
         </div>
       </div>
     </div>

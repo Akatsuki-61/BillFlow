@@ -3,10 +3,12 @@ import {
   escapeHtml,
   formatMoney,
   getBase64Logo,
+  getDocumentLabels,
   invoiceFontCss,
 } from "./helpers";
 
 export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
+  const labels = getDocumentLabels(data);
   const logoBase64 = getBase64Logo();
   const subtotalCents =
     data.items && data.items.length > 0
@@ -429,7 +431,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
     <!-- CLIENT & META -->
     <div class="client-and-meta">
       <div class="client-box">
-        <div class="to-label">To:</div>
+        <div class="to-label">${escapeHtml(labels.recipientToPrefix)}</div>
         <div class="client-name">${escapeHtml(data.client.name)}</div>
         ${data.client.billingAddress ? `<div style="white-space:pre-line">${escapeHtml(data.client.billingAddress)}</div>` : ""}
         ${data.paymentUrl ? `<div><a href="${escapeHtml(data.paymentUrl)}">Pay online</a></div>` : ""}
@@ -439,9 +441,9 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
       </div>
 
       <div class="invoice-meta-box">
-        <div class="invoice-hero">INVOICE</div>
+        <div class="invoice-hero">${escapeHtml(labels.title)}</div>
         <div class="meta-row">
-          <span class="meta-label">Invoice No.:</span>
+          <span class="meta-label">${escapeHtml(labels.codeLabel)}</span>
           <span class="meta-val">${escapeHtml(data.code)}</span>
         </div>
         <div class="meta-row">
@@ -452,7 +454,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
           data.dueDate
             ? `
         <div class="meta-row">
-          <span class="meta-label">Due Date:</span>
+          <span class="meta-label">${escapeHtml(labels.dueDateLabel)}</span>
           <span class="meta-val">${escapeHtml(data.dueDate)}</span>
         </div>`
             : ""
@@ -517,7 +519,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
             : ""
         }
         ${
-          paidCents > 0
+          !labels.isQuote && paidCents > 0
             ? `
           <div class="totals-line">
             <span>Amount Paid:</span>
@@ -527,7 +529,7 @@ export function buildInvoiceHtmlExecutiveWave(data: InvoicePdfPayload): string {
             : ""
         }
         <div class="grand-total-banner">
-          <span>GRAND TOTAL</span>
+          <span>${escapeHtml(labels.grandTotalBannerLabel)}</span>
           <span class="gt-amount">${formatMoney(data.amountCents, data.currency)}</span>
         </div>
       </div>

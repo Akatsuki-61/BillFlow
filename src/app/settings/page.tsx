@@ -79,6 +79,13 @@ const InvoiceDocumentSheet = dynamic(
   () => import("@/components/invoices/InvoiceDocumentSheet"),
   { ssr: false },
 );
+const EncryptedBackupCard = dynamic(
+  () =>
+    import("@/components/settings/EncryptedBackupCard").then(
+      (m) => m.EncryptedBackupCard,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 type SettingsTab = "profile" | "invoices" | "data" | "appearance";
 
@@ -2135,6 +2142,8 @@ function SettingsContent() {
                       </div>
                     </div>
                   </div>
+
+                  <EncryptedBackupCard />
 
                   {/* Reset Data */}
                   <div className="ui-card p-6 space-y-4 ui-card--danger">
