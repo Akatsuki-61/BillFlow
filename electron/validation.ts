@@ -286,6 +286,21 @@ export const updateSettingsSchema = z.object({
     )
     .nullable()
     .optional(),
+  digestEnabled: z.boolean().optional(),
+  digestLastSentDate: invoiceDate.nullable().optional(),
+  rollingBackupEnabled: z.boolean().optional(),
+  rollingBackupDirectory: z
+    .string()
+    .max(4096)
+    .refine(
+      (value) => path.isAbsolute(value),
+      "Choose an absolute encrypted backup folder",
+    )
+    .nullable()
+    .optional(),
+  rollingBackupRetention: z.number().int().min(1).max(100).optional(),
+  rollingBackupIntervalHours: z.number().int().min(1).max(720).optional(),
+  rollingBackupLastAt: timestamp.nullable().optional(),
 });
 
 export const newVendorSchema = z.object({
@@ -499,3 +514,118 @@ export const newCalendarEventSchema = z.object({
 });
 
 export const calendarEventPatchSchema = newCalendarEventSchema.partial();
+
+export const recurringCadenceSchema = z.enum([
+  "weekly",
+  "biweekly",
+  "monthly",
+  "quarterly",
+  "yearly",
+]);
+
+export const recurringLineItemSchema = z.object({
+  description: z.string().trim().min(1, "Description is required").max(500),
+  quantity: z
+    .number()
+    .int()
+    .positive("Quantity must be positive")
+    .max(1_000_000)
+    .default(1),
+  unitPriceCents: minorAmount,
+  catalogId: z.string().nullable().optional(),
+});
+
+const invoiceTemplateSchema = z
+  .enum([
+    "geometric-teal",
+    "executive-wave",
+    "scarlet-modern",
+    "apex-orange",
+    "noir-crimson",
+  ])
+  .nullable()
+  .optional();
+
+export const newRecurringRuleSchema = z.object({
+  clientId: recordId,
+  title: z.string().trim().min(1, "Retainer title is required").max(160),
+  cadence: recurringCadenceSchema.default("monthly"),
+  dayOfMonth: z.number().int().min(1).max(31).nullable().optional(),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
+  items: z.array(recurringLineItemSchema).min(1).max(500),
+  discountCents: minorAmount.optional().default(0),
+  taxCents: minorAmount.optional().default(0),
+  advanceCents: minorAmount.optional().default(0),
+  amountCents: minorAmount,
+  dueDays: z.number().int().min(0).max(365).default(14),
+  autoStatus: z.enum(["DRAFT", "UNPAID"]).default("DRAFT"),
+  autoExportPdf: z.boolean().default(true),
+  notes: z.string().trim().max(1000).nullable().optional(),
+  deliveryUrl: deliveryLink,
+  paymentUrl: onlinePaymentUrl,
+  template: invoiceTemplateSchema,
+  nextRunDate: invoiceDate,
+  isActive: z.boolean().optional().default(true),
+});
+
+export const recurringRulePatchSchema = newRecurringRuleSchema.partial();
+
+export const quoteStatusSchema = z.enum([
+  "DRAFT",
+  "SENT",
+  "APPROVED",
+  "DECLINED",
+  "CONVERTED",
+]);
+
+export const newQuoteSchema = z
+  .object({
+    clientId: z.string().min(1).optional(),
+    newClient: newClientSchema.optional(),
+    saveAsPermanentClient: z.boolean().optional().default(true),
+    code: z.string().trim().min(1).max(40).optional(),
+    title: z.string().trim().max(160).optional(),
+    items: z.array(recurringLineItemSchema).min(1).max(500),
+    discountCents: minorAmount.optional().default(0),
+    taxCents: minorAmount.optional().default(0),
+    advanceCents: minorAmount.optional().default(0),
+    amountCents: minorAmount,
+    currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
+    issueDate: invoiceDate.optional(),
+    validUntil: invoiceDate.nullable().optional(),
+    status: z
+      .enum(["DRAFT", "SENT", "APPROVED", "DECLINED"])
+      .default("DRAFT"),
+    template: invoiceTemplateSchema,
+    deliveryUrl: deliveryLink,
+    notes: z.string().trim().max(1000).nullable().optional(),
+  })
+  .refine(
+    (input) => Boolean(input.clientId) !== Boolean(input.newClient),
+    "Select a client or provide new client details.",
+  );
+
+export const quotePatchSchema = z.object({
+  clientId: z.string().min(1).optional(),
+  code: z.string().trim().min(1).max(40).optional(),
+  title: z.string().trim().max(160).nullable().optional(),
+  items: z.array(recurringLineItemSchema).min(1).max(500).optional(),
+  discountCents: minorAmount.optional(),
+  taxCents: minorAmount.optional(),
+  advanceCents: minorAmount.optional(),
+  amountCents: minorAmount.optional(),
+  currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
+  issueDate: invoiceDate.optional(),
+  validUntil: invoiceDate.nullable().optional(),
+  status: z.enum(["DRAFT", "SENT", "APPROVED", "DECLINED"]).optional(),
+  template: invoiceTemplateSchema,
+  deliveryUrl: deliveryLink,
+  notes: z.string().trim().max(1000).nullable().optional(),
+});
+
+export const convertQuoteSchema = z.object({
+  quoteId: recordId,
+  status: z.enum(["DRAFT", "UNPAID"]).optional().default("UNPAID"),
+  dueDate: invoiceDate.nullable().optional(),
+  advanceCents: minorAmount.optional(),
+});

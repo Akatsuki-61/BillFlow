@@ -23,7 +23,23 @@ import type {
   AppSettings,
   UpdateSettingsInput,
   ExportDataPayload,
+  RollingBackupStatus,
+  FinancialDigestSummary,
 } from "./settings";
+import type {
+  RecurringRuleItem,
+  NewRecurringRuleInput,
+  RecurringRulePatchInput,
+  RecurringRunResult,
+} from "./recurring";
+import type {
+  QuoteWithClient,
+  NewQuoteInput,
+  QuotePatchInput,
+  QuoteStatus,
+  ConvertQuoteInput,
+  ConvertQuoteResult,
+} from "./quotes";
 import type {
   VendorItem,
   NewVendorInput,
@@ -329,6 +345,96 @@ export interface BillFlowAPI extends WorkflowAPI {
       skipped?: number;
     }>;
     reset: () => Promise<{ success: boolean }>;
+    saveEncryptedBackup?: (passphrase: string) => Promise<SaveFileResult>;
+    chooseRollingBackupDirectory?: () => Promise<string | null>;
+    getRollingBackupStatus?: () => Promise<RollingBackupStatus>;
+    configureRollingBackup?: (input: {
+      enabled?: boolean;
+      directory?: string | null;
+      retention?: number;
+      intervalHours?: number;
+      passphrase?: string;
+      clearPassphrase?: boolean;
+    }) => Promise<RollingBackupStatus>;
+    runRollingBackupNow?: (passphraseOverride?: string) => Promise<{
+      ran: boolean;
+      reason?: string;
+      filePath?: string;
+      prunedCount?: number;
+      status: RollingBackupStatus;
+    }>;
+    chooseEncryptedBackupFile?: () => Promise<
+      | { canceled: true }
+      | {
+          canceled: false;
+          token: string;
+          fileName: string;
+          fileSize: number;
+        }
+    >;
+    preflightEncryptedBackup?: (
+      token: string,
+      passphrase: string,
+      mode?: "replace" | "merge",
+    ) => Promise<{
+      success: boolean;
+      importedClients: number;
+      importedInvoices: number;
+      exportedAt: string;
+      receiptsCount: number;
+    }>;
+    restoreEncryptedBackup?: (
+      token: string,
+      passphrase: string,
+      mode?: "replace" | "merge",
+    ) => Promise<{
+      success: boolean;
+      importedClients: number;
+      importedInvoices: number;
+      skipped?: number;
+    }>;
+  };
+  recurring?: {
+    list: () => Promise<RecurringRuleItem[]>;
+    create: (input: NewRecurringRuleInput) => Promise<RecurringRuleItem>;
+    update: (
+      id: string,
+      patch: RecurringRulePatchInput,
+    ) => Promise<RecurringRuleItem>;
+    toggle: (id: string, isActive: boolean) => Promise<RecurringRuleItem>;
+    remove: (id: string) => Promise<{ success: boolean }>;
+    runNow: (id: string) => Promise<{
+      rule: RecurringRuleItem;
+      invoice: InvoiceWithClient;
+      pdfPath?: string | null;
+    }>;
+    runDue: () => Promise<RecurringRunResult>;
+  };
+  quotes?: {
+    list: (clientId?: string) => Promise<QuoteWithClient[]>;
+    nextCode: () => Promise<string>;
+    create: (input: NewQuoteInput) => Promise<QuoteWithClient>;
+    update: (id: string, patch: QuotePatchInput) => Promise<QuoteWithClient>;
+    setStatus: (
+      id: string,
+      status: Exclude<QuoteStatus, "CONVERTED">,
+    ) => Promise<QuoteWithClient>;
+    remove: (id: string) => Promise<{ success: boolean }>;
+    exportPdf: (
+      id: string,
+      template?: string,
+    ) => Promise<{ success: boolean; filePath: string }>;
+    savePdfAs: (id: string, template?: string) => Promise<SaveFileResult>;
+    openPdf: (id: string, reveal?: boolean) => Promise<{ success: boolean }>;
+    convertToInvoice: (input: ConvertQuoteInput) => Promise<ConvertQuoteResult>;
+  };
+  digest?: {
+    summary: () => Promise<FinancialDigestSummary>;
+    sendTest: () => Promise<{
+      sent: boolean;
+      reason?: string;
+      summary: FinancialDigestSummary;
+    }>;
   };
   onWorkspaceLocked?: (callback: () => void) => () => void;
   onDataChanged: (callback: (change?: WorkspaceChange) => void) => () => void;

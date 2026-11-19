@@ -3,10 +3,12 @@ import {
   escapeHtml,
   formatMoney,
   getBase64Logo,
+  getDocumentLabels,
   invoiceFontCss,
 } from "./helpers";
 
 export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
+  const labels = getDocumentLabels(data);
   const logoBase64 = getBase64Logo();
   const subtotalCents =
     data.items && data.items.length > 0
@@ -444,9 +446,9 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
       </div>
 
       <div class="meta-side">
-        <div class="invoice-title">INVOICE</div>
+        <div class="invoice-title">${escapeHtml(labels.title)}</div>
         <div class="meta-row">
-          <span class="meta-label">Invoice No.:</span>
+          <span class="meta-label">${escapeHtml(labels.codeLabel)}</span>
           <span class="meta-val">${escapeHtml(data.code)}</span>
         </div>
         <div class="meta-row">
@@ -457,7 +459,7 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
           data.dueDate
             ? `
         <div class="meta-row">
-          <span class="meta-label">Due Date:</span>
+          <span class="meta-label">${escapeHtml(labels.dueDateLabel)}</span>
           <span class="meta-val">${escapeHtml(data.dueDate)}</span>
         </div>`
             : ""
@@ -470,7 +472,7 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
   <div class="body-content">
     <div class="sub-header-grid">
       <div>
-        <div class="section-label">INVOICE TO:</div>
+        <div class="section-label">${escapeHtml(labels.recipientHeadingUpper)}</div>
         <div class="client-name">${escapeHtml(data.client.name)}</div>
         ${data.client.billingAddress ? `<div style="white-space:pre-line">${escapeHtml(data.client.billingAddress)}</div>` : ""}
         ${data.paymentUrl ? `<div><a href="${escapeHtml(data.paymentUrl)}">Pay online</a></div>` : ""}
@@ -546,7 +548,7 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
               : ""
           }
           ${
-            paidCents > 0
+            !labels.isQuote && paidCents > 0
               ? `
             <div class="breakdown-line" style="color: #059669;">
               <span>Amount Paid:</span>
@@ -559,7 +561,7 @@ export function buildInvoiceHtmlApexOrange(data: InvoicePdfPayload): string {
 
         <!-- Solid Orange Total Bar -->
         <div class="grand-total-banner">
-          <span>Total:</span>
+          <span>${escapeHtml(labels.totalLabel)}</span>
           <span class="gt-amount">${formatMoney(data.amountCents, data.currency)}</span>
         </div>
       </div>

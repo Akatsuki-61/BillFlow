@@ -59,6 +59,12 @@ interface InvoiceDocumentSheetProps {
   onRecordPayment?: () => void;
   initialTemplate?: InvoiceTemplateId;
   onSelectTemplate?: (templateId: InvoiceTemplateId) => void;
+  documentKind?: "invoice" | "quote";
+  onSavePdfAs?: (
+    templateId: InvoiceTemplateId,
+  ) => Promise<
+    { success: boolean; canceled?: boolean; filePath?: string } | undefined
+  >;
 }
 
 const TEMPLATES: Array<{
@@ -111,6 +117,8 @@ export default function InvoiceDocumentSheet({
   onRecordPayment,
   initialTemplate,
   onSelectTemplate,
+  documentKind = "invoice",
+  onSavePdfAs,
 }: InvoiceDocumentSheetProps) {
   const activityProfile = activeProfileScope();
   const { settings: currentSettings } = useSettings();
@@ -236,6 +244,17 @@ export default function InvoiceDocumentSheet({
     setIsSavingPdf(true);
     setSavedNotice(null);
     try {
+      if (onSavePdfAs) {
+        const result = await onSavePdfAs(selectedTemplate);
+        if (result?.success && result.filePath) {
+          const fileName =
+            result.filePath.split(/[\\/]/).pop() || "document.pdf";
+          setSavedNotice(`Saved: ${fileName}`);
+          setTimeout(() => setSavedNotice(null), 4500);
+        }
+        return;
+      }
+      if (documentKind === "quote") return;
       const draft: NewInvoiceInput | undefined =
         invoice.id === "draft-preview"
           ? {
@@ -458,7 +477,9 @@ export default function InvoiceDocumentSheet({
       {/* 1. DIALOG HEADER WITH TEMPLATE PICKER */}
       <div className="app-dialog-header flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3>Invoice Preview</h3>
+          <h3>
+            {documentKind === "quote" ? "Proposal Preview" : "Invoice Preview"}
+          </h3>
           <p className="flex items-center gap-2 mt-1 text-xs">
             <span className="font-bold text-accent">{invoice.code}</span>
             <span className="text-content-neutral-300 dark:text-neutral-600">
@@ -613,6 +634,7 @@ export default function InvoiceDocumentSheet({
             delivery={delivery}
             businessName={businessName}
             professionalTitle={professionalTitle}
+            documentKind={documentKind}
             openExternalLink={openExternalLink}
             formatMoney={formatCents}
             formatDate={formatDateDisplay}
@@ -626,6 +648,7 @@ export default function InvoiceDocumentSheet({
             delivery={delivery}
             businessName={businessName}
             professionalTitle={professionalTitle}
+            documentKind={documentKind}
             openExternalLink={openExternalLink}
             formatMoney={formatCents}
             formatDate={formatDateDisplay}
@@ -639,6 +662,7 @@ export default function InvoiceDocumentSheet({
             delivery={delivery}
             businessName={businessName}
             professionalTitle={professionalTitle}
+            documentKind={documentKind}
             openExternalLink={openExternalLink}
             formatMoney={formatCents}
             formatDate={formatDateDisplay}
@@ -652,6 +676,7 @@ export default function InvoiceDocumentSheet({
             delivery={delivery}
             businessName={businessName}
             professionalTitle={professionalTitle}
+            documentKind={documentKind}
             openExternalLink={openExternalLink}
             formatMoney={formatCents}
             formatDate={formatDateDisplay}
@@ -665,6 +690,7 @@ export default function InvoiceDocumentSheet({
             delivery={delivery}
             businessName={businessName}
             professionalTitle={professionalTitle}
+            documentKind={documentKind}
             openExternalLink={openExternalLink}
             formatMoney={formatCents}
             formatDate={formatDateDisplay}
@@ -707,7 +733,8 @@ export default function InvoiceDocumentSheet({
         </Button>
 
         {/* Share Button & Dropdown */}
-        <div className="relative" ref={shareDropdownRef}>
+        {documentKind !== "quote" && (
+          <div className="relative" ref={shareDropdownRef}>
           <Button
             variant="secondary"
             type="button"
@@ -794,9 +821,12 @@ export default function InvoiceDocumentSheet({
               </m.div>
             )}
           </AnimatePresence>
-        </div>
+          </div>
+        )}
 
-        {onRecordPayment && invoice.status !== "PAID" && (
+        {documentKind !== "quote" &&
+          onRecordPayment &&
+          invoice.status !== "PAID" && (
           <Button variant="secondary" type="button" onClick={onRecordPayment}>
             <CreditCard className="w-4 h-4 text-emerald-500" />
             <span>Record Payment</span>

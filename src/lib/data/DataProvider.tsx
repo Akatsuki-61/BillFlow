@@ -64,6 +64,20 @@ import type {
   NewCalendarEventInput,
   CalendarEventPatchInput,
 } from "@/types/calendar";
+import type {
+  RecurringRuleItem,
+  NewRecurringRuleInput,
+  RecurringRulePatchInput,
+  RecurringRunResult,
+} from "@/types/recurring";
+import type {
+  QuoteWithClient,
+  NewQuoteInput,
+  QuotePatchInput,
+  QuoteStatus,
+  ConvertQuoteInput,
+  ConvertQuoteResult,
+} from "@/types/quotes";
 
 interface DataContextType {
   tasks: TaskItem[];
@@ -81,6 +95,8 @@ interface DataContextType {
   expenses: ExpenseItem[];
   workOrders: WorkOrderItem[];
   events: CalendarEventItem[];
+  recurringRules: RecurringRuleItem[];
+  quotes: QuoteWithClient[];
   catalogItems: CatalogItem[];
   dashboard: DashboardSummary | null;
   settings: AppSettings | null;
@@ -189,6 +205,42 @@ interface DataContextType {
     importedInvoices: number;
   }>;
   resetData: () => Promise<void>;
+  createRecurringRule: (input: NewRecurringRuleInput) => Promise<RecurringRuleItem>;
+  updateRecurringRule: (
+    id: string,
+    patch: RecurringRulePatchInput,
+  ) => Promise<RecurringRuleItem>;
+  toggleRecurringRule: (
+    id: string,
+    isActive: boolean,
+  ) => Promise<RecurringRuleItem>;
+  deleteRecurringRule: (id: string) => Promise<void>;
+  runRecurringRuleNow: (id: string) => Promise<{
+    rule: RecurringRuleItem;
+    invoice: InvoiceWithClient;
+    pdfPath?: string | null;
+  }>;
+  runDueRecurringRules: () => Promise<RecurringRunResult>;
+  getNextQuoteCode: () => Promise<string>;
+  createQuote: (input: NewQuoteInput) => Promise<QuoteWithClient>;
+  updateQuote: (id: string, patch: QuotePatchInput) => Promise<QuoteWithClient>;
+  setQuoteStatus: (
+    id: string,
+    status: Exclude<QuoteStatus, "CONVERTED">,
+  ) => Promise<QuoteWithClient>;
+  deleteQuote: (id: string) => Promise<void>;
+  exportQuotePdf: (
+    id: string,
+    template?: string,
+  ) => Promise<{ success: boolean; filePath: string }>;
+  saveQuotePdfAs: (
+    id: string,
+    template?: string,
+  ) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>;
+  openQuotePdf: (id: string, reveal?: boolean) => Promise<void>;
+  convertQuoteToInvoice: (
+    input: ConvertQuoteInput,
+  ) => Promise<ConvertQuoteResult>;
 }
 
 type RefreshFn = (datasets?: WorkspaceDataset[]) => Promise<void>;
@@ -296,6 +348,35 @@ interface TasksContextValue {
   refresh: RefreshFn;
 }
 
+interface RecurringContextValue {
+  recurringRules: RecurringRuleItem[];
+  isLoading: boolean;
+  error: string | null;
+  createRecurringRule: DataContextType["createRecurringRule"];
+  updateRecurringRule: DataContextType["updateRecurringRule"];
+  toggleRecurringRule: DataContextType["toggleRecurringRule"];
+  deleteRecurringRule: DataContextType["deleteRecurringRule"];
+  runRecurringRuleNow: DataContextType["runRecurringRuleNow"];
+  runDueRecurringRules: DataContextType["runDueRecurringRules"];
+  refresh: RefreshFn;
+}
+
+interface QuotesContextValue {
+  quotes: QuoteWithClient[];
+  isLoading: boolean;
+  error: string | null;
+  getNextQuoteCode: DataContextType["getNextQuoteCode"];
+  createQuote: DataContextType["createQuote"];
+  updateQuote: DataContextType["updateQuote"];
+  setQuoteStatus: DataContextType["setQuoteStatus"];
+  deleteQuote: DataContextType["deleteQuote"];
+  exportQuotePdf: DataContextType["exportQuotePdf"];
+  saveQuotePdfAs: DataContextType["saveQuotePdfAs"];
+  openQuotePdf: DataContextType["openQuotePdf"];
+  convertQuoteToInvoice: DataContextType["convertQuoteToInvoice"];
+  refresh: RefreshFn;
+}
+
 const DataContext = createContext<DataContextType | null>(null);
 const RefreshContext = createContext<RefreshFn | null>(null);
 const CurrencyContext = createContext<{ activeCurrency: Currency } | null>(
@@ -309,6 +390,8 @@ const WorkOrdersContext = createContext<WorkOrdersContextValue | null>(null);
 const CatalogContext = createContext<CatalogContextValue | null>(null);
 const ExpensesContext = createContext<ExpensesContextValue | null>(null);
 const TasksContext = createContext<TasksContextValue | null>(null);
+const RecurringContext = createContext<RecurringContextValue | null>(null);
+const QuotesContext = createContext<QuotesContextValue | null>(null);
 
 function checkIsElectron(): boolean {
   return typeof window !== "undefined" && Boolean(window.billflow?.isElectron);
@@ -371,6 +454,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrderItem[]>([]);
   const [events, setEvents] = useState<CalendarEventItem[]>([]);
+  const [recurringRules, setRecurringRules] = useState<RecurringRuleItem[]>([]);
+  const [quotes, setQuotes] = useState<QuoteWithClient[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -444,21 +529,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           isElectron: true,
         };
       }
-      return {
-        clients: [],
-        invoices: [],
-        vendors: [],
-        expenses: [],
-        catalogItems: [],
-        tasks: [],
-        workOrders: [],
-        events: [],
-        trackingOffers: [],
-        isElectron: false,
-      };
-    },
-    [],
-  );
+        return {
+          clients: [],
+          invoices: [],
+          vendors: [],
+          expenses: [],
+          catalogItems: [],
+          tasks: [],
+          workOrders: [],
+          events: [],
+          recurringRules: [],
+          quotes: [],
+          trackingOffers: [],
+          isElectron: false,
+        };
+      },
+      [],
+    );
 
   const refreshQueue = useRef<Promise<void>>(Promise.resolve());
   const pendingRefresh = useRef<{
@@ -477,6 +564,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setExpenses([]);
     setWorkOrders([]);
     setEvents([]);
+    setRecurringRules([]);
+    setQuotes([]);
     setCatalogItems([]);
     setSettings(null);
     setBackupStatus(null);
@@ -545,6 +634,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
                 if (snapshot.expenses) setExpenses(snapshot.expenses);
                 if (snapshot.workOrders) setWorkOrders(snapshot.workOrders);
                 if (snapshot.events) setEvents(snapshot.events);
+                if (snapshot.recurringRules)
+                  setRecurringRules(snapshot.recurringRules);
+                if (snapshot.quotes) setQuotes(snapshot.quotes);
                 if (snapshot.catalogItems)
                   setCatalogItems(snapshot.catalogItems);
                 if (snapshot.backupStatus)
@@ -828,6 +920,78 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     await requireDesktop().events.remove(id);
   };
 
+  const createRecurringRule = async (
+    input: NewRecurringRuleInput,
+  ): Promise<RecurringRuleItem> => requireDesktop().recurring!.create(input);
+
+  const updateRecurringRule = async (
+    id: string,
+    patch: RecurringRulePatchInput,
+  ): Promise<RecurringRuleItem> =>
+    requireDesktop().recurring!.update(id, patch);
+
+  const toggleRecurringRule = async (
+    id: string,
+    isActive: boolean,
+  ): Promise<RecurringRuleItem> =>
+    requireDesktop().recurring!.toggle(id, isActive);
+
+  const deleteRecurringRule = async (id: string): Promise<void> => {
+    await requireDesktop().recurring!.remove(id);
+  };
+
+  const runRecurringRuleNow = async (id: string) =>
+    requireDesktop().recurring!.runNow(id);
+
+  const runDueRecurringRules = async (): Promise<RecurringRunResult> =>
+    requireDesktop().recurring!.runDue();
+
+  const getNextQuoteCode = async (): Promise<string> =>
+    requireDesktop().quotes!.nextCode();
+
+  const createQuote = async (
+    input: NewQuoteInput,
+  ): Promise<QuoteWithClient> => requireDesktop().quotes!.create(input);
+
+  const updateQuote = async (
+    id: string,
+    patch: QuotePatchInput,
+  ): Promise<QuoteWithClient> => requireDesktop().quotes!.update(id, patch);
+
+  const setQuoteStatus = async (
+    id: string,
+    status: Exclude<QuoteStatus, "CONVERTED">,
+  ): Promise<QuoteWithClient> =>
+    requireDesktop().quotes!.setStatus(id, status);
+
+  const deleteQuote = async (id: string): Promise<void> => {
+    await requireDesktop().quotes!.remove(id);
+  };
+
+  const exportQuotePdf = async (
+    id: string,
+    template?: string,
+  ): Promise<{ success: boolean; filePath: string }> =>
+    requireDesktop().quotes!.exportPdf(id, template);
+
+  const saveQuotePdfAs = async (
+    id: string,
+    template?: string,
+  ): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> =>
+    requireDesktop().quotes!.savePdfAs(id, template);
+
+  const openQuotePdf = async (
+    id: string,
+    reveal = false,
+  ): Promise<void> => {
+    await requireDesktop().quotes!.openPdf(id, reveal);
+  };
+
+  const convertQuoteToInvoice = async (
+    input: ConvertQuoteInput,
+  ): Promise<ConvertQuoteResult> =>
+    requireDesktop().quotes!.convertToInvoice(input);
+
   const workflow: WorkflowAPI = {
     tasks: {
       reorder: (id, target, placement) =>
@@ -948,6 +1112,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     exportData,
     importData,
     resetData,
+    createRecurringRule,
+    updateRecurringRule,
+    toggleRecurringRule,
+    deleteRecurringRule,
+    runRecurringRuleNow,
+    runDueRecurringRules,
+    getNextQuoteCode,
+    createQuote,
+    updateQuote,
+    setQuoteStatus,
+    deleteQuote,
+    exportQuotePdf,
+    saveQuotePdfAs,
+    openQuotePdf,
+    convertQuoteToInvoice,
   };
   const actionsRef = useRef(latestActions);
   useLayoutEffect(() => {
@@ -1060,6 +1239,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       exportData: () => actionsRef.current.exportData(),
       importData: (...args) => actionsRef.current.importData(...args),
       resetData: () => actionsRef.current.resetData(),
+      createRecurringRule: (...args) =>
+        actionsRef.current.createRecurringRule(...args),
+      updateRecurringRule: (...args) =>
+        actionsRef.current.updateRecurringRule(...args),
+      toggleRecurringRule: (...args) =>
+        actionsRef.current.toggleRecurringRule(...args),
+      deleteRecurringRule: (...args) =>
+        actionsRef.current.deleteRecurringRule(...args),
+      runRecurringRuleNow: (...args) =>
+        actionsRef.current.runRecurringRuleNow(...args),
+      runDueRecurringRules: () => actionsRef.current.runDueRecurringRules(),
+      getNextQuoteCode: () => actionsRef.current.getNextQuoteCode(),
+      createQuote: (...args) => actionsRef.current.createQuote(...args),
+      updateQuote: (...args) => actionsRef.current.updateQuote(...args),
+      setQuoteStatus: (...args) => actionsRef.current.setQuoteStatus(...args),
+      deleteQuote: (...args) => actionsRef.current.deleteQuote(...args),
+      exportQuotePdf: (...args) => actionsRef.current.exportQuotePdf(...args),
+      saveQuotePdfAs: (...args) => actionsRef.current.saveQuotePdfAs(...args),
+      openQuotePdf: (...args) => actionsRef.current.openQuotePdf(...args),
+      convertQuoteToInvoice: (...args) =>
+        actionsRef.current.convertQuoteToInvoice(...args),
     }),
     [],
   );
@@ -1204,6 +1404,41 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
+  const recurringContextValue = useMemo<RecurringContextValue>(
+    () => ({
+      recurringRules,
+      isLoading,
+      error,
+      createRecurringRule: stableActions.createRecurringRule,
+      updateRecurringRule: stableActions.updateRecurringRule,
+      toggleRecurringRule: stableActions.toggleRecurringRule,
+      deleteRecurringRule: stableActions.deleteRecurringRule,
+      runRecurringRuleNow: stableActions.runRecurringRuleNow,
+      runDueRecurringRules: stableActions.runDueRecurringRules,
+      refresh,
+    }),
+    [recurringRules, isLoading, error, stableActions, refresh],
+  );
+
+  const quotesContextValue = useMemo<QuotesContextValue>(
+    () => ({
+      quotes,
+      isLoading,
+      error,
+      getNextQuoteCode: stableActions.getNextQuoteCode,
+      createQuote: stableActions.createQuote,
+      updateQuote: stableActions.updateQuote,
+      setQuoteStatus: stableActions.setQuoteStatus,
+      deleteQuote: stableActions.deleteQuote,
+      exportQuotePdf: stableActions.exportQuotePdf,
+      saveQuotePdfAs: stableActions.saveQuotePdfAs,
+      openQuotePdf: stableActions.openQuotePdf,
+      convertQuoteToInvoice: stableActions.convertQuoteToInvoice,
+      refresh,
+    }),
+    [quotes, isLoading, error, stableActions, refresh],
+  );
+
   const contextValue = useMemo(
     () => ({
       tasks,
@@ -1215,6 +1450,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       expenses,
       workOrders,
       events,
+      recurringRules,
+      quotes,
       catalogItems,
       dashboard,
       settings,
@@ -1237,6 +1474,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       expenses,
       workOrders,
       events,
+      recurringRules,
+      quotes,
       catalogItems,
       dashboard,
       settings,
@@ -1262,9 +1501,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
                   <CatalogContext.Provider value={catalogContextValue}>
                     <ExpensesContext.Provider value={expensesContextValue}>
                       <TasksContext.Provider value={tasksContextValue}>
-                        <DataContext.Provider value={contextValue}>
-                          {children}
-                        </DataContext.Provider>
+                        <RecurringContext.Provider
+                          value={recurringContextValue}
+                        >
+                          <QuotesContext.Provider value={quotesContextValue}>
+                            <DataContext.Provider value={contextValue}>
+                              {children}
+                            </DataContext.Provider>
+                          </QuotesContext.Provider>
+                        </RecurringContext.Provider>
                       </TasksContext.Provider>
                     </ExpensesContext.Provider>
                   </CatalogContext.Provider>
@@ -1390,6 +1635,22 @@ export function useTasks() {
   const context = useContext(TasksContext);
   if (!context) {
     throw new Error("useTasks must be used within a DataProvider");
+  }
+  return context;
+}
+
+export function useRecurringRules() {
+  const context = useContext(RecurringContext);
+  if (!context) {
+    throw new Error("useRecurringRules must be used within a DataProvider");
+  }
+  return context;
+}
+
+export function useQuotes() {
+  const context = useContext(QuotesContext);
+  if (!context) {
+    throw new Error("useQuotes must be used within a DataProvider");
   }
   return context;
 }

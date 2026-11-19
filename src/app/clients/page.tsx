@@ -45,7 +45,9 @@ import {
   Edit3,
   Search,
   RotateCcw,
+  TrendingUp,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useClients, useInvoices, useData } from "@/lib/data/DataProvider";
 import {
   formatCents,
@@ -54,7 +56,19 @@ import {
   getCurrencySymbol,
 } from "@/lib/format";
 import { openExternalLink } from "@/lib/deliveryUrl";
-import type { ClientWithStats, Currency } from "@/types/billing";
+import type {
+  ClientWithStats,
+  Currency,
+  InvoiceWithClient,
+} from "@/types/billing";
+
+const ProjectMarginDrawer = dynamic(
+  () =>
+    import("@/components/analytics/ProjectMarginDrawer").then(
+      (m) => m.ProjectMarginDrawer,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 function ClientsContent() {
   const reporting = useReportingData();
@@ -107,6 +121,10 @@ function ClientsContent() {
   };
   const [selectedClientForBill, setSelectedClientForBill] =
     useState<ClientWithStats | null>(null);
+  const [marginDrawerClient, setMarginDrawerClient] =
+    useState<ClientWithStats | null>(null);
+  const [marginDrawerInvoice, setMarginDrawerInvoice] =
+    useState<InvoiceWithClient | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
@@ -867,6 +885,18 @@ function ClientsContent() {
                             >
                               <Receipt className="w-3.5 h-3.5 text-content-neutral-400" />
                               <span>View Ledger</span>
+                            </Button>
+                            <Button
+                              variant="menu"
+                              onClick={() => {
+                                setMarginDrawerInvoice(null);
+                                setMarginDrawerClient(client);
+                                setActiveMenuId(null);
+                              }}
+                              className="w-full"
+                            >
+                              <TrendingUp className="w-3.5 h-3.5 text-accent" />
+                              <span>Project Margin (P&amp;L)</span>
                             </Button>
                             <Button
                               variant="menu"
@@ -1716,6 +1746,18 @@ function ClientsContent() {
                       Invoices & Payment Records
                     </h4>
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          const target = selectedClientForHistory;
+                          setSelectedClientForHistory(null);
+                          setMarginDrawerInvoice(null);
+                          setMarginDrawerClient(target);
+                        }}
+                      >
+                        <TrendingUp className="w-3.5 h-3.5 text-accent" />
+                        <span>Project Margin (P&amp;L)</span>
+                      </Button>
                       {isElectron && (
                         <Button
                           variant="secondary"
@@ -1937,6 +1979,25 @@ function ClientsContent() {
               </div>
             </div>
           </Dialog>
+        )}
+      </MotionPresence>
+
+      <MotionPresence>
+        {(marginDrawerInvoice || marginDrawerClient) && (
+          <ProjectMarginDrawer
+            mode={marginDrawerInvoice ? "invoice" : "client"}
+            invoice={marginDrawerInvoice}
+            client={marginDrawerClient}
+            onSelectInvoice={(inv) => setMarginDrawerInvoice(inv)}
+            onClose={() => {
+              if (marginDrawerInvoice && marginDrawerClient) {
+                setMarginDrawerInvoice(null);
+              } else {
+                setMarginDrawerInvoice(null);
+                setMarginDrawerClient(null);
+              }
+            }}
+          />
         )}
       </MotionPresence>
     </div>

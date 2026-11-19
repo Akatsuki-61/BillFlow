@@ -176,6 +176,7 @@ export async function saveWorkspaceCsv() {
       "signature_data",
       "business_snapshot",
       "pdf_export_directory",
+      "rolling_backup_directory",
     ]);
     const tables = backupTables.filter(
       (table) => !table.endsWith("_pdf_exports"),

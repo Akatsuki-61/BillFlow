@@ -19,6 +19,9 @@ import {
   payableItemSchema,
   payableVendorSchema,
   newCalendarEventSchema,
+  newRecurringRuleSchema,
+  quoteStatusSchema,
+  recurringLineItemSchema,
   updateSettingsSchema,
 } from "./validation";
 import { payableAmount } from "../src/lib/payable-math";
@@ -78,6 +81,9 @@ export const backupTables = [
   "work_order_pdf_exports",
   "task_time_slots",
   "workspace_activity",
+  "recurring_rules",
+  "quotes",
+  "quote_items",
 ] as const;
 type Row = Record<string, string | number | null>;
 const backupSchema = z
@@ -148,12 +154,15 @@ export function exportWorkspace(): ExportDataPayload {
       records[table] = sqlite
         .prepare(`SELECT * FROM "${table}"`)
         .all() as Row[];
-    // PDF output locations are machine-local, independently regenerable artifacts.
+    // PDF output and local rolling backup settings are machine-local artifacts.
     records.invoice_pdf_exports = [];
     records.work_order_pdf_exports = [];
     records.settings = (records.settings || []).map((row) => ({
       ...row,
       pdf_export_directory: null,
+      digest_last_sent_date: null,
+      rolling_backup_directory: null,
+      rolling_backup_last_at: null,
     }));
     const unique = [
       ...new Map(
@@ -172,7 +181,13 @@ export function exportWorkspace(): ExportDataPayload {
     const payload = {
       version: "2",
       exportedAt: new Date().toISOString(),
-      settings: { ...currentSettings, pdfExportDirectory: null },
+      settings: {
+        ...currentSettings,
+        pdfExportDirectory: null,
+        digestLastSentDate: null,
+        rollingBackupDirectory: null,
+        rollingBackupLastAt: null,
+      },
       clients: getDb().select().from(clients).all(),
       invoices: getDb().select().from(invoices).all(),
       catalogItems: getDb().select().from(catalogItems).all(),
@@ -214,10 +229,19 @@ function validateRows(database: Database.Database, table: string, rows: Row[]) {
     }
     if (row.currency) currencySchema.parse(row.currency);
     if (table === "settings") {
+      for (const boolCol of ["digest_enabled", "rolling_backup_enabled"]) {
+        if (![0, 1].includes(Number(row[boolCol])))
+          throw new Error(`Invalid boolean settings.${boolCol}`);
+      }
       const fields = Object.fromEntries(
         Object.entries(getTableColumns(settings))
           .filter(([key]) => key !== "id" && key !== "updatedAt")
-          .map(([key, column]) => [key, row[column.name]]),
+          .map(([key, column]) => [
+            key,
+            key === "digestEnabled" || key === "rollingBackupEnabled"
+              ? Boolean(row[column.name])
+              : row[column.name],
+          ]),
       );
       updateSettingsSchema.parse(fields);
     }
@@ -318,6 +342,60 @@ function validateRows(database: Database.Database, table: string, rows: Row[]) {
           throw new Error("Invalid scheduled task time.");
     if (table === "subtasks" && ![0, 1].includes(Number(row.completed)))
       throw new Error("Invalid subtask completion.");
+    if (table === "recurring_rules") {
+      if (![0, 1].includes(Number(row.auto_export_pdf)))
+        throw new Error("Invalid recurring rule auto_export_pdf value.");
+      if (![0, 1].includes(Number(row.is_active)))
+        throw new Error("Invalid recurring rule is_active value.");
+      const parsedItems = z
+        .array(recurringLineItemSchema)
+        .min(1)
+        .max(500)
+        .parse(JSON.parse(String(row.items_json)));
+      newRecurringRuleSchema.parse({
+        clientId: row.client_id,
+        title: row.title,
+        cadence: row.cadence,
+        dayOfMonth: row.day_of_month,
+        currency: row.currency,
+        items: parsedItems,
+        discountCents: row.discount_cents,
+        taxCents: row.tax_cents,
+        advanceCents: row.advance_cents,
+        amountCents: row.amount_cents,
+        dueDays: row.due_days,
+        autoStatus: row.auto_status,
+        autoExportPdf: Boolean(row.auto_export_pdf),
+        notes: row.notes,
+        deliveryUrl: row.delivery_url,
+        paymentUrl: row.payment_url,
+        template: row.template,
+        nextRunDate: row.next_run_date,
+        isActive: Boolean(row.is_active),
+      });
+      validateInvoiceAmounts({
+        amountCents: Number(row.amount_cents),
+        discountCents: Number(row.discount_cents),
+        taxCents: Number(row.tax_cents),
+        advanceCents: Number(row.advance_cents),
+        items: parsedItems,
+      });
+    }
+    if (table === "quotes") {
+      quoteStatusSchema.parse(row.status);
+      if (row.client_id === null && !row.client_snapshot)
+        throw new Error("Temporary quote client snapshot is missing.");
+      if (row.client_snapshot)
+        z.object({ name: z.string().min(1) })
+          .passthrough()
+          .parse(JSON.parse(String(row.client_snapshot)));
+      if (Number(row.advance_cents) > Number(row.amount_cents))
+        throw new Error("Quote advance exceeds total.");
+    }
+    if (table === "quote_items") {
+      if (Number(row.quantity) <= 0 || Number(row.unit_price_cents) < 0)
+        throw new Error("Invalid quote item amounts.");
+    }
   }
 }
 function insertRows(database: Database.Database, table: string, rows: Row[]) {
@@ -387,6 +465,13 @@ const newerFields: Partial<Record<(typeof backupTables)[number], Row>> = {
     notification_placement: null,
     typeface: null,
     layout_density: null,
+    digest_enabled: 1,
+    digest_last_sent_date: null,
+    rolling_backup_enabled: 0,
+    rolling_backup_directory: null,
+    rolling_backup_retention: 10,
+    rolling_backup_interval_hours: 24,
+    rolling_backup_last_at: null,
   },
   tasks: {
     board_position: null,
@@ -413,7 +498,17 @@ export function importWorkspace(
       "This backup predates complete workflow backups. Use the previous app version to restore it, then export a version 2 backup.",
     );
   assertBackupBudget(input);
-  const localPdfExportDir = getOrCreateSettings().pdfExportDirectory ?? null;
+  const currentLocalSettings = getOrCreateSettings();
+  const localPdfExportDir = currentLocalSettings.pdfExportDirectory ?? null;
+  const localRollingSettings = {
+    digestLastSentDate: currentLocalSettings.digestLastSentDate ?? null,
+    rollingBackupEnabled: currentLocalSettings.rollingBackupEnabled ? 1 : 0,
+    rollingBackupDirectory: currentLocalSettings.rollingBackupDirectory ?? null,
+    rollingBackupRetention: currentLocalSettings.rollingBackupRetention ?? 10,
+    rollingBackupIntervalHours:
+      currentLocalSettings.rollingBackupIntervalHours ?? 24,
+    rollingBackupLastAt: currentLocalSettings.rollingBackupLastAt ?? null,
+  };
   const payload = backupSchema.parse(input);
   for (const table of backupTables)
     for (const row of payload.records[table] ?? [])
@@ -440,6 +535,9 @@ export function importWorkspace(
   payload.records.calendar_events ??= [];
   payload.records.task_time_slots ??= [];
   payload.records.work_order_pdf_exports ??= [];
+  payload.records.recurring_rules ??= [];
+  payload.records.quotes ??= [];
+  payload.records.quote_items ??= [];
   for (const row of payload.records.vendor_payouts || [])
     row.voided_at ??= null;
   if (Array.isArray(payload.records.settings)) {
@@ -448,8 +546,11 @@ export function importWorkspace(
         if (!("default_invoice_template" in sRow)) {
           sRow.default_invoice_template = "geometric-teal";
         }
-        // Ignore any machine-local PDF output folder from external backups.
+        // Ignore machine-local folders and schedule timestamps from external backups.
         sRow.pdf_export_directory = null;
+        sRow.digest_last_sent_date = null;
+        sRow.rolling_backup_directory = null;
+        sRow.rolling_backup_last_at = null;
       }
     }
   }
@@ -564,6 +665,29 @@ export function importWorkspace(
         discountCents: Number(invoice.discount_cents),
         taxCents: Number(invoice.tax_cents),
         advanceCents: Number(invoice.advance_cents),
+        items: items.map((item) => ({
+          quantity: Number(item.quantity),
+          unitPriceCents: Number(item.unit_price_cents),
+        })),
+      });
+    }
+    const itemsByQuote = new Map<
+      string,
+      (typeof payload.records.quote_items)[number][]
+    >();
+    for (const item of payload.records.quote_items) {
+      const key = String(item.quote_id || "");
+      const list = itemsByQuote.get(key) || [];
+      list.push(item);
+      itemsByQuote.set(key, list);
+    }
+    for (const quote of payload.records.quotes) {
+      const items = itemsByQuote.get(String(quote.id || "")) || [];
+      validateInvoiceAmounts({
+        amountCents: Number(quote.amount_cents),
+        discountCents: Number(quote.discount_cents),
+        taxCents: Number(quote.tax_cents),
+        advanceCents: Number(quote.advance_cents),
         items: items.map((item) => ({
           quantity: Number(item.quantity),
           unitPriceCents: Number(item.unit_price_cents),
@@ -716,9 +840,25 @@ export function importWorkspace(
       if (mode === "replace") {
         sqlite
           .prepare(
-            "UPDATE settings SET pdf_export_directory = ? WHERE id = 'default'",
+            `UPDATE settings SET
+              pdf_export_directory = ?,
+              digest_last_sent_date = ?,
+              rolling_backup_enabled = ?,
+              rolling_backup_directory = ?,
+              rolling_backup_retention = ?,
+              rolling_backup_interval_hours = ?,
+              rolling_backup_last_at = ?
+            WHERE id = 'default'`,
           )
-          .run(localPdfExportDir);
+          .run(
+            localPdfExportDir,
+            localRollingSettings.digestLastSentDate,
+            localRollingSettings.rollingBackupEnabled,
+            localRollingSettings.rollingBackupDirectory,
+            localRollingSettings.rollingBackupRetention,
+            localRollingSettings.rollingBackupIntervalHours,
+            localRollingSettings.rollingBackupLastAt,
+          );
       }
       assertWorkspaceIntegrity(sqlite);
     })();

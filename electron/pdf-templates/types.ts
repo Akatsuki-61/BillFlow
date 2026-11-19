@@ -5,6 +5,8 @@ export interface InvoicePdfItem {
 }
 
 export interface InvoicePdfPayload {
+  documentKind?: "invoice" | "quote";
+  documentTitle?: string;
   code: string;
   issueDate: string;
   dueDate?: string | null;

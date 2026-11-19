@@ -700,7 +700,10 @@ function buildClientSnapshot(client: typeof clients.$inferSelect): string {
   });
 }
 
-export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
+export function createInvoiceInTx(
+  tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0],
+  input: NewInvoiceInput,
+): string {
   const value = newInvoiceSchema.parse(input);
   validateInvoiceAmounts(value);
   const { requestId, ...details } = value;
@@ -709,28 +712,26 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
     .update(JSON.stringify(details))
     .digest("hex");
   const id = requestId || crypto.randomUUID();
-  const db = getDb();
 
-  db.transaction((tx) => {
-    const existing = tx
-      .select()
-      .from(invoices)
-      .where(eq(invoices.id, id))
-      .get();
-    if (existing) {
-      if (existing.trashedAt)
-        throw new AppError(
-          "IN_TRASH",
-          "Restore this invoice from Trash before using it.",
-        );
-      if (existing.requestHash !== requestHash) {
-        throw new AppError(
-          "CONFLICT",
-          "This invoice request was already used with different details.",
-        );
-      }
-      return;
+  const existing = tx
+    .select()
+    .from(invoices)
+    .where(eq(invoices.id, id))
+    .get();
+  if (existing) {
+    if (existing.trashedAt)
+      throw new AppError(
+        "IN_TRASH",
+        "Restore this invoice from Trash before using it.",
+      );
+    if (existing.requestHash !== requestHash) {
+      throw new AppError(
+        "CONFLICT",
+        "This invoice request was already used with different details.",
+      );
     }
+    return id;
+  }
     if (
       value.catalogItemId &&
       !tx
@@ -992,7 +993,11 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
         .where(eq(workOrders.taskId, taskId))
         .run();
     }
-  });
+  return id;
+}
+
+export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
+  const id = getDb().transaction((tx) => createInvoiceInTx(tx, input));
 
   // Attempt auto-exporting PDF after invoice is created
   scheduleInvoiceExport(id);

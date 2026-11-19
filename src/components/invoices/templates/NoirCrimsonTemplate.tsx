@@ -2,7 +2,7 @@
 
 import { InvoiceSupplement } from "./InvoiceSupplement";
 import { ExternalLink, Phone, Mail, Globe, MapPin } from "lucide-react";
-import type { InvoiceTemplateProps } from "./types";
+import { getTemplateDocumentLabels, type InvoiceTemplateProps } from "./types";
 
 export function NoirCrimsonTemplate({
   invoice,
@@ -11,10 +11,12 @@ export function NoirCrimsonTemplate({
   delivery,
   businessName,
   professionalTitle,
+  documentKind,
   openExternalLink,
   formatMoney,
   formatDate,
 }: InvoiceTemplateProps) {
+  const labels = getTemplateDocumentLabels(documentKind);
   const subtotalCents =
     invoice.items && invoice.items.length > 0
       ? invoice.items.reduce(
@@ -70,7 +72,7 @@ export function NoirCrimsonTemplate({
 
         {/* HUGE INVOICE TITLE */}
         <h1 className="text-[38px] font-black tracking-[0.28em] text-white uppercase text-center mt-4 mb-2 leading-none">
-          INVOICE
+          {labels.title}
         </h1>
       </div>
 
@@ -117,7 +119,9 @@ export function NoirCrimsonTemplate({
         {/* Client Details */}
         <div className="min-w-0 flex-1 px-4">
           <div className="text-xs">
-            <span className="font-bold text-[#D9383A]">To. </span>
+            <span className="font-bold text-[#D9383A]">
+              {labels.recipientToPrefix.replace(":", ".")}{" "}
+            </span>
             <span className="font-extrabold text-white text-sm">
               {client?.name || invoice.clientName}
             </span>
@@ -143,7 +147,7 @@ export function NoirCrimsonTemplate({
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
               <span className="font-bold text-[#D9383A] w-24">
-                Invoice No.:
+                {labels.codeLabel}
               </span>
               <span className="font-black text-white">{invoice.code}</span>
             </div>
@@ -154,9 +158,15 @@ export function NoirCrimsonTemplate({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-[#D9383A] w-24">Due Date:</span>
+              <span className="font-bold text-[#D9383A] w-24">
+                {labels.dueDateLabel}
+              </span>
               <span className="font-medium text-white">
-                {invoice.dueDate ? formatDate(invoice.dueDate) : "On Receipt"}
+                {invoice.dueDate
+                  ? formatDate(invoice.dueDate)
+                  : labels.isQuote
+                    ? "Upon Agreement"
+                    : "On Receipt"}
               </span>
             </div>
           </div>
@@ -330,7 +340,7 @@ export function NoirCrimsonTemplate({
               </div>
             ) : null}
 
-            {paidCents > 0 && (
+            {!labels.isQuote && paidCents > 0 && (
               <div className="flex justify-between items-center text-emerald-400">
                 <span>Paid Amount:</span>
                 <span className="font-semibold">
@@ -339,7 +349,7 @@ export function NoirCrimsonTemplate({
               </div>
             )}
 
-            {paidCents > 0 && balanceDueCents > 0 && (
+            {!labels.isQuote && paidCents > 0 && balanceDueCents > 0 && (
               <div className="flex justify-between items-center text-rose-400">
                 <span>Balance Due:</span>
                 <span className="font-semibold">
@@ -350,7 +360,7 @@ export function NoirCrimsonTemplate({
 
             <div className="flex justify-between items-center pt-2.5 border-t border-[#D9383A]/30">
               <span className="text-sm font-black text-[#D9383A] uppercase tracking-wider">
-                Total:
+                {labels.totalLabel}
               </span>
               <span className="text-2xl font-black text-[#D9383A]">
                 {formatMoney(invoice.amountCents, invoice.currency)}

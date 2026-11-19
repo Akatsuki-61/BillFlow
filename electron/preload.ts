@@ -24,7 +24,23 @@ import type {
   AppSettings,
   UpdateSettingsInput,
   ExportDataPayload,
+  RollingBackupStatus,
+  FinancialDigestSummary,
 } from "../src/types/settings";
+import type {
+  RecurringRuleItem,
+  NewRecurringRuleInput,
+  RecurringRulePatchInput,
+  RecurringRunResult,
+} from "../src/types/recurring";
+import type {
+  QuoteWithClient,
+  NewQuoteInput,
+  QuotePatchInput,
+  QuoteStatus,
+  ConvertQuoteInput,
+  ConvertQuoteResult,
+} from "../src/types/quotes";
 import type {
   VendorItem,
   NewVendorInput,
@@ -379,6 +395,84 @@ if (process.isMainFrame && trustedDocument)
       import: (payload: ExportDataPayload, mode?: "replace" | "merge") =>
         invoke("settings:import", payload, mode),
       reset: (): Promise<{ success: boolean }> => invoke("settings:reset"),
+      saveEncryptedBackup: (passphrase: string) =>
+        invoke("settings:saveEncryptedBackup", passphrase),
+      chooseRollingBackupDirectory: (): Promise<string | null> =>
+        invoke("settings:chooseRollingBackupDirectory"),
+      getRollingBackupStatus: (): Promise<RollingBackupStatus> =>
+        invoke("settings:getRollingBackupStatus"),
+      configureRollingBackup: (input: {
+        enabled?: boolean;
+        directory?: string | null;
+        retention?: number;
+        intervalHours?: number;
+        passphrase?: string;
+        clearPassphrase?: boolean;
+      }): Promise<RollingBackupStatus> =>
+        invoke("settings:configureRollingBackup", input),
+      runRollingBackupNow: (passphraseOverride?: string) =>
+        invoke("settings:runRollingBackupNow", passphraseOverride),
+      chooseEncryptedBackupFile: () => invoke("settings:chooseEncryptedBackupFile"),
+      preflightEncryptedBackup: (
+        token: string,
+        passphrase: string,
+        mode?: "replace" | "merge",
+      ) => invoke("settings:preflightEncryptedBackup", token, passphrase, mode),
+      restoreEncryptedBackup: (
+        token: string,
+        passphrase: string,
+        mode?: "replace" | "merge",
+      ) => invoke("settings:restoreEncryptedBackup", token, passphrase, mode),
+    },
+    recurring: {
+      list: (): Promise<RecurringRuleItem[]> => invoke("recurring:list"),
+      create: (input: NewRecurringRuleInput): Promise<RecurringRuleItem> =>
+        invoke("recurring:create", input),
+      update: (
+        id: string,
+        patch: RecurringRulePatchInput,
+      ): Promise<RecurringRuleItem> => invoke("recurring:update", id, patch),
+      toggle: (id: string, isActive: boolean): Promise<RecurringRuleItem> =>
+        invoke("recurring:toggle", id, isActive),
+      remove: (id: string): Promise<{ success: boolean }> =>
+        invoke("recurring:remove", id),
+      runNow: (id: string) => invoke("recurring:runNow", id),
+      runDue: (): Promise<RecurringRunResult> => invoke("recurring:runDue"),
+    },
+    quotes: {
+      list: (clientId?: string): Promise<QuoteWithClient[]> =>
+        invoke("quotes:list", clientId),
+      nextCode: (): Promise<string> => invoke("quotes:nextCode"),
+      create: (input: NewQuoteInput): Promise<QuoteWithClient> =>
+        invoke("quotes:create", input),
+      update: (id: string, patch: QuotePatchInput): Promise<QuoteWithClient> =>
+        invoke("quotes:update", id, patch),
+      setStatus: (
+        id: string,
+        status: Exclude<QuoteStatus, "CONVERTED">,
+      ): Promise<QuoteWithClient> => invoke("quotes:setStatus", id, status),
+      remove: (id: string): Promise<{ success: boolean }> =>
+        invoke("quotes:remove", id),
+      exportPdf: (
+        id: string,
+        template?: string,
+      ): Promise<{ success: boolean; filePath: string }> =>
+        invoke("quotes:exportPdf", id, template),
+      savePdfAs: (
+        id: string,
+        template?: string,
+      ): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> =>
+        invoke("quotes:savePdfAs", id, template),
+      openPdf: (id: string, reveal?: boolean): Promise<{ success: boolean }> =>
+        invoke("quotes:openPdf", id, reveal),
+      convertToInvoice: (
+        input: ConvertQuoteInput,
+      ): Promise<ConvertQuoteResult> =>
+        invoke("quotes:convertToInvoice", input),
+    },
+    digest: {
+      summary: (): Promise<FinancialDigestSummary> => invoke("digest:summary"),
+      sendTest: () => invoke("digest:sendTest"),
     },
     tasks: {
       reorder: (id: string, target: string, placement: "before" | "after") =>

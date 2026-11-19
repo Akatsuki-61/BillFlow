@@ -1,7 +1,13 @@
 import { InvoicePdfPayload } from "./types";
-import { escapeHtml, formatMoney, invoiceFontCss } from "./helpers";
+import {
+  escapeHtml,
+  formatMoney,
+  getDocumentLabels,
+  invoiceFontCss,
+} from "./helpers";
 
 export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
+  const labels = getDocumentLabels(data);
   const subtotalCents =
     data.items && data.items.length > 0
       ? data.items.reduce((sum, it) => sum + it.quantity * it.unitPriceCents, 0)
@@ -464,7 +470,7 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
         <div class="brand-title">${professionalTitle}</div>
       </div>
     </div>
-    <div class="invoice-title">INVOICE</div>
+    <div class="invoice-title">${escapeHtml(labels.title)}</div>
   </div>
 
   <!-- 2. METADATA ROW WITH CHEVRONS -->
@@ -480,7 +486,7 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
     <!-- Client Block -->
     <div class="client-block">
       <div>
-        <span class="client-to">To. </span>
+        <span class="client-to">${escapeHtml(labels.recipientToPrefix.replace(":", "."))} </span>
         <span class="client-name">${clientName}</span>
       </div>
       <div class="client-details">
@@ -496,7 +502,7 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
     <!-- Invoice Block -->
     <div class="invoice-block">
       <div class="meta-line">
-        <span class="meta-label">Invoice No.:</span>
+        <span class="meta-label">${escapeHtml(labels.codeLabel)}</span>
         <span class="meta-val">${escapeHtml(data.code)}</span>
       </div>
       <div class="meta-line">
@@ -504,8 +510,8 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
         <span class="meta-val">${escapeHtml(data.issueDate)}</span>
       </div>
       <div class="meta-line">
-        <span class="meta-label">Due Date:</span>
-        <span class="meta-val">${escapeHtml(data.dueDate || "On Receipt")}</span>
+        <span class="meta-label">${escapeHtml(labels.dueDateLabel)}</span>
+        <span class="meta-val">${escapeHtml(data.dueDate || (labels.isQuote ? "Upon Agreement" : "On Receipt"))}</span>
       </div>
     </div>
 
@@ -578,7 +584,7 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
         }
 
         ${
-          paidCents > 0
+          !labels.isQuote && paidCents > 0
             ? `<div class="calc-row calc-green">
                 <span>Paid Amount:</span>
                 <span>${formatMoney(paidCents, data.currency)}</span>
@@ -587,7 +593,7 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
         }
 
         ${
-          paidCents > 0 && balanceDueCents > 0
+          !labels.isQuote && paidCents > 0 && balanceDueCents > 0
             ? `<div class="calc-row calc-rose">
                 <span>Balance Due:</span>
                 <span>${formatMoney(balanceDueCents, data.currency)}</span>
@@ -596,7 +602,7 @@ export function buildInvoiceHtmlNoirCrimson(data: InvoicePdfPayload): string {
         }
 
         <div class="grand-total-row">
-          <span class="grand-total-label">Total:</span>
+          <span class="grand-total-label">${escapeHtml(labels.totalLabel)}</span>
           <span class="grand-total-val">${formatMoney(data.amountCents, data.currency)}</span>
         </div>
       </div>

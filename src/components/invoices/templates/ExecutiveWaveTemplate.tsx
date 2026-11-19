@@ -2,7 +2,7 @@
 
 import { InvoiceSupplement } from "./InvoiceSupplement";
 import { ExternalLink } from "lucide-react";
-import type { InvoiceTemplateProps } from "./types";
+import { getTemplateDocumentLabels, type InvoiceTemplateProps } from "./types";
 
 export function ExecutiveWaveTemplate({
   invoice,
@@ -11,10 +11,12 @@ export function ExecutiveWaveTemplate({
   delivery,
   businessName,
   professionalTitle,
+  documentKind,
   openExternalLink,
   formatMoney,
   formatDate,
 }: InvoiceTemplateProps) {
+  const labels = getTemplateDocumentLabels(documentKind);
   const subtotalCents =
     invoice.items && invoice.items.length > 0
       ? invoice.items.reduce(
@@ -149,7 +151,7 @@ export function ExecutiveWaveTemplate({
           {/* To: Client */}
           <div className="max-w-[320px]">
             <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-              To:
+              {labels.recipientToPrefix}
             </span>
             <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
               {invoice.clientName}
@@ -187,11 +189,11 @@ export function ExecutiveWaveTemplate({
           {/* Right: INVOICE Title & Metadata */}
           <div className="text-right">
             <div className="text-[34px] font-black tracking-[3px] text-slate-900 uppercase leading-none mb-3">
-              INVOICE
+              {labels.title}
             </div>
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-end gap-4">
-                <span className="text-slate-500 font-bold">Invoice No.:</span>
+                <span className="text-slate-500 font-bold">{labels.codeLabel}</span>
                 <span className="font-extrabold text-slate-900 tabular-nums min-w-[95px] text-right">
                   {invoice.code}
                 </span>
@@ -204,7 +206,7 @@ export function ExecutiveWaveTemplate({
               </div>
               {invoice.dueDate && (
                 <div className="flex justify-end gap-4">
-                  <span className="text-slate-500 font-bold">Due Date:</span>
+                  <span className="text-slate-500 font-bold">{labels.dueDateLabel}</span>
                   <span className="font-semibold text-slate-900 min-w-[95px] text-right">
                     {formatDate(invoice.dueDate)}
                   </span>
@@ -306,7 +308,7 @@ export function ExecutiveWaveTemplate({
             {/* Grand Total Solid Amber Bar */}
             <div className="mt-2 bg-[#EAA828] text-slate-950 px-4 py-2.5 rounded-sm flex justify-between items-center font-black">
               <span className="text-xs uppercase tracking-wider">
-                Grand Total
+                {labels.grandTotalLabel}
               </span>
               <span className="text-base tabular-nums">
                 {formatMoney(invoice.amountCents, invoice.currency)}
@@ -322,7 +324,7 @@ export function ExecutiveWaveTemplate({
               </div>
             ) : null}
 
-            {paidCents > 0 ? (
+            {!labels.isQuote && paidCents > 0 ? (
               <div className="flex justify-between text-emerald-600 py-0.5">
                 <span className="font-bold">Amount Paid:</span>
                 <span className="font-extrabold tabular-nums">
@@ -331,12 +333,14 @@ export function ExecutiveWaveTemplate({
               </div>
             ) : null}
 
-            <div className="flex justify-between text-slate-900 pt-1 border-t border-slate-200 py-0.5 font-black">
-              <span>Balance Due:</span>
-              <span className="text-sm tabular-nums">
-                {formatMoney(balanceDueCents, invoice.currency)}
-              </span>
-            </div>
+            {!labels.isQuote && (
+              <div className="flex justify-between text-slate-900 pt-1 border-t border-slate-200 py-0.5 font-black">
+                <span>Balance Due:</span>
+                <span className="text-sm tabular-nums">
+                  {formatMoney(balanceDueCents, invoice.currency)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
