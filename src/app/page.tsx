@@ -212,31 +212,33 @@ export default function DashboardPage() {
     const isCompact = size === "compact";
 
     if (widgetId === "workspace-insights") {
-      return isCompact ? "col-span-12 lg:col-span-6" : "col-span-12";
+      return isCompact
+        ? "col-span-1 md:col-span-6 lg:col-span-6"
+        : "col-span-1 md:col-span-6 lg:col-span-12";
     }
     if (baseSize === "metric") {
       return isCompact
-        ? "col-span-12 sm:col-span-6 lg:col-span-3"
-        : "col-span-12 sm:col-span-6 lg:col-span-3";
+        ? "col-span-1 md:col-span-2 lg:col-span-2"
+        : "col-span-1 md:col-span-3 lg:col-span-3";
     }
     if (baseSize === "full") {
       return isCompact
-        ? "col-span-12 lg:col-span-6"
-        : "col-span-12";
+        ? "col-span-1 md:col-span-6 lg:col-span-6"
+        : "col-span-1 md:col-span-6 lg:col-span-12";
     }
     if (baseSize === "medium") {
       return isCompact
-        ? "col-span-12 sm:col-span-6 lg:col-span-3"
-        : "col-span-12 md:col-span-6 lg:col-span-4";
+        ? "col-span-1 md:col-span-3 lg:col-span-3"
+        : "col-span-1 md:col-span-3 lg:col-span-4";
     }
     if (baseSize === "wide") {
       return isCompact
-        ? "col-span-12 md:col-span-6 lg:col-span-4"
-        : "col-span-12 lg:col-span-6";
+        ? "col-span-1 md:col-span-3 lg:col-span-4"
+        : "col-span-1 md:col-span-6 lg:col-span-6";
     }
     return isCompact
-      ? "col-span-12 md:col-span-6 lg:col-span-4"
-      : "col-span-12 lg:col-span-6";
+      ? "col-span-1 md:col-span-3 lg:col-span-4"
+      : "col-span-1 md:col-span-6 lg:col-span-6";
   };
 
   return (

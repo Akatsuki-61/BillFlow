@@ -560,7 +560,7 @@ export default function TasksView({
     setDragOverColumn(null);
   };
 
-  const handleDrop = (e: React.DragEvent, targetStatus: TaskStatus) => {
+  const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
     e.preventDefault();
     setDragOverColumn(null);
     const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
@@ -576,12 +576,14 @@ export default function TasksView({
       return;
     }
 
-    void saveTask(taskId, { status: targetStatus });
-    showToast(`Updated task status to ${targetStatus.replace("-", " ")}`);
     setDraggedTaskId(null);
+    const saved = await saveTask(taskId, { status: targetStatus });
+    if (saved) {
+      showToast(`Updated task status to ${targetStatus.replace("-", " ")}`);
+    }
   };
 
-  const handleAdvanceStage = (task: TaskItem, e: React.MouseEvent) => {
+  const handleAdvanceStage = async (task: TaskItem, e: React.MouseEvent) => {
     e.stopPropagation();
     const transition = nextTaskStage(task.status);
     if (!transition) return;
@@ -589,8 +591,10 @@ export default function TasksView({
       setTaskForSubmitWork(task);
       return;
     }
-    void saveTask(task.id, { status: transition.next });
-    showToast(`Moved "${task.title}" to ${transition.next.replace("-", " ")}`);
+    const saved = await saveTask(task.id, { status: transition.next });
+    if (saved) {
+      showToast(`Moved "${task.title}" to ${transition.next.replace("-", " ")}`);
+    }
   };
 
   // Outsource navigation handler
@@ -1284,7 +1288,7 @@ export default function TasksView({
                 key={col.id}
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, col.id)}
+                onDrop={(e) => void handleDrop(e, col.id)}
                 className={`ui-card p-4 transition-all duration-200 min-h-[420px] flex flex-col ${
                   isDropTarget ? "!border-accent ring-2 ring-accent/20" : ""
                 }`}
@@ -1749,7 +1753,7 @@ export default function TasksView({
                                   <Button
                                     variant="ghost"
                                     size="small"
-                                    onClick={(e) => handleAdvanceStage(task, e)}
+                                    onClick={(e) => void handleAdvanceStage(task, e)}
                                     title={`Move task to ${transition.next.replace("-", " ")}`}
                                     className="text-[11px] text-content-neutral-700 hover:text-content-neutral-950 flex items-center gap-1 font-medium"
                                   >

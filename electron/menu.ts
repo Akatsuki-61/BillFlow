@@ -7,6 +7,7 @@ import {
 } from "electron";
 import path from "path";
 import fs from "fs";
+import { isWorkspaceUnlocked } from "./workspace-session";
 
 export function getAboutIconPath(): string | undefined {
   const candidates: (string | undefined)[] = [
@@ -56,6 +57,9 @@ export function buildMenuTemplate(
   navigate: (route: string) => void,
   isMac: boolean = process.platform === "darwin",
   getMainWindow?: () => BrowserWindow | null,
+  includeDevTools: boolean = typeof app === "object" && app !== null
+    ? !app.isPackaged
+    : true,
 ): MenuItemConstructorOptions[] {
   const appMenu: MenuItemConstructorOptions = {
     label: app?.name || "BillFlow",
@@ -130,10 +134,14 @@ export function buildMenuTemplate(
   const viewMenu: MenuItemConstructorOptions = {
     label: "View",
     submenu: [
-      { role: "reload" },
-      { role: "forceReload" },
-      { role: "toggleDevTools" },
-      { type: "separator" },
+      ...(includeDevTools
+        ? [
+            { role: "reload" as const },
+            { role: "forceReload" as const },
+            { role: "toggleDevTools" as const },
+            { type: "separator" as const },
+          ]
+        : []),
       { role: "resetZoom" },
       { role: "zoomIn" },
       { role: "zoomOut" },
@@ -224,12 +232,16 @@ export function createApplicationMenu(
       win.show();
       win.focus();
 
-      if (win.webContents.isLoading()) {
-        win.webContents.once("did-finish-load", () => {
+      const dispatchRoute = () => {
+        if (!win.isDestroyed() && isWorkspaceUnlocked()) {
           win.webContents.send("navigate-to", route);
-        });
+        }
+      };
+
+      if (win.webContents.isLoading()) {
+        win.webContents.once("did-finish-load", dispatchRoute);
       } else {
-        win.webContents.send("navigate-to", route);
+        dispatchRoute();
       }
     }
   };

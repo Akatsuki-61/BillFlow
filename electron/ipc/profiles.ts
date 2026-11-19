@@ -1,4 +1,5 @@
 import { imageDataSchema } from "../validation";
+import { atomicWrite } from "../managed-files";
 import {
   initializeProfileSession,
   unlockProfileSession,
@@ -72,6 +73,15 @@ const accentEnum = z.enum([
 const themeEnum = z.enum(["system", "light", "dark"]);
 const currencyEnum = z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]);
 
+const nonEmptyPasswordSchema = z
+  .string()
+  .min(4, "Password must be at least 4 characters.")
+  .max(128)
+  .refine(
+    (val) => val.trim().length > 0,
+    "Password cannot be whitespace only.",
+  );
+
 const createProfileSchema = z.object({
   name: z.string().trim().min(1, "Profile name is required.").max(60),
   role: roleEnum.default("software-engineering"),
@@ -82,12 +92,7 @@ const createProfileSchema = z.object({
   themePreference: themeEnum.optional(),
   defaultCurrency: currencyEnum.optional(),
   invoicePrefix: z.string().trim().min(1).max(12).optional(),
-  password: z
-    .string()
-    .min(4, "Password must be at least 4 characters.")
-    .max(128)
-    .optional()
-    .or(z.literal("")),
+  password: nonEmptyPasswordSchema.optional().or(z.literal("")),
   passwordHint: z.string().trim().max(80).optional(),
   seedRoleCatalog: z.boolean().optional(),
 });
@@ -108,15 +113,10 @@ const updateProfileSchema = z.object({
   defaultCurrency: currencyEnum.optional(),
   invoicePrefix: z.string().trim().min(1).max(12).optional(),
   password: z
-    .union([
-      z.string().min(4, "Password must be at least 4 characters.").max(128),
-      z.literal(""),
-      z.null(),
-    ])
+    .union([nonEmptyPasswordSchema, z.literal(""), z.null()])
     .optional(),
   currentPassword: z.string().max(128).optional(),
   passwordHint: z.string().trim().max(80).nullable().optional(),
-  isOnboarded: z.boolean().optional(),
 });
 
 const onboardingSlotSchema = z.object({
@@ -127,12 +127,7 @@ const onboardingSlotSchema = z.object({
   accent: accentEnum,
   defaultCurrency: currencyEnum,
   invoicePrefix: z.string().trim().min(1).max(12),
-  password: z
-    .string()
-    .min(4, "Password must be at least 4 characters.")
-    .max(128)
-    .optional()
-    .or(z.literal("")),
+  password: nonEmptyPasswordSchema.optional().or(z.literal("")),
   passwordHint: z.string().trim().max(80).optional(),
   seedRoleCatalog: z.boolean().default(true),
 });
@@ -148,43 +143,119 @@ const completeOnboardingSchema = z.object({
   profiles: z.array(onboardingSlotSchema).min(1).max(MAX_PROFILES),
 });
 
+const SCRYPT_OPTIONS = {
+  N: 65536,
+  r: 8,
+  p: 1,
+  maxmem: 128 * 1024 * 1024,
+} as const;
+
 export function hashProfilePassword(password: string): {
   hash: string;
   salt: string;
 } {
   const isPin = /^\d{4}$/.test(password);
   const rawSalt = crypto.randomBytes(16).toString("hex");
-  const salt = `${isPin ? "pin" : "pwd"}:${rawSalt}`;
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  const salt = `${isPin ? "pin2" : "pwd2"}:${rawSalt}`;
+  const hash = crypto
+    .scryptSync(password, salt, 64, SCRYPT_OPTIONS)
+    .toString("hex");
   return { hash, salt };
 }
 
-const failedUnlocks = new Map<string, { count: number; retryAt: number }>();
+type LockoutRecord = { count: number; retryAt: number };
+const memoryLockouts = new Map<string, LockoutRecord>();
+
+function lockoutFilePath(): string | null {
+  try {
+    return path.join(
+      path.dirname(getRootDatabasePath()),
+      "profile-lockout.json",
+    );
+  } catch {
+    return null;
+  }
+}
+
+function readLockoutMap(): Record<string, LockoutRecord> {
+  const file = lockoutFilePath();
+  if (!file) return Object.fromEntries(memoryLockouts);
+  try {
+    if (!fs.existsSync(file) || fs.statSync(file).size > 64 * 1024) return {};
+    const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
+    return parsed as Record<string, LockoutRecord>;
+  } catch {
+    return {};
+  }
+}
+
+function writeLockoutMap(map: Record<string, LockoutRecord>) {
+  const file = lockoutFilePath();
+  if (!file) {
+    memoryLockouts.clear();
+    for (const [key, value] of Object.entries(map)) {
+      memoryLockouts.set(key, value);
+    }
+    return;
+  }
+  try {
+    atomicWrite(file, JSON.stringify(map), 0o600);
+  } catch {
+    // Non-fatal in read-only environments
+  }
+}
+
+function recordFailedAttempt(
+  map: Record<string, LockoutRecord>,
+  saltKey: string,
+  attempt: LockoutRecord | undefined,
+) {
+  const count = (attempt?.count || 0) + 1;
+  const delayMs =
+    count >= 5 ? Math.min(15 * 60 * 1000, 60_000 * 2 ** (count - 5)) : 0;
+  map[saltKey] = {
+    count,
+    retryAt: delayMs > 0 ? Date.now() + delayMs : 0,
+  };
+  writeLockoutMap(map);
+}
+
 export function verifyProfilePasswordHash(
   password: string,
   storedHash: string | null | undefined,
   storedSalt: string | null | undefined,
 ): boolean {
   if (!storedHash || !storedSalt) return true;
-  const attempt = failedUnlocks.get(storedSalt);
+  const saltKey = crypto.createHash("sha256").update(storedSalt).digest("hex");
+  const lockouts = readLockoutMap();
+  const attempt = lockouts[saltKey];
   if (attempt && Date.now() < attempt.retryAt)
     throw new AppError(
       "TRY_LATER",
-      "Too many attempts. Try again in a minute.",
+      "Too many attempts. Try again later.",
     );
-  if (!password || password.length > 128) return false;
+  if (!password || password.length > 128) {
+    recordFailedAttempt(lockouts, saltKey, attempt);
+    return false;
+  }
   try {
-    const derived = crypto.scryptSync(password, storedSalt, 64);
+    const useHardenedScrypt =
+      storedSalt.startsWith("pin2:") || storedSalt.startsWith("pwd2:");
+    const derived = useHardenedScrypt
+      ? crypto.scryptSync(password, storedSalt, 64, SCRYPT_OPTIONS)
+      : crypto.scryptSync(password, storedSalt, 64);
     const expected = Buffer.from(storedHash, "hex");
     if (derived.length !== expected.length) return false;
     const valid = crypto.timingSafeEqual(derived, expected);
-    if (valid) failedUnlocks.delete(storedSalt);
-    else {
-      const count = (attempt?.count || 0) + 1;
-      failedUnlocks.set(storedSalt, {
-        count,
-        retryAt: count >= 5 ? Date.now() + 60000 : 0,
-      });
+    if (valid) {
+      if (attempt) {
+        delete lockouts[saltKey];
+        writeLockoutMap(lockouts);
+      }
+    } else {
+      recordFailedAttempt(lockouts, saltKey, attempt);
     }
     return valid;
   } catch {
@@ -196,7 +267,8 @@ function mapProfileRow(row: UserProfileRow): UserProfile {
   const hasPassword = Boolean(row.passwordHash && row.passwordSalt);
   const lockType = !hasPassword
     ? null
-    : row.passwordSalt?.startsWith("pin:")
+    : row.passwordSalt?.startsWith("pin:") ||
+        row.passwordSalt?.startsWith("pin2:")
       ? "pin"
       : "password";
 
@@ -236,16 +308,20 @@ function syncProfilesJsonMirror(
   try {
     const rootDir = path.dirname(getRootDatabasePath());
     const mirrorPath = path.join(rootDir, "profiles.json");
-    const tempPath = `${mirrorPath}.tmp`;
+    const mirroredProfiles = profiles.map(
+      ({ photoData: _photoData, ...rest }) => {
+        void _photoData;
+        return rest;
+      },
+    );
     const payload = {
       version: 1,
       maxProfiles: MAX_PROFILES,
       activeProfileId,
       updatedAt: new Date().toISOString(),
-      profiles,
+      profiles: mirroredProfiles,
     };
-    fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), "utf8");
-    fs.renameSync(tempPath, mirrorPath);
+    atomicWrite(mirrorPath, JSON.stringify(payload, null, 2), 0o600);
   } catch {
     // Non-fatal if directory is read-only during isolated unit tests
   }
@@ -428,7 +504,8 @@ export function listProfilesState(): ProfileListResponse {
   const profiles = rows.map(mapProfileRow);
   syncProfilesJsonMirror(profiles, activeRow.id);
 
-  const needsOnboarding = rows.length === 1 && !rows[0].isOnboarded;
+  const needsOnboarding =
+    rows.length === 1 && !rows[0].isOnboarded && !rows[0].passwordHash;
 
   return {
     profiles,
@@ -461,7 +538,7 @@ export function createProfile(input: CreateProfileInput): ProfileListResponse {
   const id = `prof-${crypto.randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
 
-  const rawPassword = value.password?.trim() || "";
+  const rawPassword = value.password || "";
   const passwordCredentials = rawPassword
     ? hashProfilePassword(rawPassword)
     : { hash: null, salt: null };
@@ -549,19 +626,25 @@ export function updateProfile(
     throw new AppError("NOT_FOUND", "Profile not found.");
   }
 
+  let passwordVerified = false;
   if (
     id !== getActiveProfileId() &&
-    existing.passwordHash &&
-    !verifyProfilePasswordHash(
-      value.currentPassword || "",
-      existing.passwordHash,
-      existing.passwordSalt,
-    )
-  )
-    throw new AppError(
-      "INVALID_PASSWORD",
-      "Current password is incorrect. Unlock this profile before changing its settings.",
-    );
+    existing.passwordHash
+  ) {
+    if (
+      !verifyProfilePasswordHash(
+        value.currentPassword || "",
+        existing.passwordHash,
+        existing.passwordSalt,
+      )
+    ) {
+      throw new AppError(
+        "INVALID_PASSWORD",
+        "Current password is incorrect. Unlock this profile before changing its settings.",
+      );
+    }
+    passwordVerified = true;
+  }
   let passwordHash = existing.passwordHash;
   let passwordSalt = existing.passwordSalt;
   let passwordHint =
@@ -570,7 +653,7 @@ export function updateProfile(
       : existing.passwordHint;
 
   if (value.password !== undefined) {
-    if (existing.passwordHash && existing.passwordSalt) {
+    if (existing.passwordHash && existing.passwordSalt && !passwordVerified) {
       if (
         !verifyProfilePasswordHash(
           value.currentPassword ?? "",
@@ -810,12 +893,19 @@ export function completeProfileOnboarding(
   input: CompleteOnboardingInput,
 ): ProfileListResponse {
   const created: string[] = [];
+  const previousProfileId = getActiveProfileId();
   try {
     return getRootDb().transaction(() =>
       completeOnboardingTransaction(input, created),
     );
   } catch (error) {
-    switchWorkspaceDatabase("default");
+    if (created.length > 0 || getActiveProfileId() !== previousProfileId) {
+      try {
+        switchWorkspaceDatabase(previousProfileId);
+      } catch {
+        // Keep the original error if rollback switch fails
+      }
+    }
     for (const id of created) deleteWorkspaceDatabaseFiles(id);
     throw error;
   }
@@ -825,23 +915,28 @@ function completeOnboardingTransaction(
   created: string[],
 ): ProfileListResponse {
   ensureDefaultProfile();
-  const value = completeOnboardingSchema.parse(input);
-  if (!listProfilesState().needsOnboarding)
-    throw new AppError(
-      "ALREADY_ONBOARDED",
-      "Onboarding has already been completed. Use profile settings to make changes.",
-    );
   const rootDb = getRootDb();
-  const now = new Date().toISOString();
-
   const existingRows = rootDb
     .select()
     .from(userProfiles)
     .orderBy(asc(userProfiles.position), asc(userProfiles.createdAt))
     .all();
 
+  if (
+    existingRows.length !== 1 ||
+    existingRows[0].isOnboarded ||
+    existingRows.some((r) => Boolean(r.passwordHash))
+  )
+    throw new AppError(
+      "ALREADY_ONBOARDED",
+      "Onboarding has already been completed. Use profile settings to make changes.",
+    );
+
+  const value = completeOnboardingSchema.parse(input);
+  const now = new Date().toISOString();
+
   const primarySlot = value.profiles[0];
-  const primaryPass = primarySlot.password?.trim() || "";
+  const primaryPass = primarySlot.password || "";
   const primaryCreds = primaryPass
     ? hashProfilePassword(primaryPass)
     : { hash: null, salt: null };
@@ -888,7 +983,7 @@ function completeOnboardingTransaction(
 
   for (let i = 1; i < value.profiles.length; i++) {
     const slot = value.profiles[i];
-    const rawPass = slot.password?.trim() || "";
+    const rawPass = slot.password || "";
     const creds = rawPass
       ? hashProfilePassword(rawPass)
       : { hash: null, salt: null };

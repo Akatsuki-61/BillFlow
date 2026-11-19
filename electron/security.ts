@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "async_hooks";
 import { ipcMain as nativeIpcMain } from "electron";
 import type { WebContents, IpcMainEvent, IpcMainInvokeEvent } from "electron";
+import { formatError } from "./ipc/errors";
 
 const channelContext = new AsyncLocalStorage<string>();
 export function currentIpcChannel() {
@@ -12,12 +13,34 @@ let authorizeWorkspace: () => boolean = () => false;
 const bootstrapChannels = new Set([
   "profiles:list",
   "profiles:switch",
-  "profiles:verifyPassword",
   "profiles:lock",
   "profiles:completeOnboarding",
   "theme:initial",
   "theme:set",
 ]);
+
+const allowedMailtoParams = new Set(["subject", "body", "cc", "bcc"]);
+export function sanitizeExternalUrl(value: string): string | null {
+  if (!value || value.length > 4096 || /[\x00-\x1f\x7f]/.test(value))
+    return null;
+  try {
+    const url = new URL(value);
+    if (url.username || url.password) return null;
+    if (url.protocol === "https:" || url.protocol === "http:") return url.href;
+    if (url.protocol === "mailto:") {
+      const keys = [...url.searchParams.keys()];
+      if (
+        new Set(keys).size !== keys.length ||
+        keys.some((key) => !allowedMailtoParams.has(key.toLowerCase()))
+      )
+        return null;
+      return url.href;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export function isTrustedDocument(
   value: string,
@@ -71,7 +94,22 @@ export const ipcMain = {
   ) {
     nativeIpcMain.handle(channel, (event, ...args) => {
       assertTrustedSender(event, channel);
-      return channelContext.run(channel, () => listener(event, ...args));
+      try {
+        const result = channelContext.run(channel, () =>
+          listener(event, ...args),
+        );
+        if (
+          result &&
+          typeof (result as PromiseLike<unknown>).then === "function"
+        ) {
+          return (result as Promise<unknown>).catch((error) => {
+            throw formatError(error);
+          });
+        }
+        return result;
+      } catch (error) {
+        throw formatError(error);
+      }
     });
   },
   on(channel: string, listener: Parameters<typeof nativeIpcMain.on>[1]) {

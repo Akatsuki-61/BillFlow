@@ -4,7 +4,7 @@ import { listPayments } from "./invoices";
 import { ipcMain } from "../security";
 import { randomUUID, createHash } from "crypto";
 import { and, eq, isNull, asc, desc } from "drizzle-orm";
-import { getDb } from "../db";
+import { getActiveProfileId, getDb, getRootDb } from "../db";
 import {
   tasks,
   subtasks,
@@ -41,12 +41,26 @@ function resolveDefaultAssignee(tx: Pick<ReturnType<typeof getDb>, "select">) {
     .where(eq(settings.id, "default"))
     .get()
     ?.businessName?.trim();
-  const profileName = tx
-    .select({ name: userProfiles.name })
-    .from(userProfiles)
-    .where(eq(userProfiles.isActive, true))
-    .get()
-    ?.name?.trim();
+  let profileName: string | undefined;
+  try {
+    const rootDb = getRootDb();
+    const activeId = getActiveProfileId();
+    profileName =
+      rootDb
+        .select({ name: userProfiles.name })
+        .from(userProfiles)
+        .where(eq(userProfiles.id, activeId))
+        .get()
+        ?.name?.trim() ||
+      rootDb
+        .select({ name: userProfiles.name })
+        .from(userProfiles)
+        .where(eq(userProfiles.isActive, true))
+        .get()
+        ?.name?.trim();
+  } catch {
+    // Fall back when root DB is not initialized in isolated unit tests
+  }
   const resolvedName = bizName || profileName || "Workspace Owner";
   return {
     name: resolvedName,

@@ -23,11 +23,13 @@ describe("deliveryUrl utility", () => {
       expect(formatExternalUrl("drive.google.com/drive/folders/123")).toBe("https://drive.google.com/drive/folders/123");
     });
 
-    it("blocks dangerous javascript, vbscript, and data URLs", () => {
+    it("blocks dangerous javascript, vbscript, data, and file URLs or control chars", () => {
       expect(formatExternalUrl("javascript:alert(1)")).toBe("");
       expect(formatExternalUrl("  JaVaScRiPt:alert(document.cookie)")).toBe("");
       expect(formatExternalUrl("vbscript:msgbox(1)")).toBe("");
       expect(formatExternalUrl("data:text/html,<script>alert(1)</script>")).toBe("");
+      expect(formatExternalUrl("file:///etc/passwd")).toBe("");
+      expect(formatExternalUrl("https://example.com/\nX")).toBe("");
     });
   });
 

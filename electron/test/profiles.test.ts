@@ -14,7 +14,9 @@ import {
 } from "../ipc/profiles";
 import { listExpenses, createExpense } from "../ipc/expenses";
 import { listCatalogItems } from "../ipc/catalog";
-import { getOrCreateSettings } from "../ipc/settings";
+import { getOrCreateSettings, updateSettings } from "../ipc/settings";
+import { createInvoice, recordPayment } from "../ipc/invoices";
+import { decideTracking, listTasks } from "../ipc/tasks";
 
 let directory: string;
 let databasePath: string;
@@ -214,5 +216,71 @@ describe("Netflix-Style Multi-Profile Engine, Password Locks & Role Onboarding",
     // Deleting a secondary profile frees up a slot
     const afterDelete = deleteProfile(opsProfile.id);
     expect(afterDelete.profiles).toHaveLength(4);
+  });
+
+  it("resolves secondary profile name from root DB for auto-created invoice task assignees", () => {
+    const onboarded = completeProfileOnboarding({
+      studioName: "Studio Umbrella",
+      email: "studio@billflow.local",
+      defaultCurrency: "USD",
+      profiles: [
+        {
+          name: "Software Engineering",
+          role: "software-engineering",
+          subtitle: "Full-Stack",
+          avatar: "code",
+          accent: "blue",
+          defaultCurrency: "USD",
+          invoicePrefix: "SE-",
+          seedRoleCatalog: false,
+        },
+        {
+          name: "AI Development",
+          role: "ai-development",
+          subtitle: "ML & Agents",
+          avatar: "cpu",
+          accent: "purple",
+          defaultCurrency: "USD",
+          invoicePrefix: "AI-",
+          seedRoleCatalog: false,
+        },
+      ],
+    });
+
+    const aiProfile = onboarded.profiles.find((p) => p.name === "AI Development")!;
+    switchProfile(aiProfile.id);
+    updateSettings({ businessName: "" });
+
+    const created = createInvoice({
+      newClient: {
+        name: "Northwind AI",
+        email: "ai@northwind.test",
+        currency: "USD",
+        contactPerson: "Sam",
+      },
+      items: [
+        {
+          description: "Deploy retrieval pipeline",
+          quantity: 1,
+          unitPriceCents: 100000,
+        },
+      ],
+      amountCents: 100000,
+      advanceCents: 50000,
+      currency: "USD",
+    });
+
+    recordPayment({
+      invoiceId: created.id,
+      amountCents: 50000,
+      currency: "USD",
+      reference: "ADV-AI-01",
+      requestId: crypto.randomUUID(),
+    });
+
+    const tracking = decideTracking(created.id, "yes");
+    expect(tracking.taskIds).toHaveLength(1);
+    const createdTasks = listTasks();
+    expect(createdTasks[0].assignee.name).toBe("AI Development");
   });
 });

@@ -10,14 +10,15 @@ import {
   ExternalLink,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useProfiles } from "@/context/ProfileContext";
 import {
   TOUR_STEPS,
+  isTourCompleted,
   markTourCompleted,
+  normalizeTourRoute,
   resetTourCompleted,
 } from "@/lib/onboarding-tour";
-import { MotionSurface } from "@/components/ui/MotionSurface";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 
 interface HighlightRect {
@@ -31,12 +32,19 @@ export function WorkspaceTour() {
   const router = useRouter();
   const pathname = usePathname();
   const { activeProfile, isGateOpen, isLocked } = useProfiles();
+  const reducedMotion = useReducedMotion();
 
   const [isOpen, setIsOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [highlightRect, setHighlightRect] = useState<HighlightRect | null>(
     null,
   );
+  const [tourProfileId, setTourProfileId] = useState(activeProfile.id);
+  if (tourProfileId !== activeProfile.id) {
+    setTourProfileId(activeProfile.id);
+    setIsOpen(false);
+    setHighlightRect(null);
+  }
 
   const step = TOUR_STEPS[stepIndex] ?? TOUR_STEPS[0];
 
@@ -70,8 +78,12 @@ export function WorkspaceTour() {
   }, [isOpen, step.targetSelector]);
 
   useEffect(() => {
-    const startHandler = () => {
-      resetTourCompleted(activeProfile.id);
+    const startHandler = (event: Event) => {
+      const auto = Boolean(
+        (event as CustomEvent<{ auto?: boolean }>).detail?.auto,
+      );
+      if (auto && isTourCompleted(activeProfile.id)) return;
+      if (!auto) resetTourCompleted(activeProfile.id);
       setStepIndex(0);
       setIsOpen(true);
     };
@@ -96,13 +108,22 @@ export function WorkspaceTour() {
   useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (isGateOpen || isLocked) return;
+      if (isGateOpen || isLocked || e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
       if (
         target &&
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
           target.isContentEditable)
+      ) {
+        return;
+      }
+      if (
+        typeof document !== "undefined" &&
+        document.querySelector(
+          '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], [role="menu"]',
+        )
       ) {
         return;
       }
@@ -125,15 +146,15 @@ export function WorkspaceTour() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [isOpen, stepIndex, isGateOpen, isLocked, closeTour]);
 
-  if (!isOpen || isGateOpen || isLocked) return null;
-
+  const visible = isOpen && !isGateOpen && !isLocked;
   const isLast = stepIndex === TOUR_STEPS.length - 1;
-  const isOnStepRoute = pathname === step.route;
+  const isOnStepRoute =
+    normalizeTourRoute(pathname || "/") === normalizeTourRoute(step.route);
 
   return (
     <>
       <AnimatePresence>
-        {highlightRect && (
+        {visible && highlightRect && (
           <motion.div
             key={step.id}
             aria-hidden="true"
@@ -152,12 +173,26 @@ export function WorkspaceTour() {
         )}
       </AnimatePresence>
 
-      <MotionSurface
-        kind="toast"
-        role="region"
-        aria-label="BillFlow Guided Tour"
-        className="fixed bottom-5 right-5 z-40 w-[360px] max-w-[calc(100vw-2rem)] rounded-[20px] bg-surface border border-line-neutral-200 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_8px_16px_-4px_rgba(0,0,0,0.12),0px_24px_32px_-12px_rgba(0,0,0,0.14)] p-4 app-no-drag"
-      >
+      <AnimatePresence>
+        {visible && (
+          <motion.aside
+            key="workspace-tour-card"
+            role="region"
+            aria-label="BillFlow Guided Tour"
+            initial={
+              reducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: 12, scale: 0.97 }
+            }
+            animate={
+              reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }
+            }
+            exit={
+              reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.97 }
+            }
+            transition={SPRING_NAV_GLIDE}
+            className="fixed bottom-5 left-5 z-40 w-[360px] max-w-[calc(100vw-2rem)] rounded-[20px] bg-surface border border-line-neutral-200 shadow-[0px_0px_0px_1px_rgba(0,0,0,0.06),0px_8px_16px_-4px_rgba(0,0,0,0.12),0px_24px_32px_-12px_rgba(0,0,0,0.14)] p-4 app-no-drag"
+          >
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-line-neutral-100">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-accent-faint text-accent flex items-center justify-center shrink-0">
@@ -241,7 +276,9 @@ export function WorkspaceTour() {
             </button>
           </div>
         </div>
-      </MotionSurface>
+      </motion.aside>
+        )}
+      </AnimatePresence>
     </>
   );
 }

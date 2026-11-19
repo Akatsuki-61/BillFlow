@@ -69,8 +69,10 @@ const FALLBACK_DEFAULT_PROFILE: UserProfile = {
 };
 
 const BROWSER_PROFILES_KEY = "billflow_browser_profiles_v1";
-const BROWSER_PASSWORDS_KEY = "billflow_browser_profile_passwords_v1";
+const LEGACY_BROWSER_PASSWORDS_KEY = "billflow_browser_profile_passwords_v1";
 const SESSION_UNLOCKED_KEY = "billflow_unlocked_profile_id";
+// Memory-only preview credentials so browser fallback never persists plaintext passwords in localStorage.
+const browserPreviewPasswords = new Map<string, string>();
 
 function loadBrowserFallbackState(): ProfileListResponse {
   if (typeof window === "undefined") {
@@ -119,20 +121,10 @@ function saveBrowserFallbackState(state: ProfileListResponse) {
   }
 }
 
-function getBrowserPasswords(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(BROWSER_PASSWORDS_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function setBrowserPasswords(map: Record<string, string>) {
+function clearLegacyBrowserPasswords() {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(BROWSER_PASSWORDS_KEY, JSON.stringify(map));
+    localStorage.removeItem(LEGACY_BROWSER_PASSWORDS_KEY);
   } catch {
     // Ignore storage write error
   }
@@ -261,6 +253,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [applyResponse]);
 
   useEffect(() => {
+    clearLegacyBrowserPasswords();
     void refreshProfiles();
   }, [refreshProfiles]);
 
@@ -307,8 +300,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         const result = await api.profiles.verifyPassword(id, password);
         return result.valid;
       }
-      const map = getBrowserPasswords();
-      return !map[id] || map[id] === password;
+      const stored = browserPreviewPasswords.get(id);
+      return !stored || stored === password;
     },
     [],
   );
@@ -333,8 +326,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const current = loadBrowserFallbackState();
       const target = current.profiles.find((p) => p.id === id);
       if (!target) throw new Error("Profile not found.");
-      const passwords = getBrowserPasswords();
-      if (target.hasPassword && passwords[id] && passwords[id] !== password) {
+      const storedPass = browserPreviewPasswords.get(id);
+      if (target.hasPassword && storedPass && storedPass !== password) {
         throw new Error("Incorrect password for this profile.");
       }
       const now = new Date().toISOString();
@@ -377,9 +370,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const newId = `prof-${Math.random().toString(36).slice(2, 10)}`;
       const rawPassword = input.password?.trim() || "";
       if (rawPassword) {
-        const passwords = getBrowserPasswords();
-        passwords[newId] = rawPassword;
-        setBrowserPasswords(passwords);
+        browserPreviewPasswords.set(newId, rawPassword);
       }
       const created: UserProfile = {
         id: newId,
@@ -452,21 +443,21 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       }
 
       const current = loadBrowserFallbackState();
-      const passwords = getBrowserPasswords();
       if (patch.password !== undefined) {
-        if (passwords[id]) {
-          if (passwords[id] !== patch.currentPassword) {
+        const currentStored = browserPreviewPasswords.get(id);
+        if (currentStored) {
+          if (currentStored !== patch.currentPassword) {
             throw new Error("Current password is incorrect.");
           }
         }
         if (patch.password === null || patch.password === "") {
-          delete passwords[id];
+          browserPreviewPasswords.delete(id);
         } else {
-          passwords[id] = patch.password;
+          browserPreviewPasswords.set(id, patch.password);
         }
-        setBrowserPasswords(passwords);
       }
 
+      const activePassword = browserPreviewPasswords.get(id);
       const now = new Date().toISOString();
       const updated = current.profiles.map((p): UserProfile => {
         if (p.id !== id) return p;
@@ -482,10 +473,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           themePreference: patch.themePreference ?? p.themePreference,
           defaultCurrency: patch.defaultCurrency ?? p.defaultCurrency,
           invoicePrefix: patch.invoicePrefix ?? p.invoicePrefix,
-          hasPassword: Boolean(passwords[id]),
-          lockType: !passwords[id]
+          hasPassword: Boolean(activePassword),
+          lockType: !activePassword
             ? null
-            : /^\d{4}$/.test(passwords[id])
+            : /^\d{4}$/.test(activePassword)
               ? "pin"
               : "password",
           passwordHint:
@@ -532,12 +523,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (id === "default") {
         throw new Error("The primary studio profile cannot be deleted.");
       }
-      const passwords = getBrowserPasswords();
-      if (passwords[id] && passwords[id] !== password) {
+      const storedPass = browserPreviewPasswords.get(id);
+      if (storedPass && storedPass !== password) {
         throw new Error("Incorrect password.");
       }
-      delete passwords[id];
-      setBrowserPasswords(passwords);
+      browserPreviewPasswords.delete(id);
       const remaining = current.profiles.filter((p) => p.id !== id);
       const nextActiveId =
         current.activeProfileId === id ? "default" : current.activeProfileId;
@@ -573,7 +563,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       }
 
       const now = new Date().toISOString();
-      const passwords = getBrowserPasswords();
       const createdProfiles: UserProfile[] = input.profiles
         .slice(0, MAX_PROFILES)
         .map((slot, index) => {
@@ -583,7 +572,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
               : `prof-${Math.random().toString(36).slice(2, 10)}`;
           const rawPass = slot.password?.trim() || "";
           if (rawPass) {
-            passwords[id] = rawPass;
+            browserPreviewPasswords.set(id, rawPass);
+          } else {
+            browserPreviewPasswords.delete(id);
           }
           return {
             id,
@@ -611,7 +602,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
             updatedAt: now,
           };
         });
-      setBrowserPasswords(passwords);
       const nextState: ProfileListResponse = {
         profiles: createdProfiles,
         activeProfileId: "default",

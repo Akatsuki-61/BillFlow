@@ -50,6 +50,7 @@ import {
 import {
   generateWhatsAppReminderLink,
   buildOverduePaymentReminderMessage,
+  sanitizeMailtoRecipient,
 } from "@/lib/whatsapp";
 import { openExternalLink } from "@/lib/deliveryUrl";
 
@@ -390,7 +391,7 @@ export function OverdueSummaryDialog({
         paymentInstructions,
       }),
     );
-    const mailto = `mailto:${inv.clientEmail}?subject=${subject}&body=${body}`;
+    const mailto = `mailto:${sanitizeMailtoRecipient(inv.clientEmail)}?subject=${subject}&body=${body}`;
     if (typeof window !== "undefined") {
       window.open(mailto, "_blank", "noopener,noreferrer");
       void window.billflow?.workspace

@@ -477,10 +477,14 @@ function formatUtcStamp(isoStr?: string): string {
     .replace(/\.\d{3}/, "");
 }
 
+function sanitizeIcsUidPart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
 export function buildVEventFromCalendarEvent(event: CalendarEventItem): string {
   const lines: string[] = [
     "BEGIN:VEVENT",
-    `UID:billflow-${activeProfileScope()}-evt-${event.id}@billflow.local`,
+    `UID:billflow-${sanitizeIcsUidPart(activeProfileScope())}-evt-${sanitizeIcsUidPart(event.id)}@billflow.local`,
     `DTSTAMP:${formatUtcStamp(event.updatedAt || event.createdAt)}`,
   ];
 
@@ -564,7 +568,7 @@ export function buildIcsBlocksFromTask(
 
   const veventLines: string[] = [
     "BEGIN:VEVENT",
-    `UID:billflow-${activeProfileScope()}-task-${task.id}@billflow.local`,
+    `UID:billflow-${sanitizeIcsUidPart(activeProfileScope())}-task-${sanitizeIcsUidPart(task.id)}@billflow.local`,
     `DTSTAMP:${dtStamp}`,
     dtStartLine,
     dtEndLine,
@@ -589,7 +593,7 @@ export function buildIcsBlocksFromTask(
 
   const vtodoLines: string[] = [
     "BEGIN:VTODO",
-    `UID:billflow-${activeProfileScope()}-todo-${task.id}@billflow.local`,
+    `UID:billflow-${sanitizeIcsUidPart(activeProfileScope())}-todo-${sanitizeIcsUidPart(task.id)}@billflow.local`,
     `DTSTAMP:${dtStamp}`,
     `DUE;VALUE=DATE:${formatIcsDateOnly(dueDateClean)}`,
     `SUMMARY:${escapeIcsText(task.title)}`,

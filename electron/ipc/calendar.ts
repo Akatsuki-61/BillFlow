@@ -907,6 +907,7 @@ function syncWithMacOsCalendarAppViaJxa(
 
   const jxaScript = `
     ObjC.import('stdlib');
+    ObjC.import('Foundation');
     function pad(n) { return n < 10 ? '0' + n : '' + n; }
     function fmtDate(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
     function fmtTime(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
@@ -914,7 +915,16 @@ function syncWithMacOsCalendarAppViaJxa(
 
 
     function run(argv) {
-      var itemsToPush = JSON.parse(argv[0] || "[]");
+      var rawPayload = argv[0] || "[]";
+      if (rawPayload.charAt(0) === "@") {
+        var nsContent = $.NSString.stringWithContentsOfFileEncodingError(
+          $(rawPayload.slice(1)),
+          $.NSUTF8StringEncoding,
+          null
+        );
+        rawPayload = nsContent ? ObjC.unwrap(nsContent) : "[]";
+      }
+      var itemsToPush = JSON.parse(rawPayload || "[]");
       var pullMode = argv[1] === "1";
       var ownerPrefix = argv[2];
       var Cal = Application("Calendar");
@@ -1076,51 +1086,69 @@ function syncWithMacOsCalendarAppViaJxa(
     }
   `;
 
+  const tempPayloadFile = path.join(
+    os.tmpdir(),
+    `billflow-cal-${randomUUID()}.json`,
+  );
+  fs.writeFileSync(tempPayloadFile, JSON.stringify(payloadToPush), {
+    encoding: "utf8",
+    mode: 0o600,
+    flag: "wx",
+  });
+
   return new Promise((resolve, reject) => {
-    execFile(
-      "osascript",
-      [
-        "-l",
-        "JavaScript",
-        "-e",
-        jxaScript,
-        JSON.stringify(payloadToPush),
-        shouldPullEvents ? "1" : "0",
-        `profile-${getActiveProfileId()}:`,
-      ],
-      { timeout: 7000 },
-      (err, stdout) => {
-        if (err || !stdout) {
-          reject(
-            new Error(
-              `Calendar sync failed: ${err?.message || "No response from Calendar"}`,
-            ),
-          );
-          return;
-        }
-        try {
-          const parsed = JSON.parse(stdout.trim());
-          resolve({
-            pulledEvents: Array.isArray(parsed.pulledEvents)
-              ? parsed.pulledEvents
-              : [],
-            pulledComplete: parsed.pulledComplete === true,
-            rangeFrom:
-              typeof parsed.rangeFrom === "string"
-                ? parsed.rangeFrom
-                : undefined,
-            rangeTo:
-              typeof parsed.rangeTo === "string" ? parsed.rangeTo : undefined,
-            pushedCount: Number(parsed.pushedCount) || 0,
-            deletedCount: Number(parsed.deletedCount) || 0,
-          });
-        } catch {
-          reject(
-            new Error("Calendar returned an invalid synchronization response."),
-          );
-        }
-      },
-    );
+    try {
+      execFile(
+        "osascript",
+        [
+          "-l",
+          "JavaScript",
+          "-e",
+          jxaScript,
+          `@${tempPayloadFile}`,
+          shouldPullEvents ? "1" : "0",
+          `profile-${getActiveProfileId()}:`,
+        ],
+        { timeout: 7000, maxBuffer: 10 * 1024 * 1024 },
+        (err, stdout) => {
+          fs.rmSync(tempPayloadFile, { force: true });
+          if (err || !stdout) {
+            reject(
+              new Error(
+                `Calendar sync failed: ${err?.message || "No response from Calendar"}`,
+              ),
+            );
+            return;
+          }
+          try {
+            const parsed = JSON.parse(stdout.trim());
+            resolve({
+              pulledEvents: Array.isArray(parsed.pulledEvents)
+                ? parsed.pulledEvents
+                : [],
+              pulledComplete: parsed.pulledComplete === true,
+              rangeFrom:
+                typeof parsed.rangeFrom === "string"
+                  ? parsed.rangeFrom
+                  : undefined,
+              rangeTo:
+                typeof parsed.rangeTo === "string" ? parsed.rangeTo : undefined,
+              pushedCount: Number(parsed.pushedCount) || 0,
+              deletedCount: Number(parsed.deletedCount) || 0,
+            });
+          } catch {
+            reject(
+              new Error(
+                "Calendar returned an invalid synchronization response.",
+              ),
+            );
+          }
+        },
+      );
+    } catch (error) {
+      fs.rmSync(tempPayloadFile, { force: true });
+      reject(error);
+    }
   });
 }
 
@@ -1504,23 +1532,34 @@ export async function openNativeLocalCalendar(
   };
 }
 
+const calendarFilterSchema = z
+  .object({
+    startDate: z.string().max(40).optional(),
+    endDate: z.string().max(40).optional(),
+    category: z.string().max(40).optional(),
+    taskId: recordId.optional(),
+  })
+  .optional();
+
 export function registerCalendarHandlers(broadcast: () => void): void {
   ipcMain.handle("events:list", async (_, filter) =>
-    listCalendarEvents(filter),
+    listCalendarEvents(calendarFilterSchema.parse(filter)),
   );
-  ipcMain.handle("events:get", async (_, id) => getCalendarEvent(id));
+  ipcMain.handle("events:get", async (_, id) =>
+    getCalendarEvent(recordId.parse(id)),
+  );
   ipcMain.handle("events:create", async (_, input) => {
     const created = createCalendarEvent(input, broadcast);
     scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return created;
   });
   ipcMain.handle("events:update", async (_, id, patch) => {
-    const updated = updateCalendarEvent(id, patch, broadcast);
+    const updated = updateCalendarEvent(recordId.parse(id), patch, broadcast);
     scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return updated;
   });
   ipcMain.handle("events:remove", async (_, id) => {
-    const removed = deleteCalendarEvent(id, broadcast);
+    const removed = deleteCalendarEvent(recordId.parse(id), broadcast);
     scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return removed;
   });

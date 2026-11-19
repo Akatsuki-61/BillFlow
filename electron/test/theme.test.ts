@@ -9,8 +9,13 @@ const mocks = vi.hoisted(() => {
     handle: vi.fn(),
     on: vi.fn(),
     read: vi.fn(),
+    open: vi.fn(() => 42),
+    fchmod: vi.fn(),
     write: vi.fn(),
+    fsync: vi.fn(),
+    close: vi.fn(),
     rename: vi.fn(),
+    rm: vi.fn(),
     background: vi.fn(),
     overlay: vi.fn(),
     nativeTheme: {
@@ -37,8 +42,13 @@ vi.mock("electron", () => ({
 vi.mock("fs", () => ({
   default: {
     readFileSync: mocks.read,
+    openSync: mocks.open,
+    fchmodSync: mocks.fchmod,
     writeFileSync: mocks.write,
+    fsyncSync: mocks.fsync,
+    closeSync: mocks.close,
     renameSync: mocks.rename,
+    rmSync: mocks.rm,
   },
 }));
 
@@ -93,13 +103,13 @@ describe("desktop appearance", () => {
   it("atomically persists a changed preference and updates the window", async () => {
     const theme = await setup();
     theme.set({ sender: mocks.sender, senderFrame: mocks.mainFrame }, "light");
-    expect(mocks.write).toHaveBeenCalledWith(
-      path.join("/test/userData", "appearance.json.tmp"),
-      '"light"',
-      "utf8",
+    const expectedTemp = expect.stringMatching(
+      /appearance\.json\.[0-9a-f-]+\.tmp$/,
     );
+    expect(mocks.open).toHaveBeenCalledWith(expectedTemp, "wx", 0o600);
+    expect(mocks.write).toHaveBeenCalledWith(42, '"light"');
     expect(mocks.rename).toHaveBeenCalledWith(
-      path.join("/test/userData", "appearance.json.tmp"),
+      expectedTemp,
       path.join("/test/userData", "appearance.json"),
     );
     expect(mocks.nativeTheme.themeSource).toBe("light");

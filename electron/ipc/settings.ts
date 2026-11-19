@@ -146,7 +146,7 @@ export async function saveWorkspaceBackup() {
     return { success: false, canceled: true };
   const payload = exportWorkspace();
   const revision = readBackupState().revision;
-  atomicWrite(result.filePath, JSON.stringify(payload));
+  atomicWrite(result.filePath, JSON.stringify(payload), 0o600);
   getSqlite()
     .prepare(
       "UPDATE workspace_backup_state SET backup_revision = ?, last_backup_at = ? WHERE id = 1",

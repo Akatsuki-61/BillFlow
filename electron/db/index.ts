@@ -490,7 +490,8 @@ function backupBeforeUpgrade(
     const temporary = `${backup}.${randomUUID()}.tmp`;
     let handle: number | undefined;
     try {
-      handle = fs.openSync(temporary, "wx");
+      handle = fs.openSync(temporary, "wx", 0o600);
+      if (process.platform !== "win32") fs.fchmodSync(handle, 0o600);
       fs.writeFileSync(handle, sqlite.serialize());
       fs.fsyncSync(handle);
       fs.closeSync(handle);
@@ -501,6 +502,20 @@ function backupBeforeUpgrade(
       fs.rmSync(temporary, { force: true });
     }
   }
+}
+function hardenPrivateFile(filePath: string) {
+  if (process.platform === "win32" || !filePath || filePath === ":memory:")
+    return;
+  try {
+    if (fs.existsSync(filePath)) fs.chmodSync(filePath, 0o600);
+  } catch {
+    // Ignore permission hardening errors on virtual/read-only filesystems
+  }
+}
+function hardenSqliteFiles(dbPath: string) {
+  hardenPrivateFile(dbPath);
+  hardenPrivateFile(`${dbPath}-wal`);
+  hardenPrivateFile(`${dbPath}-shm`);
 }
 export function initDatabase(customPath?: string, customMigrations?: string) {
   startupError = null;
@@ -515,8 +530,10 @@ export function initDatabase(customPath?: string, customMigrations?: string) {
   try {
     sqlite.pragma("journal_mode = WAL");
     sqlite.pragma("foreign_keys = ON");
+    hardenSqliteFiles(dbPath);
     backupBeforeUpgrade(sqlite, dbPath, customMigrations);
     migrateDatabase(sqlite, customMigrations);
+    hardenSqliteFiles(dbPath);
     const initializedDb = drizzle(sqlite, { schema });
     rootDbInstance = initializedDb;
     rootSqliteInstance = sqlite;
@@ -565,7 +582,14 @@ export function switchWorkspaceDatabase(profileId: string) {
 
   const rootDir = path.dirname(rootDbPath!);
   const profileDir = path.join(rootDir, "profiles", profileId);
-  fs.mkdirSync(profileDir, { recursive: true });
+  fs.mkdirSync(profileDir, { recursive: true, mode: 0o700 });
+  if (process.platform !== "win32") {
+    try {
+      fs.chmodSync(profileDir, 0o700);
+    } catch {
+      // Ignore permission errors on read-only/unsupported filesystems
+    }
+  }
   const targetDbPath = path.join(profileDir, "billflow.db");
 
   if (activePath === targetDbPath && dbInstance && sqliteInstance) {
@@ -577,12 +601,14 @@ export function switchWorkspaceDatabase(profileId: string) {
   try {
     sqlite.pragma("journal_mode = WAL");
     sqlite.pragma("foreign_keys = ON");
+    hardenSqliteFiles(targetDbPath);
     backupBeforeUpgrade(
       sqlite,
       targetDbPath,
       activeCustomMigrations || undefined,
     );
     migrateDatabase(sqlite, activeCustomMigrations || undefined);
+    hardenSqliteFiles(targetDbPath);
     const nextDb = drizzle(sqlite, { schema });
     if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
       sqliteInstance.close();

@@ -151,6 +151,10 @@ export function exportWorkspace(): ExportDataPayload {
     // PDF output locations are machine-local, independently regenerable artifacts.
     records.invoice_pdf_exports = [];
     records.work_order_pdf_exports = [];
+    records.settings = (records.settings || []).map((row) => ({
+      ...row,
+      pdf_export_directory: null,
+    }));
     const unique = [
       ...new Map(
         records.attachments.map((row) => [row.stored_name, row]),
@@ -164,10 +168,11 @@ export function exportWorkspace(): ExportDataPayload {
         "Workspace receipts exceed the 100 MiB backup limit. Archive unnecessary receipts before exporting.",
       );
     const files = unique.map(readAttachment);
+    const currentSettings = getOrCreateSettings();
     const payload = {
       version: "2",
       exportedAt: new Date().toISOString(),
-      settings: getOrCreateSettings(),
+      settings: { ...currentSettings, pdfExportDirectory: null },
       clients: getDb().select().from(clients).all(),
       invoices: getDb().select().from(invoices).all(),
       catalogItems: getDb().select().from(catalogItems).all(),
@@ -408,6 +413,7 @@ export function importWorkspace(
       "This backup predates complete workflow backups. Use the previous app version to restore it, then export a version 2 backup.",
     );
   assertBackupBudget(input);
+  const localPdfExportDir = getOrCreateSettings().pdfExportDirectory ?? null;
   const payload = backupSchema.parse(input);
   for (const table of backupTables)
     for (const row of payload.records[table] ?? [])
@@ -438,12 +444,12 @@ export function importWorkspace(
     row.voided_at ??= null;
   if (Array.isArray(payload.records.settings)) {
     for (const sRow of payload.records.settings) {
-      if (
-        sRow &&
-        typeof sRow === "object" &&
-        !("default_invoice_template" in sRow)
-      ) {
-        sRow.default_invoice_template = "geometric-teal";
+      if (sRow && typeof sRow === "object") {
+        if (!("default_invoice_template" in sRow)) {
+          sRow.default_invoice_template = "geometric-teal";
+        }
+        // Ignore any machine-local PDF output folder from external backups.
+        sRow.pdf_export_directory = null;
       }
     }
   }
@@ -640,8 +646,7 @@ export function importWorkspace(
       directory,
       `before-restore-${Date.now()}-${randomUUID()}.json`,
     );
-    atomicWrite(file, JSON.stringify(exportWorkspace()));
-    fs.chmodSync(file, 0o600);
+    atomicWrite(file, JSON.stringify(exportWorkspace()), 0o600);
   }
   let importedClients = 0;
   let importedInvoices = 0;
@@ -700,6 +705,13 @@ export function importWorkspace(
         }
         if (table === "clients") importedClients = rows.length;
         if (table === "invoices") importedInvoices = rows.length;
+      }
+      if (mode === "replace") {
+        sqlite
+          .prepare(
+            "UPDATE settings SET pdf_export_directory = ? WHERE id = 'default'",
+          )
+          .run(localPdfExportDir);
       }
       assertWorkspaceIntegrity(sqlite);
     })();

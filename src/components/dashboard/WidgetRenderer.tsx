@@ -176,6 +176,7 @@ function WidgetContent({
     totalTrackedHours,
     overdueInvoices,
     overdueTotalStr,
+    currencyIssuedCount,
     monthlyStats,
     taskCounts,
     pipelineStages,
@@ -858,9 +859,12 @@ function WidgetContent({
           badgeText: `${overdueInvoices.length} overdue`,
           subtitle: "Share of issued invoices overdue",
           barPct:
-            filteredInvoices.length > 0
-              ? Math.round(
-                  (overdueInvoices.length / filteredInvoices.length) * 100,
+            currencyIssuedCount > 0
+              ? Math.min(
+                  100,
+                  Math.round(
+                    (overdueInvoices.length / currencyIssuedCount) * 100,
+                  ),
                 )
               : 0,
           stripeTone: "pink",
@@ -1588,7 +1592,7 @@ function WidgetContent({
                                 inv.status === "PAID"
                                   ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                                   : inv.status === "ADVANCE_PAID"
-                                    ? "bg-accent-faint0/10 text-accent dark:text-accent"
+                                    ? "bg-accent/10 text-accent dark:text-accent"
                                     : inv.status === "OVERDUE"
                                       ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
                                       : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
@@ -2027,7 +2031,7 @@ function WidgetContent({
           : ""
       } ${
         isEditing
-          ? "ring-2 ring-dashed ring-accent/50 rounded-[24px] bg-accent-faint0/[0.03] p-0.5"
+          ? "ring-2 ring-dashed ring-accent/50 rounded-[24px] bg-accent/[0.04] p-0.5"
           : ""
       }`}
     >

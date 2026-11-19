@@ -4,6 +4,7 @@ import {
   getQuickStartProgress,
   isTourCompleted,
   markTourCompleted,
+  normalizeTourRoute,
   resetTourCompleted,
   isQuickStartDismissed,
   dismissQuickStart,
@@ -86,5 +87,13 @@ describe("Onboarding Tour & Quick-Start Progress", () => {
     dismissQuickStart("default", storage);
     expect(isQuickStartDismissed("default", storage)).toBe(true);
     expect(isQuickStartDismissed("ai-profile", storage)).toBe(false);
+  });
+
+  it("normalizes trailing slashes for Next static-export route comparison", () => {
+    expect(normalizeTourRoute("/")).toBe("/");
+    expect(normalizeTourRoute("/invoices")).toBe("/invoices");
+    expect(normalizeTourRoute("/invoices/")).toBe("/invoices");
+    expect(normalizeTourRoute("/tasks///")).toBe("/tasks");
+    expect(normalizeTourRoute("")).toBe("/");
   });
 });

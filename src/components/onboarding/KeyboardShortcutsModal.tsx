@@ -38,12 +38,21 @@ const SHORTCUT_GROUPS = [
 
 export function KeyboardShortcutsModal() {
   const { isGateOpen, isLocked } = useProfiles();
+  const blocked = isGateOpen || isLocked;
   const [isOpen, setIsOpen] = useState(false);
+  const [prevBlocked, setPrevBlocked] = useState(blocked);
+  if (prevBlocked !== blocked) {
+    setPrevBlocked(blocked);
+    if (blocked) setIsOpen(false);
+  }
 
   useEffect(() => {
-    const openHandler = () => setIsOpen(true);
+    const openHandler = () => {
+      if (blocked) return;
+      setIsOpen(true);
+    };
     const keyHandler = (e: KeyboardEvent) => {
-      if (isGateOpen || isLocked) return;
+      if (blocked) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         setIsOpen((prev) => !prev);
@@ -55,11 +64,11 @@ export function KeyboardShortcutsModal() {
       window.removeEventListener("billflow:open-shortcuts", openHandler);
       window.removeEventListener("keydown", keyHandler);
     };
-  }, [isGateOpen, isLocked]);
+  }, [blocked]);
 
   return (
     <MotionPresence>
-      {isOpen && (
+      {isOpen && !blocked && (
         <Dialog onClose={() => setIsOpen(false)} width={600}>
           <div className="app-dialog-header">
             <div className="flex items-center gap-2.5">

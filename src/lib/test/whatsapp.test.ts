@@ -125,6 +125,16 @@ describe("Contractor WhatsApp Integration", () => {
     const decoded = decodeURIComponent(mailto);
     expect(decoded).toContain("Invoice INV-500 from Studio X");
     expect(decoded).toContain("Total Amount: $800.00");
+
+    const injectedMailto = generateInvoiceEmailLink({
+      clientEmail: "bob@example.com?attach=/etc/passwd",
+      clientName: "Bob",
+      invoiceCode: "INV-501",
+      totalFormatted: "$100.00",
+      balanceFormatted: "$100.00",
+    });
+    expect(injectedMailto.startsWith("mailto:?subject=")).toBe(true);
+    expect(injectedMailto).not.toContain("attach=/etc/passwd");
   });
 
   describe("Overdue Invoice WhatsApp Reminder Integration", () => {

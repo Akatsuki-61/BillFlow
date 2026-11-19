@@ -612,7 +612,11 @@ export async function saveInvoicePdfAs(
       );
   }
 
-  const chosenPath = result.filePath;
+  const chosenPath = result.filePath.toLowerCase().endsWith(".pdf")
+    ? result.filePath
+    : `${result.filePath}.pdf`;
+  if (fs.existsSync(chosenPath) && fs.lstatSync(chosenPath).isSymbolicLink())
+    throw new Error("Cannot overwrite a symbolic link when exporting PDF.");
   atomicWrite(chosenPath, pdfBuffer);
 
   if (invoiceId !== "sample-preview" && invoiceId !== "draft-preview") {
@@ -1400,12 +1404,19 @@ export function setInvoiceStatuses(
   return { success: true };
 }
 
+const invoiceListFilterSchema = z
+  .object({
+    clientId: recordId.optional(),
+  })
+  .optional();
+
 export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle(
     "invoices:list",
     async (_event, filter?: { clientId?: string }) => {
       try {
-        return listInvoicesWithClient(filter?.clientId);
+        const parsedFilter = invoiceListFilterSchema.parse(filter);
+        return listInvoicesWithClient(parsedFilter?.clientId);
       } catch (err) {
         throw formatError(err);
       }
@@ -1446,8 +1457,9 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle(
     "invoices:update",
-    async (_event, id: string, patch: InvoicePatchInput) => {
+    async (_event, idInput: string, patch: InvoicePatchInput) => {
       try {
+        const id = recordId.parse(idInput);
         const validated = invoicePatchSchema.parse(patch);
         const db = getDb();
 

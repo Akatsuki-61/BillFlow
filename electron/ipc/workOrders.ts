@@ -5,6 +5,7 @@ import { captureWorkspace } from "../workspace-session";
 
 import { ipcMain } from "../security";
 import crypto from "crypto";
+import { z } from "zod";
 import { eq, desc, asc, and, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import {
@@ -658,6 +659,14 @@ export async function exportWorkOrderPdf(id: string): Promise<string> {
 /**
  * Registers work order IPC handlers on the electron main process.
  */
+const workOrderListFilterSchema = z
+  .object({
+    vendorId: recordId.optional(),
+    taskId: recordId.optional(),
+    invoiceId: recordId.optional(),
+  })
+  .optional();
+
 export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle(
     "workOrders:list",
@@ -666,7 +675,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
       filter?: { vendorId?: string; taskId?: string; invoiceId?: string },
     ) => {
       try {
-        return listWorkOrders(filter);
+        return listWorkOrders(workOrderListFilterSchema.parse(filter));
       } catch (err) {
         throw formatError(err);
       }
@@ -675,7 +684,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("workOrders:get", async (_event, id: string) => {
     try {
-      const wo = getWorkOrder(id);
+      const wo = getWorkOrder(recordId.parse(id));
       if (!wo) throw new AppError("NOT_FOUND", "Work order not found");
       return wo;
     } catch (err) {
@@ -698,7 +707,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
     "workOrders:update",
     async (_event, id: string, patch: WorkOrderPatchInput) => {
       try {
-        return updateWorkOrder(id, patch, broadcastDataChanged);
+        return updateWorkOrder(recordId.parse(id), patch, broadcastDataChanged);
       } catch (err) {
         throw formatError(err);
       }
@@ -732,7 +741,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
     async (_event, workOrderId: string, payoutId?: string) => {
       try {
         return removeWorkOrderPayout(
-          workOrderId,
+          recordId.parse(workOrderId),
           broadcastDataChanged,
           payoutId === undefined ? undefined : recordId.parse(payoutId),
         );
@@ -746,7 +755,11 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
     "workOrders:setPayoutStatus",
     async (_event, id: string, status: "PENDING" | "PAID") => {
       try {
-        return setWorkOrderPayoutStatus(id, status, broadcastDataChanged);
+        return setWorkOrderPayoutStatus(
+          recordId.parse(id),
+          z.enum(["PENDING", "PAID"]).parse(status),
+          broadcastDataChanged,
+        );
       } catch (err) {
         throw formatError(err);
       }
@@ -755,7 +768,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("workOrders:remove", async (_event, id: string) => {
     try {
-      return removeWorkOrder(id, broadcastDataChanged);
+      return removeWorkOrder(recordId.parse(id), broadcastDataChanged);
     } catch (err) {
       throw formatError(err);
     }
@@ -763,7 +776,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("workOrders:exportPdf", async (_event, id: string) => {
     try {
-      const filePath = await exportWorkOrderPdf(id);
+      const filePath = await exportWorkOrderPdf(recordId.parse(id));
       return { success: true, filePath };
     } catch (err) {
       throw formatError(err);

@@ -61,6 +61,7 @@ export interface DashboardMetrics {
   totalTrackedHours: number;
   overdueInvoices: InvoiceWithClient[];
   overdueTotalStr: string;
+  currencyIssuedCount: number;
   monthlyStats: ReturnType<typeof calculateFinancials>["monthlyTrends"];
   taskCounts: {
     todo: number;
@@ -145,7 +146,17 @@ export function computeDashboardMetrics({
   let pendingCents = 0;
   let pendingCount = 0;
   let overdueTotalCents = 0;
+  let currencyIssuedCount = 0;
   const overdueInvoices: InvoiceWithClient[] = [];
+  for (const inv of invoices) {
+    if (inv.status === "DRAFT" || inv.currency !== activeCurrency) continue;
+    currencyIssuedCount += 1;
+    if (isPastDue(inv)) {
+      overdueInvoices.push(inv);
+      overdueTotalCents += Math.max(0, inv.amountCents - (inv.paidCents ?? 0));
+    }
+  }
+
   const clientTotals = new Map<
     string,
     { name: string; totalBilledCents: number }
@@ -167,11 +178,6 @@ export function computeDashboardMetrics({
         advanceCentsCollected += collected;
       }
       pendingCents += Math.max(0, inv.amountCents - collected);
-    }
-
-    if (isPastDue(inv)) {
-      overdueInvoices.push(inv);
-      overdueTotalCents += Math.max(0, inv.amountCents - (inv.paidCents ?? 0));
     }
 
     const clientKey = inv.clientId || `invoice:${inv.id}`;
@@ -321,6 +327,7 @@ export function computeDashboardMetrics({
     totalTrackedHours,
     overdueInvoices,
     overdueTotalStr,
+    currencyIssuedCount,
     monthlyStats: financials.monthlyTrends,
     taskCounts,
     pipelineStages,

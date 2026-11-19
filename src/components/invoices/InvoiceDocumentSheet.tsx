@@ -436,7 +436,7 @@ export default function InvoiceDocumentSheet({
       paymentUrl: invoice.paymentUrl,
       businessName,
     });
-    window.open(link);
+    window.open(link, "_blank", "noopener,noreferrer");
     void window.billflow?.workspace
       ?.recordActivity?.(activityProfile, {
         kind: "communication",

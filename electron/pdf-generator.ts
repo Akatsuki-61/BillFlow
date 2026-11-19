@@ -95,11 +95,11 @@ export function buildInvoiceHtml(data: InvoicePdfPayload): string {
     const footer =
       /<div class="(?:footer-row|footer-container|footer-bar|footer-contact|contact-footer)[^"]*"/;
     html = footer.test(html)
-      ? html.replace(footer, supplement + "$&")
-      : html.replace("</body>", supplement + "</body>");
+      ? html.replace(footer, (match) => supplement + match)
+      : html.replace("</body>", () => `${supplement}</body>`);
   }
   if (data.items.length >= 10)
-    html = html.replace("<body>", '<body data-invoice-pagination="true">');
+    html = html.replace("<body>", () => '<body data-invoice-pagination="true">');
   const printStyle = `<style data-invoice-print>@media print {
     table { break-inside:auto; } thead { display:table-header-group; }
     tr, .table-row { break-inside:avoid; page-break-inside:avoid; }
@@ -109,7 +109,7 @@ export function buildInvoiceHtml(data: InvoicePdfPayload): string {
     body[data-invoice-pagination] .bottom-right-svg, body[data-invoice-pagination] .bottom-decoration, body[data-invoice-pagination] .bottom-shape, body[data-invoice-pagination] .footer-svg { display:none !important; }
     body[data-invoice-pagination] .footer-row, body[data-invoice-pagination] .footer-container, body[data-invoice-pagination] .footer-bar, body[data-invoice-pagination] .footer-contact, body[data-invoice-pagination] .contact-footer, body[data-invoice-pagination] .footer-content { position:relative !important; bottom:auto !important; height:auto !important; margin-top:24px !important; break-inside:avoid; }
   }</style>`;
-  return html.replace("</head>", printStyle + "</head>");
+  return html.replace("</head>", () => `${printStyle}</head>`);
 }
 
 /**

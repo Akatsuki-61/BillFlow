@@ -165,7 +165,13 @@ export async function openAttachment(id: string) {
       "Receipt file is missing. Restore it from a complete backup.",
     );
   const stat = fs.lstatSync(file);
-  if (stat.isSymbolicLink() || !stat.isFile())
+  if (
+    stat.isSymbolicLink() ||
+    !stat.isFile() ||
+    stat.size <= 0 ||
+    stat.size > MAX_RECEIPT_BYTES ||
+    stat.size !== row.sizeBytes
+  )
     throw new Error("Receipt integrity check failed.");
   if (
     createHash("sha256").update(fs.readFileSync(file)).digest("hex") !==
@@ -195,6 +201,19 @@ export function pdfOutputDirectory() {
 function assertNonSymlinkFile(filePath: string, message: string) {
   const stat = fs.lstatSync(filePath);
   if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(message);
+}
+function assertPdfFileHeader(filePath: string, message: string) {
+  const header = Buffer.alloc(5);
+  let handle: number | undefined;
+  try {
+    handle = fs.openSync(filePath, "r");
+    const bytesRead = fs.readSync(handle, header, 0, 5, 0);
+    if (bytesRead < 5 || header.toString("ascii") !== "%PDF-") {
+      throw new Error(message);
+    }
+  } finally {
+    if (handle !== undefined) fs.closeSync(handle);
+  }
 }
 // The PDF generator calls this in the main process after saving its invoice.
 export function saveInvoicePdf(invoiceId: string, bytes: Buffer) {
@@ -267,6 +286,7 @@ export async function openWorkOrderPdf(
   assertNonSymlinkFile(filePath, "Invalid voucher PDF file.");
   if (path.extname(filePath).toLowerCase() !== ".pdf")
     throw new Error("Invalid voucher PDF path.");
+  assertPdfFileHeader(filePath, "Invalid voucher PDF file.");
   if (reveal) shell.showItemInFolder(filePath);
   else {
     const error = await shell.openPath(filePath);
@@ -286,6 +306,7 @@ export async function openInvoicePdf(invoiceId: string, reveal = false) {
   assertNonSymlinkFile(record.filePath, "Invalid invoice PDF file.");
   if (path.extname(record.filePath).toLowerCase() !== ".pdf")
     throw new Error("Invalid invoice PDF path.");
+  assertPdfFileHeader(record.filePath, "Invalid invoice PDF file.");
   if (reveal) shell.showItemInFolder(record.filePath);
   else {
     const error = await shell.openPath(record.filePath);
@@ -330,7 +351,15 @@ async function selectReceiptFile(event: Electron.IpcMainInvokeEvent) {
   const stat = fs.statSync(source);
   if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_RECEIPT_BYTES)
     throw new Error("Receipt must be a file smaller than 20 MB.");
-  receiptFormat(fs.readFileSync(source));
+  const magic = Buffer.alloc(Math.min(12, stat.size));
+  let handle: number | undefined;
+  try {
+    handle = fs.openSync(source, "r");
+    fs.readSync(handle, magic, 0, magic.length, 0);
+  } finally {
+    if (handle !== undefined) fs.closeSync(handle);
+  }
+  receiptFormat(magic);
   for (const [id, selection] of selections)
     if (selection.expires < Date.now()) selections.delete(id);
   if (selections.size >= 64) selections.delete(selections.keys().next().value!);
@@ -393,7 +422,7 @@ export function registerFileHandlers(broadcast: () => void) {
   ipcMain.handle("files:openDraft", async (_event, link: string) => {
     if (typeof link !== "string" || !isMessageDraftUrl(link))
       throw new Error("Invalid WhatsApp or SMS draft.");
-    await shell.openExternal(link);
+    await shell.openExternal(new URL(link).href);
   });
   ipcMain.handle("files:openInvoicePdf", (_e, id: string, reveal?: boolean) =>
     openInvoicePdf(id, reveal),

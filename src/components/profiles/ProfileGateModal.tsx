@@ -605,7 +605,9 @@ export function ProfileGateModal() {
       });
       if (typeof window !== "undefined") {
         setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("billflow:start-tour"));
+          window.dispatchEvent(
+            new CustomEvent("billflow:start-tour", { detail: { auto: true } }),
+          );
         }, 350);
       }
     } catch (err) {

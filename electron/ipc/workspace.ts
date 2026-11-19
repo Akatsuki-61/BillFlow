@@ -1,5 +1,6 @@
 import { ipcMain } from "../security";
 import { captureWorkspace } from "../workspace-session";
+import { atomicWrite } from "../managed-files";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -109,8 +110,7 @@ export function workspaceDraft(
       .max(8 * 1024 * 1024)
       .parse(value);
     JSON.parse(value);
-    fs.writeFileSync(file + ".tmp", value, { encoding: "utf8", mode: 0o600 });
-    fs.renameSync(file + ".tmp", file);
+    atomicWrite(file, value, 0o600);
     return value;
   }
   try {
@@ -142,6 +142,21 @@ export function registerWorkspaceHandlers() {
       "quarantined-drafts",
     );
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const existingFiles = fs
+      .readdirSync(directory)
+      .filter((entry) => entry.endsWith(".json"));
+    const existingBytes = existingFiles.reduce((total, entry) => {
+      try {
+        return total + fs.statSync(path.join(directory, entry)).size;
+      } catch {
+        return total;
+      }
+    }, 0);
+    if (
+      existingFiles.length >= 20 ||
+      existingBytes + Buffer.byteLength(serialized, "utf8") > 64 * 1024 * 1024
+    )
+      throw new Error("Quarantined draft storage limit reached.");
     fs.writeFileSync(path.join(directory, `${randomUUID()}.json`), serialized, {
       encoding: "utf8",
       mode: 0o600,

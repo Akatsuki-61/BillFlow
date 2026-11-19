@@ -9,13 +9,13 @@ import type { WorkOrderItem } from "@/types/outsourcing";
 export function formatExternalUrl(url?: string | null): string {
   if (!url) return "";
   const trimmed = url.trim();
-  if (!trimmed) return "";
+  if (!trimmed || /[\x00-\x1f\x7f]/.test(trimmed)) return "";
 
-  if (/^(javascript|vbscript|data):/i.test(trimmed)) {
+  if (/^(javascript|vbscript|data|file):/i.test(trimmed)) {
     return "";
   }
 
-  if (/^(https?:\/\/|mailto:|file:\/\/)/i.test(trimmed)) {
+  if (/^(https?:\/\/|mailto:)/i.test(trimmed)) {
     return trimmed;
   }
 

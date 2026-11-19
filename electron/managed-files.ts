@@ -6,9 +6,16 @@ import { getDatabasePath } from "./db";
 export const MAX_RECEIPT_BYTES = 20 * 1024 * 1024;
 export function attachmentDirectory() {
   const directory = path.join(path.dirname(getDatabasePath()), "attachments");
-  fs.mkdirSync(directory, { recursive: true });
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   if (fs.lstatSync(directory).isSymbolicLink())
     throw new Error("Attachment storage cannot be a symbolic link.");
+  if (process.platform !== "win32") {
+    try {
+      fs.chmodSync(directory, 0o700);
+    } catch {
+      // Ignore permission errors on read-only/unsupported filesystems
+    }
+  }
   return directory;
 }
 export function managedAttachmentPath(name: string) {
@@ -47,7 +54,8 @@ export function publishManagedAttachment(name: string, bytes: Buffer) {
   const temporary = path.join(attachmentDirectory(), `${randomUUID()}.tmp`);
   let handle: number | undefined;
   try {
-    handle = fs.openSync(temporary, "wx");
+    handle = fs.openSync(temporary, "wx", 0o600);
+    if (process.platform !== "win32") fs.fchmodSync(handle, 0o600);
     fs.writeFileSync(handle, bytes);
     fs.fsyncSync(handle);
     fs.closeSync(handle);
@@ -60,11 +68,16 @@ export function publishManagedAttachment(name: string, bytes: Buffer) {
   }
 }
 
-export function atomicWrite(destination: string, bytes: Buffer | string) {
+export function atomicWrite(
+  destination: string,
+  bytes: Buffer | string,
+  mode = 0o600,
+) {
   const temporary = `${destination}.${randomUUID()}.tmp`;
   let handle: number | undefined;
   try {
-    handle = fs.openSync(temporary, "wx");
+    handle = fs.openSync(temporary, "wx", mode);
+    if (process.platform !== "win32") fs.fchmodSync(handle, mode);
     fs.writeFileSync(handle, bytes);
     fs.fsyncSync(handle);
     fs.closeSync(handle);

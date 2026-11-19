@@ -373,6 +373,25 @@ describe("CSV Export & Overdue Analysis Engine", () => {
       });
       expect(generalWorkbook).toContain('<Worksheet ss:Name="All Invoices">');
       expect(generalWorkbook).toContain("INV-2026-001");
+
+      const adversarialWorkbook = generateOverdueExcelWorkbook(
+        [
+          {
+            ...mockInvoices[0],
+            clientName: "=CMD('calc') $&\x07",
+            clientContactPerson: "+SUM(1,1)",
+          },
+        ],
+        {
+          referenceDate: fixedNow,
+          primaryCurrency: "LKR",
+          includeClientRollup: true,
+        },
+      );
+      expect(adversarialWorkbook).not.toContain("\x07");
+      expect(adversarialWorkbook).not.toContain('<Data ss:Type="String">=CMD');
+      expect(adversarialWorkbook).toContain("&apos;=CMD");
+      expect(adversarialWorkbook).toContain("&apos;+SUM(1,1)");
     });
   });
 });

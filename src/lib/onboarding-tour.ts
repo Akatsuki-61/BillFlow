@@ -117,6 +117,12 @@ function resolveStorage(): Storage | null {
   return typeof window !== "undefined" ? window.localStorage : null;
 }
 
+export function normalizeTourRoute(route: string): string {
+  const trimmed = route.trim();
+  if (!trimmed || trimmed === "/") return "/";
+  return trimmed.replace(/\/+$/, "") || "/";
+}
+
 export function isTourCompleted(
   profileId: string,
   storage: ReadStorage | null = resolveStorage(),

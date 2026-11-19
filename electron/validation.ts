@@ -1,6 +1,6 @@
 import path from "path";
 import { z } from "zod";
-import { deliveryLink, minorAmount } from "./workflow-validation";
+import { deliveryLink, minorAmount, recordId } from "./workflow-validation";
 const invoiceDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -52,6 +52,21 @@ const vendorContactFields = {
   photoData: imageDataSchema,
 };
 
+const driveUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .url("Please provide a valid URL")
+  .regex(/^https?:\/\//i, "Use an HTTP or HTTPS URL")
+  .refine((val) => {
+    try {
+      const url = new URL(val);
+      return !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }, "URL must not contain credentials");
+
 export const newClientSchema = z.object({
   ...clientContactFields,
   name: z
@@ -70,13 +85,7 @@ export const newClientSchema = z.object({
     .pipe(z.string().email("Please provide a valid email address")),
   phone: z.string().trim().max(40).optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
-  driveUrl: z
-    .string()
-    .trim()
-    .url("Please provide a valid URL")
-    .regex(/^https?:\/\//i, "Use an HTTP or HTTPS URL")
-    .optional()
-    .or(z.literal("")),
+  driveUrl: driveUrlSchema.optional().or(z.literal("")),
 });
 
 export const clientPatchSchema = z.object({
@@ -99,20 +108,18 @@ export const clientPatchSchema = z.object({
     .optional(),
   phone: z.string().trim().max(40).nullable().optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
-  driveUrl: z
-    .string()
-    .trim()
-    .url("Please provide a valid URL")
-    .regex(/^https?:\/\//i, "Use an HTTP or HTTPS URL")
-    .nullable()
-    .optional()
-    .or(z.literal("")),
+  driveUrl: driveUrlSchema.nullable().optional().or(z.literal("")),
 });
 
 export const newInvoiceItemSchema = z.object({
   id: z.string().optional(),
   description: z.string().trim().min(1, "Description is required").max(500),
-  quantity: z.number().int().positive("Quantity must be positive").default(1),
+  quantity: z
+    .number()
+    .int()
+    .positive("Quantity must be positive")
+    .max(1_000_000)
+    .default(1),
   unitPriceCents: minorAmount,
   catalogId: z.string().nullable().optional(),
   sourceTaskId: z.string().nullable().optional(),
@@ -205,10 +212,10 @@ export const newCatalogItemSchema = z.object({
     .enum(["Development", "Design", "Consulting", "Licensing"])
     .default("Development"),
   sku: z.string().trim().min(1, "SKU is required").max(60),
-  description: z.string().trim().default(""),
+  description: z.string().trim().max(2000).default(""),
   price: catalogPriceSchema,
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("LKR"),
-  unit: z.string().trim().default("/ Hourly"),
+  unit: z.string().trim().max(60).default("/ Hourly"),
   iconType: z.enum(["code", "design", "cloud", "consulting"]).default("code"),
 });
 
@@ -218,10 +225,10 @@ export const catalogItemPatchSchema = z.object({
     .enum(["Development", "Design", "Consulting", "Licensing"])
     .optional(),
   sku: z.string().trim().min(1).max(60).optional(),
-  description: z.string().trim().optional(),
+  description: z.string().trim().max(2000).optional(),
   price: catalogPriceSchema.optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
-  unit: z.string().trim().optional(),
+  unit: z.string().trim().max(60).optional(),
   iconType: z.enum(["code", "design", "cloud", "consulting"]).optional(),
 });
 
@@ -293,11 +300,7 @@ export const newVendorSchema = z.object({
     .trim()
     .min(1, "Service description cannot be blank or whitespace only")
     .max(160),
-  balanceCents: z
-    .number()
-    .int()
-    .nonnegative("Balance must be positive")
-    .default(0),
+  balanceCents: minorAmount.default(0),
   status: z.enum(["PENDING", "PAID"]).default("PENDING"),
   iconType: z
     .enum(["design", "devops", "legal", "development"])
@@ -352,9 +355,9 @@ export const newExpenseSchema = z.object({
   merchant: z.string().trim().min(1, "Merchant or payee is required").max(120),
   description: z.string().trim().max(1000).optional().default(""),
   category: z.string().trim().min(1, "Category is required").max(80),
-  amountCents: z.number().int().positive("Amount must be positive"),
+  amountCents: minorAmount.refine((n) => n > 0, "Amount must be positive"),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).default("USD"),
-  incurredAt: z.string().trim().min(1, "Incurred date is required"),
+  incurredAt: timestamp,
   deductible: z.boolean().optional().default(true),
   invoiceId: z.string().trim().nullable().optional(),
 });
@@ -363,9 +366,11 @@ export const expensePatchSchema = z.object({
   merchant: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(1000).optional(),
   category: z.string().trim().min(1).max(80).optional(),
-  amountCents: z.number().int().positive().optional(),
+  amountCents: minorAmount
+    .refine((n) => n > 0, "Amount must be positive")
+    .optional(),
   currency: z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]).optional(),
-  incurredAt: z.string().trim().min(1).optional(),
+  incurredAt: timestamp.optional(),
   deductible: z.boolean().optional(),
   invoiceId: z.string().trim().nullable().optional(),
 });
@@ -438,7 +443,7 @@ export const workOrderPatchSchema = z.object({
   status: z.enum(["todo", "in-progress", "review", "done"]).optional(),
   deliveryUrl: deliveryLink,
   notes: z.string().trim().max(2000).nullable().optional(),
-  completedAt: z.string().nullable().optional(),
+  completedAt: timestamp.nullable().optional(),
   payoutStatus: z.enum(["PENDING", "PAID"]).optional(),
   updateTask: z.boolean().optional(),
   taskStatus: z.enum(["todo", "in-progress", "review", "done"]).optional(),
@@ -472,13 +477,13 @@ export const recordWorkOrderPayoutSchema = z.object({
  * Validation schema for user local calendar events.
  */
 export const newCalendarEventSchema = z.object({
-  id: z.string().optional(),
+  id: recordId.optional(),
   title: z.string().trim().min(1, "Event title is required").max(150),
   description: z.string().trim().max(1000).optional().default(""),
-  startDate: z.string().trim().min(1, "Start date is required"),
-  endDate: z.string().trim().nullable().optional(),
-  startTime: z.string().trim().nullable().optional(),
-  endTime: z.string().trim().nullable().optional(),
+  startDate: z.string().trim().min(1, "Start date is required").max(40),
+  endDate: z.string().trim().max(40).nullable().optional(),
+  startTime: z.string().trim().max(20).nullable().optional(),
+  endTime: z.string().trim().max(20).nullable().optional(),
   isAllDay: z.boolean().optional().default(false),
   category: z
     .enum(["meeting", "milestone", "review", "deadline", "reminder", "general"])
@@ -486,10 +491,10 @@ export const newCalendarEventSchema = z.object({
   color: z
     .enum(["blue", "emerald", "amber", "purple", "rose", "cyan"])
     .default("blue"),
-  clientId: z.string().trim().nullable().optional(),
-  clientName: z.string().trim().nullable().optional(),
-  taskId: z.string().trim().nullable().optional(),
-  taskTitle: z.string().trim().nullable().optional(),
+  clientId: recordId.nullable().optional(),
+  clientName: z.string().trim().max(120).nullable().optional(),
+  taskId: recordId.nullable().optional(),
+  taskTitle: z.string().trim().max(240).nullable().optional(),
   location: z.string().trim().max(300).nullable().optional(),
 });
 

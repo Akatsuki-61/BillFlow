@@ -43,6 +43,8 @@ export function assertWorkspaceIntegrity(sqlite: Database.Database) {
     UNION ALL SELECT 'task invoice', t.id FROM tasks t JOIN invoices i ON i.id=t.invoice_id WHERE t.client_id IS NOT i.client_id OR t.currency<>i.currency
     UNION ALL SELECT 'task item', t.id FROM tasks t JOIN invoice_items item ON item.id=t.invoice_item_id WHERE t.invoice_id IS NOT item.invoice_id
     UNION ALL SELECT 'work order task', w.id FROM work_orders w JOIN tasks t ON t.id=w.task_id WHERE t.invoice_id IS NOT w.invoice_id
+    UNION ALL SELECT 'invoice overpayment', i.id FROM invoices i WHERE i.paid_cents > i.amount_cents
+    UNION ALL SELECT 'work order overpayment', w.id FROM work_orders w WHERE COALESCE((SELECT SUM(p.amount_cents) FROM vendor_payouts p WHERE p.work_order_id=w.id AND p.voided_at IS NULL),0) > w.fee_cents
     ${auditChecks}
     LIMIT 20
   `,

@@ -114,4 +114,15 @@ describe("macOS Menu & About Panel Configuration", () => {
     expect(chart?.title).toBe("Collections & Net Cashflow");
     expect(chart?.description).toContain("Recorded payments");
   });
+
+  it("omits reload and toggleDevTools entries in packaged View menus", () => {
+    const template = buildMenuTemplate(() => {}, true, undefined, false);
+    const viewMenu = template.find((m) => m.label === "View");
+    const roles = (viewMenu?.submenu as MenuItemConstructorOptions[]).map(
+      (item) => item.role,
+    );
+    expect(roles).not.toContain("toggleDevTools");
+    expect(roles).not.toContain("reload");
+    expect(roles).not.toContain("forceReload");
+  });
 });

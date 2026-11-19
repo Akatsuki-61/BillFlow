@@ -2,6 +2,7 @@ import { reclaimUnreferencedReceipts } from "../receipt-cleanup";
 import { ipcMain } from "../security";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 import { getDb } from "../db";
 import { expenses, attachments } from "../db/schema";
 import { newExpenseSchema, expensePatchSchema } from "../validation";
@@ -205,11 +206,18 @@ export function removeExpense(
   return { success: true };
 }
 
+const expenseListFilterSchema = z
+  .object({
+    category: z.string().max(80).optional(),
+    invoiceId: recordId.optional(),
+  })
+  .optional();
+
 export function registerExpenseHandlers(broadcast: () => void) {
   ipcMain.handle(
     "expenses:list",
     (_e, filter?: { category?: string; invoiceId?: string }) =>
-      listExpenses(filter),
+      listExpenses(expenseListFilterSchema.parse(filter)),
   );
   ipcMain.handle("expenses:create", (_e, input: NewExpenseInput) =>
     createExpense(input, broadcast),

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { openExternalLink } from "@/lib/deliveryUrl";
+import { formatExternalUrl, openExternalLink } from "@/lib/deliveryUrl";
 import type { InvoiceTemplateProps } from "./types";
 
 export function InvoiceSupplement({
@@ -8,7 +8,8 @@ export function InvoiceSupplement({
   settings,
 }: Pick<InvoiceTemplateProps, "invoice" | "client" | "settings">) {
   const billingAddress = invoice.clientBillingAddress || client?.billingAddress;
-  if (!invoice.paymentUrl && !settings?.signatureData && !billingAddress)
+  const safePaymentUrl = formatExternalUrl(invoice.paymentUrl);
+  if (!safePaymentUrl && !settings?.signatureData && !billingAddress)
     return null;
   return (
     <div className="mt-3 flex flex-wrap items-end justify-between gap-4 text-xs">
@@ -20,11 +21,11 @@ export function InvoiceSupplement({
             {billingAddress}
           </p>
         )}
-        {invoice.paymentUrl && (
+        {safePaymentUrl && (
           <a
             className="font-semibold underline"
-            href={invoice.paymentUrl}
-            onClick={(event) => openExternalLink(invoice.paymentUrl, event)}
+            href={safePaymentUrl}
+            onClick={(event) => openExternalLink(safePaymentUrl, event)}
           >
             Pay online
           </a>

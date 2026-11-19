@@ -23,6 +23,7 @@ import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
 import { recentMonths, isPastDue, localDateKey } from "@/lib/visual-metrics";
+import { buildDuplicateInvoiceDraft } from "@/lib/invoice-duplicate";
 
 import {
   Button,
@@ -461,9 +462,6 @@ export default function InvoicesView() {
     }
   };
 
-  const linkedClient = clients.find(
-    (client) => client.id === clientFilterParam,
-  );
   const isNewActive =
     isNewParam === "1" ||
     isNewParam === "true" ||
@@ -473,23 +471,9 @@ export default function InvoicesView() {
     isNewActive,
     searchParams.get("t"),
     clientFilterParam,
-    linkedClient?.currency,
     importTaskIdsParam,
   ]);
-  const [previousModalQueryKey, setPreviousModalQueryKey] = useState<
-    string | null
-  >(null);
-  if (previousModalQueryKey !== modalQueryKey) {
-    setPreviousModalQueryKey(modalQueryKey);
-    if (isNewActive) {
-      setShowAddInvoiceModal(true);
-      if (clientFilterParam) setNewClientId(clientFilterParam);
-      if (linkedClient) {
-        setNewCurrency(linkedClient.currency);
-        if (linkedClient.driveUrl) setNewDeliveryUrl(linkedClient.driveUrl);
-      }
-    }
-  }
+  const handledNewQueryRef = useRef<string | null>(null);
 
   // Handle ?invoice=ID&preview=1 to automatically open the InvoiceDocumentSheet preview
   const previewTargetInv =
@@ -553,7 +537,11 @@ export default function InvoicesView() {
   // Auto-populate New Invoice modal when redirected with ?action=new&importTaskIds=id1,id2...
   const importedFromQueryRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!importTaskIdsParam || tasks.length === 0) return;
+    if (!importTaskIdsParam) {
+      importedFromQueryRef.current = null;
+      return;
+    }
+    if (tasks.length === 0) return;
     if (importedFromQueryRef.current === importTaskIdsParam) return;
 
     const requestedIds = importTaskIdsParam
@@ -610,6 +598,11 @@ export default function InvoicesView() {
     });
 
     queueMicrotask(() => {
+      setNewStatus("UNPAID");
+      setNewPaymentUrl("");
+      setNewWorkflowStage(null);
+      setNewDiscount("");
+      setNewTaxRate("");
       setNewDueDate((prev) => prev || defaultDueStr);
       if (matchedClient) {
         setClientMode("existing");
@@ -743,6 +736,7 @@ export default function InvoicesView() {
     if (saveDraft) {
       saveInvoiceDraft();
     }
+    setNewStatus("UNPAID");
     setShowAddInvoiceModal(false);
     setShowImportTasksModal(false);
     if (
@@ -797,7 +791,15 @@ export default function InvoicesView() {
   // When opening Add Invoice modal, prefill the next code
   const handleOpenAddModal = async () => {
     requestId.current = null;
-    setClientMode(clients.length ? "existing" : "new");
+    const activeClients = clients.filter((record) => !record.archivedAt);
+    setClientMode(clientFilterParam || activeClients.length ? "existing" : "new");
+    setClientName("");
+    setClientEmail("");
+    setClientContact("");
+    setClientPhone("");
+    setClientWhatsApp("");
+    setClientCategory("Enterprise");
+    setNewStatus("UNPAID");
     setNewCurrency(settings?.defaultCurrency || activeCurrency || "USD");
     const due = new Date();
     due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
@@ -810,6 +812,8 @@ export default function InvoicesView() {
     setAdvancePercent(50);
     setSaveAsPermanentClient(true);
     setNewDeliveryUrl("");
+    setNewPaymentUrl("");
+    setNewWorkflowStage(null);
     setNewNotes("");
 
     try {
@@ -820,18 +824,22 @@ export default function InvoicesView() {
     }
 
     if (clientFilterParam) {
+      setClientMode("existing");
       setNewClientId(clientFilterParam);
       const match = clients.find((c) => c.id === clientFilterParam);
       if (match) {
         setNewCurrency(match.currency);
         if (match.driveUrl) setNewDeliveryUrl(match.driveUrl);
       }
-    } else if (!newClientId) {
-      const client = clients.find((record) => !record.archivedAt);
-      if (client) {
-        setNewClientId(client.id);
-        setNewCurrency(client.currency);
-        if (client.driveUrl) setNewDeliveryUrl(client.driveUrl);
+    } else {
+      const currentClient = activeClients.find((record) => record.id === newClientId);
+      const targetClient = currentClient ?? activeClients[0];
+      if (targetClient) {
+        setNewClientId(targetClient.id);
+        setNewCurrency(targetClient.currency);
+        if (targetClient.driveUrl) setNewDeliveryUrl(targetClient.driveUrl);
+      } else {
+        setNewClientId("");
       }
     }
 
@@ -845,77 +853,53 @@ export default function InvoicesView() {
     setShowAddInvoiceModal(true);
   };
 
+  const handleOpenAddModalRef = useRef(handleOpenAddModal);
+  useEffect(() => {
+    handleOpenAddModalRef.current = handleOpenAddModal;
+  });
+
+  useEffect(() => {
+    if (!isNewActive) {
+      handledNewQueryRef.current = null;
+      return;
+    }
+    if (importTaskIdsParam) return;
+    if (handledNewQueryRef.current === modalQueryKey) return;
+    handledNewQueryRef.current = modalQueryKey;
+    queueMicrotask(() => {
+      void handleOpenAddModalRef.current();
+    });
+  }, [isNewActive, importTaskIdsParam, modalQueryKey]);
+
   const handleDuplicateInvoice = async (inv: InvoiceWithClient) => {
     requestId.current = null;
-    if (inv.clientId && clients.some((c) => c.id === inv.clientId && !c.archivedAt)) {
-      setClientMode("existing");
-      setNewClientId(inv.clientId);
-    } else {
-      setClientMode("new");
-      setClientName(inv.clientName || "");
-      setClientEmail(inv.clientEmail || "");
-      setClientContact(inv.clientContactPerson || "");
-      setClientPhone(inv.clientPhone || "");
-      setClientWhatsApp("");
-      setClientCategory(inv.clientCategory || "Enterprise");
-      setSaveAsPermanentClient(false);
-    }
-    setNewCurrency(inv.currency);
-    const due = new Date();
-    due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
-    setNewDueDate(localDateKey(due));
-    setNewStatus("DRAFT");
-    const clonedItems: LineItemDraft[] =
-      inv.items && inv.items.length > 0
-        ? inv.items.map((item, idx) => ({
-            id: `${Date.now()}-${idx}`,
-            description: item.description,
-            quantity: item.quantity || 1,
-            unitPrice: ((item.unitPriceCents || 0) / 100).toFixed(2),
-          }))
-        : [
-            {
-              id: "1",
-              description: inv.title || "Freelance services",
-              quantity: 1,
-              unitPrice: ((inv.amountCents || 0) / 100).toFixed(2),
-            },
-          ];
-    setNewLineItems(clonedItems);
+    const draft = buildDuplicateInvoiceDraft(
+      inv,
+      clients,
+      settings?.defaultDueDays ?? 14,
+    );
+    setClientMode(draft.clientMode);
+    setNewClientId(draft.clientId);
+    setClientName(draft.clientName);
+    setClientEmail(draft.clientEmail);
+    setClientContact(draft.clientContact);
+    setClientPhone(draft.clientPhone);
+    setClientWhatsApp(draft.clientWhatsApp);
+    setClientCategory(draft.clientCategory);
+    setSaveAsPermanentClient(draft.saveAsPermanentClient);
+    setNewCurrency(draft.currency);
+    setNewDueDate(draft.dueDate);
+    setNewStatus(draft.status);
+    setNewLineItems(draft.items);
     setLinkedTaskIds([]);
-    const discountCents = inv.discountCents ?? 0;
-    const taxCents = inv.taxCents ?? 0;
-    const advanceCents = inv.advanceCents ?? 0;
-    setNewDiscount(
-      discountCents > 0 ? (discountCents / 100).toFixed(2) : "",
-    );
-    const subtotalCents = clonedItems.reduce(
-      (sum, it) =>
-        sum +
-        Math.round(parseFloat(it.unitPrice || "0") * 100) * (it.quantity || 1),
-      0,
-    );
-    const netBeforeTax = Math.max(0, subtotalCents - discountCents);
-    setNewTaxRate(
-      taxCents > 0 && netBeforeTax > 0
-        ? String(Math.round((taxCents / netBeforeTax) * 1000) / 10)
-        : "",
-    );
-    if (advanceCents > 0 && inv.amountCents > 0) {
-      setRequireAdvance(true);
-      setAdvancePercent(
-        Math.min(
-          100,
-          Math.max(1, Math.round((advanceCents / inv.amountCents) * 100)),
-        ),
-      );
-    } else {
-      setRequireAdvance(false);
-    }
-    setNewDeliveryUrl(inv.deliveryUrl || "");
-    setNewPaymentUrl(inv.paymentUrl || "");
+    setNewDiscount(draft.discount);
+    setNewTaxRate(draft.taxRate);
+    setRequireAdvance(draft.requireAdvance);
+    setAdvancePercent(draft.advancePercent);
+    setNewDeliveryUrl(draft.deliveryUrl);
+    setNewPaymentUrl(draft.paymentUrl);
     setNewWorkflowStage(null);
-    setNewNotes(inv.notes || "");
+    setNewNotes(draft.notes);
     setHasInvoiceDraft(false);
 
     try {
@@ -1034,10 +1018,14 @@ export default function InvoicesView() {
     }
     setStatusMenu(null);
     const rect = e.currentTarget.getBoundingClientRect();
-    const estimatedHeight = 395;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openUpward =
-      spaceBelow < estimatedHeight && rect.top > estimatedHeight;
+    const estimatedHeight =
+      415 +
+      (isElectron ? 44 : 0) +
+      (inv.payments && inv.payments.length > 0 ? 32 : 0) +
+      (!inv.clientId ? 32 : 0);
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const openUpward = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
 
     if (openUpward) {
       setActionMenu({
@@ -1046,9 +1034,13 @@ export default function InvoicesView() {
         right: Math.max(8, window.innerWidth - rect.right),
       });
     } else {
+      const maxTop = Math.max(
+        8,
+        window.innerHeight - Math.min(estimatedHeight, window.innerHeight * 0.85) - 8,
+      );
       setActionMenu({
         invoice: inv,
-        top: Math.max(8, rect.bottom + 6),
+        top: Math.max(8, Math.min(rect.bottom + 6, maxTop)),
         right: Math.max(8, window.innerWidth - rect.right),
       });
     }
@@ -4374,7 +4366,7 @@ export default function InvoicesView() {
                 value: "UNPAID",
                 label: "Unpaid",
                 desc: "No payments recorded yet",
-                dot: "bg-accent-faint0",
+                dot: "bg-accent",
               },
               {
                 value: "ADVANCE_PAID",

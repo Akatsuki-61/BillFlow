@@ -4,8 +4,12 @@ import { registerWorkspaceHandlers } from "./ipc/workspace";
 import { registerExchangeRateHandlers } from "./exchange-rates";
 import { affectedDatasets } from "../src/types/workspace";
 import { getActiveProfileId, getWorkspaceGeneration } from "./db";
-import { currentIpcChannel } from "./security";
-import { configureIpcSecurity, isTrustedDocument } from "./security";
+import {
+  configureIpcSecurity,
+  currentIpcChannel,
+  isTrustedDocument,
+  sanitizeExternalUrl,
+} from "./security";
 import { isWorkspaceUnlocked, lockProfileSession } from "./workspace-session";
 import { resolveStaticFile, documentCsp } from "./static-protocol";
 import {
@@ -66,11 +70,6 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.setName("BillFlow");
-if (process.env.BILLFLOW_USER_DATA) {
-  if (!path.isAbsolute(process.env.BILLFLOW_USER_DATA))
-    throw new Error("BILLFLOW_USER_DATA must be absolute.");
-  app.setPath("userData", process.env.BILLFLOW_USER_DATA);
-}
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
@@ -186,17 +185,9 @@ function createWindow() {
     isWorkspaceUnlocked,
   );
   const openExternal = (value: string) => {
-    try {
-      const url = new URL(value);
-      if (
-        !url.username &&
-        !url.password &&
-        ["https:", "http:", "mailto:"].includes(url.protocol)
-      )
-        void shell.openExternal(url.href);
-    } catch {
-      /* Invalid links never reach the OS. */
-    }
+    if (!isWorkspaceUnlocked()) return;
+    const safeUrl = sanitizeExternalUrl(value);
+    if (safeUrl) void shell.openExternal(safeUrl);
   };
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     openExternal(url);
@@ -237,113 +228,115 @@ function createWindow() {
   });
 }
 
-app
-  .whenReady()
-  .then(() => {
-    if (process.platform === "darwin") app.dock?.setIcon(appIconPath());
-    // Initialize database and migrations
-    try {
-      initDatabase();
-      listProfilesState();
-    } catch (error) {
+if (gotSingleInstanceLock) {
+  app
+    .whenReady()
+    .then(() => {
+      if (process.platform === "darwin") app.dock?.setIcon(appIconPath());
+      // Initialize database and migrations
+      try {
+        initDatabase();
+        listProfilesState();
+      } catch (error) {
+        dialog.showErrorBox(
+          "BillFlow database upgrade failed",
+          error instanceof Error ? error.message : String(error),
+        );
+        app.quit();
+        return;
+      }
+
+      // Register IPC handlers
+      const lockProtectedWorkspace = () => {
+        const state = listProfilesState();
+        if (
+          !state.profiles.find((profile) => profile.id === state.activeProfileId)
+            ?.hasPassword
+        )
+          return;
+        lockProfileSession();
+        mainWindow?.webContents.send("workspace:locked");
+      };
+      powerMonitor.on("lock-screen", lockProtectedWorkspace);
+      powerMonitor.on("suspend", lockProtectedWorkspace);
+      registerWorkspaceHandlers();
+      registerActivityHandlers(() =>
+        mainWindow?.webContents.send("workspace:activity-changed"),
+      );
+      registerExchangeRateHandlers();
+      registerStatementHandlers();
+      registerProfileHandlers(broadcastDataChanged);
+      registerClientHandlers(broadcastDataChanged);
+      registerInvoiceHandlers(broadcastDataChanged);
+      registerDashboardHandlers();
+      registerThemeHandlers();
+      registerSettingsHandlers(broadcastDataChanged);
+      registerVendorHandlers(broadcastDataChanged);
+      registerWorkOrderHandlers(broadcastDataChanged);
+      registerAnalyticsHandlers();
+      registerCatalogHandlers(broadcastDataChanged);
+      registerTaskHandlers(broadcastDataChanged);
+      registerFileHandlers(broadcastDataChanged);
+      registerExpenseHandlers(broadcastDataChanged);
+      registerCalendarHandlers(broadcastDataChanged);
+
+      // Register production static file protocol
+      const outDir = app.isPackaged
+        ? path.join(app.getAppPath(), "out")
+        : path.join(__dirname, "../out");
+
+      protocol.handle("app", async (req) => {
+        const filePath = resolveStaticFile(outDir, req.url);
+        if (!filePath) return new Response("Not found", { status: 404 });
+        const response = await net.fetch(pathToFileURL(filePath).toString());
+        const headers = new Headers(response.headers);
+        headers.set("X-Content-Type-Options", "nosniff");
+        if (filePath.endsWith(".html"))
+          headers.set(
+            "Content-Security-Policy",
+            documentCsp(fs.readFileSync(filePath, "utf8")),
+          );
+        return new Response(response.body, { status: response.status, headers });
+      });
+      session.defaultSession.setPermissionRequestHandler(
+        (_contents, _permission, callback) => callback(false),
+      );
+      session.defaultSession.setPermissionCheckHandler(() => false);
+      if (app.isPackaged || process.env.TEST_PROD_BUILD === "1") {
+        session.defaultSession.webRequest.onBeforeRequest(
+          { urls: ["http://*/*", "https://*/*", "ws://*/*", "wss://*/*"] },
+          (_details, callback) => callback({ cancel: true }),
+        );
+      }
+
+      createWindow();
+      createTray();
+      setupAboutPanel();
+      createApplicationMenu(() => mainWindow, showMainWindow);
+
+      app.on("activate", () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+          createWindow();
+        }
+      });
+    })
+    .catch((error) => {
+      console.error("BillFlow startup failed", error);
       dialog.showErrorBox(
-        "BillFlow database upgrade failed",
-        error instanceof Error ? error.message : String(error),
+        "BillFlow could not open your data",
+        `${error instanceof Error ? error.message : String(error)}\nNo business writes were enabled. Keep your data directory and repair or reinstall the app.`,
       );
       app.quit();
-      return;
-    }
-
-    // Register IPC handlers
-    const lockProtectedWorkspace = () => {
-      const state = listProfilesState();
-      if (
-        !state.profiles.find((profile) => profile.id === state.activeProfileId)
-          ?.hasPassword
-      )
-        return;
-      lockProfileSession();
-      mainWindow?.webContents.send("workspace:locked");
-    };
-    powerMonitor.on("lock-screen", lockProtectedWorkspace);
-    powerMonitor.on("suspend", lockProtectedWorkspace);
-    registerWorkspaceHandlers();
-    registerActivityHandlers(() =>
-      mainWindow?.webContents.send("workspace:activity-changed"),
-    );
-    registerExchangeRateHandlers();
-    registerStatementHandlers();
-    registerProfileHandlers(broadcastDataChanged);
-    registerClientHandlers(broadcastDataChanged);
-    registerInvoiceHandlers(broadcastDataChanged);
-    registerDashboardHandlers();
-    registerThemeHandlers();
-    registerSettingsHandlers(broadcastDataChanged);
-    registerVendorHandlers(broadcastDataChanged);
-    registerWorkOrderHandlers(broadcastDataChanged);
-    registerAnalyticsHandlers();
-    registerCatalogHandlers(broadcastDataChanged);
-    registerTaskHandlers(broadcastDataChanged);
-    registerFileHandlers(broadcastDataChanged);
-    registerExpenseHandlers(broadcastDataChanged);
-    registerCalendarHandlers(broadcastDataChanged);
-
-    // Register production static file protocol
-    const outDir = app.isPackaged
-      ? path.join(app.getAppPath(), "out")
-      : path.join(__dirname, "../out");
-
-    protocol.handle("app", async (req) => {
-      const filePath = resolveStaticFile(outDir, req.url);
-      if (!filePath) return new Response("Not found", { status: 404 });
-      const response = await net.fetch(pathToFileURL(filePath).toString());
-      const headers = new Headers(response.headers);
-      headers.set("X-Content-Type-Options", "nosniff");
-      if (filePath.endsWith(".html"))
-        headers.set(
-          "Content-Security-Policy",
-          documentCsp(fs.readFileSync(filePath, "utf8")),
-        );
-      return new Response(response.body, { status: response.status, headers });
     });
-    session.defaultSession.setPermissionRequestHandler(
-      (_contents, _permission, callback) => callback(false),
-    );
-    session.defaultSession.setPermissionCheckHandler(() => false);
-    if (app.isPackaged || process.env.TEST_PROD_BUILD === "1") {
-      session.defaultSession.webRequest.onBeforeRequest(
-        { urls: ["http://*/*", "https://*/*", "ws://*/*", "wss://*/*"] },
-        (_details, callback) => callback({ cancel: true }),
-      );
+
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
     }
-
-    createWindow();
-    createTray();
-    setupAboutPanel();
-    createApplicationMenu(() => mainWindow, showMainWindow);
-
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-      }
-    });
-  })
-  .catch((error) => {
-    console.error("BillFlow startup failed", error);
-    dialog.showErrorBox(
-      "BillFlow could not open your data",
-      `${error instanceof Error ? error.message : String(error)}\nNo business writes were enabled. Keep your data directory and repair or reinstall the app.`,
-    );
-    app.quit();
   });
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
-
-app.on("before-quit", () => {
-  tray?.destroy();
-  tray = null;
-});
+  app.on("before-quit", () => {
+    tray?.destroy();
+    tray = null;
+  });
+}

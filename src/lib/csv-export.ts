@@ -46,6 +46,7 @@ function spreadsheetText(value: unknown): string {
 export function escapeXml(value: unknown): string {
   if (value === null || value === undefined) return "";
   return String(value)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -1058,7 +1059,10 @@ export function generateOverdueExcelWorkbook(
     const worksheets = workbooks
       .flatMap((book) => book.match(/<Worksheet\b[\s\S]*?<\/Worksheet>/g) || [])
       .join("\n");
-    return workbooks[0].replace(/<Worksheet\b[\s\S]*<\/Worksheet>/, worksheets);
+    return workbooks[0].replace(
+      /<Worksheet\b[\s\S]*<\/Worksheet>/,
+      () => worksheets,
+    );
   }
 
   const refDate = options?.referenceDate || new Date();
@@ -1106,16 +1110,16 @@ export function generateOverdueExcelWorkbook(
       return [
         `<Row ss:Height="19">`,
         `<Cell ss:StyleID="DataCell"><Data ss:Type="Number">${idx + 1}</Data></Cell>`,
-        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.clientName)}</Data></Cell>`,
-        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.contactPerson || "-")}</Data></Cell>`,
-        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.email || "-")}</Data></Cell>`,
-        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.phone || "-")}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(spreadsheetText(c.clientName))}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.contactPerson ? spreadsheetText(c.contactPerson) : "-")}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.email ? spreadsheetText(c.email) : "-")}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.phone ? spreadsheetText(c.phone) : "-")}</Data></Cell>`,
         `<Cell ss:StyleID="DaysOverdueCell"><Data ss:Type="Number">${c.invoicesCount}</Data></Cell>`,
-        `<Cell ss:StyleID="CodeCell"><Data ss:Type="String">${escapeXml(c.invoiceCodes.join(", "))}</Data></Cell>`,
-        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.oldestDueDate)}</Data></Cell>`,
+        `<Cell ss:StyleID="CodeCell"><Data ss:Type="String">${escapeXml(spreadsheetText(c.invoiceCodes.join(", ")))}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(spreadsheetText(c.oldestDueDate))}</Data></Cell>`,
         `<Cell ss:StyleID="DaysOverdueCell"><Data ss:Type="Number">${c.maxDaysOverdue}</Data></Cell>`,
-        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.agingBucket)}</Data></Cell>`,
-        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(c.currency)}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(spreadsheetText(c.agingBucket))}</Data></Cell>`,
+        `<Cell ss:StyleID="DataCell"><Data ss:Type="String">${escapeXml(spreadsheetText(c.currency))}</Data></Cell>`,
         `<Cell ss:StyleID="CurrencyCell"><Data ss:Type="Number">${centsToDecimalString(c.totalBilledCents)}</Data></Cell>`,
         `<Cell ss:StyleID="CurrencyCell"><Data ss:Type="Number">${centsToDecimalString(c.totalPaidCents)}</Data></Cell>`,
         `<Cell ss:StyleID="OverdueCurrencyCell"><Data ss:Type="Number">${centsToDecimalString(c.totalOverdueCents)}</Data></Cell>`,
@@ -1181,7 +1185,7 @@ export function generateOverdueExcelWorkbook(
     `  </Worksheet>`,
   ].join("\n");
 
-  return sheet1Workbook.replace("</Workbook>", `${sheet2Xml}\n</Workbook>`);
+  return sheet1Workbook.replace("</Workbook>", () => `${sheet2Xml}\n</Workbook>`);
 }
 
 /**

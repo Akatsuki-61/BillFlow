@@ -9,6 +9,7 @@ import {
   buildAudienceGrowthData,
   computeCashflowRunwayCard,
 } from "../widgets/chartData";
+import { computeDashboardMetrics } from "../../components/dashboard/DashboardMetricsContext";
 import type { InvoiceWithClient, CatalogItem } from "../../types/billing";
 import type { TaskItem } from "../../types/tasks";
 import type { AnalyticsSummaryPayload } from "../../types/analytics";
@@ -271,5 +272,69 @@ describe("Widget & Chart Data Pipeline Integrity", () => {
 
     const audience = buildAudienceGrowthData([], [], [], "USD", fixedNow);
     expect(audience.chartData).toHaveLength(7);
+  });
+
+  it("includes prior-period past-due invoices in overdueInvoices on month period", () => {
+    const invoices = [
+      {
+        id: "inv-prior-overdue",
+        code: "INV-2026-010",
+        clientId: "c1",
+        clientName: "Acme",
+        status: "UNPAID",
+        currency: "USD",
+        issueDate: "2026-01-10",
+        dueDate: "2026-01-24",
+        amountCents: 150000,
+        paidCents: 50000,
+        createdAt: "2026-01-10T00:00:00Z",
+        updatedAt: "2026-01-10T00:00:00Z",
+      },
+      {
+        id: "inv-draft",
+        code: "INV-2026-011",
+        clientId: "c1",
+        clientName: "Acme",
+        status: "DRAFT",
+        currency: "USD",
+        issueDate: "2026-01-10",
+        dueDate: "2026-01-24",
+        amountCents: 90000,
+        paidCents: 0,
+        createdAt: "2026-01-10T00:00:00Z",
+        updatedAt: "2026-01-10T00:00:00Z",
+      },
+      {
+        id: "inv-other-currency",
+        code: "INV-2026-012",
+        clientId: "c2",
+        clientName: "Colombo Co",
+        status: "OVERDUE",
+        currency: "LKR",
+        issueDate: "2026-01-10",
+        dueDate: "2026-01-24",
+        amountCents: 500000,
+        paidCents: 0,
+        createdAt: "2026-01-10T00:00:00Z",
+        updatedAt: "2026-01-10T00:00:00Z",
+      },
+    ] as InvoiceWithClient[];
+
+    const metrics = computeDashboardMetrics({
+      invoices,
+      expenses: [],
+      workOrders: [],
+      clients: [],
+      tasks: [],
+      period: "month",
+      currency: "USD",
+    });
+
+    expect(metrics.filteredInvoices).toHaveLength(0);
+    expect(metrics.currencyIssuedCount).toBe(1);
+    expect(metrics.overdueInvoices.map((i) => i.id)).toEqual([
+      "inv-prior-overdue",
+    ]);
+    expect(metrics.overdueTotalStr).toBe("$1,000.00");
   });
 });
