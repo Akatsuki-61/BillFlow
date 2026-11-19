@@ -261,4 +261,54 @@ describe("Calendar Date & Item Mapping", () => {
     expect(slot?.startTime).toBe("10:00");
     expect(slot?.endTime).toBe("11:00");
   });
+
+  it("autoFixAndLinkCalendarData does not mutate input task objects in place", () => {
+    const frozenTask: TaskItem = Object.freeze({
+      id: "task-frozen-1",
+      title: "Architecture Audit",
+      description: "",
+      status: "todo",
+      priority: "medium",
+      category: "Development",
+      assignee: Object.freeze({
+        name: "Chethaka",
+        avatarLetter: "C",
+        bgColor: "bg-surface-purple-100",
+        textColor: "text-content-purple-700",
+      }),
+      dueDate: "2026-11-20",
+      subtasks: [],
+      createdAt: "2026-11-01",
+    });
+
+    const events: CalendarEventItem[] = [
+      {
+        id: "evt-frozen-link",
+        title: "Architecture Audit Sync",
+        description: "",
+        startDate: "2026-11-20",
+        endDate: "2026-11-20",
+        startTime: "14:00",
+        endTime: "15:00",
+        isAllDay: false,
+        category: "meeting",
+        color: "blue",
+        taskId: "task-frozen-1",
+        taskTitle: "Architecture Audit",
+        createdAt: "2026-11-01",
+        updatedAt: "2026-11-01",
+      },
+    ];
+
+    const result = autoFixAndLinkCalendarData({
+      tasks: [frozenTask],
+      events,
+      clients: [],
+    });
+
+    expect(frozenTask.startTime).toBeUndefined();
+    expect(result.tasks[0]).not.toBe(frozenTask);
+    expect(result.tasks[0].startTime).toBe("14:00");
+    expect(result.tasks[0].endTime).toBe("15:00");
+  });
 });

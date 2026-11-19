@@ -51,9 +51,13 @@ import type {
   EventCategory,
   EventColor,
 } from "@/types/calendar";
+import dynamic from "next/dynamic";
 import { useData, isTaskEligibleForInvoicing } from "@/lib/data/DataProvider";
 import type { InvoiceWithClient } from "@/types/billing";
-import InvoiceDocumentSheet from "@/components/invoices/InvoiceDocumentSheet";
+const InvoiceDocumentSheet = dynamic(
+  () => import("@/components/invoices/InvoiceDocumentSheet"),
+  { ssr: false },
+);
 import type { TaskPatchInput } from "@/types/workflow";
 import TaskTiming from "@/components/tasks/TaskTiming";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
@@ -210,16 +214,19 @@ const columnDefinitions: {
 export default function TasksView({
   defaultView = "kanban",
 }: {
-  defaultView?: "kanban" | "list";
+  defaultView?: "kanban" | "list" | "calendar";
 } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialView =
-    searchParams?.get("view") === "list"
-      ? "list"
-      : defaultView === "list"
+  const viewParam = searchParams?.get("view");
+  const resolvedDefaultView: "kanban" | "list" | "calendar" =
+    viewParam === "calendar"
+      ? "calendar"
+      : viewParam === "list"
         ? "list"
-        : "kanban";
+        : viewParam === "kanban"
+          ? "kanban"
+          : defaultView;
 
   const {
     tasks,
@@ -258,21 +265,21 @@ export default function TasksView({
   };
   const draftId = useRef<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
-  const [viewMode, setViewMode] = useState<"kanban" | "list">(initialView);
-
-  React.useEffect(() => {
-    if (
-      searchParams?.get("view") === "calendar" ||
-      (typeof window !== "undefined" && window.location.hash === "#calendar")
-    ) {
-      const timer = setTimeout(() => {
-        document
-          .getElementById("task-calendar-section")
-          ?.scrollIntoView({ behavior: "smooth" });
-      }, 150);
-      return () => clearTimeout(timer);
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "calendar">(
+    () => {
+      if (typeof window !== "undefined" && window.location.hash === "#calendar") {
+        return "calendar";
+      }
+      return resolvedDefaultView;
+    },
+  );
+  const [prevViewParam, setPrevViewParam] = useState(viewParam);
+  if (prevViewParam !== viewParam) {
+    setPrevViewParam(viewParam);
+    if (viewParam === "calendar" || viewParam === "list" || viewParam === "kanban") {
+      setViewMode(viewParam);
     }
-  }, [searchParams]);
+  }
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -987,7 +994,7 @@ export default function TasksView({
           <SegmentedControl
             value={viewMode}
             onChange={(val) => {
-              setViewMode(val as "kanban" | "list");
+              setViewMode(val as "kanban" | "list" | "calendar");
             }}
             label="Task view"
             options={[
@@ -1009,23 +1016,17 @@ export default function TasksView({
                   </>
                 ),
               },
+              {
+                value: "calendar",
+                label: (
+                  <>
+                    <Calendar className="w-4 h-4" />
+                    Calendar
+                  </>
+                ),
+              },
             ]}
           />
-
-          {/* Jump to Calendar Button */}
-          <Button
-            variant="secondary"
-            onClick={() => {
-              document
-                .getElementById("task-calendar-section")
-                ?.scrollIntoView({ behavior: "smooth" });
-            }}
-            className="gap-1.5"
-            title="Jump to Calendar and milestones at the bottom of the page"
-          >
-            <Calendar className="w-4 h-4" />
-            <span>Calendar</span>
-          </Button>
 
           {/* Create Event Button */}
           <Button
@@ -1053,7 +1054,7 @@ export default function TasksView({
           </Button>
         </div>
       </PageHeader>
-      {isElectron && (
+      {isElectron && viewMode !== "calendar" && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
@@ -1865,7 +1866,7 @@ export default function TasksView({
             );
           })}
         </div>
-      ) : (
+      ) : viewMode === "list" ? (
         /* LIST VIEW */
         <div key="list" className="ui-card motion-page overflow-hidden">
           <div className="overflow-x-auto">
@@ -2099,12 +2100,12 @@ export default function TasksView({
             </table>
           </div>
         </div>
-      )}
-
-      {/* CALENDAR & SCHEDULE SECTION AT THE END OF TASK PAGE */}
+      ) : (
+      /* CALENDAR VIEW */
       <section
+        key="calendar"
         id="task-calendar-section"
-        className="mt-12 pt-8 border-t border-line-neutral-200/80 space-y-4 scroll-mt-6"
+        className="motion-page space-y-4"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -2225,6 +2226,7 @@ export default function TasksView({
           onNotify={(msg) => showToast(msg)}
         />
       </section>
+      )}
 
       {/* UNIFIED CREATE NEW TASK OR EVENT MODAL */}
       <MotionPresence>

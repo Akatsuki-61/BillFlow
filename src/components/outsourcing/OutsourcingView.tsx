@@ -51,7 +51,7 @@ import { formatWorkOrderPaymentSummary } from "@/lib/payment-summary";
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE, SPRING_MENU_POPOVER } from "@/lib/motion";
 import {
   useClients,
@@ -338,16 +338,7 @@ export default function OutsourcingView() {
 
       if (paramBudget) {
         const num = parseFloat(paramBudget);
-        if (!isNaN(num) && num > 0) {
-          // If in cents (> 1000 and integer)
-          setWoFee(
-            num > 1000 && Number.isInteger(num)
-              ? String(num / 100)
-              : String(num),
-          );
-        } else {
-          setWoFee("");
-        }
+        setWoFee(Number.isFinite(num) && num > 0 ? String(num) : "");
       } else {
         setWoFee("");
       }
@@ -1048,7 +1039,7 @@ export default function OutsourcingView() {
                     }`}
                   >
                     {isActive && (
-                      <motion.span
+                      <m.span
                         layoutId="outsourcing-main-tab-pill"
                         transition={SPRING_NAV_GLIDE}
                         className="absolute inset-0 rounded-lg bg-surface shadow-xs"
@@ -1101,7 +1092,7 @@ export default function OutsourcingView() {
                     className={`vendor-filter-btn relative active:scale-[0.97] ${isActive ? "active !bg-transparent !shadow-none" : ""}`}
                   >
                     {isActive && (
-                      <motion.span
+                      <m.span
                         layoutId="outsourcing-status-pill"
                         transition={SPRING_NAV_GLIDE}
                         className="absolute inset-0 rounded-lg bg-surface dark:bg-[#252530] shadow-xs border border-line-neutral-200/80 dark:border-[#353545]"
@@ -2077,7 +2068,7 @@ export default function OutsourcingView() {
                       </option>
                     </select>
                   ) : (
-                    <motion.div
+                    <m.div
                       initial={{ opacity: 0, y: -6, scale: 0.98 }}
                       animate={{
                         opacity: 1,
@@ -2170,7 +2161,7 @@ export default function OutsourcingView() {
                           onChange={setNewVendorInlinePhone}
                         />
                       </div>
-                    </motion.div>
+                    </m.div>
                   )}
                   {woFormErrors.vendor && (
                     <p className="text-content-rose-600 text-[11px] mt-1 font-medium">

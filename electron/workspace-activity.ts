@@ -18,7 +18,8 @@ const activitySchema = z.object({
 });
 export function recordActivity(input: ActivityInput) {
   const value = activitySchema.parse(input);
-  getSqlite()
+  const sqlite = getSqlite();
+  sqlite
     .prepare(
       "INSERT INTO workspace_activity(id,kind,record_id,label,detail,created_at) VALUES (?,?,?,?,?,?)",
     )
@@ -30,6 +31,16 @@ export function recordActivity(input: ActivityInput) {
       value.detail,
       new Date().toISOString(),
     );
+  sqlite
+    .prepare(
+      `DELETE FROM workspace_activity
+       WHERE rowid NOT IN (
+         SELECT rowid FROM workspace_activity
+         ORDER BY created_at DESC, rowid DESC
+         LIMIT 1000
+       )`,
+    )
+    .run();
   notify();
 }
 export function listActivity(): WorkspaceActivity[] {

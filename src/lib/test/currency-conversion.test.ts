@@ -178,3 +178,82 @@ it("weights client collection progress across all original currencies", async ()
   expect(Math.round((paid / billed) * 100)).toBe(81);
   expect(clientBalanceInCurrency(client, "billed", "LKR", null)).toBeNull();
 });
+
+it("returns original array and record references when currencies already match", () => {
+  const invoices = [
+    {
+      id: "inv-same",
+      code: "INV-1",
+      clientId: "cli-1",
+      clientName: "Same Co",
+      status: "PAID",
+      currency: "USD",
+      amountCents: 15000,
+      paidCents: 15000,
+      advanceCents: 0,
+      issueDate: "2026-11-18",
+      payments: [
+        {
+          id: "pay-same",
+          currency: "USD",
+          amountCents: 15000,
+          receivedAt: "2026-11-18",
+        },
+      ],
+    },
+  ] as InvoiceWithClient[];
+  const expenses = [
+    {
+      id: "exp-same",
+      merchant: "SaaS",
+      currency: "USD",
+      amountCents: 2000,
+      incurredAt: "2026-11-18",
+      category: "SOFTWARE",
+    },
+  ] as ExpenseItem[];
+  const workOrders = [
+    {
+      id: "wo-same",
+      vendorId: null,
+      taskId: null,
+      invoiceId: null,
+      scope: "QA",
+      status: "done",
+      currency: "USD",
+      feeCents: 5000,
+      payoutAmountCents: 5000,
+      remainingPayoutCents: 0,
+      payouts: [
+        {
+          id: "po-same",
+          currency: "USD",
+          amountCents: 5000,
+          paidAt: "2026-11-18",
+        },
+      ],
+    },
+  ] as WorkOrderItem[];
+  const catalogItems = [
+    {
+      id: "cat-same",
+      currency: "USD",
+      priceCents: 15000,
+      price: "150.00",
+    },
+  ] as CatalogItem[];
+
+  const result = reportingRecords(
+    { invoices, expenses, workOrders, catalogItems },
+    "USD",
+    rates,
+  );
+  expect(result.invoices).toBe(invoices);
+  expect(result.invoices[0]).toBe(invoices[0]);
+  expect(result.expenses).toBe(expenses);
+  expect(result.expenses[0]).toBe(expenses[0]);
+  expect(result.workOrders).toBe(workOrders);
+  expect(result.workOrders[0]).toBe(workOrders[0]);
+  expect(result.catalogItems).toBe(catalogItems);
+  expect(result.catalogItems[0]).toBe(catalogItems[0]);
+});

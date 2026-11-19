@@ -267,6 +267,51 @@ export interface BillFlowAPI extends WorkflowAPI {
       importedClients: number;
       importedInvoices: number;
     }>;
+    chooseBackupFile?: (mode?: "replace" | "merge") => Promise<
+      | { canceled: true }
+      | {
+          canceled: false;
+          token: string;
+          fileName: string;
+          fileSize: number;
+          version: string;
+          exportedAt: string;
+          importedClients: number;
+          importedInvoices: number;
+          receiptsCount: number;
+        }
+    >;
+    stageBackupFile?: (
+      file: File,
+      mode?: "replace" | "merge",
+    ) => Promise<{
+      canceled: false;
+      token: string;
+      fileName: string;
+      fileSize: number;
+      version: string;
+      exportedAt: string;
+      importedClients: number;
+      importedInvoices: number;
+      receiptsCount: number;
+    }>;
+    preflightBackupFile?: (
+      token: string,
+      mode?: "replace" | "merge",
+    ) => Promise<{
+      success: boolean;
+      importedClients: number;
+      importedInvoices: number;
+    }>;
+    importBackupFile?: (
+      token: string,
+      mode?: "replace" | "merge",
+    ) => Promise<{
+      success: boolean;
+      importedClients: number;
+      importedInvoices: number;
+      skipped?: number;
+    }>;
     exportCsv: () => Promise<SaveFileResult>;
     saveBackup: () => Promise<SaveFileResult>;
     get: () => Promise<AppSettings>;

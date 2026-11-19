@@ -37,7 +37,7 @@ import {
   MotionPresence,
   MotionSurface,
 } from "@/components/ui/MotionSurface";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
   EXIT_MENU_POPOVER,
@@ -1862,14 +1862,63 @@ export default function InvoicesView() {
     slipFileInputRef.current?.click();
   };
 
+  const stageBrowserFile = async (file: File) => {
+    const maxReceiptBytes = 20 * 1024 * 1024;
+    if (file.size <= 0 || file.size > maxReceiptBytes) {
+      showToast("Receipt must be a non-empty file smaller than 20 MB.", "error");
+      return;
+    }
+    if (workflow?.attachments?.stageFile) {
+      try {
+        const staged = await workflow.attachments.stageFile(file);
+        if (staged) {
+          setSelectedSlip(staged);
+        }
+        return;
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : "Could not attach receipt file.",
+          "error",
+        );
+        return;
+      }
+    }
+    if (!workflow?.attachments?.stageDroppedFile) {
+      showToast("Receipt staging is unavailable in this environment.", "error");
+      return;
+    }
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const staged = await workflow.attachments.stageDroppedFile(
+        file.name,
+        bytes,
+      );
+      if (staged) {
+        setSelectedSlip(staged);
+      }
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Could not attach receipt file.",
+        "error",
+      );
+    }
+  };
+
   const handleSlipInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     e.target.value = "";
-    void handlePickReceipt();
+    if (!file) return;
+    void stageBrowserFile(file);
   };
   const handleSlipDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingSlip(false);
-    void handlePickReceipt();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) {
+      showToast("Drop a PDF, PNG, JPG, or WEBP receipt file.", "error");
+      return;
+    }
+    void stageBrowserFile(file);
   };
 
   // Submit Payment
@@ -2305,7 +2354,7 @@ export default function InvoicesView() {
               title="Set export format to RFC 4180 CSV (.csv)"
             >
               {exportFormat === "csv" && (
-                <motion.span
+                <m.span
                   layoutId="invoices-export-format-pill"
                   transition={SPRING_NAV_GLIDE}
                   className="absolute inset-0 rounded-full bg-accent-solid shadow-xs"
@@ -2325,7 +2374,7 @@ export default function InvoicesView() {
               title="Set export format to Microsoft Excel Workbook (.xls) via Convert Engine"
             >
               {exportFormat === "excel" && (
-                <motion.span
+                <m.span
                   layoutId="invoices-export-format-pill"
                   transition={SPRING_NAV_GLIDE}
                   className="absolute inset-0 rounded-full bg-accent-solid shadow-xs"
@@ -2565,7 +2614,7 @@ export default function InvoicesView() {
                         ? 100
                         : 0;
                   return (
-                    <motion.tr
+                    <m.tr
                       key={inv.id}
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -2765,7 +2814,7 @@ export default function InvoicesView() {
                           </Button>
                         </div>
                       </td>
-                    </motion.tr>
+                    </m.tr>
                   );
                 })
               )}
@@ -4322,7 +4371,7 @@ export default function InvoicesView() {
       {/* Floating Status Menu */}
       <AnimatePresence initial={false}>
         {statusMenu && (
-          <motion.div
+          <m.div
             key={`status-menu-${statusMenu.invoice.id}`}
             initial={{
               opacity: 0,
@@ -4395,7 +4444,7 @@ export default function InvoicesView() {
             ].map((opt, idx) => {
               const isCurrent = statusMenu.invoice.status === opt.value;
               return (
-                <motion.button
+                <m.button
                   key={opt.value}
                   type="button"
                   role="menuitem"
@@ -4428,17 +4477,17 @@ export default function InvoicesView() {
                   {isCurrent && (
                     <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 ml-2" />
                   )}
-                </motion.button>
+                </m.button>
               );
             })}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* Floating Actions Menu */}
       <AnimatePresence initial={false}>
         {actionMenu && (
-          <motion.div
+          <m.div
             key={`action-menu-${actionMenu.invoice.id}`}
             initial={{
               opacity: 0,
@@ -4654,7 +4703,7 @@ export default function InvoicesView() {
               <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
               <span>{isElectron ? "Move to Trash" : "Delete Invoice"}</span>
             </button>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 

@@ -1,16 +1,13 @@
 "use client";
-import { localDateKey } from "@/lib/visual-metrics";
 import { activeProfileScope } from "@/lib/profile-scope";
 import type { WorkspaceDataset, WorkspaceSnapshot } from "@/types/workspace";
-import { calculateFinancials } from "@/lib/financials";
 import { hydrateTaskTimeSlots } from "@/lib/local-calendar";
-
-import { readBrowserPreferences } from "./browserStorage";
 
 import React, {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useState,
   useRef,
   useCallback,
@@ -68,30 +65,6 @@ import type {
   CalendarEventPatchInput,
 } from "@/types/calendar";
 
-const DEFAULT_SETTINGS: AppSettings = {
-  id: "default",
-  businessName: "",
-  professionalTitle: "",
-  email: "",
-  phone: "",
-  website: "",
-  taxId: "",
-  address: "",
-  paymentDetails: "",
-  defaultCurrency: "USD",
-  invoicePrefix: "INV-",
-  nextInvoiceSeq: 1,
-  defaultDueDays: 14,
-  defaultTaxRate: 0,
-  defaultNotes:
-    "Payment due within specified due date. Thank you for your business.",
-  defaultInvoiceTemplate: "geometric-teal",
-  dateFormat: "YYYY-MM-DD",
-  currencyDisplay: "symbol",
-  pdfExportDirectory: "",
-  updatedAt: new Date().toISOString(),
-};
-
 interface DataContextType {
   tasks: TaskItem[];
   trackingOffers: TrackingOffer[];
@@ -116,7 +89,7 @@ interface DataContextType {
   isLoading: boolean;
   isElectron: boolean;
   error: string | null;
-  refresh: () => Promise<void>;
+  refresh: (datasets?: WorkspaceDataset[]) => Promise<void>;
   createClient: (input: NewClientInput) => Promise<ClientWithStats>;
   updateClient: (
     id: string,
@@ -218,58 +191,134 @@ interface DataContextType {
   resetData: () => Promise<void>;
 }
 
+type RefreshFn = (datasets?: WorkspaceDataset[]) => Promise<void>;
+
+interface ClientsContextValue {
+  clients: ClientWithStats[];
+  isLoading: boolean;
+  error: string | null;
+  createClient: DataContextType["createClient"];
+  updateClient: DataContextType["updateClient"];
+  deleteClient: DataContextType["deleteClient"];
+  refresh: RefreshFn;
+}
+
+interface InvoicesContextValue {
+  invoices: InvoiceWithClient[];
+  activeCurrency: Currency;
+  isLoading: boolean;
+  error: string | null;
+  createInvoice: DataContextType["createInvoice"];
+  updateInvoice: DataContextType["updateInvoice"];
+  promoteInvoiceClient: DataContextType["promoteInvoiceClient"];
+  promoteClient: DataContextType["promoteInvoiceClient"];
+  setInvoiceStatus: DataContextType["setInvoiceStatus"];
+  recordPayment: DataContextType["recordPayment"];
+  listPayments: DataContextType["listPayments"];
+  exportInvoicePdf: DataContextType["exportInvoicePdf"];
+  saveInvoicePdfAs: DataContextType["saveInvoicePdfAs"];
+  openInvoicePdf: DataContextType["openInvoicePdf"];
+  deleteInvoice: DataContextType["deleteInvoice"];
+  getNextInvoiceCode: DataContextType["getNextInvoiceCode"];
+  refresh: RefreshFn;
+}
+
+interface SettingsContextValue {
+  settings: AppSettings | null;
+  backupStatus: BackupStatus | null;
+  isLoading: boolean;
+  error: string | null;
+  updateSettings: DataContextType["updateSettings"];
+  getDbPath: DataContextType["getDbPath"];
+  revealDbFile: DataContextType["revealDbFile"];
+  exportData: DataContextType["exportData"];
+  importData: DataContextType["importData"];
+  resetData: DataContextType["resetData"];
+  refresh: RefreshFn;
+}
+
+interface VendorsContextValue {
+  vendors: VendorItem[];
+  isLoading: boolean;
+  error: string | null;
+  createVendor: DataContextType["createVendor"];
+  updateVendor: DataContextType["updateVendor"];
+  setVendorStatus: DataContextType["setVendorStatus"];
+  deleteVendor: DataContextType["deleteVendor"];
+  refresh: RefreshFn;
+}
+
+interface WorkOrdersContextValue {
+  workOrders: WorkOrderItem[];
+  isLoading: boolean;
+  error: string | null;
+  createWorkOrder: DataContextType["createWorkOrder"];
+  updateWorkOrder: DataContextType["updateWorkOrder"];
+  reviewWorkOrder: DataContextType["reviewWorkOrder"];
+  recordWorkOrderPayout: DataContextType["recordWorkOrderPayout"];
+  removeWorkOrderPayout: DataContextType["removeWorkOrderPayout"];
+  setWorkOrderPayoutStatus: DataContextType["setWorkOrderPayoutStatus"];
+  deleteWorkOrder: DataContextType["deleteWorkOrder"];
+  exportWorkOrderPdf: DataContextType["exportWorkOrderPdf"];
+  openWorkOrderPdf: DataContextType["openWorkOrderPdf"];
+  refresh: RefreshFn;
+}
+
+interface CatalogContextValue {
+  catalogItems: CatalogItem[];
+  createCatalogItem: DataContextType["createCatalogItem"];
+  updateCatalogItem: DataContextType["updateCatalogItem"];
+  deleteCatalogItem: DataContextType["deleteCatalogItem"];
+  bulkImportCatalogItems: DataContextType["bulkImportCatalogItems"];
+  isLoading: boolean;
+  isElectron: boolean;
+  error: string | null;
+}
+
+interface ExpensesContextValue {
+  expenses: ExpenseItem[];
+  isLoading: boolean;
+  error: string | null;
+  createExpense: DataContextType["createExpense"];
+  updateExpense: DataContextType["updateExpense"];
+  deleteExpense: DataContextType["deleteExpense"];
+  attachExpenseReceipt: DataContextType["attachExpenseReceipt"];
+  refresh: RefreshFn;
+}
+
+interface TasksContextValue {
+  tasks: TaskItem[];
+  trackingOffers: TrackingOffer[];
+  getUnbilledCompletedTasks: DataContextType["getUnbilledCompletedTasks"];
+  isLoading: boolean;
+  error: string | null;
+  workflow: WorkflowAPI;
+  refresh: RefreshFn;
+}
+
 const DataContext = createContext<DataContextType | null>(null);
+const RefreshContext = createContext<RefreshFn | null>(null);
+const CurrencyContext = createContext<{ activeCurrency: Currency } | null>(
+  null,
+);
+const ClientsContext = createContext<ClientsContextValue | null>(null);
+const InvoicesContext = createContext<InvoicesContextValue | null>(null);
+const SettingsContext = createContext<SettingsContextValue | null>(null);
+const VendorsContext = createContext<VendorsContextValue | null>(null);
+const WorkOrdersContext = createContext<WorkOrdersContextValue | null>(null);
+const CatalogContext = createContext<CatalogContextValue | null>(null);
+const ExpensesContext = createContext<ExpensesContextValue | null>(null);
+const TasksContext = createContext<TasksContextValue | null>(null);
 
-// In-memory fallback repository when running outside Electron.
-let memoryCatalog: CatalogItem[] = [];
-let memoryClients: ClientWithStats[] = [];
-let memoryInvoices: InvoiceWithClient[] = [];
-let memoryPayments: InvoicePayment[] = [];
-let memoryVendors: VendorItem[] = [];
-let memoryExpenses: ExpenseItem[] = [];
-let memoryWorkOrders: WorkOrderItem[] = [];
-let memoryEvents: CalendarEventItem[] = [];
-let memoryTasks: TaskItem[] = [];
-let memorySettings: AppSettings = { ...DEFAULT_SETTINGS };
+function checkIsElectron(): boolean {
+  return typeof window !== "undefined" && Boolean(window.billflow?.isElectron);
+}
 
-// Browser storage implements the same async snapshot contract as desktop IPC.
-async function loadBrowserSnapshot() {
-  if (typeof window !== "undefined") {
-    const saved = readBrowserPreferences(
-      memorySettings,
-      memoryVendors,
-      localStorage,
-    );
-    memorySettings = saved.settings;
-    memoryVendors = saved.vendors;
+function requireDesktop() {
+  if (!checkIsElectron() || !window.billflow) {
+    throw new Error("Open the BillFlow desktop app to save workflow records.");
   }
-  return {
-    clients: [...memoryClients],
-    invoices: [...memoryInvoices],
-    vendors: [...memoryVendors],
-    expenses: [...memoryExpenses],
-    catalogItems: [...memoryCatalog],
-    tasks: [...memoryTasks],
-    workOrders: [...memoryWorkOrders],
-    events: [...memoryEvents],
-    settings: { ...memorySettings },
-    dashboard: {
-      activeClients: memoryClients.length,
-      unpaidCount: memoryInvoices.filter(
-        (invoice) => invoice.status !== "PAID" && invoice.status !== "DRAFT",
-      ).length,
-      totalBilledByCurrency: {
-        USD: memoryInvoices.reduce((acc, inv) => acc + inv.amountCents, 0),
-      },
-      outstandingByCurrency: {
-        USD: memoryInvoices.reduce(
-          (acc, inv) => acc + (inv.amountCents - (inv.paidCents || 0)),
-          0,
-        ),
-      },
-      recentInvoices: memoryInvoices.slice(0, 5),
-    },
-  };
+  return window.billflow;
 }
 
 export function isTaskEligibleForInvoicing(task: TaskItem): boolean {
@@ -329,22 +378,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isElectron, setIsElectron] = useState<boolean>(false);
 
-  const checkIsElectron = useCallback(() => {
-    return (
-      typeof window !== "undefined" && Boolean(window.billflow?.isElectron)
-    );
-  }, []);
-
   const loadSnapshot = useCallback(
     async (
       datasets?: WorkspaceDataset[],
     ): Promise<Partial<WorkspaceSnapshot> & { isElectron: boolean }> => {
       if (checkIsElectron() && window.billflow) {
-        if (window.billflow.workspace)
+        if (window.billflow.workspace) {
           return {
             ...(await window.billflow.workspace.snapshot(datasets)),
             isElectron: true,
           };
+        }
         const [
           clients,
           invoices,
@@ -366,18 +410,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           window.billflow.catalog.list(),
           window.billflow.tasks.list(),
           window.billflow.tracking.pending(),
-          window.billflow.expenses
-            ? window.billflow.expenses.list()
-            : Promise.resolve([]),
+          window.billflow.expenses.list(),
           window.billflow.workOrders
-            ?.list()
-            .catch(() => [] as WorkOrderItem[]) ??
-            Promise.resolve([] as WorkOrderItem[]),
+            .list()
+            .catch(() => [] as WorkOrderItem[]),
           window.billflow.events
-            ? window.billflow.events
-                .list()
-                .catch(() => [] as CalendarEventItem[])
-            : Promise.resolve([] as CalendarEventItem[]),
+            .list()
+            .catch(() => [] as CalendarEventItem[]),
         ]);
         hydrateTaskTimeSlots(
           Object.fromEntries(
@@ -405,14 +444,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           isElectron: true,
         };
       }
-      const browser = await loadBrowserSnapshot();
       return {
-        ...browser,
-        trackingOffers: [] as TrackingOffer[],
+        clients: [],
+        invoices: [],
+        vendors: [],
+        expenses: [],
+        catalogItems: [],
+        tasks: [],
+        workOrders: [],
+        events: [],
+        trackingOffers: [],
         isElectron: false,
       };
     },
-    [checkIsElectron],
+    [],
   );
 
   const refreshQueue = useRef<Promise<void>>(Promise.resolve());
@@ -504,6 +549,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
                   setCatalogItems(snapshot.catalogItems);
                 if (snapshot.backupStatus)
                   setBackupStatus(snapshot.backupStatus);
+                if (!snapshot.isElectron) {
+                  setSettings(null);
+                  setDashboard(null);
+                }
                 if (snapshot.settings) setSettings(snapshot.settings);
                 if (snapshot.dashboard) setDashboard(snapshot.dashboard);
                 setError(null);
@@ -549,434 +598,92 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const createClient = async (
     input: NewClientInput,
-  ): Promise<ClientWithStats> => {
-    if (checkIsElectron() && window.billflow) {
-      const created = await window.billflow.clients.create(input);
-
-      return created;
-    } else {
-      const id = `cli-${Date.now()}`;
-      const newClient: ClientWithStats = {
-        id,
-        name: input.name,
-        category: input.category || "Enterprise",
-        contactPerson: input.contactPerson || input.name,
-        contactRole: input.contactRole || null,
-        email: input.email,
-        phone: input.phone || null,
-        whatsappPhone: input.whatsappPhone,
-        billingAddress: input.billingAddress,
-        relationshipNotes: input.relationshipNotes,
-        photoData: input.photoData,
-        currency: input.currency,
-        driveUrl: input.driveUrl || null,
-        hasQuickBill: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        totalBilledCents: 0,
-        totalPaidCents: 0,
-        outstandingBalanceCents: 0,
-        invoicesCount: 0,
-        recentInvoices: [],
-      };
-      memoryClients = [newClient, ...memoryClients];
-      await refresh();
-      return newClient;
-    }
-  };
+  ): Promise<ClientWithStats> => requireDesktop().clients.create(input);
 
   const updateClient = async (
     id: string,
     patch: ClientPatchInput,
-  ): Promise<ClientWithStats> => {
-    if (checkIsElectron() && window.billflow) {
-      const updated = await window.billflow.clients.update(id, patch);
-
-      return updated;
-    } else {
-      const idx = memoryClients.findIndex((c) => c.id === id);
-      if (idx === -1) throw new Error("Client not found");
-      const existing = memoryClients[idx];
-      const updated: ClientWithStats = {
-        ...existing,
-        ...patch,
-        updatedAt: new Date().toISOString(),
-      };
-      memoryClients[idx] = updated;
-      await refresh();
-      return updated;
-    }
-  };
+  ): Promise<ClientWithStats> => requireDesktop().clients.update(id, patch);
 
   const deleteClient = async (id: string): Promise<void> => {
-    if (checkIsElectron() && window.billflow) {
-      await window.billflow.clients.remove(id);
-    } else {
-      const hasInvoices = memoryInvoices.some((i) => i.clientId === id);
-      if (hasInvoices) {
-        throw new Error("Cannot delete client with linked invoices.");
-      }
-      memoryClients = memoryClients.filter((c) => c.id !== id);
-      await refresh();
-    }
+    await requireDesktop().clients.remove(id);
   };
 
   const createInvoice = async (
     input: NewInvoiceInput,
-  ): Promise<InvoiceWithClient> => {
-    if (checkIsElectron() && window.billflow) {
-      const created = await window.billflow.invoices.create(input);
-
-      return created;
-    } else {
-      if (!input.clientId || input.newClient)
-        throw new Error(
-          "Open the desktop app to create a new client with its invoice.",
-        );
-      const client = memoryClients.find((c) => c.id === input.clientId);
-      const id = `inv-${Date.now()}`;
-      const code =
-        input.code ||
-        `INV-${new Date().getFullYear()}-${String(memoryInvoices.length + 1).padStart(3, "0")}`;
-      const today = localDateKey(new Date());
-      const newInv: InvoiceWithClient = {
-        id,
-        code,
-        clientId: input.clientId,
-        catalogItemId: input.catalogItemId || null,
-        title: input.title || null,
-        amountCents: input.amountCents,
-        discountCents: input.discountCents ?? 0,
-        taxCents: input.taxCents ?? 0,
-        advanceCents: input.advanceCents ?? 0,
-        deliveryUrl: input.deliveryUrl || null,
-        notes: input.notes || null,
-        currency: input.currency,
-        issueDate: input.issueDate || today,
-        dueDate: input.dueDate || null,
-        status: input.status || "UNPAID",
-        paidCents: input.status === "PAID" ? input.amountCents : 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        clientName: client?.name || "Unknown Client",
-        clientEmail: client?.email,
-        clientPhone: client?.phone,
-        clientContactPerson: client?.contactPerson,
-        clientCategory: client?.category,
-        items: input.items
-          ? input.items.map((it, idx) => ({
-              id: it.id || `item-${Date.now()}-${idx}`,
-              invoiceId: id,
-              catalogId: it.catalogId || null,
-              description: it.description,
-              quantity: it.quantity,
-              unitPriceCents: it.unitPriceCents,
-              position: idx,
-            }))
-          : [],
-        payments: [],
-      };
-      memoryInvoices = [newInv, ...memoryInvoices];
-
-      // Link any imported tasks in browser fallback memory
-      const nowIso = new Date().toISOString();
-      const sourceItemMap = new Map<string, string>();
-      if (input.items && newInv.items) {
-        input.items.forEach((it, idx) => {
-          if (it.sourceTaskId && newInv.items?.[idx]) {
-            sourceItemMap.set(it.sourceTaskId, newInv.items[idx].id);
-          }
-        });
-      }
-      const linkedSet = new Set<string>([
-        ...(input.linkedTaskIds || []),
-        ...Array.from(sourceItemMap.keys()),
-      ]);
-      if (linkedSet.size > 0) {
-        memoryTasks = memoryTasks.map((t) => {
-          if (!linkedSet.has(t.id)) return t;
-          return {
-            ...t,
-            invoiceId: id,
-            invoiceCode: code,
-            invoiceItemId: sourceItemMap.get(t.id) ?? t.invoiceItemId ?? null,
-            clientId: t.clientId || input.clientId || null,
-            clientName: t.clientName || client?.name,
-            updatedAt: nowIso,
-          };
-        });
-      }
-
-      await refresh();
-      return newInv;
-    }
-  };
+  ): Promise<InvoiceWithClient> => requireDesktop().invoices.create(input);
 
   const updateInvoice = async (
     id: string,
     patch: InvoicePatchInput,
-  ): Promise<InvoiceWithClient> => {
-    if (checkIsElectron() && window.billflow) {
-      const updated = await window.billflow.invoices.update(id, patch);
-
-      return updated;
-    } else {
-      const idx = memoryInvoices.findIndex((i) => i.id === id);
-      if (idx === -1) throw new Error("Invoice not found");
-      const client = patch.clientId
-        ? memoryClients.find((c) => c.id === patch.clientId)
-        : undefined;
-      const target = memoryInvoices[idx];
-      const newStatus = patch.status ?? target.status;
-      const newAmount = patch.amountCents ?? target.amountCents;
-      const updatedItems = patch.items
-        ? patch.items.map((it, idx) => ({
-            id: it.id || `item-${Date.now()}-${idx}`,
-            invoiceId: id,
-            catalogId: it.catalogId || null,
-            description: it.description,
-            quantity: it.quantity,
-            unitPriceCents: it.unitPriceCents,
-            position: idx,
-          }))
-        : target.items;
-      const updated: InvoiceWithClient = {
-        ...target,
-        ...patch,
-        items: updatedItems,
-        amountCents: newAmount,
-        status: newStatus,
-        paidCents: newStatus === "PAID" ? newAmount : 0,
-        clientName: client ? client.name : target.clientName,
-        clientEmail: client ? client.email : target.clientEmail,
-        clientPhone: client ? client.phone : target.clientPhone,
-        clientContactPerson: client
-          ? client.contactPerson
-          : target.clientContactPerson,
-        clientCategory: client ? client.category : target.clientCategory,
-        updatedAt: new Date().toISOString(),
-      };
-      memoryInvoices[idx] = updated;
-      await refresh();
-      return updated;
-    }
-  };
+  ): Promise<InvoiceWithClient> => requireDesktop().invoices.update(id, patch);
 
   const promoteInvoiceClient = async (
     invoiceId: string,
-  ): Promise<ClientWithStats> => {
-    if (checkIsElectron() && window.billflow) {
-      const client = await window.billflow.invoices.promoteClient(invoiceId);
-
-      return client;
-    } else {
-      const inv = memoryInvoices.find((i) => i.id === invoiceId);
-      if (!inv) throw new Error("Invoice not found");
-      const clientName = inv.clientName || "Promoted Client";
-      const clientEmail = inv.clientEmail || "";
-      const id = `cli-${Date.now()}`;
-      const newClient: ClientWithStats = {
-        id,
-        name: clientName,
-        category: "Freelance",
-        contactPerson: clientName,
-        contactRole: null,
-        email: clientEmail,
-        phone: null,
-        currency: inv.currency,
-        driveUrl: inv.deliveryUrl || null,
-        hasQuickBill: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        totalBilledCents: inv.amountCents,
-        totalPaidCents: inv.paidCents,
-        outstandingBalanceCents: Math.max(0, inv.amountCents - inv.paidCents),
-        invoicesCount: 1,
-        recentInvoices: [],
-      };
-      memoryClients.push(newClient);
-      inv.clientId = id;
-      await refresh();
-      return newClient;
-    }
-  };
+  ): Promise<ClientWithStats> =>
+    requireDesktop().invoices.promoteClient(invoiceId);
 
   const setInvoiceStatus = async (
     id: string,
     status: InvoiceStatus,
-  ): Promise<InvoiceWithClient> => {
-    if (checkIsElectron() && window.billflow) {
-      const updated = await window.billflow.invoices.setStatus(id, status);
-
-      return updated;
-    } else {
-      return updateInvoice(id, { status });
-    }
-  };
+  ): Promise<InvoiceWithClient> =>
+    requireDesktop().invoices.setStatus(id, status);
 
   const recordPayment = async (
     input: RecordPaymentInput,
-  ): Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }> => {
-    if (checkIsElectron() && window.billflow) {
-      const result = await window.billflow.invoices.recordPayment(input);
+  ): Promise<{ invoice: InvoiceWithClient; payment: InvoicePayment }> =>
+    requireDesktop().invoices.recordPayment(input);
 
-      return result;
-    } else {
-      const inv = memoryInvoices.find((i) => i.id === input.invoiceId);
-      if (!inv) throw new Error("Invoice not found");
-      const payment: InvoicePayment = {
-        id: `pay-${Date.now()}`,
-        invoiceId: input.invoiceId,
-        amountCents: input.amountCents,
-        currency: input.currency || inv.currency,
-        receivedAt: input.receivedAt || new Date().toISOString(),
-        reference: input.reference || "",
-        requestId: input.requestId || `req-${Date.now()}`,
-      };
-      memoryPayments.push(payment);
-      const totalPaid = memoryPayments
-        .filter((p) => p.invoiceId === input.invoiceId)
-        .reduce((sum, p) => sum + p.amountCents, 0);
-      let newStatus: InvoiceStatus = inv.status;
-      if (totalPaid >= inv.amountCents) {
-        newStatus = "PAID";
-      } else if (inv.advanceCents && totalPaid >= inv.advanceCents) {
-        newStatus = "ADVANCE_PAID";
-      }
-      const updated: InvoiceWithClient = {
-        ...inv,
-        paidCents: totalPaid,
-        status: newStatus,
-        payments: [...(inv.payments || []), payment],
-      };
-      memoryInvoices = memoryInvoices.map((i) =>
-        i.id === inv.id ? updated : i,
-      );
-      await refresh();
-      return { invoice: updated, payment };
-    }
-  };
-
-  const listPayments = async (invoiceId: string): Promise<InvoicePayment[]> => {
-    if (checkIsElectron() && window.billflow) {
-      return await window.billflow.invoices.listPayments(invoiceId);
-    }
-    return memoryPayments.filter((p) => p.invoiceId === invoiceId);
-  };
+  const listPayments = async (invoiceId: string): Promise<InvoicePayment[]> =>
+    requireDesktop().invoices.listPayments(invoiceId);
 
   const exportInvoicePdf = async (
     invoiceId: string,
     template?: string,
-  ): Promise<{ success: boolean; filePath: string }> => {
-    if (checkIsElectron() && window.billflow) {
-      return await window.billflow.invoices.exportPdf(invoiceId, template);
-    }
-    return { success: true, filePath: "invoice.pdf" };
-  };
+  ): Promise<{ success: boolean; filePath: string }> =>
+    requireDesktop().invoices.exportPdf(invoiceId, template);
 
   const saveInvoicePdfAs = async (
     invoiceId: string,
     template?: string,
     draft?: NewInvoiceInput,
   ): Promise<{ success: boolean; canceled?: boolean; filePath?: string }> => {
-    if (checkIsElectron() && window.billflow?.invoices?.savePdfAs) {
-      return await window.billflow.invoices.savePdfAs(
-        invoiceId,
-        template,
-        draft,
+    const fn = requireDesktop().invoices.savePdfAs;
+    if (!fn) {
+      throw new Error(
+        "Open the BillFlow desktop app to save invoice PDFs.",
       );
     }
-    window.print();
-    return { success: true, canceled: false };
+    return await fn(invoiceId, template, draft);
   };
 
   const openInvoicePdf = async (
     invoiceId: string,
     reveal?: boolean,
   ): Promise<void> => {
-    if (checkIsElectron() && window.billflow) {
-      await window.billflow.files.openInvoicePdf(invoiceId, reveal);
-    }
+    await requireDesktop().files.openInvoicePdf(invoiceId, reveal);
   };
 
   const deleteInvoice = async (id: string): Promise<void> => {
-    if (checkIsElectron() && window.billflow) {
-      await window.billflow.invoices.remove(id);
-    } else {
-      memoryInvoices = memoryInvoices.filter((i) => i.id !== id);
-      await refresh();
-    }
+    await requireDesktop().invoices.remove(id);
   };
 
-  const getNextInvoiceCode = async (): Promise<string> => {
-    if (checkIsElectron() && window.billflow) {
-      return window.billflow.invoices.nextCode();
-    } else {
-      const prefix = memorySettings.invoicePrefix || "INV-";
-      const year = new Date().getFullYear();
-      const activePrefix = prefix.includes("{YYYY}")
-        ? prefix.replace("{YYYY}", String(year))
-        : prefix.endsWith("-")
-          ? `${prefix}${year}-`
-          : `${prefix}-${year}-`;
-      const nextSeq = Math.max(
-        memorySettings.nextInvoiceSeq || 1,
-        memoryInvoices.length + 1,
-      );
-      return `${activePrefix}${String(nextSeq).padStart(3, "0")}`;
-    }
-  };
+  const getNextInvoiceCode = async (): Promise<string> =>
+    requireDesktop().invoices.nextCode();
 
   const updateSettings = async (
     patch: UpdateSettingsInput,
-  ): Promise<AppSettings> => {
-    if (checkIsElectron() && window.billflow) {
-      const updated = await window.billflow.settings.update(patch);
+  ): Promise<AppSettings> => requireDesktop().settings.update(patch);
 
-      return updated;
-    } else {
-      memorySettings = {
-        ...memorySettings,
-        ...patch,
-        updatedAt: new Date().toISOString(),
-      };
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "billflow_memory_settings",
-          JSON.stringify(memorySettings),
-        );
-      }
-      await refresh();
-      return memorySettings;
-    }
-  };
-
-  const getDbPath = async (): Promise<string> => {
-    if (checkIsElectron() && window.billflow) {
-      return window.billflow.settings.getDbPath();
-    }
-    return "In-Memory Browser Fallback (Local Storage)";
-  };
+  const getDbPath = async (): Promise<string> =>
+    requireDesktop().settings.getDbPath();
 
   const revealDbFile = async (): Promise<void> => {
-    if (checkIsElectron() && window.billflow) {
-      await window.billflow.settings.revealDbFile();
-    }
+    await requireDesktop().settings.revealDbFile();
   };
 
-  const exportData = async (): Promise<ExportDataPayload> => {
-    if (checkIsElectron() && window.billflow) {
-      return window.billflow.settings.export();
-    } else {
-      return {
-        version: "0.2.0",
-        exportedAt: new Date().toISOString(),
-        settings: memorySettings,
-        clients: memoryClients,
-        invoices: memoryInvoices,
-      };
-    }
-  };
+  const exportData = async (): Promise<ExportDataPayload> =>
+    requireDesktop().settings.export();
 
   const importData = async (
     payload: ExportDataPayload,
@@ -985,500 +692,95 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     success: boolean;
     importedClients: number;
     importedInvoices: number;
-  }> => {
-    if (checkIsElectron() && window.billflow) {
-      const res = await window.billflow.settings.import(payload, mode);
-
-      return res;
-    } else {
-      if (payload.settings) {
-        memorySettings = { ...memorySettings, ...payload.settings };
-        if (typeof window !== "undefined") {
-          localStorage.setItem(
-            "billflow_memory_settings",
-            JSON.stringify(memorySettings),
-          );
-        }
-      }
-      if (Array.isArray(payload.clients)) {
-        memoryClients = payload.clients as ClientWithStats[];
-      }
-      if (Array.isArray(payload.invoices)) {
-        memoryInvoices = payload.invoices as InvoiceWithClient[];
-      }
-      await refresh();
-      return {
-        success: true,
-        importedClients: Array.isArray(payload.clients)
-          ? payload.clients.length
-          : 0,
-        importedInvoices: Array.isArray(payload.invoices)
-          ? payload.invoices.length
-          : 0,
-      };
-    }
-  };
+  }> => requireDesktop().settings.import(payload, mode);
 
   const resetData = async (): Promise<void> => {
-    if (checkIsElectron() && window.billflow) {
-      await window.billflow.settings.reset();
-    } else {
-      memoryCatalog = [];
-      memoryClients = [];
-      memoryInvoices = [];
-      memoryVendors = [];
-      memoryExpenses = [];
-      memoryWorkOrders = [];
-      memoryTasks = [];
-      memoryPayments = [];
-      memorySettings = {
-        ...memorySettings,
-        nextInvoiceSeq: 1,
-      };
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("billflow_memory_settings");
-        localStorage.removeItem("billflow_outsourcing_vendors");
-      }
-      await refresh();
-    }
+    await requireDesktop().settings.reset();
   };
 
   const createCatalogItem = async (
     input: NewCatalogItemInput,
-  ): Promise<CatalogItem> => {
-    if (checkIsElectron() && window.billflow) {
-      const created = await window.billflow.catalog.create(input);
-      return created;
-    }
-    const priceCents = Math.round(parseFloat(input.price || "0") * 100);
-    const item: CatalogItem = {
-      id: `cat-${Date.now()}`,
-      title: input.title,
-      category: input.category,
-      sku: input.sku || `SKU-${Date.now()}`,
-      description: input.description || "",
-      price: input.price || "0.00",
-      priceCents,
-      currency: input.currency || "USD",
-      unit: input.unit || "/ Hourly",
-      iconType: input.iconType || "code",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    memoryCatalog = [item, ...memoryCatalog];
-    await refresh();
-    return item;
-  };
+  ): Promise<CatalogItem> => requireDesktop().catalog.create(input);
+
   const updateCatalogItem = async (
     id: string,
     patch: CatalogItemPatchInput,
-  ): Promise<CatalogItem> => {
-    if (checkIsElectron() && window.billflow) {
-      const updated = await window.billflow.catalog.update(id, patch);
-      return updated;
-    }
-    const idx = memoryCatalog.findIndex((c) => c.id === id);
-    if (idx === -1) throw new Error("Catalog item not found");
-    const existing = memoryCatalog[idx];
-    const price = patch.price !== undefined ? patch.price : existing.price;
-    const priceCents =
-      patch.price !== undefined
-        ? Math.round(parseFloat(patch.price || "0") * 100)
-        : existing.priceCents;
-    const updated: CatalogItem = {
-      ...existing,
-      ...patch,
-      price,
-      priceCents,
-      updatedAt: new Date().toISOString(),
-    };
-    memoryCatalog[idx] = updated;
-    await refresh();
-    return updated;
-  };
+  ): Promise<CatalogItem> => requireDesktop().catalog.update(id, patch);
+
   const deleteCatalogItem = async (id: string): Promise<void> => {
-    if (checkIsElectron() && window.billflow) {
-      await window.billflow.catalog.remove(id);
-      return;
-    }
-    memoryCatalog = memoryCatalog.filter((c) => c.id !== id);
-    await refresh();
+    await requireDesktop().catalog.remove(id);
   };
+
   const bulkImportCatalogItems = async (
     items: NewCatalogItemInput[],
   ): Promise<number> => {
-    if (checkIsElectron() && window.billflow) {
-      const result = await window.billflow.catalog.bulkImport(items);
-      return result.count;
-    }
-    const imported: CatalogItem[] = items.map((input, idx) => {
-      const priceCents = Math.round(parseFloat(input.price || "0") * 100);
-      return {
-        id: `cat-${Date.now()}-${idx}`,
-        title: input.title,
-        category: input.category,
-        sku: input.sku || `SKU-${Date.now()}-${idx}`,
-        description: input.description || "",
-        price: input.price || "0.00",
-        priceCents,
-        currency: input.currency || "USD",
-        unit: input.unit || "/ Hourly",
-        iconType: input.iconType || "code",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    });
-    memoryCatalog = [...imported, ...memoryCatalog];
-    await refresh();
-    return imported.length;
+    const result = await requireDesktop().catalog.bulkImport(items);
+    return result.count;
   };
 
-  const createVendor = async (input: NewVendorInput): Promise<VendorItem> => {
-    if (checkIsElectron() && window.billflow) {
-      const created = await window.billflow.vendors.create(input);
-
-      return created;
-    } else {
-      const id = `vnd-${Date.now()}`;
-      const balance =
-        typeof input.currentBalance === "number"
-          ? input.currentBalance
-          : typeof input.balanceCents === "number"
-            ? Math.round(input.balanceCents / 100)
-            : 0;
-      const client = memoryClients.find((c) => c.id === input.linkedClientId);
-      const newVendor: VendorItem = {
-        id,
-        name: input.name,
-        service: input.service,
-        currentBalance: balance,
-        status: input.status || "PENDING",
-        iconType: input.iconType || "devops",
-        email: input.email,
-        phone: input.phone,
-        billingAddress: input.billingAddress,
-        photoData: input.photoData,
-        linkedClientId: input.linkedClientId,
-        linkedClientName: input.linkedClientName || client?.name,
-        payoutDueDate: input.payoutDueDate,
-        notes: input.notes,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      memoryVendors = [newVendor, ...memoryVendors];
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "billflow_outsourcing_vendors",
-          JSON.stringify(memoryVendors),
-        );
-      }
-      await refresh();
-      return newVendor;
-    }
-  };
+  const createVendor = async (input: NewVendorInput): Promise<VendorItem> =>
+    requireDesktop().vendors.create(input);
 
   const updateVendor = async (
     id: string,
     patch: VendorPatchInput,
-  ): Promise<VendorItem> => {
-    if (checkIsElectron() && window.billflow) {
-      const updated = await window.billflow.vendors.update(id, patch);
-
-      return updated;
-    } else {
-      const idx = memoryVendors.findIndex((v) => v.id === id);
-      if (idx === -1) throw new Error("Vendor not found");
-      const existing = memoryVendors[idx];
-      const balance =
-        typeof patch.currentBalance === "number"
-          ? patch.currentBalance
-          : typeof patch.balanceCents === "number"
-            ? Math.round(patch.balanceCents / 100)
-            : existing.currentBalance;
-      const updated: VendorItem = {
-        ...existing,
-        ...patch,
-        currentBalance: balance,
-        updatedAt: new Date().toISOString(),
-      };
-      memoryVendors[idx] = updated;
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "billflow_outsourcing_vendors",
-          JSON.stringify(memoryVendors),
-        );
-      }
-      await refresh();
-      return updated;
-    }
-  };
+  ): Promise<VendorItem> => requireDesktop().vendors.update(id, patch);
 
   const setVendorStatus = async (
     id: string,
     status: "PENDING" | "PAID",
-  ): Promise<VendorItem> => {
-    if (checkIsElectron() && window.billflow) {
-      const updated = await window.billflow.vendors.setStatus(id, status);
-
-      return updated;
-    } else {
-      return updateVendor(id, { status });
-    }
-  };
+  ): Promise<VendorItem> => requireDesktop().vendors.setStatus(id, status);
 
   const deleteVendor = async (id: string): Promise<void> => {
-    if (checkIsElectron() && window.billflow) {
-      await window.billflow.vendors.remove(id);
-    } else {
-      memoryVendors = memoryVendors.filter((v) => v.id !== id);
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "billflow_outsourcing_vendors",
-          JSON.stringify(memoryVendors),
-        );
-      }
-      await refresh();
-    }
+    await requireDesktop().vendors.remove(id);
   };
 
-  /**
-   * Creates a new per-job payable work order.
-   * In Electron desktop mode, saves to SQLite `work_orders`, updates the linked task
-   * with outsourcing metadata, and increments the vendor balance.
-   */
   const createWorkOrder = async (
     input: NewWorkOrderInput,
-  ): Promise<WorkOrderItem> => {
-    if (checkIsElectron() && window.billflow?.workOrders) {
-      const created = await window.billflow.workOrders.create(input);
+  ): Promise<WorkOrderItem> => requireDesktop().workOrders.create(input);
 
-      return created;
-    } else {
-      const id = input.id || `wo-${Date.now()}`;
-      const vendor = memoryVendors.find((v) => v.id === input.vendorId);
-      const invoice = memoryInvoices.find((i) => i.id === input.invoiceId);
-      const newWo: WorkOrderItem = {
-        id,
-        vendorId: input.vendorId ?? null,
-        taskId: input.taskId ?? null,
-        invoiceId: input.invoiceId ?? null,
-        scope: input.scope,
-        feeCents: input.feeCents,
-        currency: input.currency,
-        dueDate: input.dueDate || null,
-        payoutDueDate: input.payoutDueDate || null,
-        status: input.status || "todo",
-        deliveryUrl: input.deliveryUrl || null,
-        vendorSnapshot: input.vendorSnapshot,
-        items: input.items,
-        discountCents: input.discountCents,
-        paypalUrl: input.paypalUrl,
-        stripeUrl: input.stripeUrl,
-        vendorName: vendor?.name || input.vendorSnapshot?.name || "Contractor",
-        vendorService: vendor?.service,
-        vendorEmail: vendor?.email || input.vendorSnapshot?.email,
-        vendorPhone: vendor?.phone || input.vendorSnapshot?.phone,
-        vendorBillingAddress:
-          vendor?.billingAddress || input.vendorSnapshot?.billingAddress,
-        vendorIconType: vendor?.iconType,
-        invoiceCode: invoice?.code || "INV-000",
-        clientId: invoice?.clientId || null,
-        clientName: invoice?.clientName || "Client",
-        payoutStatus: "PENDING",
-      };
-      memoryWorkOrders = [newWo, ...memoryWorkOrders];
-      await refresh();
-      return newWo;
-    }
-  };
-
-  /**
-   * Updates an existing work order.
-   */
   const updateWorkOrder = async (
     id: string,
     patch: WorkOrderPatchInput,
-  ): Promise<WorkOrderItem> => {
-    if (checkIsElectron() && window.billflow?.workOrders) {
-      const updated = await window.billflow.workOrders.update(id, patch);
+  ): Promise<WorkOrderItem> => requireDesktop().workOrders.update(id, patch);
 
-      return updated;
-    } else {
-      const idx = memoryWorkOrders.findIndex((w) => w.id === id);
-      if (idx === -1) throw new Error("Work order not found");
-      const existing = memoryWorkOrders[idx];
-      const updated: WorkOrderItem = {
-        ...existing,
-        ...patch,
-        completedAt:
-          patch.status === "done" && !existing.completedAt
-            ? new Date().toISOString()
-            : existing.completedAt,
-      };
-      memoryWorkOrders[idx] = updated;
-      await refresh();
-      return updated;
-    }
-  };
-
-  /**
-   * Reviews contractor deliverable, saves deliverable URL & notes, and updates the original task after review.
-   */
   const reviewWorkOrder = async (
     input: ReviewWorkOrderInput,
-  ): Promise<WorkOrderItem> => {
-    if (checkIsElectron() && window.billflow?.workOrders) {
-      const updated = await window.billflow.workOrders.review(input);
+  ): Promise<WorkOrderItem> => requireDesktop().workOrders.review(input);
 
-      return updated;
-    } else {
-      const updated = await updateWorkOrder(input.workOrderId, {
-        status: input.status,
-        deliveryUrl: input.deliveryUrl,
-        notes: input.notes,
-        updateTask: input.updateTask,
-        taskStatus: input.status,
-      });
-      return updated;
-    }
-  };
-
-  const applyBrowserPayouts = async (
-    order: WorkOrderItem,
-    payouts: NonNullable<WorkOrderItem["payouts"]>,
-  ) => {
-    const active = payouts.filter((payout) => !payout.voidedAt);
-    const paid = active.reduce((sum, payout) => sum + payout.amountCents, 0);
-    const remaining = Math.max(0, order.feeCents - paid);
-    const latest = active.at(-1);
-    const updated: WorkOrderItem = {
-      ...order,
-      payoutStatus: remaining === 0 ? "PAID" : "PENDING",
-      payoutId: latest?.id ?? null,
-      paidAt: latest?.paidAt ?? null,
-      payoutAmountCents: paid,
-      remainingPayoutCents: remaining,
-      payouts,
-    };
-    memoryWorkOrders = memoryWorkOrders.map((item) =>
-      item.id === order.id ? updated : item,
-    );
-    await refresh();
-    return updated;
-  };
-
-  /**
-   * Explicitly records a vendor payout entry in SQLite `vendor_payouts`.
-   * Separate from contractor work progress.
-   */
   const recordWorkOrderPayout = async (
     input: RecordWorkOrderPayoutInput,
-  ): Promise<WorkOrderItem> => {
-    if (checkIsElectron() && window.billflow?.workOrders) {
-      const updated = await window.billflow.workOrders.recordPayout(input);
+  ): Promise<WorkOrderItem> =>
+    requireDesktop().workOrders.recordPayout(input);
 
-      return updated;
-    } else {
-      const wo = memoryWorkOrders.find((w) => w.id === input.workOrderId);
-      if (!wo) throw new Error("Work order not found");
-      const payouts = wo.payouts ?? [];
-      const id = input.requestId ?? crypto.randomUUID();
-      if (payouts.some((payout) => payout.id === id)) return wo;
-      if (input.currency && input.currency !== wo.currency)
-        throw new Error("Payout currency must match the voucher.");
-      const balance = Math.max(0, wo.feeCents - (wo.payoutAmountCents ?? 0));
-      if (!balance && input.amountCents === undefined) return wo;
-      const amountCents = input.amountCents ?? balance;
-      if (
-        !Number.isSafeInteger(amountCents) ||
-        amountCents <= 0 ||
-        amountCents > balance
-      )
-        throw new Error("Enter a payout up to the remaining balance.");
-      return applyBrowserPayouts(wo, [
-        ...payouts,
-        {
-          id,
-          amountCents,
-          currency: wo.currency,
-          paidAt: input.paidAt ?? new Date().toISOString(),
-        },
-      ]);
-    }
-  };
-
-  /**
-   * Removes a vendor payout entry, reverting payout status to PENDING
-   * without affecting contractor work status.
-   */
   const removeWorkOrderPayout = async (
     workOrderId: string,
     payoutId?: string,
-  ): Promise<WorkOrderItem> => {
-    if (checkIsElectron() && window.billflow?.workOrders) {
-      const updated = await window.billflow.workOrders.removePayout(
-        workOrderId,
-        payoutId,
-      );
+  ): Promise<WorkOrderItem> =>
+    requireDesktop().workOrders.removePayout(workOrderId, payoutId);
 
-      return updated;
-    } else {
-      const wo = memoryWorkOrders.find((w) => w.id === workOrderId);
-      if (!wo) throw new Error("Work order not found");
-      return applyBrowserPayouts(
-        wo,
-        (wo.payouts ?? []).map((payout) =>
-          !payout.voidedAt && (!payoutId || payoutId === payout.id)
-            ? { ...payout, voidedAt: new Date().toISOString() }
-            : payout,
-        ),
-      );
-    }
-  };
-
-  /**
-   * Toggles settlement payout status between PENDING and PAID.
-   * Automatically creates or removes records in `vendor_payouts`.
-   */
   const setWorkOrderPayoutStatus = async (
     id: string,
     status: "PENDING" | "PAID",
-  ): Promise<WorkOrderItem> => {
-    if (status === "PAID") {
-      return recordWorkOrderPayout({ workOrderId: id });
-    } else {
-      return removeWorkOrderPayout(id);
-    }
-  };
+  ): Promise<WorkOrderItem> =>
+    status === "PAID"
+      ? recordWorkOrderPayout({ workOrderId: id })
+      : removeWorkOrderPayout(id);
 
-  /**
-   * Deletes a work order and unlinks outsourcing info from the associated task.
-   */
   const deleteWorkOrder = async (id: string): Promise<void> => {
-    if (checkIsElectron() && window.billflow?.workOrders) {
-      await window.billflow.workOrders.remove(id);
-    } else {
-      memoryWorkOrders = memoryWorkOrders.filter((w) => w.id !== id);
-      await refresh();
-    }
+    await requireDesktop().workOrders.remove(id);
   };
 
   const exportWorkOrderPdf = async (
     id: string,
-  ): Promise<{ success: boolean; filePath: string }> => {
-    if (checkIsElectron() && window.billflow?.workOrders) {
-      return await window.billflow.workOrders.exportPdf(id);
-    }
-    return { success: true, filePath: "" };
-  };
+  ): Promise<{ success: boolean; filePath: string }> =>
+    requireDesktop().workOrders.exportPdf(id);
 
   const openWorkOrderPdf = async (
     filePath: string,
     reveal = false,
   ): Promise<void> => {
-    if (checkIsElectron() && window.billflow?.workOrders) {
-      await window.billflow.workOrders.openPdf(filePath, reveal);
-    }
+    await requireDesktop().workOrders.openPdf(filePath, reveal);
   };
 
   const getAnalyticsSummary = useCallback(
@@ -1486,231 +788,57 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       period?: string,
       currency?: string,
       accountingMethod: "accrual" | "cash" = "accrual",
-    ): Promise<AnalyticsSummaryPayload> => {
-      if (checkIsElectron() && window.billflow)
-        return window.billflow.analytics.summary(
-          period,
-          currency,
-          accountingMethod,
-        );
-      return calculateFinancials({
-        invoices: memoryInvoices,
-        workOrders: memoryWorkOrders,
-        expenses: memoryExpenses,
-        tasks,
-        period,
-        currency:
-          currency && !["ALL", "all"].includes(currency)
-            ? currency
-            : memorySettings.defaultCurrency,
-        accountingMethod,
-        clientCount: memoryClients.length,
-        vendorCount: memoryVendors.length,
-      });
-    },
-    [checkIsElectron, tasks],
+    ): Promise<AnalyticsSummaryPayload> =>
+      requireDesktop().analytics.summary(period, currency, accountingMethod),
+    [],
   );
 
   const createExpense = async (
     input: NewExpenseInput,
-  ): Promise<ExpenseItem> => {
-    if (checkIsElectron() && window.billflow?.expenses) {
-      const created = await window.billflow.expenses.create(input);
-
-      return created;
-    } else {
-      const id = input.requestId || `exp-${Date.now()}`;
-      const newExp: ExpenseItem = {
-        id,
-        invoiceId: input.invoiceId || null,
-        merchant: input.merchant,
-        description: input.description || "",
-        category: input.category,
-        amountCents: input.amountCents,
-        currency: input.currency || "USD",
-        incurredAt: input.incurredAt,
-        deductible: input.deductible !== undefined ? input.deductible : true,
-        createdAt: new Date().toISOString(),
-        attachments: [],
-      };
-      memoryExpenses = [newExp, ...memoryExpenses];
-      await refresh();
-      return newExp;
-    }
-  };
+  ): Promise<ExpenseItem> => requireDesktop().expenses.create(input);
 
   const updateExpense = async (
     id: string,
     patch: ExpensePatchInput,
-  ): Promise<ExpenseItem> => {
-    if (checkIsElectron() && window.billflow?.expenses) {
-      const updated = await window.billflow.expenses.update(id, patch);
-
-      return updated;
-    } else {
-      memoryExpenses = memoryExpenses.map((exp) =>
-        exp.id === id ? { ...exp, ...patch } : exp,
-      );
-      const found = memoryExpenses.find((exp) => exp.id === id);
-      if (!found) throw new Error("Expense not found");
-      await refresh();
-      return found;
-    }
-  };
+  ): Promise<ExpenseItem> => requireDesktop().expenses.update(id, patch);
 
   const deleteExpense = async (id: string): Promise<void> => {
-    if (checkIsElectron() && window.billflow?.expenses) {
-      await window.billflow.expenses.remove(id);
-    } else {
-      memoryExpenses = memoryExpenses.filter((exp) => exp.id !== id);
-      await refresh();
-    }
+    await requireDesktop().expenses.remove(id);
   };
 
   const attachExpenseReceipt = async (
     expenseId: string,
     requestId: string,
-  ): Promise<AttachmentItem | null> => {
-    if (checkIsElectron() && window.billflow?.attachments) {
-      const item = await window.billflow.attachments.select(
-        { type: "expense", id: expenseId },
-        requestId,
-      );
-
-      return item;
-    }
-    return null;
-  };
+  ): Promise<AttachmentItem | null> =>
+    requireDesktop().attachments.select(
+      { type: "expense", id: expenseId },
+      requestId,
+    );
 
   const createEvent = async (
     input: NewCalendarEventInput,
-  ): Promise<CalendarEventItem> => {
-    if (checkIsElectron() && window.billflow?.events) {
-      const created = await window.billflow.events.create(input);
-
-      return created;
-    } else {
-      const id = input.id || `evt-${Date.now()}`;
-      const now = new Date().toISOString();
-      const newEvt: CalendarEventItem = {
-        id,
-        title: input.title,
-        description: input.description || "",
-        startDate: input.startDate,
-        endDate: input.endDate || null,
-        startTime: input.startTime || null,
-        endTime: input.endTime || null,
-        isAllDay: Boolean(input.isAllDay),
-        category: input.category || "general",
-        color: input.color || "blue",
-        clientId: input.clientId || null,
-        clientName: input.clientName || null,
-        taskId: input.taskId || null,
-        taskTitle: input.taskTitle || null,
-        location: input.location || null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      memoryEvents = [newEvt, ...memoryEvents];
-      await refresh();
-      return newEvt;
-    }
-  };
+  ): Promise<CalendarEventItem> => requireDesktop().events.create(input);
 
   const updateEvent = async (
     id: string,
     patch: CalendarEventPatchInput,
-  ): Promise<CalendarEventItem> => {
-    if (checkIsElectron() && window.billflow?.events) {
-      const updated = await window.billflow.events.update(id, patch);
-
-      return updated;
-    } else {
-      const now = new Date().toISOString();
-      memoryEvents = memoryEvents.map((evt) =>
-        evt.id === id ? { ...evt, ...patch, updatedAt: now } : evt,
-      );
-      const found = memoryEvents.find((evt) => evt.id === id);
-      if (!found) throw new Error("Calendar event not found");
-      await refresh();
-      return found;
-    }
-  };
+  ): Promise<CalendarEventItem> => requireDesktop().events.update(id, patch);
 
   const deleteEvent = async (id: string): Promise<void> => {
-    if (checkIsElectron() && window.billflow?.events) {
-      await window.billflow.events.remove(id);
-    } else {
-      memoryEvents = memoryEvents.filter((evt) => evt.id !== id);
-      await refresh();
-    }
+    await requireDesktop().events.remove(id);
   };
 
-  const requireDesktop = () => {
-    if (!checkIsElectron() || !window.billflow)
-      throw new Error(
-        "Open the BillFlow desktop app to save workflow records.",
-      );
-    return window.billflow;
-  };
   const workflow: WorkflowAPI = {
     tasks: {
       reorder: (id, target, placement) =>
         requireDesktop().tasks.reorder(id, target, placement),
       removeMany: (ids) => requireDesktop().tasks.removeMany(ids),
       undoRemove: (token) => requireDesktop().tasks.undoRemove(token),
-      list: async () =>
-        checkIsElectron() && window.billflow
-          ? window.billflow.tasks.list()
-          : [...memoryTasks],
-      create: async (input) => {
-        if (checkIsElectron() && window.billflow) {
-          const result = await window.billflow.tasks.create(input);
-
-          return result;
-        }
-        const created: TaskItem = {
-          ...input,
-          id: input.id || `tsk-${Date.now()}`,
-          subtasks: input.subtasks || [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          activeMilliseconds: 0,
-        };
-        memoryTasks = [created, ...memoryTasks];
-        await refresh();
-        return created;
-      },
-      update: async (id, patch) => {
-        if (checkIsElectron() && window.billflow) {
-          const result = await window.billflow.tasks.update(id, patch);
-
-          return result;
-        }
-        const idx = memoryTasks.findIndex((t) => t.id === id);
-        if (idx === -1) throw new Error("Task not found");
-        const existing = memoryTasks[idx];
-        const updated: TaskItem = {
-          ...existing,
-          ...patch,
-          updatedAt: new Date().toISOString(),
-          completedAt:
-            patch.status === "done" && !existing.completedAt
-              ? new Date().toISOString()
-              : existing.completedAt,
-        };
-        memoryTasks[idx] = updated;
-        await refresh();
-        return updated;
-      },
+      list: async () => requireDesktop().tasks.list(),
+      create: async (input) => requireDesktop().tasks.create(input),
+      update: async (id, patch) => requireDesktop().tasks.update(id, patch),
       remove: async (id) => {
-        if (checkIsElectron() && window.billflow) {
-          await window.billflow.tasks.remove(id);
-
-          return;
-        }
-        memoryTasks = memoryTasks.filter((t) => t.id !== id);
-        await refresh();
+        await requireDesktop().tasks.remove(id);
       },
       history: async () => [],
     },
@@ -1736,6 +864,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       chooseFile: async () => {
         const fn = requireDesktop().attachments.chooseFile;
         return fn ? fn() : null;
+      },
+      stageFile: async (file) => {
+        const att = requireDesktop().attachments;
+        if (att.stageFile) return att.stageFile(file);
+        if (!att.stageDroppedFile) return null;
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        return att.stageDroppedFile(file.name, bytes);
+      },
+      stageDroppedFile: async (name, data) => {
+        const fn = requireDesktop().attachments.stageDroppedFile;
+        return fn ? fn(name, data) : null;
       },
       open: async (id) => requireDesktop().attachments.open(id),
     },
@@ -1811,7 +950,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     resetData,
   };
   const actionsRef = useRef(latestActions);
-  useEffect(() => {
+  useLayoutEffect(() => {
     actionsRef.current = latestActions;
   });
 
@@ -1844,6 +983,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             actionsRef.current.workflow.attachments.select(...args),
           chooseFile: () =>
             actionsRef.current.workflow.attachments.chooseFile?.() ??
+            Promise.resolve(null),
+          stageFile: (...args) =>
+            actionsRef.current.workflow.attachments.stageFile?.(...args) ??
+            Promise.resolve(null),
+          stageDroppedFile: (...args) =>
+            actionsRef.current.workflow.attachments.stageDroppedFile?.(...args) ??
             Promise.resolve(null),
           open: (...args) =>
             actionsRef.current.workflow.attachments.open(...args),
@@ -1919,6 +1064,146 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const currencyContextValue = useMemo(
+    () => ({ activeCurrency }),
+    [activeCurrency],
+  );
+
+  const clientsContextValue = useMemo<ClientsContextValue>(
+    () => ({
+      clients,
+      isLoading,
+      error,
+      createClient: stableActions.createClient,
+      updateClient: stableActions.updateClient,
+      deleteClient: stableActions.deleteClient,
+      refresh,
+    }),
+    [clients, isLoading, error, stableActions, refresh],
+  );
+
+  const invoicesContextValue = useMemo<InvoicesContextValue>(
+    () => ({
+      invoices,
+      activeCurrency,
+      isLoading,
+      error,
+      createInvoice: stableActions.createInvoice,
+      updateInvoice: stableActions.updateInvoice,
+      promoteInvoiceClient: stableActions.promoteInvoiceClient,
+      promoteClient: stableActions.promoteInvoiceClient,
+      setInvoiceStatus: stableActions.setInvoiceStatus,
+      recordPayment: stableActions.recordPayment,
+      listPayments: stableActions.listPayments,
+      exportInvoicePdf: stableActions.exportInvoicePdf,
+      saveInvoicePdfAs: stableActions.saveInvoicePdfAs,
+      openInvoicePdf: stableActions.openInvoicePdf,
+      deleteInvoice: stableActions.deleteInvoice,
+      getNextInvoiceCode: stableActions.getNextInvoiceCode,
+      refresh,
+    }),
+    [invoices, activeCurrency, isLoading, error, stableActions, refresh],
+  );
+
+  const settingsContextValue = useMemo<SettingsContextValue>(
+    () => ({
+      settings,
+      backupStatus,
+      isLoading,
+      error,
+      updateSettings: stableActions.updateSettings,
+      getDbPath: stableActions.getDbPath,
+      revealDbFile: stableActions.revealDbFile,
+      exportData: stableActions.exportData,
+      importData: stableActions.importData,
+      resetData: stableActions.resetData,
+      refresh,
+    }),
+    [settings, backupStatus, isLoading, error, stableActions, refresh],
+  );
+
+  const vendorsContextValue = useMemo<VendorsContextValue>(
+    () => ({
+      vendors,
+      isLoading,
+      error,
+      createVendor: stableActions.createVendor,
+      updateVendor: stableActions.updateVendor,
+      setVendorStatus: stableActions.setVendorStatus,
+      deleteVendor: stableActions.deleteVendor,
+      refresh,
+    }),
+    [vendors, isLoading, error, stableActions, refresh],
+  );
+
+  const workOrdersContextValue = useMemo<WorkOrdersContextValue>(
+    () => ({
+      workOrders,
+      isLoading,
+      error,
+      createWorkOrder: stableActions.createWorkOrder,
+      updateWorkOrder: stableActions.updateWorkOrder,
+      reviewWorkOrder: stableActions.reviewWorkOrder,
+      recordWorkOrderPayout: stableActions.recordWorkOrderPayout,
+      removeWorkOrderPayout: stableActions.removeWorkOrderPayout,
+      setWorkOrderPayoutStatus: stableActions.setWorkOrderPayoutStatus,
+      deleteWorkOrder: stableActions.deleteWorkOrder,
+      exportWorkOrderPdf: stableActions.exportWorkOrderPdf,
+      openWorkOrderPdf: stableActions.openWorkOrderPdf,
+      refresh,
+    }),
+    [workOrders, isLoading, error, stableActions, refresh],
+  );
+
+  const catalogContextValue = useMemo<CatalogContextValue>(
+    () => ({
+      catalogItems,
+      createCatalogItem: stableActions.createCatalogItem,
+      updateCatalogItem: stableActions.updateCatalogItem,
+      deleteCatalogItem: stableActions.deleteCatalogItem,
+      bulkImportCatalogItems: stableActions.bulkImportCatalogItems,
+      isLoading,
+      isElectron,
+      error,
+    }),
+    [catalogItems, stableActions, isLoading, isElectron, error],
+  );
+
+  const expensesContextValue = useMemo<ExpensesContextValue>(
+    () => ({
+      expenses,
+      isLoading,
+      error,
+      createExpense: stableActions.createExpense,
+      updateExpense: stableActions.updateExpense,
+      deleteExpense: stableActions.deleteExpense,
+      attachExpenseReceipt: stableActions.attachExpenseReceipt,
+      refresh,
+    }),
+    [expenses, isLoading, error, stableActions, refresh],
+  );
+
+  const tasksContextValue = useMemo<TasksContextValue>(
+    () => ({
+      tasks,
+      trackingOffers,
+      getUnbilledCompletedTasks,
+      isLoading,
+      error,
+      workflow: stableActions.workflow,
+      refresh,
+    }),
+    [
+      tasks,
+      trackingOffers,
+      getUnbilledCompletedTasks,
+      isLoading,
+      error,
+      stableActions,
+      refresh,
+    ],
+  );
+
   const contextValue = useMemo(
     () => ({
       tasks,
@@ -1967,9 +1252,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <DataContext.Provider value={contextValue}>
-      {children}
-    </DataContext.Provider>
+    <RefreshContext.Provider value={refresh}>
+      <CurrencyContext.Provider value={currencyContextValue}>
+        <ClientsContext.Provider value={clientsContextValue}>
+          <InvoicesContext.Provider value={invoicesContextValue}>
+            <SettingsContext.Provider value={settingsContextValue}>
+              <VendorsContext.Provider value={vendorsContextValue}>
+                <WorkOrdersContext.Provider value={workOrdersContextValue}>
+                  <CatalogContext.Provider value={catalogContextValue}>
+                    <ExpensesContext.Provider value={expensesContextValue}>
+                      <TasksContext.Provider value={tasksContextValue}>
+                        <DataContext.Provider value={contextValue}>
+                          {children}
+                        </DataContext.Provider>
+                      </TasksContext.Provider>
+                    </ExpensesContext.Provider>
+                  </CatalogContext.Provider>
+                </WorkOrdersContext.Provider>
+              </VendorsContext.Provider>
+            </SettingsContext.Provider>
+          </InvoicesContext.Provider>
+        </ClientsContext.Provider>
+      </CurrencyContext.Provider>
+    </RefreshContext.Provider>
   );
 }
 
@@ -1981,218 +1286,110 @@ export function useData() {
   return context;
 }
 
+export function useDataRefresh() {
+  const context = useContext(RefreshContext);
+  if (!context) {
+    throw new Error("useDataRefresh must be used within a DataProvider");
+  }
+  return context;
+}
+
 export function useActiveCurrency() {
-  const { activeCurrency } = useData();
-  return { activeCurrency };
+  const context = useContext(CurrencyContext);
+  if (!context) {
+    throw new Error("useActiveCurrency must be used within a DataProvider");
+  }
+  return context;
 }
 
 export function useClients() {
-  const {
-    clients,
-    isLoading,
-    error,
-    createClient,
-    updateClient,
-    deleteClient,
-    refresh,
-  } = useData();
-  return {
-    clients,
-    isLoading,
-    error,
-    createClient,
-    updateClient,
-    deleteClient,
-    refresh,
-  };
+  const context = useContext(ClientsContext);
+  if (!context) {
+    throw new Error("useClients must be used within a DataProvider");
+  }
+  return context;
 }
 
 export function useInvoices(filter?: { clientId?: string }) {
-  const {
-    invoices,
-    activeCurrency,
-    isLoading,
-    error,
-    createInvoice,
-    updateInvoice,
-    promoteInvoiceClient,
-    setInvoiceStatus,
-    recordPayment,
-    listPayments,
-    exportInvoicePdf,
-    saveInvoicePdfAs,
-    openInvoicePdf,
-    deleteInvoice,
-    getNextInvoiceCode,
-    refresh,
-  } = useData();
-
+  const context = useContext(InvoicesContext);
+  if (!context) {
+    throw new Error("useInvoices must be used within a DataProvider");
+  }
   const clientId = filter?.clientId;
   const filteredInvoices = useMemo(
     () =>
       clientId
-        ? invoices.filter((i) => i.clientId === clientId)
-        : invoices,
-    [invoices, clientId],
+        ? context.invoices.filter((i) => i.clientId === clientId)
+        : context.invoices,
+    [context.invoices, clientId],
   );
 
-  return {
-    invoices: filteredInvoices,
-    allInvoices: invoices,
-    activeCurrency,
-    isLoading,
-    error,
-    createInvoice,
-    updateInvoice,
-    promoteInvoiceClient,
-    promoteClient: promoteInvoiceClient,
-    setInvoiceStatus,
-    recordPayment,
-    listPayments,
-    exportInvoicePdf,
-    saveInvoicePdfAs,
-    openInvoicePdf,
-    deleteInvoice,
-    getNextInvoiceCode,
-    refresh,
-  };
+  return useMemo(
+    () => ({
+      ...context,
+      invoices: filteredInvoices,
+      allInvoices: context.invoices,
+    }),
+    [context, filteredInvoices],
+  );
 }
 
 export function useSettings() {
-  const {
-    settings,
-    backupStatus,
-    isLoading,
-    error,
-    updateSettings,
-    getDbPath,
-    revealDbFile,
-    exportData,
-    importData,
-    resetData,
-    refresh,
-  } = useData();
-  return {
-    settings,
-    backupStatus,
-    isLoading,
-    error,
-    updateSettings,
-    getDbPath,
-    revealDbFile,
-    exportData,
-    importData,
-    resetData,
-    refresh,
-  };
+  const context = useContext(SettingsContext);
+  if (!context) {
+    throw new Error("useSettings must be used within a DataProvider");
+  }
+  return context;
 }
 
 export function useVendors() {
-  const {
-    vendors,
-    isLoading,
-    error,
-    createVendor,
-    updateVendor,
-    setVendorStatus,
-    deleteVendor,
-    refresh,
-  } = useData();
-
-  return {
-    vendors,
-    isLoading,
-    error,
-    createVendor,
-    updateVendor,
-    setVendorStatus,
-    deleteVendor,
-    refresh,
-  };
+  const context = useContext(VendorsContext);
+  if (!context) {
+    throw new Error("useVendors must be used within a DataProvider");
+  }
+  return context;
 }
 
 export function useWorkOrders() {
-  const {
-    workOrders,
-    isLoading,
-    error,
-    createWorkOrder,
-    updateWorkOrder,
-    reviewWorkOrder,
-    recordWorkOrderPayout,
-    removeWorkOrderPayout,
-    setWorkOrderPayoutStatus,
-    deleteWorkOrder,
-    exportWorkOrderPdf,
-    openWorkOrderPdf,
-    refresh,
-  } = useData();
-
-  return {
-    workOrders,
-    isLoading,
-    error,
-    createWorkOrder,
-    updateWorkOrder,
-    reviewWorkOrder,
-    recordWorkOrderPayout,
-    removeWorkOrderPayout,
-    setWorkOrderPayoutStatus,
-    deleteWorkOrder,
-    exportWorkOrderPdf,
-    openWorkOrderPdf,
-    refresh,
-  };
+  const context = useContext(WorkOrdersContext);
+  if (!context) {
+    throw new Error("useWorkOrders must be used within a DataProvider");
+  }
+  return context;
 }
 
 export function useCatalog() {
-  const {
-    catalogItems,
-    createCatalogItem,
-    updateCatalogItem,
-    deleteCatalogItem,
-    bulkImportCatalogItems,
-    isLoading,
-    isElectron,
-    error,
-  } = useData();
-  return {
-    catalogItems,
-    createCatalogItem,
-    updateCatalogItem,
-    deleteCatalogItem,
-    bulkImportCatalogItems,
-    isLoading,
-    isElectron,
-    error,
-  };
+  const context = useContext(CatalogContext);
+  if (!context) {
+    throw new Error("useCatalog must be used within a DataProvider");
+  }
+  return context;
 }
 
 export function useExpenses(filter?: { category?: string }) {
-  const {
-    expenses,
-    isLoading,
-    error,
-    createExpense,
-    updateExpense,
-    deleteExpense,
-    attachExpenseReceipt,
-    refresh,
-  } = useData();
+  const context = useContext(ExpensesContext);
+  if (!context) {
+    throw new Error("useExpenses must be used within a DataProvider");
+  }
   const category = filter?.category;
   const filteredExpenses = useMemo(() => {
-    if (!category || category === "All Categories") return expenses;
-    return expenses.filter((e) => e.category === category);
-  }, [expenses, category]);
-  return {
-    expenses: filteredExpenses,
-    allExpenses: expenses,
-    isLoading,
-    error,
-    createExpense,
-    updateExpense,
-    deleteExpense,
-    attachExpenseReceipt,
-    refresh,
-  };
+    if (!category || category === "All Categories") return context.expenses;
+    return context.expenses.filter((e) => e.category === category);
+  }, [context.expenses, category]);
+  return useMemo(
+    () => ({
+      ...context,
+      expenses: filteredExpenses,
+      allExpenses: context.expenses,
+    }),
+    [context, filteredExpenses],
+  );
+}
+
+export function useTasks() {
+  const context = useContext(TasksContext);
+  if (!context) {
+    throw new Error("useTasks must be used within a DataProvider");
+  }
+  return context;
 }

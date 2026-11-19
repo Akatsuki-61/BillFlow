@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import React, { useId } from "react";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   Code2,
@@ -201,7 +201,7 @@ export function ProfileAvatarTile({
     <div
       className={`relative inline-flex items-center justify-center shrink-0 select-none ${className}`}
     >
-      <motion.div
+      <m.div
         layoutId={layoutId}
         transition={layoutId ? SPRING_NAV_GLIDE : undefined}
         className={`${sizeSpec.box} relative overflow-hidden flex items-center justify-center transition-[box-shadow,border-color,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] shadow-[0_12px_28px_-8px_rgba(0,0,0,0.55),0_0_0_1px_rgba(255,255,255,0.12)_inset] ${
@@ -288,7 +288,7 @@ export function ProfileAvatarTile({
             </div>
           </div>
         )}
-      </motion.div>
+      </m.div>
 
       {hasPassword && !isManageMode && (size === "xs" || size === "sm") && (
         <span

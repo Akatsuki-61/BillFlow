@@ -22,7 +22,7 @@ import {
   Switch,
 } from "@/components/ui/Workspace";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
@@ -306,7 +306,7 @@ export default function AnalyticsView() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
                 {metricWidgets.map((w) => (
-                  <motion.div
+                  <m.div
                     key={w.id}
                     layout="position"
                     transition={SPRING_NAV_GLIDE}
@@ -327,7 +327,7 @@ export default function AnalyticsView() {
                       isDraggable={true}
                       onContextMenu={handleContextMenu}
                     />
-                  </motion.div>
+                  </m.div>
                 ))}
               </div>
             </div>
@@ -352,7 +352,7 @@ export default function AnalyticsView() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 {chartWidgets.map((w) => (
-                  <motion.div
+                  <m.div
                     key={w.id}
                     layout="position"
                     transition={SPRING_NAV_GLIDE}
@@ -373,7 +373,7 @@ export default function AnalyticsView() {
                       isDraggable={true}
                       onContextMenu={handleContextMenu}
                     />
-                  </motion.div>
+                  </m.div>
                 ))}
               </div>
             </div>
@@ -394,7 +394,7 @@ export default function AnalyticsView() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 {otherWidgets.map((w) => (
-                  <motion.div
+                  <m.div
                     key={w.id}
                     layout="position"
                     transition={SPRING_NAV_GLIDE}
@@ -415,7 +415,7 @@ export default function AnalyticsView() {
                       isDraggable={true}
                       onContextMenu={handleContextMenu}
                     />
-                  </motion.div>
+                  </m.div>
                 ))}
               </div>
             </div>

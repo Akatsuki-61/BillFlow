@@ -2,7 +2,7 @@
 
 import React from "react";
 import { ExternalLink, FileCheck } from "lucide-react";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
@@ -114,7 +114,7 @@ export function ReviewDeliverableModal({
                     }`}
                   >
                     {isActive && (
-                      <motion.span
+                      <m.span
                         layoutId="review-status-pill"
                         transition={SPRING_NAV_GLIDE}
                         className="absolute inset-0 rounded-lg bg-accent shadow-xs"

@@ -9,7 +9,7 @@ import React, {
   useCallback,
 } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, MotionConfig } from "motion/react";
+import { AnimatePresence, m, MotionConfig } from "motion/react";
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
 import {
   SPRING_NAV_GLIDE,
@@ -48,6 +48,7 @@ import { useReportingData } from "@/context/ReportingContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useWidgetContext } from "@/context/WidgetContext";
 import { useProfiles } from "@/context/ProfileContext";
+import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
 import {
   PROFILE_AVATAR_ICONS,
   PROFILE_ACCENT_STYLES,
@@ -182,6 +183,7 @@ export default function Sidebar() {
   const profileRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sheenId = useId();
+  const isMac = useIsMac();
 
   const openSearch = useCallback(() => {
     setSearchFocused(true);
@@ -330,8 +332,9 @@ export default function Sidebar() {
     ];
   }, [activityDay, invoices, tasks, workOrders, convert, reportingCurrency]);
 
-  const searchIndex = useMemo<SearchResult[]>(
-    () => [
+  const searchIndex = useMemo<SearchResult[]>(() => {
+    if (!searchOpen) return [];
+    return [
       ...creationCommands,
       ...mainNavItems.map((page) => ({
         title: page.name,
@@ -416,10 +419,19 @@ export default function Sidebar() {
           order.clientName,
         ].join(" "),
       })),
-    ],
-    [invoices, clients, tasks, expenses, catalogItems, vendors, workOrders],
-  );
+    ];
+  }, [
+    searchOpen,
+    invoices,
+    clients,
+    tasks,
+    expenses,
+    catalogItems,
+    vendors,
+    workOrders,
+  ]);
   const searchResults = useMemo(() => {
+    if (!searchOpen) return [];
     const query = searchQuery.trim().toLowerCase();
     if (!query)
       return searchIndex.filter(
@@ -438,7 +450,7 @@ export default function Sidebar() {
           Number(a.title.toLowerCase().includes(query)),
       )
       .slice(0, 60);
-  }, [searchIndex, searchQuery]);
+  }, [searchOpen, searchIndex, searchQuery]);
   const selectedResult = Math.min(activeResult, searchResults.length - 1);
   const activateResult = (entry: SearchResult) => {
     closeSearch();
@@ -485,7 +497,7 @@ export default function Sidebar() {
           <div className={`flex items-center justify-self-start ${dragClass}`}>
             <Link
               href="/"
-              className={`flex items-center gap-2.5 shrink-0 group focus:outline-none ${dragClass} cursor-default`}
+              className="flex items-center gap-2.5 shrink-0 group focus:outline-none app-no-drag cursor-pointer"
             >
               <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 pointer-events-none">
                 <Image
@@ -583,7 +595,7 @@ export default function Sidebar() {
                 >
                   {isHovered &&
                     !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
-                      <motion.span
+                      <m.span
                         className="absolute inset-0 -z-20 rounded-[15px] bg-black/[0.045] dark:bg-white/[0.065]"
                         layoutId="main-nav-hover"
                         transition={SPRING_NAV_GLIDE}
@@ -591,7 +603,7 @@ export default function Sidebar() {
                     )}
                   {isActive &&
                     !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
-                      <motion.span
+                      <m.span
                         className="nav-active-pill absolute inset-0 -z-10 rounded-[12px] bg-[#1c1c1f] dark:bg-[#f4f4f6] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.22)]"
                         layoutId="main-nav-active"
                         transition={SPRING_NAV_GLIDE}
@@ -614,7 +626,7 @@ export default function Sidebar() {
                 aria-expanded={searchOpen}
                 aria-controls="search-popover"
                 aria-label="Search workspace"
-                title="Search workspace"
+                title={`Search workspace (${formatShortcut("Cmd+K", isMac)})`}
                 className="w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer"
               >
                 <Search className="w-[17px] h-[17px]" strokeWidth={1.9} />
@@ -670,7 +682,7 @@ export default function Sidebar() {
                       />
                       <AnimatePresence initial={false}>
                         {searchQuery && (
-                          <motion.button
+                          <m.button
                             key="clear-search"
                             type="button"
                             initial={{
@@ -691,7 +703,7 @@ export default function Sidebar() {
                             aria-label="Clear search"
                           >
                             <X className="w-3.5 h-3.5" />
-                          </motion.button>
+                          </m.button>
                         )}
                       </AnimatePresence>
                     </div>
@@ -720,7 +732,7 @@ export default function Sidebar() {
                           </span>
                           {entry.shortcut && (
                             <kbd className="text-xs text-content-neutral-600 shrink-0">
-                              Alt+{entry.shortcut}
+                              {formatShortcut(`Alt+${entry.shortcut}`, isMac)}
                             </kbd>
                           )}
                         </div>
@@ -1013,7 +1025,7 @@ export default function Sidebar() {
                               }`}
                             >
                               {active && (
-                                <motion.span
+                                <m.span
                                   layoutId="profile-theme-pill"
                                   transition={SPRING_NAV_GLIDE}
                                   className="absolute inset-0 -z-10 rounded-[8px] bg-surface shadow-xs border border-line-neutral-200/60"
@@ -1119,7 +1131,7 @@ export default function Sidebar() {
                           Keyboard Shortcuts
                         </span>
                         <kbd className="text-[11px] font-mono text-content-neutral-400">
-                          ⌘/
+                          {formatShortcut("Cmd+/", isMac)}
                         </kbd>
                       </button>
                     </div>

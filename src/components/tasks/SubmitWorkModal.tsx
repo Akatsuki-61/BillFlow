@@ -17,10 +17,13 @@ import {
   Receipt,
   CheckSquare,
   FileText,
+  MessageCircle,
 } from "lucide-react";
 import type { TaskItem } from "@/types/tasks";
 import type { TaskPatchInput } from "@/types/workflow";
 import { useData } from "@/lib/data/DataProvider";
+import { useToast } from "@/context/ToastContext";
+import { openMessageDraft, whatsAppDraft } from "@/lib/message-drafts";
 import {
   resolveDeliveryUrl,
   formatExternalUrl,
@@ -43,12 +46,27 @@ export default function SubmitWorkModal({
   saving = false,
 }: SubmitWorkModalProps) {
   const { clients, invoices } = useData();
+  const { showToast } = useToast();
 
   // Resolve initial delivery link from task, invoice or client
   const resolved = useMemo(
     () => resolveDeliveryUrl(task, { clients, invoices }),
     [task, clients, invoices],
   );
+  const linkedClient = useMemo(
+    () => clients.find((c) => c.id === task.clientId),
+    [clients, task.clientId],
+  );
+  const linkedInvoice = useMemo(
+    () => invoices.find((inv) => inv.id === task.invoiceId),
+    [invoices, task.invoiceId],
+  );
+  const clientPhone =
+    linkedClient?.whatsappPhone ||
+    linkedClient?.phone ||
+    linkedInvoice?.clientWhatsAppPhone ||
+    linkedInvoice?.clientPhone ||
+    null;
 
   const activityProfile = activeProfileScope();
   const [deliveryUrlInput, setDeliveryUrlInput] = useState(
@@ -108,6 +126,20 @@ export default function SubmitWorkModal({
       setTimeout(() => setCopiedMessage(false), 2000);
     } catch {
       // ignore clipboard error
+    }
+  };
+
+  const handleSendWhatsApp = async () => {
+    try {
+      await openMessageDraft(
+        whatsAppDraft(clientPhone, clientHandoverMessage, "web"),
+      );
+      showToast("WhatsApp handover draft opened.");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Could not open WhatsApp.",
+        "error",
+      );
     }
   };
 
@@ -403,26 +435,41 @@ export default function SubmitWorkModal({
                 <span>Client Handover Message (WhatsApp / Email)</span>
               </span>
 
-              <Button
-                type="button"
-                variant="ghost"
-                size="small"
-                onClick={handleCopyMessage}
-                className="text-xs gap-1 text-accent hover:bg-accent-faint"
-                title="Copy client handover message to clipboard"
-              >
-                <IconCrossfade
-                  iconKey={copiedMessage ? "copied" : "copy"}
-                  className="w-3 h-3"
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="small"
+                  onClick={() => void handleSendWhatsApp()}
+                  className="text-xs gap-1 text-content-emerald-700 dark:text-content-emerald-400 hover:bg-surface-emerald-50 dark:hover:bg-emerald-950/30"
+                  title="Open handover message in WhatsApp"
                 >
-                  {copiedMessage ? (
-                    <Check className="w-3 h-3 text-accent success-confirm-pulse rounded-full" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                </IconCrossfade>
-                <span>{copiedMessage ? "Copied Message" : "Copy Message"}</span>
-              </Button>
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Send via WhatsApp</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="small"
+                  onClick={handleCopyMessage}
+                  className="text-xs gap-1 text-accent hover:bg-accent-faint"
+                  title="Copy client handover message to clipboard"
+                >
+                  <IconCrossfade
+                    iconKey={copiedMessage ? "copied" : "copy"}
+                    className="w-3 h-3"
+                  >
+                    {copiedMessage ? (
+                      <Check className="w-3 h-3 text-accent success-confirm-pulse rounded-full" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </IconCrossfade>
+                  <span>
+                    {copiedMessage ? "Copied Message" : "Copy Message"}
+                  </span>
+                </Button>
+              </div>
             </div>
 
             <pre className="text-[11px] font-sans whitespace-pre-wrap bg-surface p-2.5 rounded-lg border border-line-neutral-200/80 text-text-placeholder leading-relaxed select-all">

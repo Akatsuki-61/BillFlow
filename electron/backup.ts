@@ -464,7 +464,10 @@ export function importWorkspace(
   )
     throw new Error("Backup must not restore machine-local PDF paths.");
   const sandbox = new Database(":memory:");
-  const fileBytes = new Map<string, Buffer>();
+  const fileCache = new Map<
+    string,
+    { bytes: Buffer; sha256: string; mimeType: string }
+  >();
   try {
     sandbox.pragma("foreign_keys = ON");
     migrateDatabase(sandbox);
@@ -492,7 +495,7 @@ export function importWorkspace(
     for (const file of payload.files) {
       managedAttachmentPath(file.storedName);
       if (
-        fileBytes.has(file.storedName) ||
+        fileCache.has(file.storedName) ||
         !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
           file.base64,
         )
@@ -500,17 +503,22 @@ export function importWorkspace(
         throw new Error("Duplicate or invalid attachment bytes.");
       const bytes = Buffer.from(file.base64, "base64");
       const format = receiptFormat(bytes);
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
       if (
         !bytes.length ||
         bytes.length > MAX_RECEIPT_BYTES ||
-        createHash("sha256").update(bytes).digest("hex") !== file.sha256 ||
+        sha256 !== file.sha256 ||
         file.storedName !== `${file.sha256}.${format.extension}`
       )
         throw new Error("Receipt integrity check failed.");
-      fileBytes.set(file.storedName, bytes);
+      fileCache.set(file.storedName, {
+        bytes,
+        sha256,
+        mimeType: format.mimeType,
+      });
     }
     if (
-      [...fileBytes.values()].reduce((s, b) => s + b.length, 0) >
+      [...fileCache.values()].reduce((s, entry) => s + entry.bytes.length, 0) >
       MAX_BACKUP_ATTACHMENT_BYTES
     )
       throw new Error("Backup attachments exceed 100 MB.");
@@ -518,17 +526,16 @@ export function importWorkspace(
       payload.records.attachments.map((r) => String(r.stored_name)),
     );
     if (
-      expected.size !== fileBytes.size ||
-      [...expected].some((name) => !fileBytes.has(name))
+      expected.size !== fileCache.size ||
+      [...expected].some((name) => !fileCache.has(name))
     )
       throw new Error("Backup receipt files are missing or unreferenced.");
     for (const row of payload.records.attachments) {
-      const bytes = fileBytes.get(String(row.stored_name))!;
-      const format = receiptFormat(bytes);
+      const cached = fileCache.get(String(row.stored_name))!;
       if (
-        bytes.length !== row.size_bytes ||
-        row.sha256 !== createHash("sha256").update(bytes).digest("hex") ||
-        row.mime_type !== format.mimeType
+        cached.bytes.length !== row.size_bytes ||
+        row.sha256 !== cached.sha256 ||
+        row.mime_type !== cached.mimeType
       )
         throw new Error("Receipt metadata does not match its bytes.");
     }
@@ -655,8 +662,8 @@ export function importWorkspace(
   try {
     // Content-addressed files are immutable: publish new files before committing their metadata.
     // A process interruption before commit leaves only unreferenced files, never partial records.
-    for (const [name, bytes] of fileBytes) {
-      const published = publishManagedAttachment(name, bytes);
+    for (const [name, entry] of fileCache) {
+      const published = publishManagedAttachment(name, entry.bytes);
       if (published.created) created.push(published.destination);
     }
     const sqlite = getSqlite();

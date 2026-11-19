@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   ChevronLeft,
@@ -1060,7 +1060,7 @@ export default function TaskCalendarView({
                   }`}
                 >
                   {isActive && (
-                    <motion.span
+                    <m.span
                       layoutId="calendar-scope-pill"
                       transition={SPRING_NAV_GLIDE}
                       className="absolute inset-0 rounded-lg bg-surface shadow-xs"
@@ -1126,7 +1126,7 @@ export default function TaskCalendarView({
                   }`}
                 >
                   {isActive && (
-                    <motion.span
+                    <m.span
                       layoutId="calendar-view-mode-pill"
                       transition={SPRING_NAV_GLIDE}
                       className="absolute inset-0 rounded-lg bg-surface shadow-xs"

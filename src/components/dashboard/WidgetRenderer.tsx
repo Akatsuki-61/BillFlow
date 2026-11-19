@@ -22,10 +22,11 @@ import {
   Lightbulb,
 } from "lucide-react";
 import {
-  useData,
   useClients,
+  useTasks,
   useVendors,
 } from "@/lib/data/DataProvider";
+import type { TaskItem } from "@/types/tasks";
 import {
   formatCents,
   formatDateDisplay,
@@ -112,6 +113,128 @@ function getTransparentDragCanvas(): HTMLCanvasElement | null {
   return sharedTransparentDragCanvas;
 }
 
+function ActiveClientsMonthlyDots() {
+  const { clients } = useClients();
+  return (
+    <DataDots
+      label="New clients by month"
+      noun="clients"
+      points={recentMonths().map((month) => ({
+        ...month,
+        value: clients.filter((client) =>
+          client.createdAt.startsWith(month.key),
+        ).length,
+      }))}
+    />
+  );
+}
+
+function OutsourcedCostsMetric({
+  renderCard,
+}: {
+  renderCard: (vendorCount: number) => React.ReactNode;
+}) {
+  const { vendors } = useVendors();
+  return <>{renderCard(vendors.length)}</>;
+}
+
+function SprintTasksList({
+  isCompact,
+  activeTasks,
+  onNavigate,
+}: {
+  isCompact: boolean;
+  activeTasks: TaskItem[];
+  onNavigate: () => void;
+}) {
+  const { tasks } = useTasks();
+  return (
+    <div className="mt-3.5 space-y-2">
+      {tasks.length === 0 ? (
+        <div
+          onClick={onNavigate}
+          className="p-4 rounded-[16px] bg-surface border border-line-neutral-200/80 flex items-center justify-between cursor-pointer hover:bg-surface-neutral-50"
+        >
+          <div>
+            <div className="text-[13.5px] font-medium text-content-neutral-950">
+              Launch your first sprint deliverable
+            </div>
+            <div className="text-[12px] text-content-neutral-500 mt-0.5">
+              Tasks auto-generate when an invoice reaches Advance Paid
+            </div>
+          </div>
+          <span className="zentra-circle-btn zentra-circle-btn--sm">
+            <ArrowUpRight className="w-4 h-4" />
+          </span>
+        </div>
+      ) : (
+        (activeTasks.length > 0 ? activeTasks : tasks)
+          .slice(0, isCompact ? 2 : 3)
+          .map((t) => {
+            const progressPct = taskProgress(t);
+            const barClass =
+              t.status === "done"
+                ? "zentra-stripe-green"
+                : t.status === "review"
+                  ? "zentra-stripe-pink"
+                  : t.status === "in-progress"
+                    ? "zentra-stripe-blue"
+                    : "zentra-stripe-blue-soft";
+
+            return (
+              <div
+                key={t.id}
+                onClick={onNavigate}
+                className="p-3 rounded-[16px] bg-surface hover:bg-surface-neutral-50 transition-all cursor-pointer border border-line-neutral-200/80 shadow-2xs"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          t.priority === "urgent"
+                            ? "bg-[#ec4899]"
+                            : t.priority === "high"
+                              ? "bg-[#f59e0b]"
+                              : "bg-accent-solid"
+                        }`}
+                      />
+                      <span className="text-[13.5px] font-medium text-content-neutral-950 truncate">
+                        {t.title}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 pl-4 text-[11.5px] text-content-neutral-400 truncate">
+                      {t.clientName || t.category || "Sprint Deliverable"}
+                      {t.invoiceCode ? ` · ${t.invoiceCode}` : ""}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="zentra-pill-badge !py-0.5 !px-2 !text-[10.5px]">
+                      {t.status.replace("-", " ")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2.5 flex items-center gap-2.5">
+                  <div className="flex-1 h-1.5 rounded-full bg-surface-neutral-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${barClass} transition-all duration-300`}
+                      style={{ width: `${progressPct ?? 0}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] font-semibold tabular-nums text-content-neutral-600">
+                    {progressPct === null ? "No checklist" : `${progressPct}%`}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+      )}
+    </div>
+  );
+}
+
 interface WidgetRendererProps {
   widgetId: string;
   source: "dashboard" | "analytics";
@@ -181,9 +304,6 @@ function WidgetContent({
     taskCounts,
     pipelineStages,
   } = useDashboardMetrics(period);
-  const { clients } = useClients();
-  const { vendors } = useVendors();
-  const { tasks } = useData();
   const { draggedWidgetId, startWidgetDrag, endWidgetDrag } =
     useWidgetContext();
   const isBeingDragged = draggedWidgetId === widgetId;
@@ -752,16 +872,7 @@ function WidgetContent({
                 </div>
               </div>
 
-              <DataDots
-                label="New clients by month"
-                noun="clients"
-                points={recentMonths().map((month) => ({
-                  ...month,
-                  value: clients.filter((client) =>
-                    client.createdAt.startsWith(month.key),
-                  ).length,
-                }))}
-              />
+              <ActiveClientsMonthlyDots />
             </div>
 
             <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
@@ -780,22 +891,28 @@ function WidgetContent({
 
       // 5. Outsourced Costs
       case "outsourced-costs":
-        return renderZentraMetric({
-          title: "Subcontractor Payables",
-          value:
-            vendors.length > 0
-              ? outsourcedCostsStr
-              : formatCents(0, activeCurrency),
-          badgeText: `${vendors.length} vendors`,
-          subtitle: "Contractor share of gross revenue",
-          barPct:
-            totalRevenueCents > 0
-              ? Math.round((totalOutsourcedCents / totalRevenueCents) * 100)
-              : 0,
-          stripeTone: "blue",
-          href: "/outsourcing",
-          actionLabel: "Open Outsourcing",
-        });
+        return (
+          <OutsourcedCostsMetric
+            renderCard={(vendorCount) =>
+              renderZentraMetric({
+                title: "Subcontractor Payables",
+                value:
+                  vendorCount > 0
+                    ? outsourcedCostsStr
+                    : formatCents(0, activeCurrency),
+                badgeText: `${vendorCount} vendors`,
+                subtitle: "Contractor share of gross revenue",
+                barPct:
+                  totalRevenueCents > 0
+                    ? Math.round((totalOutsourcedCents / totalRevenueCents) * 100)
+                    : 0,
+                stripeTone: "blue",
+                href: "/outsourcing",
+                actionLabel: "Open Outsourcing",
+              })
+            }
+          />
+        );
 
       // 6. Operating Expenses
       case "operating-expenses":
@@ -1701,93 +1818,11 @@ function WidgetContent({
               </div>
 
               {/* Active Deliverable Capsules with Progress Bars */}
-              <div className="mt-3.5 space-y-2">
-                {tasks.length === 0 ? (
-                  <div
-                    onClick={() => router.push("/tasks")}
-                    className="p-4 rounded-[16px] bg-surface border border-line-neutral-200/80 flex items-center justify-between cursor-pointer hover:bg-surface-neutral-50"
-                  >
-                    <div>
-                      <div className="text-[13.5px] font-medium text-content-neutral-950">
-                        Launch your first sprint deliverable
-                      </div>
-                      <div className="text-[12px] text-content-neutral-500 mt-0.5">
-                        Tasks auto-generate when an invoice reaches Advance Paid
-                      </div>
-                    </div>
-                    <span className="zentra-circle-btn zentra-circle-btn--sm">
-                      <ArrowUpRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                ) : (
-                  (activeTasks.length > 0 ? activeTasks : tasks)
-                    .slice(0, isCompact ? 2 : 3)
-                    .map((t) => {
-                      const progressPct = taskProgress(t);
-                      const barClass =
-                        t.status === "done"
-                          ? "zentra-stripe-green"
-                          : t.status === "review"
-                            ? "zentra-stripe-pink"
-                            : t.status === "in-progress"
-                              ? "zentra-stripe-blue"
-                              : "zentra-stripe-blue-soft";
-
-                      return (
-                        <div
-                          key={t.id}
-                          onClick={() => router.push("/tasks")}
-                          className="p-3 rounded-[16px] bg-surface hover:bg-surface-neutral-50 transition-all cursor-pointer border border-line-neutral-200/80 shadow-2xs"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`w-2 h-2 rounded-full shrink-0 ${
-                                    t.priority === "urgent"
-                                      ? "bg-[#ec4899]"
-                                      : t.priority === "high"
-                                        ? "bg-[#f59e0b]"
-                                        : "bg-accent-solid"
-                                  }`}
-                                />
-                                <span className="text-[13.5px] font-medium text-content-neutral-950 truncate">
-                                  {t.title}
-                                </span>
-                              </div>
-                              <div className="mt-0.5 pl-4 text-[11.5px] text-content-neutral-400 truncate">
-                                {t.clientName ||
-                                  t.category ||
-                                  "Sprint Deliverable"}
-                                {t.invoiceCode ? ` · ${t.invoiceCode}` : ""}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="zentra-pill-badge !py-0.5 !px-2 !text-[10.5px]">
-                                {t.status.replace("-", " ")}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="mt-2.5 flex items-center gap-2.5">
-                            <div className="flex-1 h-1.5 rounded-full bg-surface-neutral-100 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${barClass} transition-all duration-300`}
-                                style={{ width: `${progressPct ?? 0}%` }}
-                              />
-                            </div>
-                            <span className="text-[11px] font-semibold tabular-nums text-content-neutral-600">
-                              {progressPct === null
-                                ? "No checklist"
-                                : `${progressPct}%`}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                )}
-              </div>
+              <SprintTasksList
+                isCompact={isCompact}
+                activeTasks={activeTasks}
+                onNavigate={() => router.push("/tasks")}
+              />
             </div>
 
             <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">

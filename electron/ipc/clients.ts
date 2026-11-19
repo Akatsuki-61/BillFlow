@@ -10,18 +10,21 @@ import { recordId } from "../workflow-validation";
 import { AppError, formatError } from "./errors";
 import {
   ClientWithStats,
+  InvoiceWithClient,
   NewClientInput,
   ClientPatchInput,
 } from "../../src/types/billing";
 
-export function listClientsWithStats(): ClientWithStats[] {
+export function listClientsWithStats(
+  preloadedInvoices?: InvoiceWithClient[],
+): ClientWithStats[] {
   const db = getDb();
   const allClients = db
     .select()
     .from(clients)
     .orderBy(desc(clients.createdAt))
     .all();
-  const allInvoices = listInvoicesWithClient();
+  const allInvoices = preloadedInvoices ?? listInvoicesWithClient();
 
   const invoiceMap = new Map<string, typeof allInvoices>();
   for (const invoice of allInvoices) {

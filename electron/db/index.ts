@@ -528,7 +528,10 @@ export function initDatabase(customPath?: string, customMigrations?: string) {
   const dbPath = customPath || getRootDatabasePath();
   const sqlite = new Database(dbPath);
   try {
+    sqlite.pragma("busy_timeout = 5000");
     sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("synchronous = NORMAL");
+    sqlite.pragma("temp_store = MEMORY");
     sqlite.pragma("foreign_keys = ON");
     hardenSqliteFiles(dbPath);
     backupBeforeUpgrade(sqlite, dbPath, customMigrations);
@@ -560,7 +563,6 @@ export function getRootDb() {
 }
 
 export function switchWorkspaceDatabase(profileId: string) {
-  workspaceGeneration++;
   if (startupError) throw startupError;
   if (!/^[a-zA-Z0-9_-]+$/.test(profileId)) {
     throw new Error("Invalid profile identifier.");
@@ -570,6 +572,8 @@ export function switchWorkspaceDatabase(profileId: string) {
   }
 
   if (profileId === "default") {
+    const changed =
+      activeProfileId !== "default" || sqliteInstance !== rootSqliteInstance;
     if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
       sqliteInstance.close();
     }
@@ -577,6 +581,7 @@ export function switchWorkspaceDatabase(profileId: string) {
     sqliteInstance = rootSqliteInstance;
     activePath = rootDbPath;
     activeProfileId = "default";
+    if (changed) workspaceGeneration++;
     return { db: dbInstance!, sqlite: sqliteInstance!, dbPath: activePath! };
   }
 
@@ -593,13 +598,17 @@ export function switchWorkspaceDatabase(profileId: string) {
   const targetDbPath = path.join(profileDir, "billflow.db");
 
   if (activePath === targetDbPath && dbInstance && sqliteInstance) {
+    if (activeProfileId !== profileId) workspaceGeneration++;
     activeProfileId = profileId;
     return { db: dbInstance, sqlite: sqliteInstance, dbPath: activePath };
   }
 
   const sqlite = new Database(targetDbPath);
   try {
+    sqlite.pragma("busy_timeout = 5000");
     sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("synchronous = NORMAL");
+    sqlite.pragma("temp_store = MEMORY");
     sqlite.pragma("foreign_keys = ON");
     hardenSqliteFiles(targetDbPath);
     backupBeforeUpgrade(
@@ -617,6 +626,7 @@ export function switchWorkspaceDatabase(profileId: string) {
     dbInstance = nextDb;
     activePath = targetDbPath;
     activeProfileId = profileId;
+    workspaceGeneration++;
     return { db: dbInstance, sqlite: sqliteInstance, dbPath: targetDbPath };
   } catch (error) {
     sqlite.close();
@@ -655,12 +665,23 @@ export function getSqlite() {
   return sqliteInstance || initDatabase().sqlite;
 }
 
-export function closeDatabaseForTesting() {
+export function closeAllDatabases() {
   workspaceGeneration++;
-  if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
-    sqliteInstance.close();
+  const handles = new Set<Database.Database>();
+  if (sqliteInstance) handles.add(sqliteInstance);
+  if (rootSqliteInstance) handles.add(rootSqliteInstance);
+  for (const handle of handles) {
+    try {
+      handle.pragma("wal_checkpoint(TRUNCATE)");
+    } catch {
+      // Ignore checkpoint errors if already closed or read-only
+    }
+    try {
+      handle.close();
+    } catch {
+      // Ignore close errors during shutdown
+    }
   }
-  rootSqliteInstance?.close();
   sqliteInstance = null;
   dbInstance = null;
   rootSqliteInstance = null;
@@ -670,4 +691,8 @@ export function closeDatabaseForTesting() {
   activeProfileId = "default";
   activeCustomMigrations = null;
   startupError = null;
+}
+
+export function closeDatabaseForTesting() {
+  closeAllDatabases();
 }

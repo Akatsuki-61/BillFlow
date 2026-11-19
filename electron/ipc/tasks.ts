@@ -455,6 +455,21 @@ function qualifyingInvoice(id: string) {
   return { invoice, received };
 }
 
+function parseClientSnapshot(
+  raw: string | null,
+): { name?: string; driveUrl?: string } | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as { name?: string; driveUrl?: string };
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function pendingTracking(): TrackingOffer[] {
   const db = getDb();
   return db.transaction((tx) => {
@@ -488,9 +503,7 @@ export function pendingTracking(): TrackingOffer[] {
       const client = row.clientId
         ? tx.select().from(clients).where(eq(clients.id, row.clientId)).get()
         : undefined;
-      const snapshot = row.clientSnapshot
-        ? (JSON.parse(row.clientSnapshot) as { name?: string })
-        : undefined;
+      const snapshot = parseClientSnapshot(row.clientSnapshot);
       offers.push({
         invoiceId: row.id,
         code: row.code,
@@ -534,12 +547,7 @@ export function decideTracking(idInput: string, choiceInput: "yes" | "no") {
               .where(eq(clients.id, invoice.clientId))
               .get()
           : undefined;
-        const snapshot = invoice.clientSnapshot
-          ? (JSON.parse(invoice.clientSnapshot) as {
-              name?: string;
-              driveUrl?: string;
-            })
-          : undefined;
+        const snapshot = parseClientSnapshot(invoice.clientSnapshot);
         for (const item of items) {
           const taskId = randomUUID();
           const inserted = tx
@@ -549,7 +557,8 @@ export function decideTracking(idInput: string, choiceInput: "yes" | "no") {
               invoiceItemId: item.id,
               invoiceId: id,
               clientId: invoice.clientId,
-              title: item.description,
+              title:
+                item.description.trim().slice(0, 240) || "Invoice deliverable",
               description: item.description,
               assignee: resolveDefaultAssignee(tx),
               clientName: snapshot?.name || client?.name,

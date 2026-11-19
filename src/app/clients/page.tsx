@@ -17,7 +17,7 @@ import { DataBreakdown } from "@/components/ui/DataGraphic";
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
   EXIT_MENU_POPOVER,
@@ -824,7 +824,7 @@ function ClientsContent() {
                       {/* Dropdown Menu */}
                       <AnimatePresence initial={false}>
                         {activeMenuId === client.id && (
-                          <motion.div
+                          <m.div
                             key={`client-menu-${client.id}`}
                             initial={{
                               opacity: 0,
@@ -930,7 +930,7 @@ function ClientsContent() {
                               <Trash2 className="w-3.5 h-3.5 text-content-red-400" />
                               <span>Delete Client</span>
                             </Button>
-                          </motion.div>
+                          </m.div>
                         )}
                       </AnimatePresence>
                     </div>

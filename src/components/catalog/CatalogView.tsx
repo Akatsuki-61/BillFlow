@@ -11,10 +11,10 @@ import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import {
   IconCrossfade,
   MotionPresence,
-  MotionSurface,
 } from "@/components/ui/MotionSurface";
+import { useToast } from "@/context/ToastContext";
 import { Dialog } from "@/components/ui/Dialog";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import { SPRING_NAV_GLIDE, SPRING_LIQUID_BUTTON } from "@/lib/motion";
 
 import { formatCents } from "@/lib/format";
@@ -37,7 +37,6 @@ import {
   Copy,
   Check,
   FileText,
-  CheckCircle2,
   RotateCcw,
 } from "lucide-react";
 import {
@@ -104,20 +103,7 @@ export default function CatalogView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] =
     useState<Category>("All Items");
-
-  // Notifications / Toast
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
-
-  const showToast = (
-    message: string,
-    type: "success" | "error" = "success",
-  ) => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3600);
-  };
+  const { showToast } = useToast();
 
   // Modals state
   const [showNewItemModal, setShowNewItemModal] = useState(false);
@@ -442,7 +428,10 @@ export default function CatalogView() {
     e.preventDefault();
     if (!quickInvoiceItem) return;
     if (!invoiceClientId) {
-      alert("Please select a client or create one on the Clients page.");
+      showToast(
+        "Please select a client or create one on the Clients page.",
+        "error",
+      );
       return;
     }
 
@@ -542,28 +531,6 @@ export default function CatalogView() {
 
   return (
     <div className="workspace-page motion-page">
-      {/* Toast Notification */}
-      <MotionPresence>
-        {notification && (
-          <MotionSurface
-            key={notification.message}
-            kind="toast"
-            className={`fixed top-14 right-6 z-[9999] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
-              notification.type === "error"
-                ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
-                : "bg-surface-neutral-900 border-line-neutral-700 text-white"
-            }`}
-          >
-            {notification.type === "error" ? (
-              <span className="w-2 h-2 rounded-full bg-rose-400" />
-            ) : (
-              <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
-            )}
-            <span>{notification.message}</span>
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
       {/* Top Header */}
       <PageHeader
         title="Catalog"
@@ -696,7 +663,7 @@ export default function CatalogView() {
           />
           <AnimatePresence initial={false}>
             {searchQuery && (
-              <motion.div
+              <m.div
                 key="clear-catalog-search"
                 initial={{ opacity: 0, scale: 0.6 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -713,7 +680,7 @@ export default function CatalogView() {
                 >
                   <X className="w-3.5 h-3.5" />
                 </Button>
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
@@ -735,7 +702,7 @@ export default function CatalogView() {
                 }`}
               >
                 {isActive && (
-                  <motion.span
+                  <m.span
                     layoutId="catalog-category-pill"
                     transition={SPRING_NAV_GLIDE}
                     className="absolute inset-0 rounded-full bg-[#1c1c1f] dark:bg-white shadow-xs"
@@ -1507,7 +1474,7 @@ export default function CatalogView() {
                         className={`import-guide-tab relative active:scale-[0.97] ${isActive ? "import-guide-tab-active" : ""}`}
                       >
                         {isActive && (
-                          <motion.span
+                          <m.span
                             layoutId="catalog-guide-tab-pill"
                             transition={SPRING_NAV_GLIDE}
                             className="absolute inset-0 rounded-lg bg-surface dark:bg-[#22222c] shadow-xs border border-line-neutral-200/80 dark:border-[#343444]"

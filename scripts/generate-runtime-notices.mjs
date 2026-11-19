@@ -3,12 +3,15 @@ import path from "node:path";
 const packages = [
   "drizzle-orm",
   "zod",
-  "pdf-lib",
-  "@pdf-lib/standard-fonts",
-  "@pdf-lib/upng",
-  "pako",
-  "tslib",
   "better-sqlite3",
+  "echarts",
+  "zrender",
+  "motion",
+  "libphonenumber-js",
+  "lucide-react",
+  "next",
+  "react",
+  "react-dom",
 ];
 const notices = packages.map((name) => {
   const directory = path.join("node_modules", name);

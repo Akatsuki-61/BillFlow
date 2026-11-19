@@ -1095,7 +1095,6 @@ input[type="checkbox"] {
   border-radius: 50%;
   background: white;
   box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
-  will-change: transform;
 }
 .ui-switch:hover,
 .ui-switch:active {
@@ -2572,7 +2571,6 @@ i.fa-solid.fa-trash {
   transition:
     transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.18s ease;
-  will-change: transform;
 }
 
 button:hover:not(:disabled) i.fa-solid.fa-trash,
@@ -2640,7 +2638,6 @@ i.fa-solid.fa-plus {
   transition:
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.18s ease;
-  will-change: transform;
 }
 
 i.fa-solid.fa-circle-plus {
@@ -2663,7 +2660,6 @@ i.fa-solid.fa-circle-plus {
   transition:
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.18s ease;
-  will-change: transform;
 }
 
 button:hover:not(:disabled) i.fa-solid.fa-plus,
@@ -2739,7 +2735,6 @@ i.fa-solid.fa-pen {
   transition:
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.18s ease;
-  will-change: transform;
 }
 
 i.fa-solid.fa-arrows-rotate,
@@ -2763,7 +2758,6 @@ i.fa-solid.fa-rotate {
   transition:
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.18s ease;
-  will-change: transform;
 }
 
 button:hover:not(:disabled) i.fa-solid.fa-pen-to-square,

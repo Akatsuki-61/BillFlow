@@ -10,7 +10,7 @@ import {
   ExternalLink,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { useProfiles } from "@/context/ProfileContext";
 import {
   TOUR_STEPS,
@@ -20,6 +20,11 @@ import {
   resetTourCompleted,
 } from "@/lib/onboarding-tour";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
+import {
+  formatShortcut,
+  formatShortcutText,
+  useIsMac,
+} from "@/lib/platform-shortcuts";
 
 interface HighlightRect {
   top: number;
@@ -32,6 +37,7 @@ export function WorkspaceTour() {
   const router = useRouter();
   const pathname = usePathname();
   const { activeProfile, isGateOpen, isLocked } = useProfiles();
+  const isMac = useIsMac();
   const reducedMotion = useReducedMotion();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -155,7 +161,7 @@ export function WorkspaceTour() {
     <>
       <AnimatePresence>
         {visible && highlightRect && (
-          <motion.div
+          <m.div
             key={step.id}
             aria-hidden="true"
             initial={{ opacity: 0, scale: 0.96 }}
@@ -175,7 +181,7 @@ export function WorkspaceTour() {
 
       <AnimatePresence>
         {visible && (
-          <motion.aside
+          <m.aside
             key="workspace-tour-card"
             role="region"
             aria-label="BillFlow Guided Tour"
@@ -203,7 +209,7 @@ export function WorkspaceTour() {
             </span>
             {step.shortcutHint && (
               <kbd className="px-1.5 py-0.5 rounded bg-surface-neutral-100 border border-line-neutral-200 text-[10px] font-mono text-content-neutral-700">
-                {step.shortcutHint}
+                {formatShortcut(step.shortcutHint, isMac)}
               </kbd>
             )}
           </div>
@@ -222,7 +228,7 @@ export function WorkspaceTour() {
             {step.title}
           </h3>
           <p className="mt-1.5 text-[12.5px] text-content-neutral-600 leading-relaxed">
-            {step.body}
+            {formatShortcutText(step.body, isMac)}
           </p>
         </div>
 
@@ -276,7 +282,7 @@ export function WorkspaceTour() {
             </button>
           </div>
         </div>
-      </motion.aside>
+      </m.aside>
         )}
       </AnimatePresence>
     </>

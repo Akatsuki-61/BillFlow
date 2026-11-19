@@ -7,7 +7,7 @@ export default function CalendarPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/tasks#calendar");
+    router.replace("/tasks?view=calendar");
   }, [router]);
 
   return (

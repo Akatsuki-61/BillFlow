@@ -5,6 +5,7 @@ import { Keyboard } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { MotionPresence } from "@/components/ui/MotionSurface";
 import { useProfiles } from "@/context/ProfileContext";
+import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
 
 const SHORTCUT_GROUPS = [
   {
@@ -38,6 +39,7 @@ const SHORTCUT_GROUPS = [
 
 export function KeyboardShortcutsModal() {
   const { isGateOpen, isLocked } = useProfiles();
+  const isMac = useIsMac();
   const blocked = isGateOpen || isLocked;
   const [isOpen, setIsOpen] = useState(false);
   const [prevBlocked, setPrevBlocked] = useState(blocked);
@@ -102,7 +104,7 @@ export function KeyboardShortcutsModal() {
                         {item.desc}
                       </span>
                       <kbd className="px-2 py-0.5 rounded-md bg-surface-neutral-100 border border-line-neutral-200 text-[11px] font-mono text-content-neutral-700 shrink-0">
-                        {item.keys}
+                        {formatShortcut(item.keys, isMac)}
                       </kbd>
                     </div>
                   ))}

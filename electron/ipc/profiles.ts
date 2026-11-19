@@ -301,6 +301,8 @@ function mapProfileRow(row: UserProfileRow): UserProfile {
   };
 }
 
+const lastMirroredProfileSnapshotByPath = new Map<string, string>();
+
 function syncProfilesJsonMirror(
   profiles: UserProfile[],
   activeProfileId: string,
@@ -314,6 +316,16 @@ function syncProfilesJsonMirror(
         return rest;
       },
     );
+    const fingerprint = JSON.stringify({
+      activeProfileId,
+      profiles: mirroredProfiles,
+    });
+    if (
+      lastMirroredProfileSnapshotByPath.get(mirrorPath) === fingerprint &&
+      fs.existsSync(mirrorPath)
+    ) {
+      return;
+    }
     const payload = {
       version: 1,
       maxProfiles: MAX_PROFILES,
@@ -322,6 +334,7 @@ function syncProfilesJsonMirror(
       profiles: mirroredProfiles,
     };
     atomicWrite(mirrorPath, JSON.stringify(payload, null, 2), 0o600);
+    lastMirroredProfileSnapshotByPath.set(mirrorPath, fingerprint);
   } catch {
     // Non-fatal if directory is read-only during isolated unit tests
   }

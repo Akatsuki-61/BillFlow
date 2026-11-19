@@ -9,6 +9,7 @@ import { ImageUpload } from "@/components/ui/ImageUpload";
 
 import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { MAX_BACKUP_BYTES } from "@/lib/backup-limits";
+import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
 
 import { Dialog } from "@/components/ui/Dialog";
 
@@ -28,7 +29,7 @@ import {
   MotionPresence,
   MotionSurface,
 } from "@/components/ui/MotionSurface";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   User,
@@ -70,9 +71,14 @@ import type {
 } from "@/types/billing";
 import { getCurrencySymbol } from "@/lib/format";
 import type { AccentPreference } from "@/lib/theme";
+import dynamic from "next/dynamic";
 import { profileStorageKey } from "@/lib/profile-scope";
-import InvoiceDocumentSheet from "@/components/invoices/InvoiceDocumentSheet";
 import { InvoiceTemplateMiniPreview } from "@/components/settings/InvoiceTemplateMiniPreview";
+
+const InvoiceDocumentSheet = dynamic(
+  () => import("@/components/invoices/InvoiceDocumentSheet"),
+  { ssr: false },
+);
 
 type SettingsTab = "profile" | "invoices" | "data" | "appearance";
 
@@ -146,6 +152,7 @@ function SettingsContent() {
     ? (requestedTab as SettingsTab)
     : "profile";
   const { workflow, isElectron, error: dataError } = useData();
+  const isMac = useIsMac();
   const { preference, setPreference, accent, setAccent, ready } = useTheme();
   const {
     profiles,
@@ -165,6 +172,7 @@ function SettingsContent() {
     backupStatus,
     importData,
     resetData,
+    refresh: refreshWorkspace,
   } = useSettings();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
@@ -214,10 +222,18 @@ function SettingsContent() {
 
   // Modals
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDraggingBackup, setIsDraggingBackup] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [parsedImport, setParsedImport] = useState<ExportDataPayload | null>(
     null,
   );
+  const [selectedDiskBackup, setSelectedDiskBackup] = useState<{
+    token: string;
+    fileName: string;
+    importedClients: number;
+    importedInvoices: number;
+    receiptsCount: number;
+  } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isValidatingImport, setIsValidatingImport] = useState(false);
@@ -438,6 +454,38 @@ function SettingsContent() {
   };
   const handleImportMode = async (mode: "replace" | "merge") => {
     setImportMode(mode);
+    if (selectedDiskBackup && window.billflow?.settings?.preflightBackupFile) {
+      const version = ++importReadVersion.current;
+      setIsValidatingImport(true);
+      try {
+        const preview = await window.billflow.settings.preflightBackupFile(
+          selectedDiskBackup.token,
+          mode,
+        );
+        if (version === importReadVersion.current) {
+          setSelectedDiskBackup((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  importedClients: preview.importedClients,
+                  importedInvoices: preview.importedInvoices,
+                }
+              : prev,
+          );
+          setImportError(null);
+        }
+      } catch (error) {
+        if (version === importReadVersion.current)
+          setImportError(
+            error instanceof Error
+              ? error.message
+              : "Backup validation failed.",
+          );
+      } finally {
+        if (version === importReadVersion.current) setIsValidatingImport(false);
+      }
+      return;
+    }
     if (!parsedImport) return;
     const version = ++importReadVersion.current;
     setIsValidatingImport(true);
@@ -453,11 +501,80 @@ function SettingsContent() {
       if (version === importReadVersion.current) setIsValidatingImport(false);
     }
   };
+  const handleChooseDiskBackup = async () => {
+    if (!window.billflow?.settings?.chooseBackupFile) return;
+    const version = ++importReadVersion.current;
+    setIsValidatingImport(true);
+    setImportError(null);
+    try {
+      const chosen = await window.billflow.settings.chooseBackupFile(importMode);
+      if (version !== importReadVersion.current) return;
+      if (chosen.canceled) return;
+      setImportFile(null);
+      setParsedImport(null);
+      setSelectedDiskBackup({
+        token: chosen.token,
+        fileName: chosen.fileName,
+        importedClients: chosen.importedClients,
+        importedInvoices: chosen.importedInvoices,
+        receiptsCount: chosen.receiptsCount,
+      });
+    } catch (error) {
+      if (version !== importReadVersion.current) return;
+      setSelectedDiskBackup(null);
+      setImportError(
+        error instanceof Error ? error.message : "Backup validation failed.",
+      );
+    } finally {
+      if (version === importReadVersion.current) setIsValidatingImport(false);
+    }
+  };
+  const handleDropDiskBackup = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingBackup(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.name.toLowerCase().endsWith(".json")) {
+      setImportError("Drop a complete BillFlow backup .json file.");
+      return;
+    }
+    if (!window.billflow?.settings?.stageBackupFile) {
+      setImportError("Backup staging is unavailable in this environment.");
+      return;
+    }
+    const version = ++importReadVersion.current;
+    setIsValidatingImport(true);
+    setImportError(null);
+    try {
+      const staged = await window.billflow.settings.stageBackupFile(
+        file,
+        importMode,
+      );
+      if (version !== importReadVersion.current) return;
+      setImportFile(null);
+      setParsedImport(null);
+      setSelectedDiskBackup({
+        token: staged.token,
+        fileName: staged.fileName,
+        importedClients: staged.importedClients,
+        importedInvoices: staged.importedInvoices,
+        receiptsCount: staged.receiptsCount,
+      });
+    } catch (error) {
+      if (version !== importReadVersion.current) return;
+      setSelectedDiskBackup(null);
+      setImportError(
+        error instanceof Error ? error.message : "Backup validation failed.",
+      );
+    } finally {
+      if (version === importReadVersion.current) setIsValidatingImport(false);
+    }
+  };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const version = ++importReadVersion.current;
 
+    setSelectedDiskBackup(null);
     setParsedImport(null);
     if (file.size > MAX_BACKUP_BYTES) {
       setImportError("Backup must be smaller than 150 MB.");
@@ -500,6 +617,32 @@ function SettingsContent() {
   };
 
   const handleConfirmImport = async () => {
+    if (selectedDiskBackup && window.billflow?.settings?.importBackupFile) {
+      setIsImporting(true);
+      try {
+        const res = await window.billflow.settings.importBackupFile(
+          selectedDiskBackup.token,
+          importMode,
+        );
+        await refreshWorkspace();
+        showToast(
+          `${importMode === "merge" ? "Merged" : "Restored"} ${res.importedClients} clients and ${res.importedInvoices} invoices.`,
+          "success",
+        );
+        setIsImportModalOpen(false);
+        setSelectedDiskBackup(null);
+        setImportFile(null);
+        setParsedImport(null);
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error ? err.message : "Could not import the backup.";
+        setImportError(msg);
+        showToast(msg, "error");
+      } finally {
+        setIsImporting(false);
+      }
+      return;
+    }
     if (!parsedImport) return;
     setIsImporting(true);
     try {
@@ -687,7 +830,7 @@ function SettingsContent() {
               disabled={isSaving}
             >
               <Save className="w-3.5 h-3.5" />
-              {isSaving ? "Saving..." : "Save (Cmd+S)"}
+              {isSaving ? "Saving..." : `Save (${formatShortcut("Cmd+S", isMac)})`}
             </Button>
           </div>
         )}
@@ -744,7 +887,7 @@ function SettingsContent() {
                   }}
                 >
                   {isActive && (
-                    <motion.span
+                    <m.span
                       layoutId="settings-nav-active-pill"
                       transition={SPRING_NAV_GLIDE}
                       className="settings-nav-active-pill"
@@ -1980,6 +2123,7 @@ function SettingsContent() {
                           onClick={() => {
                             setImportFile(null);
                             setParsedImport(null);
+                            setSelectedDiskBackup(null);
                             setImportError(null);
                             setIsImportModalOpen(true);
                           }}
@@ -2112,18 +2256,55 @@ function SettingsContent() {
             </div>
             <div className="app-dialog-body">
               <div className="space-y-3">
-                <label className="block border-2 border-dashed border-line-neutral-200 hover:border-accent rounded-xl p-5 text-center cursor-pointer transition-colors bg-surface-neutral-50/50">
-                  <Upload className="w-5 h-5 text-content-neutral-400 mx-auto mb-1.5" />
-                  <span className="text-xs font-medium text-content-neutral-700 block">
-                    {importFile ? importFile.name : "Select backup .json file"}
-                  </span>
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
+                {window.billflow?.settings?.chooseBackupFile ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleChooseDiskBackup()}
+                    onDragOver={(e) => {
+                      if (e.dataTransfer?.types?.includes("Files")) {
+                        e.preventDefault();
+                        setIsDraggingBackup(true);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (
+                        !e.currentTarget.contains(
+                          e.relatedTarget as Node | null,
+                        )
+                      ) {
+                        setIsDraggingBackup(false);
+                      }
+                    }}
+                    onDrop={(e) => void handleDropDiskBackup(e)}
+                    className={`w-full block border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
+                      isDraggingBackup
+                        ? "border-accent bg-accent-faint/40"
+                        : "border-line-neutral-200 hover:border-accent bg-surface-neutral-50/50"
+                    }`}
+                  >
+                    <Upload className="w-5 h-5 text-content-neutral-400 mx-auto mb-1.5" />
+                    <span className="text-xs font-medium text-content-neutral-700 block">
+                      {isDraggingBackup
+                        ? "Drop backup .json file here"
+                        : selectedDiskBackup
+                          ? selectedDiskBackup.fileName
+                          : "Select or drop backup .json file"}
+                    </span>
+                  </button>
+                ) : (
+                  <label className="block border-2 border-dashed border-line-neutral-200 hover:border-accent rounded-xl p-5 text-center cursor-pointer transition-colors bg-surface-neutral-50/50">
+                    <Upload className="w-5 h-5 text-content-neutral-400 mx-auto mb-1.5" />
+                    <span className="text-xs font-medium text-content-neutral-700 block">
+                      {importFile ? importFile.name : "Select backup .json file"}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                )}
 
                 {importError && (
                   <div className="p-3 rounded-xl bg-surface-rose-50 border border-line-rose-200 text-xs text-content-rose-700 flex items-center gap-2">
@@ -2158,7 +2339,7 @@ function SettingsContent() {
                       : "Replaces the active workspace records and settings."}
                   </p>
                 </fieldset>
-                {parsedImport && (
+                {(selectedDiskBackup || parsedImport) && (
                   <div className="p-3.5 rounded-xl bg-surface-purple-50 border border-line-purple-100 text-xs text-content-purple-950 space-y-1">
                     <div className="font-semibold text-accent">
                       Records, links and receipt hashes verified
@@ -2166,25 +2347,38 @@ function SettingsContent() {
                     <div className="text-content-neutral-700">
                       Contains{" "}
                       <strong>
-                        {parsedImport.clients?.length || 0} clients
+                        {selectedDiskBackup
+                          ? selectedDiskBackup.importedClients
+                          : parsedImport?.clients?.length || 0}{" "}
+                        clients
                       </strong>{" "}
                       and{" "}
                       <strong>
-                        {parsedImport.invoices?.length || 0} invoices
+                        {selectedDiskBackup
+                          ? selectedDiskBackup.importedInvoices
+                          : parsedImport?.invoices?.length || 0}{" "}
+                        invoices
                       </strong>
                       .
                     </div>
                     <p>
-                      {parsedImport.files?.length || 0} receipts · Currencies:{" "}
-                      {[
-                        ...new Set(
-                          [
-                            ...(parsedImport.records?.invoices || []),
-                            ...(parsedImport.records?.expenses || []),
-                            ...(parsedImport.records?.work_orders || []),
-                          ].map((row) => String(row.currency)),
-                        ),
-                      ].join(", ") || "No financial records"}
+                      {selectedDiskBackup ? (
+                        <>{selectedDiskBackup.receiptsCount} receipts</>
+                      ) : (
+                        <>
+                          {parsedImport?.files?.length || 0} receipts ·
+                          Currencies:{" "}
+                          {[
+                            ...new Set(
+                              [
+                                ...(parsedImport?.records?.invoices || []),
+                                ...(parsedImport?.records?.expenses || []),
+                                ...(parsedImport?.records?.work_orders || []),
+                              ].map((row) => String(row.currency)),
+                            ),
+                          ].join(", ") || "No financial records"}
+                        </>
+                      )}
                     </p>
                     <p>
                       A complete recovery backup is saved locally before
@@ -2206,7 +2400,7 @@ function SettingsContent() {
                 variant="primary"
                 type="button"
                 disabled={
-                  !parsedImport ||
+                  (!selectedDiskBackup && !parsedImport) ||
                   isImporting ||
                   isValidatingImport ||
                   Boolean(importError)

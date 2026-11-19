@@ -31,7 +31,6 @@ import {
   type BrushRange,
 } from "@/components/evilcharts/ui/echarts-brush";
 import {
-  DataZoomComponent,
   GridComponent,
   TooltipComponent,
   type DataZoomComponentOption,
@@ -60,7 +59,7 @@ import {
 } from "@/components/evilcharts/ui/echarts-dot";
 import { LegendOverlay, type LegendVariant } from "@/components/evilcharts/ui/echarts-legend";
 import { LineChart, type LineSeriesOption } from "echarts/charts";
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 import type { ComposeOption } from "echarts/core";
 import * as echarts from "echarts/core";
 
@@ -80,7 +79,7 @@ export type {
 // `DataZoomComponent` bundles both the slider (brush footer) and inside (wheel/drag)
 // zoom. The brush's frame/handles/labels are raw zrender elements, not the
 // graphic component — see syncBrushOverlay. No GraphicComponent is registered.
-echarts.use([LineChart, GridComponent, TooltipComponent, DataZoomComponent]);
+echarts.use([LineChart, GridComponent, TooltipComponent]);
 
 type EChartsInstance = ReturnType<typeof echarts.init>;
 
@@ -1688,7 +1687,7 @@ export function EChartsLineChart<TData extends Record<string, unknown>>({
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class"],
+      attributeFilter: ["class", "data-theme"],
     });
 
     chart.on("click", (params) => {
@@ -2082,7 +2081,7 @@ export function EChartsLineChart<TData extends Record<string, unknown>>({
 
       {isLoading && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <motion.div
+          <m.div
             initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
@@ -2090,7 +2089,7 @@ export function EChartsLineChart<TData extends Record<string, unknown>>({
           >
             <div className="border-border border-t-primary h-3 w-3 animate-spin rounded-full border" />
             <span>Loading</span>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </div>

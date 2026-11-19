@@ -194,10 +194,6 @@ function recordElementTrigger(target: EventTarget | null): boolean {
     height: rect.height,
     capturedAt: Date.now(),
   };
-  writeViewTransitionOrigin(
-    `${Math.round(rect.left + rect.width / 2)}px`,
-    `${Math.round(rect.top + rect.height / 2)}px`,
-  );
   return true;
 }
 
@@ -212,17 +208,26 @@ export function ensureViewTransitionOrigin(
   explicitTrigger?: EventTarget | null,
 ) {
   if (typeof document === "undefined" || typeof window === "undefined") return;
-  if (explicitTrigger && recordElementTrigger(explicitTrigger)) {
-    return;
-  }
-  if (lastTriggerRect && Date.now() - lastTriggerRect.capturedAt < 1800) {
+  const writeFromLast = () => {
+    if (!lastTriggerRect) return false;
     writeViewTransitionOrigin(
       `${Math.round(lastTriggerRect.left + lastTriggerRect.width / 2)}px`,
       `${Math.round(lastTriggerRect.top + lastTriggerRect.height / 2)}px`,
     );
+    return true;
+  };
+  if (explicitTrigger && recordElementTrigger(explicitTrigger) && writeFromLast()) {
     return;
   }
-  if (document.activeElement && recordElementTrigger(document.activeElement)) {
+  if (lastTriggerRect && Date.now() - lastTriggerRect.capturedAt < 1800) {
+    writeFromLast();
+    return;
+  }
+  if (
+    document.activeElement &&
+    recordElementTrigger(document.activeElement) &&
+    writeFromLast()
+  ) {
     return;
   }
   writeViewTransitionOrigin("50%", "50%");

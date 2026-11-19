@@ -26,6 +26,8 @@ export function unlockProfileSession(id: string) {
   sessionGeneration++;
 }
 export function lockProfileSession() {
+  initializedProfile = null;
+  initializedPath = null;
   unlockedProfile = null;
   sessionGeneration++;
 }

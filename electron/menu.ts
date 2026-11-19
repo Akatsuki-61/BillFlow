@@ -61,15 +61,53 @@ export function buildMenuTemplate(
     ? !app.isPackaged
     : true,
 ): MenuItemConstructorOptions[] {
+  const openAbout = () => {
+    const currentVersion = app?.getVersion ? app.getVersion() : "0.2.0";
+    if (isMac) {
+      setupAboutPanel();
+      app?.showAboutPanel?.();
+      return;
+    }
+    const win = getMainWindow ? getMainWindow() : null;
+    const options = {
+      type: "info" as const,
+      title: "About BillFlow",
+      message: `BillFlow v${currentVersion}`,
+      detail:
+        "Copyright © 2026 Akatsuki-61\nhttps://github.com/Akatsuki-61/BillFlow",
+      buttons: ["OK"],
+    };
+    if (win && !win.isDestroyed()) {
+      dialog.showMessageBox(win, options);
+    } else {
+      dialog.showMessageBox(options);
+    }
+  };
+
+  const openCheckForUpdates = () => {
+    const win = getMainWindow ? getMainWindow() : null;
+    const currentVersion = app?.getVersion ? app.getVersion() : "0.2.0";
+    const options = {
+      type: "info" as const,
+      title: "Check for Updates",
+      message: `Installed version: BillFlow v${currentVersion}`,
+      detail:
+        "Automatic update checks are not enabled. Compare this version with downloads at github.com/Akatsuki-61/BillFlow/releases.",
+      buttons: ["OK"],
+    };
+    if (win && !win.isDestroyed()) {
+      dialog.showMessageBox(win, options);
+    } else {
+      dialog.showMessageBox(options);
+    }
+  };
+
   const appMenu: MenuItemConstructorOptions = {
     label: app?.name || "BillFlow",
     submenu: [
       {
         label: "About BillFlow",
-        click: () => {
-          setupAboutPanel();
-          app.showAboutPanel();
-        },
+        click: openAbout,
       },
       {
         label: "Settings...",
@@ -78,23 +116,7 @@ export function buildMenuTemplate(
       },
       {
         label: "Check for Updates...",
-        click: () => {
-          const win = getMainWindow ? getMainWindow() : null;
-          const currentVersion = app?.getVersion ? app.getVersion() : "0.2.0";
-          const options = {
-            type: "info" as const,
-            title: "Check for Updates",
-            message: `Installed version: BillFlow v${currentVersion}`,
-            detail:
-              "Automatic update checks are not enabled. Compare this version with downloads at github.com/Akatsuki-61/BillFlow/releases.",
-            buttons: ["OK"],
-          };
-          if (win && !win.isDestroyed()) {
-            dialog.showMessageBox(win, options);
-          } else {
-            dialog.showMessageBox(options);
-          }
-        },
+        click: openCheckForUpdates,
       },
       { type: "separator" },
       { role: "hide", label: "Hide BillFlow" },
@@ -113,6 +135,15 @@ export function buildMenuTemplate(
         accelerator: "CmdOrCtrl+N",
         click: () => navigate("/invoices?new=1"),
       },
+      ...(!isMac
+        ? [
+            {
+              label: "Settings...",
+              accelerator: "CmdOrCtrl+,",
+              click: () => navigate("/settings"),
+            },
+          ]
+        : []),
       { type: "separator" },
       isMac ? { role: "close" } : { role: "quit" },
     ],
@@ -213,9 +244,66 @@ export function buildMenuTemplate(
       : [{ role: "minimize" }, { role: "close" }],
   };
 
+  const helpMenu: MenuItemConstructorOptions = {
+    label: "Help",
+    submenu: [
+      {
+        label: "Check for Updates...",
+        click: openCheckForUpdates,
+      },
+      { type: "separator" },
+      {
+        label: "About BillFlow",
+        click: openAbout,
+      },
+    ],
+  };
+
   return isMac
     ? [appMenu, fileMenu, editMenu, viewMenu, tabsMenu, windowMenu]
-    : [fileMenu, editMenu, viewMenu, tabsMenu, windowMenu];
+    : [fileMenu, editMenu, viewMenu, tabsMenu, windowMenu, helpMenu];
+}
+
+export function buildQuickActionsMenuTemplate(options: {
+  openApp?: () => void;
+  navigate: (route: string) => void;
+  lockWorkspace: () => void;
+  quit?: () => void;
+  includeOpenAndQuit?: boolean;
+}): MenuItemConstructorOptions[] {
+  const { openApp, navigate, lockWorkspace, quit, includeOpenAndQuit } =
+    options;
+  const actions: MenuItemConstructorOptions[] = [
+    {
+      label: "New Invoice",
+      click: () => navigate("/invoices?new=1"),
+    },
+    {
+      label: "Add Expense",
+      click: () => navigate("/expenses?create=1"),
+    },
+    { type: "separator" },
+    {
+      label: "Lock Workspace",
+      click: lockWorkspace,
+    },
+  ];
+  if (!includeOpenAndQuit) {
+    return actions;
+  }
+  return [
+    {
+      label: "Open BillFlow",
+      click: openApp ?? (() => navigate("/")),
+    },
+    { type: "separator" },
+    ...actions,
+    { type: "separator" },
+    {
+      label: "Quit BillFlow",
+      click: quit ?? (() => app.quit()),
+    },
+  ];
 }
 
 export function createApplicationMenu(

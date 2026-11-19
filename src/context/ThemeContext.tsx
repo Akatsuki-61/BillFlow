@@ -4,11 +4,13 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useSyncExternalStore,
 } from "react";
 import { flushSync } from "react-dom";
-import { LayoutGroup, MotionConfig } from "motion/react";
+import { LazyMotion, LayoutGroup, MotionConfig } from "motion/react";
 import { ensureTriggerTracker, ensureViewTransitionOrigin } from "@/lib/motion";
+import { loadMotionFeatures } from "@/lib/motion-features";
 import {
   isThemePreference,
   isAccentPreference,
@@ -248,19 +250,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dataset.accent = accent;
   }, [accent]);
 
+  const ready = saved !== null;
+  const contextValue = useMemo(
+    () => ({
+      preference,
+      setPreference,
+      accent,
+      setAccent,
+      ready,
+    }),
+    [preference, accent, ready],
+  );
+
   return (
-    <ThemeContext.Provider
-      value={{
-        preference,
-        setPreference,
-        accent,
-        setAccent,
-        ready: saved !== null,
-      }}
-    >
-      <MotionConfig reducedMotion="user">
-        <LayoutGroup>{children}</LayoutGroup>
-      </MotionConfig>
+    <ThemeContext.Provider value={contextValue}>
+      <LazyMotion features={loadMotionFeatures}>
+        <MotionConfig reducedMotion="user">
+          <LayoutGroup>{children}</LayoutGroup>
+        </MotionConfig>
+      </LazyMotion>
     </ThemeContext.Provider>
   );
 }

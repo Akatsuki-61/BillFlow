@@ -2,7 +2,7 @@
 
 import {
   AnimatePresence,
-  motion,
+  m,
   useIsPresent,
   useReducedMotion,
   type HTMLMotionProps,
@@ -46,7 +46,7 @@ export function IconCrossfade({
   return (
     <span className={`relative ${className}`}>
       <AnimatePresence mode="popLayout" initial={false}>
-        <motion.span
+        <m.span
           key={String(iconKey)}
           initial={
             reducedMotion
@@ -76,7 +76,7 @@ export function IconCrossfade({
           className="inline-flex items-center justify-center"
         >
           {children}
-        </motion.span>
+        </m.span>
       </AnimatePresence>
     </span>
   );
@@ -267,7 +267,7 @@ export function MotionSurface({
             };
 
   return (
-    <motion.div
+    <m.div
       {...props}
       ref={surfaceRef}
       role={
@@ -295,6 +295,6 @@ export function MotionSurface({
       }}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }

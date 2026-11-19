@@ -39,16 +39,22 @@ export function loadWorkspaceSnapshot(
       profileId: workspace.profileId,
       generation: workspace.generation,
     };
+    const needsInvoices =
+      datasets.includes("invoices") ||
+      datasets.includes("clients") ||
+      datasets.includes("dashboard");
+    const sharedInvoices = needsInvoices ? listInvoicesWithClient() : undefined;
+
     for (const dataset of datasets) {
       switch (dataset) {
         case "clients":
-          snapshot.clients = listClientsWithStats();
+          snapshot.clients = listClientsWithStats(sharedInvoices);
           break;
         case "invoices":
-          snapshot.invoices = listInvoicesWithClient();
+          snapshot.invoices = sharedInvoices;
           break;
         case "dashboard":
-          snapshot.dashboard = getDashboardSummary();
+          snapshot.dashboard = getDashboardSummary(sharedInvoices);
           break;
         case "settings":
           snapshot.settings = getOrCreateSettings();
@@ -121,7 +127,7 @@ export function workspaceDraft(
     throw error;
   }
 }
-export function registerWorkspaceHandlers() {
+export function registerWorkspaceHandlers(broadcastDataChanged?: () => void) {
   ipcMain.handle("workspace:quarantineDrafts", (_event, input: unknown) => {
     const drafts = z
       .record(
@@ -177,6 +183,7 @@ export function registerWorkspaceHandlers() {
           identity,
         );
       if (!result.changes) throw new Error("Directory record not found.");
+      broadcastDataChanged?.();
     },
   );
   ipcMain.handle(

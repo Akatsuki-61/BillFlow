@@ -38,6 +38,11 @@ export interface WorkflowAPI {
     list: (owner: AttachmentOwner) => Promise<AttachmentItem[]>;
     select: (owner: AttachmentOwner, requestId: string, filePath?: string) => Promise<AttachmentItem | null>;
     chooseFile?: () => Promise<ChosenAttachmentFile | null>;
+    stageFile?: (file: File) => Promise<ChosenAttachmentFile | null>;
+    stageDroppedFile?: (
+      name: string,
+      data: Uint8Array,
+    ) => Promise<ChosenAttachmentFile | null>;
     open: (id: string) => Promise<void>;
   };
   files: {

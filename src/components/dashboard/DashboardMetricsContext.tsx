@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useMemo } from "react";
 import { useReportingData } from "@/context/ReportingContext";
-import { useClients, useData } from "@/lib/data/DataProvider";
+import { useClients, useTasks } from "@/lib/data/DataProvider";
 import { calculateFinancials } from "@/lib/financials";
 import { formatCents } from "@/lib/format";
 import { isPastDue, issuedInPeriod, sharePercent } from "@/lib/visual-metrics";
@@ -345,7 +345,7 @@ export function DashboardMetricsProvider({
 }) {
   const { invoices, expenses, workOrders, currency } = useReportingData();
   const { clients } = useClients();
-  const { tasks } = useData();
+  const { tasks } = useTasks();
 
   const metrics = useMemo(
     () =>
@@ -368,35 +368,17 @@ export function DashboardMetricsProvider({
   );
 }
 
-export function useDashboardMetrics(period: DashboardPeriod): DashboardMetrics {
+export function useDashboardMetrics(period?: DashboardPeriod): DashboardMetrics {
   const ctx = useContext(DashboardMetricsContext);
-  const { invoices, expenses, workOrders, currency } = useReportingData();
-  const { clients } = useClients();
-  const { tasks } = useData();
-
-  const matchesContext = ctx !== null && ctx.period === period;
-
-  const fallback = useMemo(() => {
-    if (matchesContext) return null;
-    return computeDashboardMetrics({
-      invoices,
-      expenses,
-      workOrders,
-      clients,
-      tasks,
-      period,
-      currency,
-    });
-  }, [
-    matchesContext,
-    invoices,
-    expenses,
-    workOrders,
-    clients,
-    tasks,
-    period,
-    currency,
-  ]);
-
-  return matchesContext ? ctx : (fallback as DashboardMetrics);
+  if (!ctx) {
+    throw new Error(
+      "useDashboardMetrics must be used within a DashboardMetricsProvider",
+    );
+  }
+  if (period && ctx.period !== period) {
+    throw new Error(
+      `useDashboardMetrics period mismatch: expected ${ctx.period}, received ${period}`,
+    );
+  }
+  return ctx;
 }

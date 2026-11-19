@@ -18,7 +18,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   IconCrossfade,
@@ -32,6 +32,7 @@ import { useWidgetContext } from "@/context/WidgetContext";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
 import { WorkflowQuickStartBar } from "@/components/onboarding/WorkflowQuickStartBar";
+import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
 import { DashboardPeriod } from "@/types/dashboard";
 
 const PERIOD_OPTIONS: SelectOption<DashboardPeriod>[] = [
@@ -63,6 +64,7 @@ export default function DashboardPage() {
   } = useWidgetContext();
 
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
+  const isMac = useIsMac();
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const lastSwapRef = useRef<{ pair: string; time: number }>({
     pair: "",
@@ -350,7 +352,7 @@ export default function DashboardPage() {
                   size="small"
                   onClick={undoDashboard}
                   disabled={!canUndo}
-                  title="Undo last change (Cmd+Z)"
+                  title={`Undo last change (${formatShortcut("Cmd+Z", isMac)})`}
                   className="gap-1.5"
                 >
                   <RotateCcw className="w-3 h-3" />
@@ -458,7 +460,7 @@ export default function DashboardPage() {
             const isOver = dragOverIndex === index;
 
             return (
-              <motion.div
+              <m.div
                 key={w.id}
                 layout="position"
                 transition={SPRING_NAV_GLIDE}
@@ -521,7 +523,7 @@ export default function DashboardPage() {
                   onRemove={() => removeFromDashboard(w.id)}
                   onContextMenu={handleContextMenu}
                 />
-              </motion.div>
+              </m.div>
             );
           })}
           </div>
