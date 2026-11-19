@@ -23,7 +23,8 @@ export function smsDraft(phone: string | null | undefined, message: string) {
 }
 
 export function isMessageDraftUrl(input: string) {
-  if (!input || input.length > 16_000 || /[\r\n]/.test(input)) return false;
+  if (!input || input.length > 16_000 || /[\x00-\x1f\x7f]/.test(input))
+    return false;
   try {
     const url = new URL(input);
     if (url.hash || url.username || url.password || url.port) return false;

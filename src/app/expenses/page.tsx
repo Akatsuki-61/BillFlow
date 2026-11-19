@@ -19,11 +19,12 @@ import {
   EmptyState,
 } from "@/components/ui/Workspace";
 
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
-import { motion } from "motion/react";
+import { MotionPresence } from "@/components/ui/MotionSurface";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE, listRowTransition } from "@/lib/motion";
+import { useToast } from "@/context/ToastContext";
 
-import React, { useState, useMemo, useRef, useEffect, Suspense } from "react";
+import React, { useState, useMemo, Suspense } from "react";
 import {
   Download,
   Printer,
@@ -36,19 +37,20 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  CheckCircle2,
-  AlertCircle,
   DollarSign,
   Cpu,
   Server,
   Search,
   Receipt,
+  Pencil,
   Trash2,
   RotateCcw,
+  Upload,
 } from "lucide-react";
-import { useExpenses, useData } from "@/lib/data/DataProvider";
+import { useExpenses, useInvoices, useData } from "@/lib/data/DataProvider";
 import type { ExpenseItem } from "@/types/expenses";
-import type { Currency } from "@/types/billing";
+import type { Currency, InvoiceWithClient } from "@/types/billing";
+import type { ChosenAttachmentFile } from "@/types/workflow";
 import { formatCents, formatDateDisplay } from "@/lib/format";
 import {
   escapeCsvField,
@@ -134,12 +136,16 @@ const EXPENSE_CATEGORY_OPTIONS: SelectOption[] = [
 ];
 
 /** Builds an RFC 4180 CSV report for expenses with per-currency totals. */
-function generateExpensesCsv(items: ExpenseItem[]): string {
+function generateExpensesCsv(
+  items: ExpenseItem[],
+  invoiceMap: Map<string, InvoiceWithClient>,
+): string {
   const headers = [
     "Date",
     "Merchant",
     "Description",
     "Category",
+    "Linked Invoice",
     "Currency",
     "Amount",
     "Tax Deductible",
@@ -153,12 +159,15 @@ function generateExpensesCsv(items: ExpenseItem[]): string {
       .map((attachment) => attachment.originalName)
       .filter(Boolean)
       .join("; ");
+    const linked = item.invoiceId ? invoiceMap.get(item.invoiceId) : undefined;
+    const linkedLabel = linked ? `${linked.code} (${linked.clientName})` : "";
 
     return [
       escapeCsvField(item.incurredAt || ""),
       escapeCsvField(item.merchant),
       escapeCsvField(item.description || ""),
       escapeCsvField(item.category),
+      escapeCsvField(linkedLabel),
       escapeCsvField(item.currency),
       escapeCsvField(centsToDecimalString(item.amountCents)),
       escapeCsvField(item.deductible ? "Yes" : "No"),
@@ -191,6 +200,7 @@ function generateExpensesCsv(items: ExpenseItem[]): string {
           `Deductible: ${centsToDecimalString(deductibleCents)} ${currency}`,
         ),
         "",
+        "",
         escapeCsvField(currency),
         escapeCsvField(centsToDecimalString(totalCents)),
         "",
@@ -217,23 +227,14 @@ function ExpensesContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ExpenseItem | null>(
+    null,
+  );
   const [deletingExpense, setDeletingExpense] = useState<{
     id: string;
     merchant: string;
   } | null>(null);
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
+  const { showToast } = useToast();
 
   const {
     expenses,
@@ -243,6 +244,11 @@ function ExpensesContent() {
     deleteExpense,
     attachExpenseReceipt,
   } = useExpenses({ category: selectedCategory });
+  const { allInvoices } = useInvoices();
+  const invoiceMap = useMemo(
+    () => new Map(allInvoices.map((inv) => [inv.id, inv])),
+    [allInvoices],
+  );
 
   const { workflow, activeCurrency } = useData();
   const reporting = useReportingData();
@@ -255,8 +261,14 @@ function ExpensesContent() {
     currency: activeCurrency || ("LKR" as Currency),
     date: localDateKey(new Date()),
     deductible: true,
-    receiptAttached: false,
+    invoiceId: "",
   });
+  const [stagedReceipt, setStagedReceipt] =
+    useState<ChosenAttachmentFile | null>(null);
+  const [isDraggingModalReceipt, setIsDraggingModalReceipt] = useState(false);
+  const [dragOverExpenseId, setDragOverExpenseId] = useState<string | null>(
+    null,
+  );
   const [hasExpenseDraft, setHasExpenseDraft] = useState(false);
 
   const isExpenseFormDirty = () => {
@@ -293,19 +305,53 @@ function ExpensesContent() {
   };
 
   const closeLogExpenseModal = (saveDraft = true) => {
-    if (saveDraft) {
+    if (saveDraft && !editingExpense) {
       saveExpenseDraft();
     }
     setIsLogModalOpen(false);
+    setEditingExpense(null);
+    setStagedReceipt(null);
+    setIsDraggingModalReceipt(false);
   };
 
   const openLogExpenseModal = async () => {
+    setEditingExpense(null);
+    setStagedReceipt(null);
+    setIsDraggingModalReceipt(false);
+    setFormData({
+      merchant: "",
+      description: "",
+      category: "SOFTWARE",
+      amount: "",
+      currency: activeCurrency || ("LKR" as Currency),
+      date: localDateKey(new Date()),
+      deductible: true,
+      invoiceId: "",
+    });
     try {
       const saved = await workspaceDraft("billflow_draft_expense");
       setHasExpenseDraft(Boolean(saved));
     } catch {
       setHasExpenseDraft(false);
     }
+    setIsLogModalOpen(true);
+  };
+
+  const openEditExpenseModal = (item: ExpenseItem) => {
+    setEditingExpense(item);
+    setStagedReceipt(null);
+    setIsDraggingModalReceipt(false);
+    setHasExpenseDraft(false);
+    setFormData({
+      merchant: item.merchant,
+      description: item.description || "",
+      category: item.category || "SOFTWARE",
+      amount: (item.amountCents / 100).toFixed(2),
+      currency: item.currency,
+      date: item.incurredAt || localDateKey(new Date()),
+      deductible: Boolean(item.deductible),
+      invoiceId: item.invoiceId || "",
+    });
     setIsLogModalOpen(true);
   };
 
@@ -321,18 +367,20 @@ function ExpensesContent() {
     return true;
   });
 
-  const showToast = (
-    message: string,
-    type: "success" | "error" = "success",
-  ) => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
+  const stageExpenseReceiptFile = async (file: File) => {
+    if (file.size <= 0 || file.size > 20 * 1024 * 1024) {
+      showToast("Receipt must be a non-empty file smaller than 20 MB.", "error");
+      return null;
     }
-    setNotification({ message, type });
-    toastTimerRef.current = setTimeout(() => {
-      setNotification(null);
-      toastTimerRef.current = null;
-    }, 3500);
+    if (workflow.attachments.stageFile) {
+      return workflow.attachments.stageFile(file);
+    }
+    if (workflow.attachments.stageDroppedFile) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      return workflow.attachments.stageDroppedFile(file.name, bytes);
+    }
+    showToast("Receipt staging is unavailable in this environment.", "error");
+    return null;
   };
 
   const toggleDeductible = async (item: ExpenseItem) => {
@@ -375,7 +423,7 @@ function ExpensesContent() {
     }));
   };
 
-  const handleCreateExpense = async (e: React.FormEvent) => {
+  const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.merchant.trim() || !formData.amount) return;
 
@@ -385,6 +433,32 @@ function ExpensesContent() {
     const amountCents = Math.round(parsedAmount * 100);
 
     try {
+      if (editingExpense) {
+        const updated = await updateExpense(editingExpense.id, {
+          merchant: formData.merchant.trim(),
+          description:
+            formData.description.trim() || "General operational expense",
+          category: formData.category,
+          amountCents,
+          currency: (formData.currency as Currency) || activeCurrency || "LKR",
+          incurredAt: formData.date,
+          deductible: formData.deductible,
+          invoiceId: formData.invoiceId || null,
+        });
+        if (stagedReceipt) {
+          await workflow.attachments.select(
+            { type: "expense", id: updated.id },
+            crypto.randomUUID(),
+            stagedReceipt.path,
+          );
+        }
+        closeLogExpenseModal(false);
+        showToast(
+          `Updated expense of ${formatCents(amountCents, formData.currency)} for ${updated.merchant}.`,
+        );
+        return;
+      }
+
       const created = await createExpense({
         merchant: formData.merchant.trim(),
         description:
@@ -394,14 +468,19 @@ function ExpensesContent() {
         currency: (formData.currency as Currency) || activeCurrency || "LKR",
         incurredAt: formData.date,
         deductible: formData.deductible,
+        invoiceId: formData.invoiceId || null,
       });
 
-      if (formData.receiptAttached && created?.id) {
+      if (stagedReceipt && created?.id) {
         const requestId = crypto.randomUUID();
         try {
-          await attachExpenseReceipt(created.id, requestId);
+          await workflow.attachments.select(
+            { type: "expense", id: created.id },
+            requestId,
+            stagedReceipt.path,
+          );
         } catch (attErr) {
-          console.error("Receipt attach cancelled or failed:", attErr);
+          console.error("Receipt attach failed:", attErr);
         }
       }
 
@@ -415,7 +494,7 @@ function ExpensesContent() {
         currency: activeCurrency || "LKR",
         date: localDateKey(new Date()),
         deductible: true,
-        receiptAttached: false,
+        invoiceId: "",
       });
       showToast(
         `Logged expense of ${formatCents(amountCents, formData.currency)} for ${created.merchant}!`,
@@ -482,18 +561,22 @@ function ExpensesContent() {
       return allExpenses.filter((expense) => expense.id === openedExpenseId);
     if (!searchQuery.trim()) return expenses;
     const q = searchQuery.toLowerCase().trim();
-    return expenses.filter(
-      (e) =>
+    return expenses.filter((e) => {
+      const linked = e.invoiceId ? invoiceMap.get(e.invoiceId) : undefined;
+      return (
         e.merchant.toLowerCase().includes(q) ||
         (e.description && e.description.toLowerCase().includes(q)) ||
-        e.category.toLowerCase().includes(q),
-    );
-  }, [expenses, searchQuery, openedExpenseId, allExpenses]);
+        e.category.toLowerCase().includes(q) ||
+        Boolean(linked?.code.toLowerCase().includes(q)) ||
+        Boolean(linked?.clientName.toLowerCase().includes(q))
+      );
+    });
+  }, [expenses, searchQuery, openedExpenseId, allExpenses, invoiceMap]);
 
   const handleExportReport = () => {
     try {
       const todayStr = localDateKey();
-      const csv = generateExpensesCsv(searchedExpenses);
+      const csv = generateExpensesCsv(searchedExpenses, invoiceMap);
       const isFiltered =
         Boolean(openedExpenseId) ||
         selectedCategory !== "All Categories" ||
@@ -519,36 +602,20 @@ function ExpensesContent() {
   };
 
   const itemsPerPage = 8;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(searchedExpenses.length / itemsPerPage),
+  );
+  const safePage = Math.min(currentPage, totalPages);
   const paginatedExpenses = useMemo(() => {
     return searchedExpenses.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage,
+      (safePage - 1) * itemsPerPage,
+      safePage * itemsPerPage,
     );
-  }, [searchedExpenses, currentPage]);
+  }, [searchedExpenses, safePage]);
 
   return (
     <div className="workspace-page motion-page">
-      {/* Toast Notification */}
-      <MotionPresence>
-        {notification && (
-          <MotionSurface
-            kind="toast"
-            className={`fixed top-14 right-6 z-[9999] px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
-              notification.type === "error"
-                ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
-                : "bg-surface-neutral-900 border-line-neutral-700 text-white"
-            }`}
-          >
-            {notification.type === "error" ? (
-              <AlertCircle className="w-5 h-5 text-content-rose-400 shrink-0" />
-            ) : (
-              <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
-            )}
-            <span>{notification.message}</span>
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
       {/* Page Header */}
       <PageHeader
         title="Expenses"
@@ -652,7 +719,8 @@ function ExpensesContent() {
           const receipts = records.filter(
             (expense) => expense.attachments?.length,
           ).length;
-          const money = (value: number) => formatCents(value, activeCurrency);
+          const money = (value: number) =>
+            formatCents(value, reporting.currency);
           return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <section className="ui-card p-6 space-y-5">
@@ -661,7 +729,7 @@ function ExpensesContent() {
                   <div className="summary-value">{money(total)}</div>
                   <p className="summary-caption">
                     {records.length} expense{records.length === 1 ? "" : "s"} ·{" "}
-                    {activeCurrency}
+                    {reporting.currency}
                   </p>
                 </div>
                 <DataBreakdown
@@ -714,10 +782,10 @@ function ExpensesContent() {
               <section className="ui-card p-6 space-y-5">
                 <h2>Monthly Spending</h2>
                 <p className="summary-caption">
-                  Recorded by expense date · {activeCurrency}
+                  Recorded by expense date · {reporting.currency}
                 </p>
                 <MonthlyBars
-                  label={`Expenses · last six months · ${activeCurrency}`}
+                  label={`Expenses · last six months · ${reporting.currency}`}
                   formatValue={money}
                   points={recentMonths().map((month) => ({
                     ...month,
@@ -759,26 +827,44 @@ function ExpensesContent() {
                 <th className="py-3.5 px-6 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest text-center">
                   RECEIPT
                 </th>
-                <th className="w-12 py-3.5 px-4"></th>
+                <th className="w-24 py-3.5 px-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line-neutral-100 text-xs">
-              {expenses.length === 0 ? (
+              {searchedExpenses.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-0 text-center">
                     <EmptyState
-                      title="No expenses logged"
-                      description="Track business, travel, software, and office expenses for tax deductions."
+                      title={
+                        expenses.length === 0
+                          ? "No expenses logged"
+                          : "No matching expenses"
+                      }
+                      description={
+                        expenses.length === 0
+                          ? "Track business, travel, software, and office expenses for tax deductions."
+                          : "Try clearing or adjusting your search query."
+                      }
                       icon={<Receipt />}
                     >
-                      <Button
-                        variant="primary"
-                        onClick={openLogExpenseModal}
-                        className="mt-4"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Log Expense</span>
-                      </Button>
+                      {expenses.length === 0 ? (
+                        <Button
+                          variant="primary"
+                          onClick={openLogExpenseModal}
+                          className="mt-4"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Log Expense</span>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          onClick={() => setSearchQuery("")}
+                          className="mt-4"
+                        >
+                          Clear search
+                        </Button>
+                      )}
                     </EmptyState>
                   </td>
                 </tr>
@@ -792,7 +878,7 @@ function ExpensesContent() {
                     : null;
 
                   return (
-                    <motion.tr
+                    <m.tr
                       key={item.id}
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -819,6 +905,16 @@ function ExpensesContent() {
                         <div className="text-content-neutral-400 text-xs mt-0.5 max-w-md truncate font-normal">
                           {item.description || "Operational expense"}
                         </div>
+                        {item.invoiceId && invoiceMap.get(item.invoiceId) && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-accent-faint/70 text-accent border border-border-accent/40">
+                              {invoiceMap.get(item.invoiceId)!.code}
+                              {invoiceMap.get(item.invoiceId)!.clientName
+                                ? ` · ${invoiceMap.get(item.invoiceId)!.clientName}`
+                                : ""}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Category */}
@@ -848,15 +944,62 @@ function ExpensesContent() {
                       </td>
 
                       {/* Receipt */}
-                      <td className="py-4 px-6 text-center">
+                      <td
+                        className="py-4 px-6 text-center"
+                        onDragOver={(e) => {
+                          if (e.dataTransfer?.types?.includes("Files")) {
+                            e.preventDefault();
+                            setDragOverExpenseId(item.id);
+                          }
+                        }}
+                        onDragLeave={(e) => {
+                          if (
+                            !e.currentTarget.contains(
+                              e.relatedTarget as Node | null,
+                            )
+                          ) {
+                            setDragOverExpenseId((cur) =>
+                              cur === item.id ? null : cur,
+                            );
+                          }
+                        }}
+                        onDrop={async (e) => {
+                          e.preventDefault();
+                          setDragOverExpenseId(null);
+                          const file = e.dataTransfer.files?.[0];
+                          if (!file) return;
+                          try {
+                            const staged = await stageExpenseReceiptFile(file);
+                            if (!staged) return;
+                            await workflow.attachments.select(
+                              { type: "expense", id: item.id },
+                              crypto.randomUUID(),
+                              staged.path,
+                            );
+                            showToast(`Attached receipt ${staged.name}`);
+                          } catch (err) {
+                            showToast(
+                              err instanceof Error
+                                ? err.message
+                                : "Could not attach receipt file.",
+                              "error",
+                            );
+                          }
+                        }}
+                      >
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleAttachReceiptToRow(item)}
+                          className={
+                            dragOverExpenseId === item.id
+                              ? "ring-2 ring-accent bg-accent-faint/60"
+                              : ""
+                          }
                           title={
                             hasReceipt
                               ? `View ${receiptName}`
-                              : "Attach Receipt file"
+                              : "Click or drop PDF/image receipt"
                           }
                         >
                           <Paperclip
@@ -865,23 +1008,35 @@ function ExpensesContent() {
                         </Button>
                       </td>
 
-                      {/* Delete */}
-                      <td className="py-4 px-4 text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            setDeletingExpense({
-                              id: item.id,
-                              merchant: item.merchant,
-                            })
-                          }
-                          title="Delete expense"
-                        >
-                          <Trash2 className="w-4 h-4 text-content-neutral-400 hover:text-red-600 transition-colors" />
-                        </Button>
+                      {/* Actions */}
+                      <td className="py-4 px-4 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditExpenseModal(item)}
+                            title="Edit expense"
+                            aria-label={`Edit expense for ${item.merchant}`}
+                          >
+                            <Pencil className="w-4 h-4 text-content-neutral-400 hover:text-content-neutral-900 transition-colors" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              setDeletingExpense({
+                                id: item.id,
+                                merchant: item.merchant,
+                              })
+                            }
+                            title="Delete expense"
+                            aria-label={`Delete expense for ${item.merchant}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-content-neutral-400 hover:text-red-600 transition-colors" />
+                          </Button>
+                        </div>
                       </td>
-                    </motion.tr>
+                    </m.tr>
                   );
                 })
               )}
@@ -895,9 +1050,9 @@ function ExpensesContent() {
             Showing{" "}
             {searchedExpenses.length === 0
               ? 0
-              : (currentPage - 1) * itemsPerPage + 1}{" "}
-            to {Math.min(currentPage * itemsPerPage, searchedExpenses.length)}{" "}
-            of {searchedExpenses.length} entries
+              : (safePage - 1) * itemsPerPage + 1}{" "}
+            to {Math.min(safePage * itemsPerPage, searchedExpenses.length)} of{" "}
+            {searchedExpenses.length} entries
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -906,18 +1061,18 @@ function ExpensesContent() {
               variant="ghost"
               size="icon"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
+              disabled={safePage === 1}
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
 
             {Array.from(
               {
-                length: Math.max(1, Math.ceil(expenses.length / itemsPerPage)),
+                length: totalPages,
               },
               (_, i) => i + 1,
             ).map((pageNumber) => {
-              const isActive = currentPage === pageNumber;
+              const isActive = safePage === pageNumber;
               return (
                 <button
                   key={pageNumber}
@@ -929,7 +1084,7 @@ function ExpensesContent() {
                   }`}
                 >
                   {isActive && (
-                    <motion.span
+                    <m.span
                       layoutId="expenses-page-pill"
                       transition={SPRING_NAV_GLIDE}
                       className="absolute inset-0 rounded bg-accent-deep-solid shadow-xs"
@@ -945,17 +1100,9 @@ function ExpensesContent() {
               variant="ghost"
               size="icon"
               onClick={() =>
-                setCurrentPage((p) =>
-                  Math.min(
-                    Math.max(1, Math.ceil(expenses.length / itemsPerPage)),
-                    p + 1,
-                  ),
-                )
+                setCurrentPage((p) => Math.min(totalPages, p + 1))
               }
-              disabled={
-                currentPage >=
-                Math.max(1, Math.ceil(expenses.length / itemsPerPage))
-              }
+              disabled={safePage >= totalPages}
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -963,7 +1110,7 @@ function ExpensesContent() {
         </div>
       </div>
 
-      {/* Log Expense Modal */}
+      {/* Log / Edit Expense Modal */}
       <MotionPresence>
         {isLogModalOpen && (
           <Dialog onClose={() => closeLogExpenseModal()} width={620}>
@@ -974,15 +1121,19 @@ function ExpensesContent() {
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-content-neutral-900">
-                    Log Business Expense
+                    {editingExpense
+                      ? "Edit Business Expense"
+                      : "Log Business Expense"}
                   </h3>
                   <p className="text-xs text-content-neutral-400">
-                    Track a business cost and keep its receipt.
+                    {editingExpense
+                      ? "Update details, amount, date, or deductibility."
+                      : "Track a business cost and keep its receipt."}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {hasExpenseDraft && (
+                {!editingExpense && hasExpenseDraft && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -997,85 +1148,87 @@ function ExpensesContent() {
                 )}
               </div>
             </div>
-            <div className="app-dialog-banner">
-              {/* Presets */}
-              <div>
-                <label className="block text-[11px] font-semibold text-content-neutral-400 uppercase tracking-wider mb-2">
-                  Quick expense presets
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() =>
-                      applyPreset({
-                        merchant: "Adobe Creative Cloud",
-                        description: "Creative Cloud All Apps Subscription",
-                        category: "SOFTWARE",
-                        amount: "54.99",
-                        currency: "USD",
-                      })
-                    }
-                    className="justify-start gap-2.5 px-3"
-                  >
-                    <AdobeBrandIcon className="w-4 h-4" />
-                    <span>Adobe CC ($54.99)</span>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() =>
-                      applyPreset({
-                        merchant: "Anthropic",
-                        description: "Claude AI API Tokens",
-                        category: "AI INFRASTRUCTURE",
-                        amount: "42.50",
-                        currency: "USD",
-                      })
-                    }
-                    className="justify-start gap-2.5 px-3"
-                  >
-                    <AnthropicBrandIcon className="w-4 h-4" />
-                    <span>Claude AI API ($42.50)</span>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() =>
-                      applyPreset({
-                        merchant: "OpenAI",
-                        description: "GPT-4o API Tokens & Platform",
-                        category: "AI INFRASTRUCTURE",
-                        amount: "30.00",
-                        currency: "USD",
-                      })
-                    }
-                    className="justify-start gap-2.5 px-3"
-                  >
-                    <OpenAIBrandIcon className="w-4 h-4" />
-                    <span>OpenAI API ($30.00)</span>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() =>
-                      applyPreset({
-                        merchant: "Vercel Inc.",
-                        description: "Vercel Pro Team Hosting",
-                        category: "HOSTING",
-                        amount: "20.00",
-                        currency: "USD",
-                      })
-                    }
-                    className="justify-start gap-2.5 px-3"
-                  >
-                    <VercelBrandIcon className="w-3.5 h-3.5" />
-                    <span>Vercel Pro ($20.00)</span>
-                  </Button>
+            {!editingExpense && (
+              <div className="app-dialog-banner">
+                {/* Presets */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-content-neutral-400 uppercase tracking-wider mb-2">
+                    Quick expense presets
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() =>
+                        applyPreset({
+                          merchant: "Adobe Creative Cloud",
+                          description: "Creative Cloud All Apps Subscription",
+                          category: "SOFTWARE",
+                          amount: "54.99",
+                          currency: "USD",
+                        })
+                      }
+                      className="justify-start gap-2.5 px-3"
+                    >
+                      <AdobeBrandIcon className="w-4 h-4" />
+                      <span>Adobe CC ($54.99)</span>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() =>
+                        applyPreset({
+                          merchant: "Anthropic",
+                          description: "Claude AI API Tokens",
+                          category: "AI INFRASTRUCTURE",
+                          amount: "42.50",
+                          currency: "USD",
+                        })
+                      }
+                      className="justify-start gap-2.5 px-3"
+                    >
+                      <AnthropicBrandIcon className="w-4 h-4" />
+                      <span>Claude AI API ($42.50)</span>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() =>
+                        applyPreset({
+                          merchant: "OpenAI",
+                          description: "GPT-4o API Tokens & Platform",
+                          category: "AI INFRASTRUCTURE",
+                          amount: "30.00",
+                          currency: "USD",
+                        })
+                      }
+                      className="justify-start gap-2.5 px-3"
+                    >
+                      <OpenAIBrandIcon className="w-4 h-4" />
+                      <span>OpenAI API ($30.00)</span>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() =>
+                        applyPreset({
+                          merchant: "Vercel Inc.",
+                          description: "Vercel Pro Team Hosting",
+                          category: "HOSTING",
+                          amount: "20.00",
+                          currency: "USD",
+                        })
+                      }
+                      className="justify-start gap-2.5 px-3"
+                    >
+                      <VercelBrandIcon className="w-3.5 h-3.5" />
+                      <span>Vercel Pro ($20.00)</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-            <form onSubmit={handleCreateExpense} className="app-dialog-form">
+            )}
+            <form onSubmit={handleSaveExpense} className="app-dialog-form">
               <div className="app-dialog-body">
                 {/* Row 1: Merchant & Category */}
                 <div className="grid grid-cols-2 gap-3.5">
@@ -1176,20 +1329,50 @@ function ExpensesContent() {
                   </div>
                 </div>
 
-                {/* Row 3: Description */}
-                <div>
-                  <label className="block mb-1.5 text-content-neutral-700 font-semibold">
-                    Expense Description
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Monthly developer tools subscription"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
-                  />
+                {/* Row 3: Description & Linked Invoice */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block mb-1.5 text-content-neutral-700 font-semibold">
+                      Expense Description
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Monthly developer tools subscription"
+                      value={formData.description}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          description: e.target.value,
+                        })
+                      }
+                      className="ui-field w-full px-3.5 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="expense-linked-invoice"
+                      className="block mb-1.5 text-content-neutral-700 font-semibold"
+                    >
+                      Linked Invoice / Project (Optional)
+                    </label>
+                    <select
+                      id="expense-linked-invoice"
+                      value={formData.invoiceId}
+                      onChange={(e) =>
+                        setFormData({ ...formData, invoiceId: e.target.value })
+                      }
+                      className="ui-field w-full px-3 border border-line-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    >
+                      <option value="">Overhead (No linked invoice)</option>
+                      {allInvoices.map((inv) => (
+                        <option key={inv.id} value={inv.id}>
+                          {inv.code} · {inv.clientName}
+                          {inv.title ? ` (${inv.title})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="p-3.5 bg-surface-neutral-50 rounded-xl border border-line-neutral-100 space-y-3">
@@ -1215,26 +1398,99 @@ function ExpensesContent() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-line-neutral-200/60">
-                    <div>
-                      <span className="font-semibold text-content-neutral-800 block text-xs">
-                        Attach Receipt
-                      </span>
-                      <span className="text-content-neutral-400 text-[11px] font-normal">
-                        Store local proof of payment
-                      </span>
+                  <div className="pt-2.5 border-t border-line-neutral-200/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-semibold text-content-neutral-800 block text-xs">
+                          Receipt Proof (Optional)
+                        </span>
+                        <span className="text-content-neutral-400 text-[11px] font-normal">
+                          Drop a PDF, PNG, JPEG, or WebP receipt or choose a file
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="small"
+                        onClick={async () => {
+                          if (!workflow.attachments.chooseFile) return;
+                          try {
+                            const chosen = await workflow.attachments.chooseFile();
+                            if (chosen) setStagedReceipt(chosen);
+                          } catch (err) {
+                            showToast(
+                              err instanceof Error
+                                ? err.message
+                                : "Could not select receipt.",
+                              "error",
+                            );
+                          }
+                        }}
+                      >
+                        Choose Receipt
+                      </Button>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={formData.receiptAttached}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          receiptAttached: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 text-accent rounded-sm focus:ring-accent"
-                    />
+
+                    <div
+                      onDragOver={(e) => {
+                        if (e.dataTransfer?.types?.includes("Files")) {
+                          e.preventDefault();
+                          setIsDraggingModalReceipt(true);
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        if (
+                          !e.currentTarget.contains(
+                            e.relatedTarget as Node | null,
+                          )
+                        ) {
+                          setIsDraggingModalReceipt(false);
+                        }
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        setIsDraggingModalReceipt(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (!file) return;
+                        try {
+                          const staged = await stageExpenseReceiptFile(file);
+                          if (staged) setStagedReceipt(staged);
+                        } catch (err) {
+                          showToast(
+                            err instanceof Error
+                              ? err.message
+                              : "Could not stage receipt file.",
+                            "error",
+                          );
+                        }
+                      }}
+                      className={`rounded-lg border border-dashed px-3 py-2.5 text-xs transition-colors flex items-center justify-between gap-2 ${
+                        isDraggingModalReceipt
+                          ? "border-accent bg-accent-faint/50 text-accent"
+                          : "border-line-neutral-200 bg-surface text-content-neutral-500"
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2 min-w-0 truncate">
+                        <Upload className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">
+                          {stagedReceipt
+                            ? `Ready to attach: ${stagedReceipt.name}`
+                            : editingExpense?.attachments?.length
+                              ? `${editingExpense.attachments.length} receipt attached (${editingExpense.attachments.map((a) => a.originalName).join(", ")})`
+                              : "Drop receipt file here"}
+                        </span>
+                      </span>
+                      {stagedReceipt && (
+                        <button
+                          type="button"
+                          onClick={() => setStagedReceipt(null)}
+                          aria-label="Clear staged receipt"
+                          className="p-0.5 rounded hover:bg-surface-neutral-100 text-content-neutral-500 shrink-0 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1247,7 +1503,7 @@ function ExpensesContent() {
                   Cancel
                 </Button>
                 <Button variant="primary" type="submit">
-                  Save Expense
+                  {editingExpense ? "Save Changes" : "Save Expense"}
                 </Button>
               </div>
             </form>

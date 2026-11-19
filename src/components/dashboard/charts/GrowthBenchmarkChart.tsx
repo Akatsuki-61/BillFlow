@@ -6,6 +6,7 @@ import {
   type ChartConfig,
 } from "@/components/evilcharts/charts/echarts-area-chart";
 import { useData } from "@/lib/data/DataProvider";
+import { buildGrowthBenchmarkData } from "@/lib/widgets/chartData";
 
 const config = {
   completed: {
@@ -16,37 +17,24 @@ const config = {
 
 export function GrowthBenchmarkChart() {
   const { tasks } = useData();
-  const data = useMemo(() => {
-    const now = new Date();
-    now.setHours(23, 59, 59, 999);
-    return Array.from({ length: 8 }, (_, index) => {
-      const end = new Date(now);
-      end.setDate(end.getDate() - (7 - index) * 7);
-      const start = new Date(end);
-      start.setDate(start.getDate() - 7);
-      return {
-        date: end.toLocaleDateString("en", { month: "short", day: "numeric" }),
-        completed: tasks.filter(
-          (task) =>
-            task.status === "done" &&
-            task.completedAt &&
-            new Date(task.completedAt) > start &&
-            new Date(task.completedAt) <= end,
-        ).length,
-      };
-    });
-  }, [tasks]);
+  const data = useMemo(() => buildGrowthBenchmarkData(tasks), [tasks]);
+  const hasAny = data.some((d) => d.completed > 0);
+
   return (
-    <div className="flex h-full w-full min-h-[300px] flex-col p-4">
-      <p className="summary-caption">
-        Completed deliverables per week · last eight weeks. Each task is counted
-        once, on its completion date.
+    <div className="flex h-full w-full min-h-[260px] flex-col">
+      <p className="summary-caption !mt-0 mb-2">
+        Completed deliverables per week across the last 8 weeks.
       </p>
+      {!hasAny && (
+        <div className="mb-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No completed tasks in the last 8 weeks. Move tasks to Done to see weekly output.
+        </div>
+      )}
       <EChartsAreaChart
         data={data}
         config={config}
         xDataKey="date"
-        className="mt-4 min-h-[220px] w-full flex-1"
+        className="mt-2 min-h-[205px] w-full flex-1"
         curveType="linear"
       >
         <EChartsAreaChart.Grid />

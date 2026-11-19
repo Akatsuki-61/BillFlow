@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import { IconCrossfade } from "@/components/ui/MotionSurface";
 import {
   SPRING_MODAL_SHEET,
@@ -171,7 +171,7 @@ export function ProfileGateModal() {
   const [deletePassword, setDeletePassword] = useState("");
 
   // Onboarding state
-  const [studioName, setStudioName] = useState("Chethaka Lakshitha");
+  const [studioName, setStudioName] = useState("");
   const [studioCurrency, setStudioCurrency] = useState<Currency>("USD");
   const [onboardingSlots, setOnboardingSlots] = useState<
     Array<OnboardingProfileSlot & { enabled: boolean }>
@@ -234,7 +234,7 @@ export function ProfileGateModal() {
       setBusy(false);
 
       if (modalMode === "onboarding") {
-        setStudioName(settings?.businessName?.trim() || "Chethaka Lakshitha");
+        setStudioName(settings?.businessName?.trim() || "");
         const initialCurr =
           (settings?.defaultCurrency as Currency) || "USD";
         setStudioCurrency(initialCurr);
@@ -603,6 +603,13 @@ export function ProfileGateModal() {
           seedRoleCatalog: s.seedRoleCatalog,
         })),
       });
+      if (typeof window !== "undefined") {
+        setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent("billflow:start-tour", { detail: { auto: true } }),
+          );
+        }, 350);
+      }
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Failed to complete onboarding.",
@@ -624,7 +631,7 @@ export function ProfileGateModal() {
   return (
     <AnimatePresence initial={false}>
       {isGateOpen && (
-        <motion.div
+        <m.div
           key="profile-gate-modal"
           role="dialog"
           aria-modal="true"
@@ -635,8 +642,8 @@ export function ProfileGateModal() {
           className="fixed inset-0 z-[120] flex flex-col overflow-y-auto select-none text-white app-no-drag"
           style={{
             backgroundColor: "rgba(8, 9, 13, 0.985)",
-            backdropFilter: "blur(64px) saturate(140%)",
-            WebkitBackdropFilter: "blur(64px) saturate(140%)",
+            backdropFilter: "blur(20px) saturate(140%)",
+            WebkitBackdropFilter: "blur(20px) saturate(140%)",
           }}
         >
           {/* Subtle Ambient Radial Glow that responds to active/hovered profile */}
@@ -672,7 +679,7 @@ export function ProfileGateModal() {
               type="button"
               onClick={() => {
                 setStudioName(
-                  settings?.businessName?.trim() || "Chethaka Lakshitha",
+                  settings?.businessName?.trim() || "",
                 );
                 setView("onboarding");
               }}
@@ -709,7 +716,7 @@ export function ProfileGateModal() {
       <div className="relative z-10 flex-1 w-full overflow-y-auto">
       <AnimatePresence initial={false}>
       {view === "select" && (
-        <motion.div
+        <m.div
           key="view-select"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
@@ -736,7 +743,7 @@ export function ProfileGateModal() {
             {profiles.map((profile, idx) => {
               const isCurrent = profile.id === activeProfile.id;
               return (
-                <motion.button
+                <m.button
                   key={profile.id}
                   type="button"
                   disabled={busy}
@@ -783,7 +790,7 @@ export function ProfileGateModal() {
                       </span>
                     ) : null}
                   </div>
-                </motion.button>
+                </m.button>
               );
             })}
 
@@ -827,14 +834,14 @@ export function ProfileGateModal() {
               {isManageMode ? "Done" : "Manage Profiles"}
             </button>
           </div>
-        </motion.div>
+        </m.div>
       )}
 
       {/* =====================================================================
           VIEW 2: NETFLIX PROFILE LOCK / PASSCODE UNLOCK STAGE
          ===================================================================== */}
       {view === "unlock" && unlockTarget && (
-        <motion.div
+        <m.div
           key="view-unlock"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
@@ -850,16 +857,16 @@ export function ProfileGateModal() {
             layoutId={`profile-avatar-${unlockTarget.id}`}
           />
 
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={detailSettleTransition(0)}
             className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-zinc-400"
           >
             {unlockTarget.name} · {unlockTarget.subtitle}
-          </motion.div>
+          </m.div>
 
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={detailSettleTransition(1)}
@@ -872,10 +879,10 @@ export function ProfileGateModal() {
                 ? "Enter your 4-digit PIN to access this workspace."
                 : "Enter your passcode to access this workspace."}
             </p>
-          </motion.div>
+          </m.div>
 
           <form onSubmit={handleUnlockFormSubmit} className="w-full space-y-6">
-            <motion.div
+            <m.div
               key={shakeCount}
               animate={shakeCount > 0 ? KEYFRAME_ERROR_SHAKE : undefined}
             >
@@ -884,7 +891,7 @@ export function ProfileGateModal() {
                   {[0, 1, 2, 3].map((idx) => {
                     const hasDigit = Boolean(unlockPinDigits[idx]);
                     return (
-                      <motion.div
+                      <m.div
                         key={idx}
                         animate={
                           hasDigit ? { scale: [1, 1.07, 1] } : { scale: 1 }
@@ -906,7 +913,7 @@ export function ProfileGateModal() {
                           aria-label={`PIN digit ${idx + 1}`}
                           className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-white/[0.05] border-2 border-white/20 focus:border-white focus:bg-white/[0.09] focus:shadow-[0_0_0_4px_rgba(255,255,255,0.14)] text-center text-2xl font-mono text-white outline-none transition-[border-color,background-color,box-shadow]"
                         />
-                      </motion.div>
+                      </m.div>
                     );
                   })}
                 </div>
@@ -941,11 +948,11 @@ export function ProfileGateModal() {
                   </button>
                 </div>
               )}
-            </motion.div>
+            </m.div>
 
             <AnimatePresence initial={false}>
               {errorMsg && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: -6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.95 }}
@@ -953,7 +960,7 @@ export function ProfileGateModal() {
                   className="px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium max-w-xs mx-auto"
                 >
                   {errorMsg}
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
@@ -984,14 +991,14 @@ export function ProfileGateModal() {
               </button>
             </div>
           </form>
-        </motion.div>
+        </m.div>
       )}
 
       {/* =====================================================================
           VIEW 3: PREMIUM EDITORIAL PROFILE CREATOR / EDITOR
          ===================================================================== */}
       {view === "form" && (
-        <motion.div
+        <m.div
           key="view-form"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
@@ -1136,7 +1143,7 @@ export function ProfileGateModal() {
                         type="text"
                         value={formName}
                         onChange={(e) => setFormName(e.target.value)}
-                        placeholder="e.g. Chethaka — AI"
+                        placeholder="e.g. Studio — AI Systems"
                         maxLength={60}
                         className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm text-white placeholder:text-zinc-500 outline-none transition-colors"
                       />
@@ -1249,7 +1256,7 @@ export function ProfileGateModal() {
                             }`}
                           >
                             {formLockMode === "pin" && (
-                              <motion.span
+                              <m.span
                                 layoutId="profile-lock-mode-pill"
                                 transition={SPRING_NAV_GLIDE}
                                 className="absolute inset-0 -z-10 rounded-lg bg-white"
@@ -1268,7 +1275,7 @@ export function ProfileGateModal() {
                             }`}
                           >
                             {formLockMode === "alphanumeric" && (
-                              <motion.span
+                              <m.span
                                 layoutId="profile-lock-mode-pill"
                                 transition={SPRING_NAV_GLIDE}
                                 className="absolute inset-0 -z-10 rounded-lg bg-white"
@@ -1415,14 +1422,14 @@ export function ProfileGateModal() {
               </div>
             </form>
           </div>
-        </motion.div>
+        </m.div>
       )}
 
       {/* =====================================================================
           VIEW 4: FULL-SCREEN ROLE ONBOARDING SETUP
          ===================================================================== */}
       {view === "onboarding" && (
-        <motion.div
+        <m.div
           key="view-onboarding"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
@@ -1456,7 +1463,7 @@ export function ProfileGateModal() {
                     type="text"
                     value={studioName}
                     onChange={(e) => setStudioName(e.target.value)}
-                    placeholder="Chethaka Lakshitha"
+                    placeholder="e.g. Alex Rivera or Apex Studio"
                     className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm text-white outline-none"
                   />
                 </div>
@@ -1486,7 +1493,7 @@ export function ProfileGateModal() {
 
               <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
                 {onboardingSlots.map((slot, idx) => (
-                  <motion.div
+                  <m.div
                     key={slot.role}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1572,7 +1579,7 @@ export function ProfileGateModal() {
                         />
                       )}
                     </div>
-                  </motion.div>
+                  </m.div>
                 ))}
               </div>
 
@@ -1599,11 +1606,11 @@ export function ProfileGateModal() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       )}
       </AnimatePresence>
       </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

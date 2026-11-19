@@ -42,6 +42,7 @@ export function ImageUpload({
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const change = async (file: File | null) => {
     setError("");
     setBusy(true);
@@ -64,7 +65,37 @@ export function ImageUpload({
     }
   };
   return (
-    <div className="space-y-2">
+    <div
+      onDragOver={(event) => {
+        if (event.dataTransfer?.types?.includes("Files")) {
+          event.preventDefault();
+          if (!busy) setIsDraggingOver(true);
+        }
+      }}
+      onDragLeave={(event) => {
+        if (
+          !event.currentTarget.contains(event.relatedTarget as Node | null)
+        ) {
+          setIsDraggingOver(false);
+        }
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setIsDraggingOver(false);
+        if (busy) return;
+        const file = event.dataTransfer.files?.[0];
+        if (!file) {
+          setError("Drop a PNG, JPEG, or WebP image file.");
+          return;
+        }
+        void change(file);
+      }}
+      className={`space-y-2 rounded-xl border p-2.5 transition-colors ${
+        isDraggingOver
+          ? "border-accent bg-accent-faint/40 border-dashed"
+          : "border-transparent p-0"
+      }`}
+    >
       <p className="text-xs font-medium">{label}</p>
       <div className="flex flex-wrap items-center gap-2">
         {value && (
@@ -98,7 +129,9 @@ export function ImageUpload({
           disabled={busy}
           onClick={() => input.current?.click()}
         >
-          Upload {signature ? "signature" : "photo"}
+          {isDraggingOver
+            ? `Drop ${signature ? "signature" : "image"} here`
+            : `Upload ${signature ? "signature" : "photo"}`}
         </Button>
         {value && (
           <Button

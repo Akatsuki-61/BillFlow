@@ -1,18 +1,16 @@
 "use client";
-import { localDateKey } from "@/lib/visual-metrics";
-import { useReportingData } from "@/context/ReportingContext";
 
 import { useMemo } from "react";
 import {
   EChartsAreaChart,
   type ChartConfig,
 } from "@/components/evilcharts/charts/echarts-area-chart";
-import { useActiveCurrency } from "@/lib/data/DataProvider";
-import { formatCents } from "@/lib/format";
+import { useReportingData } from "@/context/ReportingContext";
+import { buildPortfolioComparisonData } from "@/lib/widgets/chartData";
 
 const chartConfig = {
   web: {
-    label: "Other services",
+    label: "Core services",
     colors: { light: ["#2563eb"], dark: ["#3b82f6"] },
   },
   ai: {
@@ -22,129 +20,21 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function PortfolioComparisonChart() {
-  const { invoices } = useReportingData();
-  const { activeCurrency } = useActiveCurrency();
+  const { invoices, catalogItems, currency: activeCurrency } = useReportingData();
 
-  const { series, chartData, hasInvoices } = useMemo(() => {
-    let totalWebCents = 0;
-    let totalAiCents = 0;
-    const validInvoices = (invoices || []).filter(
-      (inv) => inv.status !== "DRAFT" && inv.currency === activeCurrency,
-    );
-
-    validInvoices.forEach((inv) => {
-      if (inv.items && inv.items.length > 0) {
-        inv.items.forEach((item) => {
-          const desc = `${item.description || ""}`.toLowerCase();
-          const isAi = /\bai\b|consulting|automation|agent/i.test(desc);
-          const itemCents = (item.quantity || 1) * (item.unitPriceCents || 0);
-          if (isAi) {
-            totalAiCents += itemCents;
-          } else {
-            totalWebCents += itemCents;
-          }
-        });
-      } else {
-        const text =
-          `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
-        const isAi = /\bai\b|consulting|automation|agent/i.test(text);
-        if (isAi) {
-          totalAiCents += inv.amountCents;
-        } else {
-          totalWebCents += inv.amountCents;
-        }
-      }
-    });
-
-    const totalPortfolioCents = totalWebCents + totalAiCents;
-    const webPct =
-      totalPortfolioCents > 0
-        ? Math.round((totalWebCents / totalPortfolioCents) * 100)
-        : 0;
-    const aiPct =
-      totalPortfolioCents > 0
-        ? Math.round((totalAiCents / totalPortfolioCents) * 100)
-        : 0;
-
-    const seriesData = [
-      {
-        key: "web",
-        label: "Other services",
-        color: "#2563eb",
-        pct: webPct,
-        formattedTotal: formatCents(totalWebCents, activeCurrency),
-      },
-      {
-        key: "ai",
-        label: "AI & consulting",
-        color: "#10b981",
-        pct: aiPct,
-        formattedTotal: formatCents(totalAiCents, activeCurrency),
-      },
-    ] as const;
-
-    // 14-day timeline
-    const days: Array<{ date: string; key: string; web: number; ai: number }> =
-      [];
-    const now = new Date();
-    const MS_PER_DAY = 86400000;
-
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * MS_PER_DAY);
-      const key = localDateKey(d);
-      const dateLabel = `${d.toLocaleString("default", { month: "short" })} ${String(d.getDate()).padStart(2, "0")}`;
-      days.push({ date: dateLabel, key, web: 0, ai: 0 });
-    }
-
-    validInvoices.forEach((inv) => {
-      if (!inv.issueDate) return;
-      const invDate = inv.issueDate.split("T")[0];
-      const target = days.find((d) => d.key === invDate);
-      if (!target) return;
-
-      if (inv.items && inv.items.length > 0) {
-        inv.items.forEach((item) => {
-          const desc = `${item.description || ""}`.toLowerCase();
-          const isAi = /\bai\b|consulting|automation|agent/i.test(desc);
-          const itemMajor = Math.round(
-            ((item.quantity || 1) * (item.unitPriceCents || 0)) / 100,
-          );
-          if (isAi) {
-            target.ai += itemMajor;
-          } else {
-            target.web += itemMajor;
-          }
-        });
-      } else {
-        const text =
-          `${inv.title || ""} ${inv.notes || ""} ${inv.clientName || ""}`.toLowerCase();
-        const isAi = /\bai\b|consulting|automation|agent/i.test(text);
-        const amtMajor = Math.round(inv.amountCents / 100);
-
-        if (isAi) {
-          target.ai += amtMajor;
-        } else {
-          target.web += amtMajor;
-        }
-      }
-    });
-
-    return {
-      series: seriesData,
-      chartData: days.map(({ date, web, ai }) => ({ date, web, ai })),
-      hasInvoices: validInvoices.length > 0,
-    };
-  }, [invoices, activeCurrency]);
+  const { series, chartData, hasInvoices } = useMemo(
+    () => buildPortfolioComparisonData(invoices, catalogItems, activeCurrency),
+    [invoices, catalogItems, activeCurrency],
+  );
 
   return (
-    <div className="flex h-full w-full min-h-[300px] flex-col pt-4">
-      <p className="summary-caption px-4">
-        Gross line-item values before invoice discounts and tax. Groups inferred
-        from descriptions; chart shows the last 14 days.
+    <div className="flex h-full w-full min-h-[260px] flex-col">
+      <p className="summary-caption !mt-0 mb-3">
+        Gross line-item values over the last 6 months before discounts and tax.
       </p>
-      <div className="grid grid-cols-2 gap-x-8 px-4">
+      <div className="grid grid-cols-2 gap-x-6 mb-2">
         {series.map(({ key, label, color, pct, formattedTotal }) => (
-          <div key={key} className="flex flex-col gap-1">
+          <div key={key} className="flex flex-col gap-0.5">
             <div className="text-content-neutral-500 flex items-center gap-2 text-xs">
               <span
                 className="size-2.5 shrink-0 rounded-full border-2"
@@ -152,10 +42,10 @@ export function PortfolioComparisonChart() {
               />
               {label}
             </div>
-            <div className="text-content-neutral-900 text-xl font-semibold tracking-tight sm:text-2xl">
+            <div className="text-content-neutral-900 text-xl font-semibold tracking-tight sm:text-2xl tabular-nums">
               {pct}%
             </div>
-            <div className="text-xs font-medium text-content-neutral-600">
+            <div className="text-xs font-medium text-content-neutral-600 tabular-nums">
               {formattedTotal}
             </div>
           </div>
@@ -163,9 +53,8 @@ export function PortfolioComparisonChart() {
       </div>
 
       {!hasInvoices && (
-        <div className="mt-2 mx-4 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
-          No service invoices recorded. Portfolio breakdown calculates from
-          active client invoices.
+        <div className="mt-2 px-3 py-1.5 rounded-lg bg-surface-neutral-50 border border-line-neutral-100 text-[11px] text-content-neutral-500 text-center">
+          No service invoices recorded yet. Breakdown updates as invoices are issued.
         </div>
       )}
 
@@ -173,11 +62,11 @@ export function PortfolioComparisonChart() {
         data={chartData}
         config={chartConfig}
         xDataKey="date"
-        className="mt-4 min-h-[200px] w-full flex-1"
+        className="mt-2 min-h-[175px] w-full flex-1"
         curveType="step"
         enableHoverReveal
         chartOptions={{
-          grid: { left: 8, right: 8, top: 16, bottom: 8 },
+          grid: { left: 8, right: 8, top: 14, bottom: 8 },
           yAxis: { type: "value", show: false, min: 0 },
         }}
       >

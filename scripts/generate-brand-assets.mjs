@@ -66,14 +66,12 @@ await writeFile(
   path.join(root, "public/brand/logo-white.png"),
   await square(white, 128, 0.94),
 );
-await writeFile(path.join(root, "build/icon.png"), appIcon);
 await writeFile(
-  path.join(root, "src/app/icon.png"),
-  await sharp(appIcon).resize(512, 512).png().toBuffer(),
-);
-await writeFile(
-  path.join(root, "src/app/apple-icon.png"),
-  await sharp(appIcon).resize(180, 180).png().toBuffer(),
+  path.join(root, "build/icon.png"),
+  await sharp(appIcon)
+    .resize(512, 512)
+    .png({ compressionLevel: 9, palette: true, quality: 92 })
+    .toBuffer(),
 );
 
 async function ico(sizes, input = appIcon) {

@@ -54,6 +54,15 @@ export function affectedDatasets(channel: string): WorkspaceDataset[] {
 }
 
 function domainDatasets(channel: string): WorkspaceDataset[] {
+  if (channel === "workspace:archive")
+    return [
+      "clients",
+      "vendors",
+      "invoices",
+      "workOrders",
+      "tasks",
+      "dashboard",
+    ];
   const domain = channel.split(":")[0];
   if (domain === "invoices")
     return [

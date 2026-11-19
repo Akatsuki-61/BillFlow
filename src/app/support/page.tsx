@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import {
   SPRING_NAV_GLIDE,
   SPRING_MENU_POPOVER,
@@ -672,7 +672,7 @@ export default function SupportPage() {
                   }`}
                 >
                   {active && (
-                    <motion.span
+                    <m.span
                       layoutId="support-category-pill"
                       transition={SPRING_NAV_GLIDE}
                       className="absolute inset-0 rounded-lg bg-accent shadow-xs"
@@ -739,7 +739,7 @@ export default function SupportPage() {
 
                   <AnimatePresence initial={false}>
                     {isOpen && (
-                      <motion.div
+                      <m.div
                         key={`faq-body-${faq.id}`}
                         initial={{ height: 0, opacity: 0 }}
                         animate={{
@@ -754,7 +754,7 @@ export default function SupportPage() {
                         }}
                         className="overflow-hidden"
                       >
-                        <motion.div
+                        <m.div
                           initial={{ opacity: 0, y: 4 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={detailSettleTransition(0)}
@@ -762,7 +762,7 @@ export default function SupportPage() {
                         >
                           <p>{faq.answer}</p>
                           {faq.actionHref && (
-                            <motion.div
+                            <m.div
                               initial={{ opacity: 0, y: 4 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={detailSettleTransition(1)}
@@ -775,10 +775,10 @@ export default function SupportPage() {
                                 <span>{faq.actionText || "Learn more"}</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
                               </Link>
-                            </motion.div>
+                            </m.div>
                           )}
-                        </motion.div>
-                      </motion.div>
+                        </m.div>
+                      </m.div>
                     )}
                   </AnimatePresence>
                 </div>

@@ -5,6 +5,7 @@ import { captureWorkspace } from "../workspace-session";
 
 import { ipcMain } from "../security";
 import crypto from "crypto";
+import { z } from "zod";
 import { eq, desc, asc, and, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import {
@@ -32,6 +33,27 @@ import type {
   ReviewWorkOrderInput,
   RecordWorkOrderPayoutInput,
 } from "../../src/types/outsourcing";
+
+function adjustVendorBalance(
+  tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0],
+  vendorId: string | null | undefined,
+  deltaCents: number,
+) {
+  if (!vendorId || !deltaCents) return;
+  const vendor = tx
+    .select()
+    .from(vendors)
+    .where(eq(vendors.id, vendorId))
+    .get();
+  if (!vendor) return;
+  tx.update(vendors)
+    .set({
+      balanceCents: Math.max(0, vendor.balanceCents + deltaCents),
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(vendors.id, vendor.id))
+    .run();
+}
 
 /**
  * Lists all payable work orders with hydrated vendor, task, invoice, and client details.
@@ -62,10 +84,24 @@ export function listWorkOrders(filter?: {
   const allTasks = db.select().from(tasks).all();
   const taskMap = new Map(allTasks.map((t) => [t.id, t]));
 
-  const allInvoices = db.select().from(invoices).all();
+  const allInvoices = db
+    .select({
+      id: invoices.id,
+      code: invoices.code,
+      clientId: invoices.clientId,
+      clientSnapshot: invoices.clientSnapshot,
+    })
+    .from(invoices)
+    .all();
   const invoiceMap = new Map(allInvoices.map((i) => [i.id, i]));
 
-  const allClients = db.select().from(clients).all();
+  const allClients = db
+    .select({
+      id: clients.id,
+      name: clients.name,
+    })
+    .from(clients)
+    .all();
   const clientMap = new Map(allClients.map((c) => [c.id, c.name]));
 
   const allPayouts = db
@@ -186,16 +222,17 @@ export function createWorkOrder(
   const task = validated.taskId
     ? db.select().from(tasks).where(eq(tasks.id, validated.taskId)).get()
     : undefined;
-  const invoice = validated.invoiceId
+  const effectiveInvoiceId = validated.invoiceId ?? task?.invoiceId ?? null;
+  const invoice = effectiveInvoiceId
     ? db
         .select()
         .from(invoices)
-        .where(eq(invoices.id, validated.invoiceId))
+        .where(eq(invoices.id, effectiveInvoiceId))
         .get()
     : undefined;
   if (validated.taskId && (!task || task.deletedAt))
     throw new AppError("NOT_FOUND", "Task not found.");
-  if (validated.invoiceId && (!invoice || invoice.trashedAt))
+  if (effectiveInvoiceId && (!invoice || invoice.trashedAt))
     throw new AppError("NOT_FOUND", "Invoice not found.");
   if (
     task &&
@@ -222,6 +259,7 @@ export function createWorkOrder(
     tx.insert(workOrders)
       .values({
         ...validated,
+        invoiceId: effectiveInvoiceId,
         id,
         feeCents: fee,
         createdAt: new Date().toISOString(),
@@ -234,22 +272,22 @@ export function createWorkOrder(
           isOutsourced: true,
           outsourcedVendor: vendor?.name ?? validated.vendorSnapshot?.name,
           outsourceBudgetCents: fee,
-          invoiceId: invoice?.id || task.invoiceId,
+          invoiceId: effectiveInvoiceId,
           clientId: invoice?.clientId || task.clientId,
           deliveryUrl: validated.deliveryUrl || task.deliveryUrl,
           updatedAt: new Date().toISOString(),
         })
         .where(eq(tasks.id, task.id))
         .run();
+      if (effectiveInvoiceId && !task.invoiceId) {
+        tx.update(workOrders)
+          .set({ invoiceId: effectiveInvoiceId })
+          .where(eq(workOrders.taskId, task.id))
+          .run();
+      }
     }
     if (vendor) {
-      tx.update(vendors)
-        .set({
-          balanceCents: vendor.balanceCents + fee,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(vendors.id, vendor.id))
-        .run();
+      adjustVendorBalance(tx, vendor.id, fee);
     }
   });
 
@@ -342,13 +380,17 @@ export function updateWorkOrder(
   if (validated.completedAt !== undefined)
     updateData.completedAt = validated.completedAt;
 
-  db.transaction(() => {
+  db.transaction((tx) => {
     if (Object.keys(updateData).length > 0) {
-      db.update(workOrders).set(updateData).where(eq(workOrders.id, id)).run();
+      tx.update(workOrders).set(updateData).where(eq(workOrders.id, id)).run();
+    }
+
+    if (fee !== existing.feeCents) {
+      adjustVendorBalance(tx, existing.vendorId, fee - existing.feeCents);
     }
 
     if (existing.taskId && fee !== existing.feeCents) {
-      db.update(tasks)
+      tx.update(tasks)
         .set({ outsourceBudgetCents: fee, updatedAt: new Date().toISOString() })
         .where(eq(tasks.id, existing.taskId))
         .run();
@@ -480,6 +522,7 @@ export function recordWorkOrderPayout(
         requestId,
       })
       .run();
+    adjustVendorBalance(tx, existing.vendorId, -amountCents);
   });
 
   broadcastDataChanged?.();
@@ -509,16 +552,18 @@ export function removeWorkOrderPayout(
   }
 
   db.transaction((tx) => {
+    const filter = and(
+      eq(vendorPayouts.workOrderId, workOrderId),
+      isNull(vendorPayouts.voidedAt),
+      payoutId ? eq(vendorPayouts.id, payoutId) : undefined,
+    );
+    const activeToVoid = tx.select().from(vendorPayouts).where(filter).all();
+    const voidedCents = activeToVoid.reduce((s, p) => s + p.amountCents, 0);
     tx.update(vendorPayouts)
       .set({ voidedAt: new Date().toISOString() })
-      .where(
-        and(
-          eq(vendorPayouts.workOrderId, workOrderId),
-          isNull(vendorPayouts.voidedAt),
-          payoutId ? eq(vendorPayouts.id, payoutId) : undefined,
-        ),
-      )
+      .where(filter)
       .run();
+    adjustVendorBalance(tx, existing.vendorId, voidedCents);
   });
 
   broadcastDataChanged?.();
@@ -574,20 +619,47 @@ export function removeWorkOrder(
         "HAS_PAYOUT",
         "Work orders with payout history cannot be deleted. Corrected settlements and receipts are retained.",
       );
-    // 2. Remove work order
+    // 2. Remove work order and revert remaining committed fee on vendor balance
     tx.delete(workOrders).where(eq(workOrders.id, id)).run();
+    adjustVendorBalance(tx, existing.vendorId, -existing.feeCents);
 
-    // 3. Reset task outsource state
-    if (existing.taskId)
-      tx.update(tasks)
-        .set({
-          isOutsourced: false,
-          outsourcedVendor: null,
-          outsourceBudgetCents: null,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(tasks.id, existing.taskId))
-        .run();
+    // 3. Reset task outsource state only if no sibling work orders remain
+    if (existing.taskId) {
+      const sibling = tx
+        .select()
+        .from(workOrders)
+        .where(eq(workOrders.taskId, existing.taskId))
+        .orderBy(desc(workOrders.createdAt))
+        .get();
+      if (!sibling) {
+        tx.update(tasks)
+          .set({
+            isOutsourced: false,
+            outsourcedVendor: null,
+            outsourceBudgetCents: null,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(tasks.id, existing.taskId))
+          .run();
+      } else {
+        const siblingVendorName = sibling.vendorId
+          ? (tx
+              .select({ name: vendors.name })
+              .from(vendors)
+              .where(eq(vendors.id, sibling.vendorId))
+              .get()?.name ?? null)
+          : (sibling.vendorSnapshot?.name ?? null);
+        tx.update(tasks)
+          .set({
+            isOutsourced: true,
+            outsourcedVendor: siblingVendorName,
+            outsourceBudgetCents: sibling.feeCents,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(tasks.id, existing.taskId))
+          .run();
+      }
+    }
   });
 
   broadcastDataChanged?.();
@@ -658,6 +730,14 @@ export async function exportWorkOrderPdf(id: string): Promise<string> {
 /**
  * Registers work order IPC handlers on the electron main process.
  */
+const workOrderListFilterSchema = z
+  .object({
+    vendorId: recordId.optional(),
+    taskId: recordId.optional(),
+    invoiceId: recordId.optional(),
+  })
+  .optional();
+
 export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle(
     "workOrders:list",
@@ -666,7 +746,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
       filter?: { vendorId?: string; taskId?: string; invoiceId?: string },
     ) => {
       try {
-        return listWorkOrders(filter);
+        return listWorkOrders(workOrderListFilterSchema.parse(filter));
       } catch (err) {
         throw formatError(err);
       }
@@ -675,7 +755,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("workOrders:get", async (_event, id: string) => {
     try {
-      const wo = getWorkOrder(id);
+      const wo = getWorkOrder(recordId.parse(id));
       if (!wo) throw new AppError("NOT_FOUND", "Work order not found");
       return wo;
     } catch (err) {
@@ -698,7 +778,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
     "workOrders:update",
     async (_event, id: string, patch: WorkOrderPatchInput) => {
       try {
-        return updateWorkOrder(id, patch, broadcastDataChanged);
+        return updateWorkOrder(recordId.parse(id), patch, broadcastDataChanged);
       } catch (err) {
         throw formatError(err);
       }
@@ -732,7 +812,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
     async (_event, workOrderId: string, payoutId?: string) => {
       try {
         return removeWorkOrderPayout(
-          workOrderId,
+          recordId.parse(workOrderId),
           broadcastDataChanged,
           payoutId === undefined ? undefined : recordId.parse(payoutId),
         );
@@ -746,7 +826,11 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
     "workOrders:setPayoutStatus",
     async (_event, id: string, status: "PENDING" | "PAID") => {
       try {
-        return setWorkOrderPayoutStatus(id, status, broadcastDataChanged);
+        return setWorkOrderPayoutStatus(
+          recordId.parse(id),
+          z.enum(["PENDING", "PAID"]).parse(status),
+          broadcastDataChanged,
+        );
       } catch (err) {
         throw formatError(err);
       }
@@ -755,7 +839,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("workOrders:remove", async (_event, id: string) => {
     try {
-      return removeWorkOrder(id, broadcastDataChanged);
+      return removeWorkOrder(recordId.parse(id), broadcastDataChanged);
     } catch (err) {
       throw formatError(err);
     }
@@ -763,7 +847,7 @@ export function registerWorkOrderHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle("workOrders:exportPdf", async (_event, id: string) => {
     try {
-      const filePath = await exportWorkOrderPdf(id);
+      const filePath = await exportWorkOrderPdf(recordId.parse(id));
       return { success: true, filePath };
     } catch (err) {
       throw formatError(err);

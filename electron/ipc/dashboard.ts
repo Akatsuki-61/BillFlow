@@ -6,15 +6,26 @@ import { desc, isNull } from "drizzle-orm";
 import type { InvoiceWithClient } from "../../src/types/billing";
 import { DashboardSummary } from "../../src/types/billing";
 
-export function getDashboardSummary(): DashboardSummary {
+export function getDashboardSummary(
+  preloadedInvoices?: InvoiceWithClient[],
+): DashboardSummary {
   const db = getDb();
-  const allClients = db.select().from(clients).all();
-  const allInvoices = db
-    .select()
-    .from(invoices)
-    .where(isNull(invoices.trashedAt))
-    .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
+  const allClients = db
+    .select({
+      id: clients.id,
+      name: clients.name,
+      email: clients.email,
+    })
+    .from(clients)
     .all();
+  const allInvoices =
+    preloadedInvoices ??
+    db
+      .select()
+      .from(invoices)
+      .where(isNull(invoices.trashedAt))
+      .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
+      .all();
 
   const totalBilledByCurrency: Record<string, number> = {};
   const outstandingByCurrency: Record<string, number> = {};

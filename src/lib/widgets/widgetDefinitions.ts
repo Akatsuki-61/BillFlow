@@ -142,7 +142,7 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
     title: "Profit & Growth Trajectory",
     description: "Month-over-month revenue volume and net profit margin plot",
     category: "charts",
-    size: "full",
+    size: "wide",
     defaultOnDashboard: true,
     defaultOnAnalytics: true,
   },
@@ -249,11 +249,12 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
 
 export const DEFAULT_DASHBOARD_WIDGET_IDS = [
   "workspace-insights",
-  "profit-trajectory-chart",
   "total-revenue",
   "net-profit",
   "pending-receivables",
   "active-clients",
+  "profit-trajectory-chart",
+  "revenue-expenses-chart",
   "sprint-tasks",
   "recent-invoices",
 ];

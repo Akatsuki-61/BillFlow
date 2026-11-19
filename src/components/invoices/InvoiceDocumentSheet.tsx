@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
   EXIT_MENU_POPOVER,
@@ -436,7 +436,7 @@ export default function InvoiceDocumentSheet({
       paymentUrl: invoice.paymentUrl,
       businessName,
     });
-    window.open(link);
+    window.open(link, "_blank", "noopener,noreferrer");
     void window.billflow?.workspace
       ?.recordActivity?.(activityProfile, {
         kind: "communication",
@@ -523,7 +523,7 @@ export default function InvoiceDocumentSheet({
           {/* Dropdown Popover */}
           <AnimatePresence initial={false}>
             {isTemplateDropdownOpen && (
-              <motion.div
+              <m.div
                 key="invoice-template-dropdown"
                 initial={{ opacity: 0, scale: POPOVER_INITIAL_SCALE, y: -6 }}
                 animate={{
@@ -547,7 +547,7 @@ export default function InvoiceDocumentSheet({
                 {TEMPLATES.map((tmpl, idx) => {
                   const isSelected = selectedTemplate === tmpl.id;
                   return (
-                    <motion.button
+                    <m.button
                       key={tmpl.id}
                       type="button"
                       initial={{ opacity: 0, y: -3 }}
@@ -583,10 +583,10 @@ export default function InvoiceDocumentSheet({
                       {isSelected && (
                         <Check className="w-3.5 h-3.5 text-accent shrink-0 ml-1" />
                       )}
-                    </motion.button>
+                    </m.button>
                   );
                 })}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
@@ -677,7 +677,7 @@ export default function InvoiceDocumentSheet({
         <div className="mr-auto flex items-center gap-2">
           <AnimatePresence initial={false}>
             {savedNotice && (
-              <motion.span
+              <m.span
                 key={savedNotice}
                 role={savedNotice.startsWith("Could not") ? "alert" : "status"}
                 initial={{ opacity: 0, y: 4 }}
@@ -691,7 +691,7 @@ export default function InvoiceDocumentSheet({
                   <Check className="w-4 h-4 success-confirm-pulse rounded-full" />
                 )}
                 <span>{savedNotice}</span>
-              </motion.span>
+              </m.span>
             )}
           </AnimatePresence>
         </div>
@@ -726,7 +726,7 @@ export default function InvoiceDocumentSheet({
 
           <AnimatePresence initial={false}>
             {isShareOpen && (
-              <motion.div
+              <m.div
                 key="invoice-share-dropdown"
                 initial={{ opacity: 0, scale: POPOVER_INITIAL_SCALE, y: 6 }}
                 animate={{
@@ -791,7 +791,7 @@ export default function InvoiceDocumentSheet({
                     </div>
                   </div>
                 </button>
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>

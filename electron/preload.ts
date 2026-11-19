@@ -3,7 +3,7 @@ import type {
   WorkspaceDataset,
   WorkspaceChange,
 } from "../src/types/workspace";
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   ClientWithStats,
   NewClientInput,
@@ -357,6 +357,24 @@ if (process.isMainFrame && trustedDocument)
         invoke("settings:revealDbFile"),
       preflight: (payload: ExportDataPayload, mode?: "replace" | "merge") =>
         invoke("settings:preflight", payload, mode),
+      chooseBackupFile: (mode?: "replace" | "merge") =>
+        invoke("settings:chooseBackupFile", mode),
+      stageBackupFile: (file: File, mode?: "replace" | "merge") => {
+        const filePath =
+          typeof webUtils?.getPathForFile === "function"
+            ? webUtils.getPathForFile(file)
+            : "";
+        if (!filePath) {
+          return Promise.reject(
+            new Error("Drop a local backup .json file from your computer."),
+          );
+        }
+        return invoke("settings:stageDroppedBackup", filePath, mode);
+      },
+      preflightBackupFile: (token: string, mode?: "replace" | "merge") =>
+        invoke("settings:preflightBackupFile", token, mode),
+      importBackupFile: (token: string, mode?: "replace" | "merge") =>
+        invoke("settings:importBackupFile", token, mode),
       export: (): Promise<ExportDataPayload> => invoke("settings:export"),
       import: (payload: ExportDataPayload, mode?: "replace" | "merge") =>
         invoke("settings:import", payload, mode),
@@ -384,6 +402,19 @@ if (process.isMainFrame && trustedDocument)
       select: (owner: AttachmentOwner, requestId: string, filePath?: string) =>
         invoke("attachments:select", owner, requestId, filePath),
       chooseFile: () => invoke("attachments:chooseFile"),
+      stageFile: async (file: File) => {
+        const filePath =
+          typeof webUtils?.getPathForFile === "function"
+            ? webUtils.getPathForFile(file)
+            : "";
+        if (filePath) {
+          return await invoke("attachments:stageDroppedPath", filePath);
+        }
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        return await invoke("attachments:stageDroppedFile", file.name, bytes);
+      },
+      stageDroppedFile: (name: string, data: Uint8Array) =>
+        invoke("attachments:stageDroppedFile", name, data),
       open: (id: string) => invoke("attachments:open", id),
     },
     files: {

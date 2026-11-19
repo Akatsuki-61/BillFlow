@@ -102,45 +102,44 @@ function chunks<T>(values: T[], size = 500): T[][] {
   return result;
 }
 
-export function listInvoicesWithClient(
-  clientId?: string,
-  trash = false,
+const invoiceWithClientSelect = {
+  invoice: invoices,
+  clientName: clients.name,
+  clientEmail: clients.email,
+  clientPhone: clients.phone,
+  clientWhatsAppPhone: clients.whatsappPhone,
+  clientBillingAddress: clients.billingAddress,
+  clientContactPerson: clients.contactPerson,
+  clientCategory: clients.category,
+};
+
+type RawInvoiceClientRow = {
+  invoice: typeof invoices.$inferSelect;
+  clientName: string | null;
+  clientEmail: string | null;
+  clientPhone: string | null;
+  clientWhatsAppPhone: string | null;
+  clientBillingAddress: string | null;
+  clientContactPerson: string | null;
+  clientCategory: string | null;
+};
+
+function hydrateInvoices(
+  db: ReturnType<typeof getDb>,
+  allInvoices: RawInvoiceClientRow[],
 ): InvoiceWithClient[] {
-  const db = getDb();
-  const allInvoices = db
-    .select({
-      invoice: invoices,
-      clientName: clients.name,
-      clientEmail: clients.email,
-      clientPhone: clients.phone,
-      clientWhatsAppPhone: clients.whatsappPhone,
-      clientBillingAddress: clients.billingAddress,
-      clientContactPerson: clients.contactPerson,
-      clientCategory: clients.category,
-    })
-    .from(invoices)
-    .leftJoin(clients, eq(invoices.clientId, clients.id))
-    .where(
-      and(
-        trash ? isNotNull(invoices.trashedAt) : isNull(invoices.trashedAt),
-        clientId ? eq(invoices.clientId, clientId) : undefined,
-      ),
-    )
-    .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
-    .all();
+  if (allInvoices.length === 0) return [];
 
   const ids = allInvoices.map((row) => row.invoice.id);
-  const allItems = ids.length
-    ? chunks(ids).flatMap((batch) =>
-        db
-          .select()
-          .from(invoiceItems)
-          .where(inArray(invoiceItems.invoiceId, batch))
-          .orderBy(asc(invoiceItems.position))
-          .all(),
-      )
-    : [];
-  const allPayments = ids.length ? readPayments(ids) : [];
+  const allItems = chunks(ids).flatMap((batch) =>
+    db
+      .select()
+      .from(invoiceItems)
+      .where(inArray(invoiceItems.invoiceId, batch))
+      .orderBy(asc(invoiceItems.position))
+      .all(),
+  );
+  const allPayments = readPayments(ids);
   const itemMap = new Map<string, typeof allItems>();
   const paymentMap = new Map<string, InvoicePayment[]>();
   for (const item of allItems) {
@@ -192,6 +191,47 @@ export function listInvoicesWithClient(
       payments,
     };
   });
+}
+
+export function getInvoiceWithClient(
+  id: string,
+  trash = false,
+): InvoiceWithClient | null {
+  const db = getDb();
+  const rows = db
+    .select(invoiceWithClientSelect)
+    .from(invoices)
+    .leftJoin(clients, eq(invoices.clientId, clients.id))
+    .where(
+      and(
+        eq(invoices.id, id),
+        trash ? isNotNull(invoices.trashedAt) : isNull(invoices.trashedAt),
+      ),
+    )
+    .limit(1)
+    .all();
+  return hydrateInvoices(db, rows)[0] ?? null;
+}
+
+export function listInvoicesWithClient(
+  clientId?: string,
+  trash = false,
+): InvoiceWithClient[] {
+  const db = getDb();
+  const allInvoices = db
+    .select(invoiceWithClientSelect)
+    .from(invoices)
+    .leftJoin(clients, eq(invoices.clientId, clients.id))
+    .where(
+      and(
+        trash ? isNotNull(invoices.trashedAt) : isNull(invoices.trashedAt),
+        clientId ? eq(invoices.clientId, clientId) : undefined,
+      ),
+    )
+    .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
+    .all();
+
+  return hydrateInvoices(db, allInvoices);
 }
 
 export async function buildInvoicePdfPayloadAndBuffer(
@@ -270,7 +310,7 @@ export async function buildInvoicePdfPayloadAndBuffer(
       paidCents: 4500000,
       discountCents: 1000000,
       taxCents: 0,
-      deliveryUrl: "https://github.com/Chethaka/acme-web-platform",
+      deliveryUrl: "https://github.com/acme-cloud/web-platform",
       notes:
         "Milestone 1 begins upon advance receipt. Full code and deployment upon final settlement.",
       client: { name: "Acme Cloud Corp", email: "billing@acmecloud.com" },
@@ -440,11 +480,14 @@ export function exportInvoicePdf(
     }
     throw error;
   });
-  exportQueue = tracked;
+  exportQueue = tracked.then(
+    () => undefined,
+    () => undefined,
+  );
   return tracked;
 }
 export async function exportInvoiceBatch(idsInput: string[]) {
-  const ids = [...new Set(z.array(recordId).min(1).parse(idsInput))];
+  const ids = [...new Set(z.array(recordId).min(1).max(200).parse(idsInput))];
   const workspace = captureWorkspace();
   const result = await dialog.showOpenDialog({
     title: "Choose a Folder for Invoice PDFs",
@@ -519,7 +562,7 @@ async function prepareInvoiceShare(invoiceId: string, template?: string) {
   const workspace = captureWorkspace();
   const filePath = await exportInvoicePdf(id, template);
   workspace.assertCurrent();
-  const invoice = listInvoicesWithClient().find((row) => row.id === id);
+  const invoice = getInvoiceWithClient(id);
   if (!invoice) throw new AppError("NOT_FOUND", "Active invoice not found.");
   const settings = getOrCreateSettings();
   const balance = Math.max(0, invoice.amountCents - invoice.paidCents);
@@ -546,6 +589,12 @@ async function prepareInvoiceShare(invoiceId: string, template?: string) {
 const scheduledExports = new Map<string, ReturnType<typeof setTimeout>>();
 function scheduleInvoiceExport(id: string) {
   if (getSqlite().inTransaction) return;
+  const row = getDb()
+    .select({ status: invoices.status, trashedAt: invoices.trashedAt })
+    .from(invoices)
+    .where(eq(invoices.id, id))
+    .get();
+  if (!row || row.trashedAt || row.status === "DRAFT") return;
   const workspace = captureWorkspace();
   const key = `${workspace.databasePath}:${id}`;
   const previous = scheduledExports.get(key);
@@ -612,7 +661,11 @@ export async function saveInvoicePdfAs(
       );
   }
 
-  const chosenPath = result.filePath;
+  const chosenPath = result.filePath.toLowerCase().endsWith(".pdf")
+    ? result.filePath
+    : `${result.filePath}.pdf`;
+  if (fs.existsSync(chosenPath) && fs.lstatSync(chosenPath).isSymbolicLink())
+    throw new Error("Cannot overwrite a symbolic link when exporting PDF.");
   atomicWrite(chosenPath, pdfBuffer);
 
   if (invoiceId !== "sample-preview" && invoiceId !== "draft-preview") {
@@ -631,6 +684,20 @@ export async function saveInvoicePdfAs(
   }
 
   return { success: true, canceled: false, filePath: chosenPath };
+}
+
+function buildClientSnapshot(client: typeof clients.$inferSelect): string {
+  return JSON.stringify({
+    name: client.name,
+    email: client.email,
+    contactPerson: client.contactPerson,
+    phone: client.phone,
+    whatsappPhone: client.whatsappPhone,
+    billingAddress: client.billingAddress,
+    driveUrl: client.driveUrl,
+    category: client.category,
+    currency: client.currency,
+  });
 }
 
 export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
@@ -693,19 +760,7 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
           .from(clients)
           .where(eq(clients.id, clientId))
           .get();
-        clientSnapshotStr = client
-          ? JSON.stringify({
-              name: client.name,
-              email: client.email,
-              contactPerson: client.contactPerson,
-              phone: client.phone,
-              whatsappPhone: client.whatsappPhone,
-              billingAddress: client.billingAddress,
-              driveUrl: client.driveUrl,
-              category: client.category,
-              currency: client.currency,
-            })
-          : null;
+        clientSnapshotStr = client ? buildClientSnapshot(client) : null;
       } else {
         // Temporary client: keep clientId null, preserve details in clientSnapshot
         clientId = undefined;
@@ -729,17 +784,7 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
           "The specified client does not exist.",
         );
       }
-      clientSnapshotStr = JSON.stringify({
-        name: client.name,
-        email: client.email,
-        contactPerson: client.contactPerson,
-        phone: client.phone,
-        whatsappPhone: client.whatsappPhone,
-        billingAddress: client.billingAddress,
-        driveUrl: client.driveUrl,
-        category: client.category,
-        currency: client.currency,
-      });
+      clientSnapshotStr = buildClientSnapshot(client);
     } else {
       throw new AppError(
         "CLIENT_NOT_FOUND",
@@ -799,10 +844,12 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
     const today = localDateKey(new Date());
     const issueDate = value.issueDate || today;
     const profile = getOrCreateSettings();
-    const defaultDue = new Date(`${issueDate}T00:00:00`);
+    const defaultDue = new Date(`${issueDate}T00:00:00Z`);
     defaultDue.setUTCDate(defaultDue.getUTCDate() + profile.defaultDueDays);
     const dueDate =
-      value.dueDate === undefined ? localDateKey(defaultDue) : value.dueDate;
+      value.dueDate === undefined
+        ? defaultDue.toISOString().slice(0, 10)
+        : value.dueDate;
 
     const discountCents = value.discountCents || 0;
     const taxCents = value.taxCents || 0;
@@ -950,7 +997,7 @@ export function createInvoice(input: NewInvoiceInput): InvoiceWithClient {
   // Attempt auto-exporting PDF after invoice is created
   scheduleInvoiceExport(id);
 
-  return listInvoicesWithClient().find((row) => row.id === id)!;
+  return getInvoiceWithClient(id)!;
 }
 
 export function recordPayment(input: RecordPaymentInput): {
@@ -1028,9 +1075,7 @@ export function recordPayment(input: RecordPaymentInput): {
   // Re-export PDF with updated payment details
   scheduleInvoiceExport(value.invoiceId);
 
-  const updatedInvoice = listInvoicesWithClient().find(
-    (row) => row.id === value.invoiceId,
-  )!;
+  const updatedInvoice = getInvoiceWithClient(value.invoiceId)!;
   return { payment: createdPayment!, invoice: updatedInvoice };
 }
 
@@ -1175,9 +1220,7 @@ export function correctPayment(input: CorrectPaymentInput): InvoiceWithClient {
     refreshInvoiceCollection(tx, invoice, now);
   });
   scheduleInvoiceExport(value.invoiceId);
-  return listInvoicesWithClient().find(
-    (invoice) => invoice.id === value.invoiceId,
-  )!;
+  return getInvoiceWithClient(value.invoiceId)!;
 }
 
 export function promoteInvoiceClient(
@@ -1243,13 +1286,22 @@ export function promoteInvoiceClient(
   };
 
   db.transaction((tx) => {
+    const now = new Date().toISOString();
     tx.insert(clients).values(newClientData).run();
     tx.update(invoices)
       .set({
         clientId: newClientId,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       })
       .where(eq(invoices.id, invoiceId))
+      .run();
+    tx.update(tasks)
+      .set({
+        clientId: newClientId,
+        clientName: newClientData.name,
+        updatedAt: now,
+      })
+      .where(eq(tasks.invoiceId, invoiceId))
       .run();
   });
 
@@ -1400,12 +1452,19 @@ export function setInvoiceStatuses(
   return { success: true };
 }
 
+const invoiceListFilterSchema = z
+  .object({
+    clientId: recordId.optional(),
+  })
+  .optional();
+
 export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
   ipcMain.handle(
     "invoices:list",
     async (_event, filter?: { clientId?: string }) => {
       try {
-        return listInvoicesWithClient(filter?.clientId);
+        const parsedFilter = invoiceListFilterSchema.parse(filter);
+        return listInvoicesWithClient(parsedFilter?.clientId);
       } catch (err) {
         throw formatError(err);
       }
@@ -1446,93 +1505,119 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
 
   ipcMain.handle(
     "invoices:update",
-    async (_event, id: string, patch: InvoicePatchInput) => {
+    async (_event, idInput: string, patch: InvoicePatchInput) => {
       try {
+        const id = recordId.parse(idInput);
         const validated = invoicePatchSchema.parse(patch);
         const db = getDb();
 
-        const existing = db
-          .select()
-          .from(invoices)
-          .where(eq(invoices.id, id))
-          .get();
-        if (!existing || existing.trashedAt) {
-          throw new AppError("NOT_FOUND", "Active invoice not found.");
-        }
-
-        const paymentRows = db
-          .select()
-          .from(invoicePayments)
-          .where(eq(invoicePayments.invoiceId, id))
-          .all();
-        const newCurrency = validated.currency ?? existing.currency;
-        const newClientId = validated.clientId ?? existing.clientId;
-        if (newClientId !== existing.clientId && existing.status !== "DRAFT")
-          throw new AppError(
-            "ISSUED_CLIENT",
-            "An issued invoice keeps its original client. Create a new invoice for another client.",
-          );
-        if (newCurrency !== existing.currency && paymentRows.length)
-          throw new AppError(
-            "HAS_PAYMENTS",
-            "Currency cannot change after payments have been recorded.",
-          );
-        const linkedTasks = db
-          .select()
-          .from(tasks)
-          .where(eq(tasks.invoiceId, id))
-          .all();
-        if (
-          linkedTasks.length &&
-          (newCurrency !== existing.currency ||
-            newClientId !== existing.clientId)
-        )
-          throw new AppError(
-            "LINKED_TASKS",
-            "Client and currency cannot change while deliverables are linked.",
-          );
-        if (paymentRows.length && newClientId !== existing.clientId)
-          throw new AppError(
-            "HAS_PAYMENTS",
-            "Client cannot change after payments have been recorded.",
-          );
-        const oldItems = db
-          .select()
-          .from(invoiceItems)
-          .where(eq(invoiceItems.invoiceId, id))
-          .all();
-        const newAmount = validated.amountCents ?? existing.amountCents;
-        if (
-          paymentRows.reduce((sum, payment) => sum + payment.amountCents, 0) >
-          newAmount
-        )
-          throw new AppError(
-            "PAYMENT_EXCEEDS_BALANCE",
-            "The invoice total cannot be less than payments already recorded. Correct the payment first.",
-          );
-        validateInvoiceAmounts({
-          amountCents: newAmount,
-          discountCents: validated.discountCents ?? existing.discountCents,
-          taxCents: validated.taxCents ?? existing.taxCents,
-          advanceCents: validated.advanceCents ?? existing.advanceCents,
-          items: validated.items ?? oldItems,
-        });
-
         db.transaction((tx) => {
+          const existing = tx
+            .select()
+            .from(invoices)
+            .where(eq(invoices.id, id))
+            .get();
+          if (!existing || existing.trashedAt) {
+            throw new AppError("NOT_FOUND", "Active invoice not found.");
+          }
+
+          const paymentRows = tx
+            .select({
+              payment: invoicePayments,
+              correction: invoicePaymentCorrections,
+            })
+            .from(invoicePayments)
+            .leftJoin(
+              invoicePaymentCorrections,
+              eq(
+                invoicePaymentCorrections.originalPaymentId,
+                invoicePayments.id,
+              ),
+            )
+            .where(eq(invoicePayments.invoiceId, id))
+            .all();
+          const activePaidCents = paymentRows
+            .filter((row) => !row.correction)
+            .reduce((sum, row) => sum + row.payment.amountCents, 0);
+
+          const newCurrency = validated.currency ?? existing.currency;
+          const newClientId = validated.clientId ?? existing.clientId;
+          if (newClientId !== existing.clientId && existing.status !== "DRAFT")
+            throw new AppError(
+              "ISSUED_CLIENT",
+              "An issued invoice keeps its original client. Create a new invoice for another client.",
+            );
+          if (newCurrency !== existing.currency && paymentRows.length)
+            throw new AppError(
+              "HAS_PAYMENTS",
+              "Currency cannot change after payments have been recorded.",
+            );
+          const linkedTasks = tx
+            .select()
+            .from(tasks)
+            .where(eq(tasks.invoiceId, id))
+            .all();
+          if (
+            linkedTasks.length &&
+            (newCurrency !== existing.currency ||
+              newClientId !== existing.clientId)
+          )
+            throw new AppError(
+              "LINKED_TASKS",
+              "Client and currency cannot change while deliverables are linked.",
+            );
+          if (paymentRows.length && newClientId !== existing.clientId)
+            throw new AppError(
+              "HAS_PAYMENTS",
+              "Client cannot change after payments have been recorded.",
+            );
+
+          let nextClientSnapshot = existing.clientSnapshot;
+          if (newClientId !== existing.clientId && newClientId) {
+            const nextClient = tx
+              .select()
+              .from(clients)
+              .where(eq(clients.id, newClientId))
+              .get();
+            if (!nextClient) {
+              throw new AppError(
+                "CLIENT_NOT_FOUND",
+                "The specified client does not exist.",
+              );
+            }
+            if (nextClient.archivedAt) {
+              throw new AppError(
+                "CLIENT_ARCHIVED",
+                "Archived clients cannot be assigned to an invoice.",
+              );
+            }
+            nextClientSnapshot = buildClientSnapshot(nextClient);
+          }
+
+          const oldItems = tx
+            .select()
+            .from(invoiceItems)
+            .where(eq(invoiceItems.invoiceId, id))
+            .all();
+          const newAmount = validated.amountCents ?? existing.amountCents;
+          if (activePaidCents > newAmount)
+            throw new AppError(
+              "PAYMENT_EXCEEDS_BALANCE",
+              "The invoice total cannot be less than payments already recorded. Correct the payment first.",
+            );
+          validateInvoiceAmounts({
+            amountCents: newAmount,
+            discountCents: validated.discountCents ?? existing.discountCents,
+            taxCents: validated.taxCents ?? existing.taxCents,
+            advanceCents: validated.advanceCents ?? existing.advanceCents,
+            items: validated.items ?? oldItems,
+          });
+
           tx.update(invoices)
             .set({
               code: validated.code ?? existing.code,
               clientId: validated.clientId ?? existing.clientId,
-              clientSnapshot:
-                newClientId !== existing.clientId && newClientId
-                  ? JSON.stringify(
-                      tx
-                        .select()
-                        .from(clients)
-                        .where(eq(clients.id, newClientId))
-                        .get(),
-                    )
-                  : existing.clientSnapshot,
+              clientSnapshot: nextClientSnapshot,
               catalogItemId:
                 validated.catalogItemId !== undefined
                   ? validated.catalogItemId
@@ -1576,7 +1661,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
                   ? existing.paymentUrl
                   : validated.paymentUrl,
               status: existing.status,
-              paidCents: paymentRows.reduce((sum, p) => sum + p.amountCents, 0),
+              paidCents: activePaidCents,
               updatedAt: new Date().toISOString(),
             })
             .where(eq(invoices.id, id))
@@ -1627,11 +1712,18 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
                   "INVALID_TASKS",
                   "Import completed tasks when creating an invoice.",
                 );
+              const validService = item.catalogId
+                ? tx
+                    .select()
+                    .from(catalogServices)
+                    .where(eq(catalogServices.id, item.catalogId))
+                    .get()
+                : undefined;
               const fields = {
                 description: item.description,
                 quantity: item.quantity,
                 unitPriceCents: item.unitPriceCents,
-                catalogId: item.catalogId || null,
+                catalogId: validService ? item.catalogId : null,
                 position: index,
               };
               if (row)
@@ -1656,8 +1748,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
         scheduleInvoiceExport(id);
 
         broadcastDataChanged();
-        const all = listInvoicesWithClient();
-        return all.find((inv) => inv.id === id)!;
+        return getInvoiceWithClient(id)!;
       } catch (err) {
         throw formatError(err);
       }
@@ -1685,8 +1776,7 @@ export function registerInvoiceHandlers(broadcastDataChanged: () => void) {
         scheduleInvoiceExport(id);
 
         broadcastDataChanged();
-        const all = listInvoicesWithClient();
-        return all.find((inv) => inv.id === id)!;
+        return getInvoiceWithClient(id)!;
       } catch (err) {
         throw formatError(err);
       }

@@ -85,7 +85,9 @@ export const invoices = sqliteTable(
   },
   (table) => [
     index("invoices_client_id_idx").on(table.clientId),
+    index("invoices_catalog_item_id_idx").on(table.catalogItemId),
     index("invoices_trashed_at_idx").on(table.trashedAt),
+    index("invoices_status_trashed_idx").on(table.trashedAt, table.status),
   ],
 );
 
@@ -227,6 +229,7 @@ export const invoiceItems = sqliteTable(
   },
   (t) => [
     uniqueIndex("invoice_items_order").on(t.invoiceId, t.position),
+    index("invoice_items_catalog_id_idx").on(t.catalogId),
     check("item_amount", sql`${t.quantity} > 0 AND ${t.unitPriceCents} >= 0`),
   ],
 );
@@ -275,50 +278,58 @@ export const invoicePaymentCorrections = sqliteTable(
   ],
 );
 
-export const tasks = sqliteTable("tasks", {
-  id: text("id").primaryKey(),
-  requestHash: text("request_hash"),
-  invoiceItemId: text("invoice_item_id")
-    .references(() => invoiceItems.id, { onDelete: "restrict" })
-    .unique(),
-  invoiceId: text("invoice_id").references(() => invoices.id, {
-    onDelete: "restrict",
-  }),
-  clientId: text("client_id").references(() => clients.id, {
-    onDelete: "restrict",
-  }),
-  title: text("title").notNull(),
-  description: text("description").notNull().default(""),
-  status: text("status", { enum: ["todo", "in-progress", "review", "done"] })
-    .notNull()
-    .default("todo"),
-  priority: text("priority", { enum: ["low", "medium", "high", "urgent"] })
-    .notNull()
-    .default("medium"),
-  category: text("category").notNull().default("Development"),
-  assignee: text("assignee", { mode: "json" })
-    .$type<import("../../src/types/tasks").TaskAssignee>()
-    .notNull(),
-  dueDate: text("due_date").notNull().default(""),
-  clientName: text("client_name"),
-  deliveryUrl: text("delivery_url"),
-  isOutsourced: integer("is_outsourced", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  outsourcedVendor: text("outsourced_vendor"),
-  outsourceBudgetCents: integer("outsource_budget"), // contractor amount in minor units
-  currency: text("currency").notNull().default("LKR"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-  startedAt: text("started_at"),
-  completedAt: text("completed_at"),
-  activeSince: text("active_since"),
-  activeMilliseconds: integer("active_milliseconds").notNull().default(0),
-  deletedAt: text("deleted_at"), // retain generated-item uniqueness after deletion
-  boardPosition: integer("board_position"),
-  deletionToken: text("deletion_token"),
-  deletedEventIds: text("deleted_event_ids"),
-});
+export const tasks = sqliteTable(
+  "tasks",
+  {
+    id: text("id").primaryKey(),
+    requestHash: text("request_hash"),
+    invoiceItemId: text("invoice_item_id")
+      .references(() => invoiceItems.id, { onDelete: "restrict" })
+      .unique(),
+    invoiceId: text("invoice_id").references(() => invoices.id, {
+      onDelete: "restrict",
+    }),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "restrict",
+    }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    status: text("status", { enum: ["todo", "in-progress", "review", "done"] })
+      .notNull()
+      .default("todo"),
+    priority: text("priority", { enum: ["low", "medium", "high", "urgent"] })
+      .notNull()
+      .default("medium"),
+    category: text("category").notNull().default("Development"),
+    assignee: text("assignee", { mode: "json" })
+      .$type<import("../../src/types/tasks").TaskAssignee>()
+      .notNull(),
+    dueDate: text("due_date").notNull().default(""),
+    clientName: text("client_name"),
+    deliveryUrl: text("delivery_url"),
+    isOutsourced: integer("is_outsourced", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    outsourcedVendor: text("outsourced_vendor"),
+    outsourceBudgetCents: integer("outsource_budget"), // contractor amount in minor units
+    currency: text("currency").notNull().default("LKR"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    startedAt: text("started_at"),
+    completedAt: text("completed_at"),
+    activeSince: text("active_since"),
+    activeMilliseconds: integer("active_milliseconds").notNull().default(0),
+    deletedAt: text("deleted_at"), // retain generated-item uniqueness after deletion
+    boardPosition: integer("board_position"),
+    deletionToken: text("deletion_token"),
+    deletedEventIds: text("deleted_event_ids"),
+  },
+  (t) => [
+    index("tasks_invoice_id_idx").on(t.invoiceId),
+    index("tasks_client_id_idx").on(t.clientId),
+    index("tasks_deleted_status_idx").on(t.deletedAt, t.status),
+  ],
+);
 
 export const subtasks = sqliteTable(
   "subtasks",
@@ -335,15 +346,19 @@ export const subtasks = sqliteTable(
   (t) => [index("subtasks_task_idx").on(t.taskId)],
 );
 
-export const taskHistory = sqliteTable("task_history", {
-  id: text("id").primaryKey(),
-  taskId: text("task_id")
-    .notNull()
-    .references(() => tasks.id, { onDelete: "cascade" }),
-  fromStatus: text("from_status"),
-  toStatus: text("to_status").notNull(),
-  occurredAt: text("occurred_at").notNull(),
-});
+export const taskHistory = sqliteTable(
+  "task_history",
+  {
+    id: text("id").primaryKey(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    occurredAt: text("occurred_at").notNull(),
+  },
+  (t) => [index("task_history_task_id_idx").on(t.taskId)],
+);
 
 export const expenses = sqliteTable(
   "expenses",
@@ -365,7 +380,11 @@ export const expenses = sqliteTable(
       .notNull()
       .default(sql`(CURRENT_TIMESTAMP)`),
   },
-  (t) => [check("expense_amount", sql`${t.amountCents} >= 0`)],
+  (t) => [
+    check("expense_amount", sql`${t.amountCents} >= 0`),
+    index("expenses_invoice_id_idx").on(t.invoiceId),
+    index("expenses_incurred_at_idx").on(t.incurredAt),
+  ],
 );
 
 export const workOrders = sqliteTable(
@@ -412,6 +431,8 @@ export const workOrders = sqliteTable(
       sql`${t.vendorId} IS NOT NULL OR ${t.vendorSnapshot} IS NOT NULL`,
     ),
     check("work_order_discount", sql`${t.discountCents} >= 0`),
+    index("work_orders_vendor_id_idx").on(t.vendorId),
+    index("work_orders_task_id_idx").on(t.taskId),
     index("work_orders_invoice_idx").on(t.invoiceId),
   ],
 );
@@ -460,7 +481,9 @@ export const attachments = sqliteTable(
       "attachment_one_owner",
       sql`(${t.paymentId} IS NOT NULL) + (${t.expenseId} IS NOT NULL) + (${t.payoutId} IS NOT NULL) = 1`,
     ),
+    index("attachments_payment_id_idx").on(t.paymentId),
     index("attachments_expense_idx").on(t.expenseId),
+    index("attachments_payout_id_idx").on(t.payoutId),
   ],
 );
 
@@ -508,31 +531,43 @@ export const userProfiles = sqliteTable("user_profiles", {
 
 export type UserProfileRow = typeof userProfiles.$inferSelect;
 export type InsertUserProfileRow = typeof userProfiles.$inferInsert;
-export const calendarEvents = sqliteTable("calendar_events", {
-  id: text("id").primaryKey(),
-  title: text("title").notNull(),
-  description: text("description").notNull().default(""),
-  startDate: text("start_date").notNull(),
-  endDate: text("end_date"),
-  startTime: text("start_time"),
-  endTime: text("end_time"),
-  isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
-  category: text("category").notNull().default("general"),
-  color: text("color").notNull().default("blue"),
-  clientId: text("client_id").references(() => clients.id, {
-    onDelete: "set null",
-  }),
-  clientName: text("client_name"),
-  taskId: text("task_id").references(() => tasks.id, { onDelete: "set null" }),
-  taskTitle: text("task_title"),
-  location: text("location"),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(CURRENT_TIMESTAMP)`),
-  updatedAt: text("updated_at")
-    .notNull()
-    .default(sql`(CURRENT_TIMESTAMP)`),
-});
+export const calendarEvents = sqliteTable(
+  "calendar_events",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    startDate: text("start_date").notNull(),
+    endDate: text("end_date"),
+    startTime: text("start_time"),
+    endTime: text("end_time"),
+    isAllDay: integer("is_all_day", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    category: text("category").notNull().default("general"),
+    color: text("color").notNull().default("blue"),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "set null",
+    }),
+    clientName: text("client_name"),
+    taskId: text("task_id").references(() => tasks.id, {
+      onDelete: "set null",
+    }),
+    taskTitle: text("task_title"),
+    location: text("location"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (t) => [
+    index("calendar_events_client_id_idx").on(t.clientId),
+    index("calendar_events_task_id_idx").on(t.taskId),
+    index("calendar_events_start_date_idx").on(t.startDate),
+  ],
+);
 
 export const workOrderPdfExports = sqliteTable("work_order_pdf_exports", {
   workOrderId: text("work_order_id")

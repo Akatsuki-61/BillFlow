@@ -10,7 +10,7 @@ import type {
   ExchangeRateState,
 } from "../src/lib/currency-conversion";
 
-const rate = z.number().finite().positive().max(1_000_000_000);
+const rate = z.number().finite().min(1e-6).max(500_000);
 const ratesSchema = z.object({
   USD: z.literal(1),
   LKR: rate,
@@ -81,7 +81,9 @@ export function fetchPublicExchangeRates(): Promise<ExchangeRates> {
             const now = Date.now();
             if (
               value.time_last_update_unix * 1000 > now + 86_400_000 ||
-              value.time_next_update_unix <= value.time_last_update_unix
+              value.time_last_update_unix * 1000 < now - 30 * 86_400_000 ||
+              value.time_next_update_unix <= value.time_last_update_unix ||
+              value.time_next_update_unix * 1000 > now + 7 * 86_400_000
             )
               throw new Error("Invalid exchange-rate timestamp.");
             resolve({
@@ -125,8 +127,13 @@ export async function loadExchangeRates(): Promise<ExchangeRateState> {
     process.env.NODE_ENV === "test"
   )
     return { snapshot: cached, error: null };
-  if (cached && Date.now() < Date.parse(cached.nextUpdateAt))
-    return { snapshot: cached, error: null };
+  if (cached) {
+    const freshUntil = Math.min(
+      Date.parse(cached.nextUpdateAt),
+      Date.parse(cached.fetchedAt) + 7 * 86_400_000,
+    );
+    if (Date.now() < freshUntil) return { snapshot: cached, error: null };
+  }
   if (inFlight) return inFlight;
   if (Date.now() - lastAttempt < 60_000)
     return { snapshot: cached, error: lastError };
@@ -134,7 +141,7 @@ export async function loadExchangeRates(): Promise<ExchangeRateState> {
   inFlight = (async () => {
     try {
       const snapshot = await fetchPublicExchangeRates();
-      atomicWrite(cachePath(), JSON.stringify(snapshot));
+      atomicWrite(cachePath(), JSON.stringify(snapshot), 0o600);
       lastError = null;
       return { snapshot, error: null };
     } catch {

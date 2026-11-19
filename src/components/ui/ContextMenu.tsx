@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
   EXIT_MENU_POPOVER,
@@ -86,7 +86,7 @@ export function ContextMenu({
             onClose();
           }}
         >
-          <motion.div
+          <m.div
             ref={menuRef}
             initial={
               reducedMotion
@@ -126,7 +126,7 @@ export function ContextMenu({
           >
             <div className="flex flex-col gap-0.5">
               {items.map((item, index) => (
-                <motion.button
+                <m.button
                   key={index}
                   type="button"
                   initial={reducedMotion ? false : { opacity: 0, y: -3 }}
@@ -149,10 +149,10 @@ export function ContextMenu({
                     </span>
                   )}
                   <span className="truncate">{item.label}</span>
-                </motion.button>
+                </m.button>
               ))}
             </div>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

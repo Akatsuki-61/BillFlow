@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { WorkspaceActivity } from "@/types/activity";
 export function WorkspaceActivityPanel({
@@ -18,11 +19,32 @@ export function WorkspaceActivityPanel({
         })
         .catch(() => {});
     };
+    const handleProfileSwitch = () => {
+      if (!active) return;
+      setEntries([]);
+      setError("");
+      reload();
+    };
+    const handleWorkspaceLocked = () => {
+      if (!active) return;
+      setEntries([]);
+      setError("");
+    };
     reload();
     const cleanup = window.billflow?.workspace?.onActivityChanged?.(reload);
+    window.addEventListener("billflow:profile-switched", handleProfileSwitch);
+    window.addEventListener("billflow:workspace-locked", handleWorkspaceLocked);
     return () => {
       active = false;
       cleanup?.();
+      window.removeEventListener(
+        "billflow:profile-switched",
+        handleProfileSwitch,
+      );
+      window.removeEventListener(
+        "billflow:workspace-locked",
+        handleWorkspaceLocked,
+      );
     };
   }, []);
   const latest = new Map<string, WorkspaceActivity>();
@@ -56,9 +78,9 @@ export function WorkspaceActivityPanel({
         </p>
       )}
       {exportsOnly && (
-        <a href="/settings" className="text-xs underline">
+        <Link href="/settings" className="text-xs underline">
           Change export folder in Settings
-        </a>
+        </Link>
       )}
       {error && (
         <p role="alert" className="text-sm mt-2">

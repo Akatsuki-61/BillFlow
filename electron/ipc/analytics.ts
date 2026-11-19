@@ -18,9 +18,10 @@ export function getAnalyticsSummary(
   accountingMethod: "accrual" | "cash" = "accrual",
 ) {
   const db = getDb();
+  const parsedCurrency = z.string().max(16).optional().parse(currency);
   const selected =
-    currency && !["all", "ALL"].includes(currency)
-      ? currencySchema.parse(currency.toUpperCase())
+    parsedCurrency && !["all", "ALL"].includes(parsedCurrency)
+      ? currencySchema.parse(parsedCurrency.toUpperCase())
       : getOrCreateSettings().defaultCurrency;
   z.enum(["all", "all-time", "year", "quarter", "month"]).parse(period);
   z.enum(["accrual", "cash"]).parse(accountingMethod);

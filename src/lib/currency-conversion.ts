@@ -60,6 +60,24 @@ export function convertCents(
   return result;
 }
 
+function mapSameOrConvert<T>(
+  items: T[],
+  convertRow: (row: T) => T | null,
+): T[] {
+  let result: T[] | null = null;
+  for (let i = 0; i < items.length; i++) {
+    const row = items[i];
+    const next = convertRow(row);
+    if (result) {
+      if (next !== null) result.push(next);
+    } else if (next !== row) {
+      result = items.slice(0, i);
+      if (next !== null) result.push(next);
+    }
+  }
+  return result ?? items;
+}
+
 export function reportingRecords(
   input: {
     invoices: InvoiceWithClient[];
@@ -76,69 +94,81 @@ export function reportingRecords(
     if (converted === null) missing.add(source);
     return converted;
   };
-  const invoices = input.invoices.flatMap((row) => {
+  const invoices = mapSameOrConvert(input.invoices, (row) => {
+    if (
+      row.currency === currency &&
+      (!row.payments || row.payments.every((p) => p.currency === currency))
+    ) {
+      return row;
+    }
     const amountCents = amount(row.amountCents, row.currency);
-    if (amountCents === null) return [];
-    return [
-      {
-        ...row,
+    if (amountCents === null) return null;
+    return {
+      ...row,
+      currency,
+      amountCents,
+      paidCents: amount(row.paidCents || 0, row.currency)!,
+      advanceCents: amount(row.advanceCents || 0, row.currency)!,
+      discountCents: amount(row.discountCents || 0, row.currency)!,
+      taxCents: amount(row.taxCents || 0, row.currency)!,
+      items: row.items?.map((item) => ({
+        ...item,
+        unitPriceCents: amount(item.unitPriceCents, row.currency)!,
+      })),
+      payments: row.payments?.map((payment) => ({
+        ...payment,
         currency,
-        amountCents,
-        paidCents: amount(row.paidCents || 0, row.currency)!,
-        advanceCents: amount(row.advanceCents || 0, row.currency)!,
-        discountCents: amount(row.discountCents || 0, row.currency)!,
-        taxCents: amount(row.taxCents || 0, row.currency)!,
-        items: row.items?.map((item) => ({
-          ...item,
-          unitPriceCents: amount(item.unitPriceCents, row.currency)!,
-        })),
-        payments: row.payments?.map((payment) => ({
-          ...payment,
-          currency,
-          amountCents: amount(payment.amountCents, payment.currency)!,
-        })),
-      },
-    ];
+        amountCents: amount(payment.amountCents, payment.currency)!,
+      })),
+    };
   });
-  const expenses = input.expenses.flatMap((row) => {
+  const expenses = mapSameOrConvert(input.expenses, (row) => {
+    if (row.currency === currency) return row;
     const amountCents = amount(row.amountCents, row.currency);
-    return amountCents === null ? [] : [{ ...row, currency, amountCents }];
+    return amountCents === null ? null : { ...row, currency, amountCents };
   });
-  const workOrders = input.workOrders.flatMap((row) => {
+  const workOrders = mapSameOrConvert(input.workOrders, (row) => {
+    if (
+      row.currency === currency &&
+      row.payoutAmountCents !== undefined &&
+      row.remainingPayoutCents !== undefined &&
+      (!row.payouts || row.payouts.every((p) => p.currency === currency))
+    ) {
+      return row;
+    }
     const feeCents = amount(row.feeCents, row.currency);
-    if (feeCents === null) return [];
-    return [
-      {
-        ...row,
+    if (feeCents === null) return null;
+    return {
+      ...row,
+      currency,
+      feeCents,
+      payoutAmountCents: amount(row.payoutAmountCents || 0, row.currency)!,
+      remainingPayoutCents: amount(
+        row.remainingPayoutCents ??
+          Math.max(0, row.feeCents - (row.payoutAmountCents || 0)),
+        row.currency,
+      )!,
+      payouts: row.payouts?.map((payout) => ({
+        ...payout,
         currency,
-        feeCents,
-        payoutAmountCents: amount(row.payoutAmountCents || 0, row.currency)!,
-        remainingPayoutCents: amount(
-          row.remainingPayoutCents ??
-            Math.max(0, row.feeCents - (row.payoutAmountCents || 0)),
-          row.currency,
-        )!,
-        payouts: row.payouts?.map((payout) => ({
-          ...payout,
-          currency,
-          amountCents: amount(payout.amountCents, payout.currency)!,
-        })),
-      },
-    ];
+        amountCents: amount(payout.amountCents, payout.currency)!,
+      })),
+    };
   });
-  const catalogItems = (input.catalogItems || []).flatMap((row) => {
-    const priceCents = amount(row.priceCents, row.currency);
-    return priceCents === null
-      ? []
-      : [
-          {
-            ...row,
-            currency,
-            priceCents,
-            price: (priceCents / 100).toFixed(2),
-          },
-        ];
-  });
+  const catalogItems = input.catalogItems
+    ? mapSameOrConvert(input.catalogItems, (row) => {
+        if (row.currency === currency) return row;
+        const priceCents = amount(row.priceCents, row.currency);
+        return priceCents === null
+          ? null
+          : {
+              ...row,
+              currency,
+              priceCents,
+              price: (priceCents / 100).toFixed(2),
+            };
+      })
+    : [];
   return {
     invoices,
     expenses,

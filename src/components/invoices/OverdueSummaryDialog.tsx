@@ -22,8 +22,9 @@ import {
 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Workspace";
+import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
 import { IconCrossfade } from "@/components/ui/MotionSurface";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import type { InvoiceWithClient } from "@/types/billing";
 import { formatCents } from "@/lib/format";
@@ -50,6 +51,7 @@ import {
 import {
   generateWhatsAppReminderLink,
   buildOverduePaymentReminderMessage,
+  sanitizeMailtoRecipient,
 } from "@/lib/whatsapp";
 import { openExternalLink } from "@/lib/deliveryUrl";
 
@@ -82,6 +84,7 @@ export function OverdueSummaryDialog({
   showToast,
 }: OverdueSummaryDialogProps) {
   const activityProfile = activeProfileScope();
+  const isMac = useIsMac();
   const reporting = useReportingData();
   const convertedInvoices = useMemo(
     () =>
@@ -316,7 +319,7 @@ export function OverdueSummaryDialog({
       setTimeout(() => setCopiedType(null), 2200);
       showToast(
         type === "tsv"
-          ? "Copied table! Paste (Cmd+V) directly into Excel, Google Sheets, or Notion."
+          ? `Copied table! Paste (${formatShortcut("Cmd+V", isMac)}) directly into Excel, Google Sheets, or Notion.`
           : "Raw CSV template copied to clipboard!",
       );
     } catch {
@@ -390,7 +393,7 @@ export function OverdueSummaryDialog({
         paymentInstructions,
       }),
     );
-    const mailto = `mailto:${inv.clientEmail}?subject=${subject}&body=${body}`;
+    const mailto = `mailto:${sanitizeMailtoRecipient(inv.clientEmail)}?subject=${subject}&body=${body}`;
     if (typeof window !== "undefined") {
       window.open(mailto, "_blank", "noopener,noreferrer");
       void window.billflow?.workspace
@@ -450,7 +453,7 @@ export function OverdueSummaryDialog({
                 }`}
               >
                 {exportFormat === "csv" && (
-                  <motion.span
+                  <m.span
                     layoutId="overdue-export-fmt-pill"
                     transition={SPRING_NAV_GLIDE}
                     className="absolute inset-0 -z-10 rounded-lg bg-accent-solid shadow-2xs"
@@ -469,7 +472,7 @@ export function OverdueSummaryDialog({
                 }`}
               >
                 {exportFormat === "excel" && (
-                  <motion.span
+                  <m.span
                     layoutId="overdue-export-fmt-pill"
                     transition={SPRING_NAV_GLIDE}
                     className="absolute inset-0 -z-10 rounded-lg bg-accent-solid shadow-2xs"
@@ -648,7 +651,7 @@ export function OverdueSummaryDialog({
               }`}
             >
               {activeViewTab === "ledger" && (
-                <motion.span
+                <m.span
                   layoutId="overdue-ledger-tab-pill"
                   transition={SPRING_NAV_GLIDE}
                   className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-xs border border-line-neutral-200/70"
@@ -670,7 +673,7 @@ export function OverdueSummaryDialog({
               }`}
             >
               {activeViewTab === "clients" && (
-                <motion.span
+                <m.span
                   layoutId="overdue-ledger-tab-pill"
                   transition={SPRING_NAV_GLIDE}
                   className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-xs border border-line-neutral-200/70"
@@ -692,7 +695,7 @@ export function OverdueSummaryDialog({
               }`}
             >
               {activeViewTab === "template" && (
-                <motion.span
+                <m.span
                   layoutId="overdue-ledger-tab-pill"
                   transition={SPRING_NAV_GLIDE}
                   className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-xs border border-line-neutral-200/70"
@@ -1087,7 +1090,7 @@ export function OverdueSummaryDialog({
                         }`}
                       >
                         {csvTemplateMode === "executive" && (
-                          <motion.span
+                          <m.span
                             layoutId="overdue-template-mode-pill"
                             transition={SPRING_NAV_GLIDE}
                             className="absolute inset-0 rounded-md bg-accent-solid"
@@ -1108,7 +1111,7 @@ export function OverdueSummaryDialog({
                         }`}
                       >
                         {csvTemplateMode === "flat" && (
-                          <motion.span
+                          <m.span
                             layoutId="overdue-template-mode-pill"
                             transition={SPRING_NAV_GLIDE}
                             className="absolute inset-0 rounded-md bg-accent-solid"

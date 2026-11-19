@@ -2,7 +2,7 @@ import { shell } from "electron";
 import { ipcMain } from "../security";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
-import { execFile, execFileSync } from "child_process";
+import { execFile } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -358,9 +358,6 @@ export function deleteCalendarEvent(
 
   db.delete(calendarEvents).where(eq(calendarEvents.id, id)).run();
   broadcast?.();
-  if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
-    void syncNativeLocalCalendar(broadcast);
-  }
   return { success: true };
 }
 
@@ -390,8 +387,9 @@ function inferMacCalendarColor(calendarTitle: string): EventColor {
   if (lower.includes("holiday") || lower.includes("family")) return "emerald";
   if (
     lower.includes("work") ||
-    lower.includes("university") ||
-    lower.includes("ousl")
+    lower.includes("academic") ||
+    lower.includes("campus") ||
+    lower.includes("lecture")
   )
     return "purple";
   if (
@@ -489,7 +487,7 @@ export function upsertNativeMacEventToBillFlowDb(raw: {
   isAllDay: boolean;
   location: string | null;
 }): boolean {
-  const cleanTitle = (raw.title || "").trim();
+  const cleanTitle = (raw.title || "").trim().slice(0, 150);
   if (!cleanTitle) return false;
   // Skip BillFlow's own exported items to prevent circular duplication
   if (
@@ -516,9 +514,16 @@ export function upsertNativeMacEventToBillFlowDb(raw: {
   );
   const category = inferMacEventCategory(cleanTitle, raw.calendarName);
   const color = inferMacCalendarColor(raw.calendarName);
-  const descWithSource = raw.calendarName
+  const rawDescription = raw.calendarName
     ? `${raw.description ? `${raw.description}\n` : ""}Local Calendar: ${raw.calendarName}`
     : raw.description || "Synced from macOS Calendar";
+  const descWithSource = rawDescription.trim().slice(0, 1000);
+  const cleanLocation = raw.location
+    ? raw.location.trim().slice(0, 300) || null
+    : null;
+  const cleanClientName = (raw.calendarName || "Local Calendar")
+    .trim()
+    .slice(0, 150);
 
   const existing = db
     .select()
@@ -534,7 +539,7 @@ export function upsertNativeMacEventToBillFlowDb(raw: {
       existing.endTime !== fixedTimes.endTime ||
       existing.endDate !== fixedEnd ||
       existing.description !== descWithSource ||
-      existing.location !== (raw.location || null) ||
+      existing.location !== cleanLocation ||
       existing.isAllDay !== fixedTimes.isAllDay ||
       existing.category !== category ||
       existing.color !== color
@@ -550,7 +555,7 @@ export function upsertNativeMacEventToBillFlowDb(raw: {
           isAllDay: fixedTimes.isAllDay,
           category,
           color,
-          location: raw.location || null,
+          location: cleanLocation,
           updatedAt: now,
         })
         .where(eq(calendarEvents.id, deterministicId))
@@ -573,10 +578,10 @@ export function upsertNativeMacEventToBillFlowDb(raw: {
       category,
       color,
       clientId: null,
-      clientName: raw.calendarName || "Local Calendar",
+      clientName: cleanClientName,
       taskId: null,
       taskTitle: null,
-      location: raw.location || null,
+      location: cleanLocation,
       createdAt: now,
       updatedAt: now,
     })
@@ -846,17 +851,22 @@ export function pullFromMacOsCalendarSqliteDb(
   };
 }
 
-function isMacCalendarAppRunning(): boolean {
-  if (process.platform !== "darwin") return false;
-  try {
-    const stdout = execFileSync("pgrep", ["-x", "Calendar"], {
-      encoding: "utf-8",
-      timeout: 300,
-    });
-    return Boolean(stdout.trim());
-  } catch {
-    return false;
-  }
+function isMacCalendarAppRunning(): Promise<boolean> {
+  if (process.platform !== "darwin") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    execFile(
+      "pgrep",
+      ["-x", "Calendar"],
+      { encoding: "utf-8", timeout: 300 },
+      (error, stdout) => {
+        if (error) {
+          resolve(false);
+          return;
+        }
+        resolve(Boolean(stdout.trim()));
+      },
+    );
+  });
 }
 
 /**
@@ -906,6 +916,7 @@ function syncWithMacOsCalendarAppViaJxa(
 
   const jxaScript = `
     ObjC.import('stdlib');
+    ObjC.import('Foundation');
     function pad(n) { return n < 10 ? '0' + n : '' + n; }
     function fmtDate(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
     function fmtTime(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
@@ -913,7 +924,16 @@ function syncWithMacOsCalendarAppViaJxa(
 
 
     function run(argv) {
-      var itemsToPush = JSON.parse(argv[0] || "[]");
+      var rawPayload = argv[0] || "[]";
+      if (rawPayload.charAt(0) === "@") {
+        var nsContent = $.NSString.stringWithContentsOfFileEncodingError(
+          $(rawPayload.slice(1)),
+          $.NSUTF8StringEncoding,
+          null
+        );
+        rawPayload = nsContent ? ObjC.unwrap(nsContent) : "[]";
+      }
+      var itemsToPush = JSON.parse(rawPayload || "[]");
       var pullMode = argv[1] === "1";
       var ownerPrefix = argv[2];
       var Cal = Application("Calendar");
@@ -1075,51 +1095,69 @@ function syncWithMacOsCalendarAppViaJxa(
     }
   `;
 
+  const tempPayloadFile = path.join(
+    os.tmpdir(),
+    `billflow-cal-${randomUUID()}.json`,
+  );
+  fs.writeFileSync(tempPayloadFile, JSON.stringify(payloadToPush), {
+    encoding: "utf8",
+    mode: 0o600,
+    flag: "wx",
+  });
+
   return new Promise((resolve, reject) => {
-    execFile(
-      "osascript",
-      [
-        "-l",
-        "JavaScript",
-        "-e",
-        jxaScript,
-        JSON.stringify(payloadToPush),
-        shouldPullEvents ? "1" : "0",
-        `profile-${getActiveProfileId()}:`,
-      ],
-      { timeout: 7000 },
-      (err, stdout) => {
-        if (err || !stdout) {
-          reject(
-            new Error(
-              `Calendar sync failed: ${err?.message || "No response from Calendar"}`,
-            ),
-          );
-          return;
-        }
-        try {
-          const parsed = JSON.parse(stdout.trim());
-          resolve({
-            pulledEvents: Array.isArray(parsed.pulledEvents)
-              ? parsed.pulledEvents
-              : [],
-            pulledComplete: parsed.pulledComplete === true,
-            rangeFrom:
-              typeof parsed.rangeFrom === "string"
-                ? parsed.rangeFrom
-                : undefined,
-            rangeTo:
-              typeof parsed.rangeTo === "string" ? parsed.rangeTo : undefined,
-            pushedCount: Number(parsed.pushedCount) || 0,
-            deletedCount: Number(parsed.deletedCount) || 0,
-          });
-        } catch {
-          reject(
-            new Error("Calendar returned an invalid synchronization response."),
-          );
-        }
-      },
-    );
+    try {
+      execFile(
+        "osascript",
+        [
+          "-l",
+          "JavaScript",
+          "-e",
+          jxaScript,
+          `@${tempPayloadFile}`,
+          shouldPullEvents ? "1" : "0",
+          `profile-${getActiveProfileId()}:`,
+        ],
+        { timeout: 7000, maxBuffer: 10 * 1024 * 1024 },
+        (err, stdout) => {
+          fs.rmSync(tempPayloadFile, { force: true });
+          if (err || !stdout) {
+            reject(
+              new Error(
+                `Calendar sync failed: ${err?.message || "No response from Calendar"}`,
+              ),
+            );
+            return;
+          }
+          try {
+            const parsed = JSON.parse(stdout.trim());
+            resolve({
+              pulledEvents: Array.isArray(parsed.pulledEvents)
+                ? parsed.pulledEvents
+                : [],
+              pulledComplete: parsed.pulledComplete === true,
+              rangeFrom:
+                typeof parsed.rangeFrom === "string"
+                  ? parsed.rangeFrom
+                  : undefined,
+              rangeTo:
+                typeof parsed.rangeTo === "string" ? parsed.rangeTo : undefined,
+              pushedCount: Number(parsed.pushedCount) || 0,
+              deletedCount: Number(parsed.deletedCount) || 0,
+            });
+          } catch {
+            reject(
+              new Error(
+                "Calendar returned an invalid synchronization response.",
+              ),
+            );
+          }
+        },
+      );
+    } catch (error) {
+      fs.rmSync(tempPayloadFile, { force: true });
+      reject(error);
+    }
   });
 }
 
@@ -1288,7 +1326,7 @@ export async function syncNativeLocalCalendar(
     // If this is a background push-only sync (from task/event edit, create, or delete)
     // and Calendar.app is NOT currently running, do NOT launch Calendar.app!
     // Simply keep the local BillFlow.ics export up-to-date.
-    const isCalendarRunning = isMacCalendarAppRunning();
+    const isCalendarRunning = await isMacCalendarAppRunning();
     if (pushOnly && !isCalendarRunning) {
       try {
         const icsContent = generateIcsFromEventsAndTasks({
@@ -1430,10 +1468,10 @@ export async function openNativeLocalCalendar(
   incomingTaskTimeSlots?: TaskTimeSlotMap,
 ): Promise<{ success: boolean; syncedFromMac: number; pushedToMac: number }> {
   const timeSlots = savePersistedTaskTimeSlots(incomingTaskTimeSlots);
+  let openedSuccessfully = true;
 
   if (
     process.env.BILLFLOW_DISABLE_NATIVE_CALENDAR !== "1" &&
-    process.platform === "darwin" &&
     !process.env.VITEST &&
     process.env.NODE_ENV !== "test"
   ) {
@@ -1482,56 +1520,84 @@ export async function openNativeLocalCalendar(
         ),
       );
 
-      // Open macOS Calendar.app immediately without waiting on JXA
-      execFile("open", ["-a", "Calendar", icsPath], () => {});
+      if (process.platform === "darwin") {
+        // Open macOS Calendar.app immediately without waiting on JXA
+        execFile("open", ["-a", "Calendar", icsPath], () => {});
+      } else {
+        const openError = await shell.openPath(icsPath);
+        openedSuccessfully = !openError;
+      }
     } catch {
-      try {
-        await shell.openExternal("ical://");
-      } catch {}
+      if (process.platform === "darwin") {
+        try {
+          await shell.openExternal("ical://");
+        } catch {
+          openedSuccessfully = false;
+        }
+      } else {
+        openedSuccessfully = false;
+      }
     }
   }
 
-  // Trigger two-way sync in background without blocking the open call
-  void syncNativeLocalCalendar(broadcast, incomingTaskTimeSlots, true).catch(
-    (error) => console.warn("Calendar sync failed:", error.message),
-  );
+  if (process.platform === "darwin") {
+    // Trigger two-way sync in background without blocking the open call
+    void syncNativeLocalCalendar(broadcast, incomingTaskTimeSlots, true).catch(
+      (error) => console.warn("Calendar sync failed:", error.message),
+    );
+  }
 
   return {
-    success: true,
+    success: openedSuccessfully,
     syncedFromMac: 0,
     pushedToMac: 0,
   };
 }
 
+const calendarFilterSchema = z
+  .object({
+    startDate: z.string().max(40).optional(),
+    endDate: z.string().max(40).optional(),
+    category: z.string().max(40).optional(),
+    taskId: recordId.optional(),
+  })
+  .optional();
+
 export function registerCalendarHandlers(broadcast: () => void): void {
   ipcMain.handle("events:list", async (_, filter) =>
-    listCalendarEvents(filter),
+    listCalendarEvents(calendarFilterSchema.parse(filter)),
   );
-  ipcMain.handle("events:get", async (_, id) => getCalendarEvent(id));
+  ipcMain.handle("events:get", async (_, id) =>
+    getCalendarEvent(recordId.parse(id)),
+  );
   ipcMain.handle("events:create", async (_, input) => {
     const created = createCalendarEvent(input, broadcast);
     scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return created;
   });
   ipcMain.handle("events:update", async (_, id, patch) => {
-    const updated = updateCalendarEvent(id, patch, broadcast);
+    const updated = updateCalendarEvent(recordId.parse(id), patch, broadcast);
     scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return updated;
   });
   ipcMain.handle("events:remove", async (_, id) => {
-    const removed = deleteCalendarEvent(id, broadcast);
+    const removed = deleteCalendarEvent(recordId.parse(id), broadcast);
     scheduleBackgroundNativeCalendarSync(broadcast, { pushOnly: true });
     return removed;
   });
   ipcMain.handle(
     "events:syncNative",
     async (_, taskTimeSlots?: TaskTimeSlotMap) => {
-      savePersistedTaskTimeSlots(taskTimeSlots);
-      scheduleBackgroundNativeCalendarSync(broadcast, {
-        pushOnly: true,
-        incomingTaskTimeSlots: taskTimeSlots,
-      });
-      return { syncedFromMac: 0, pushedToMac: 0 };
+      const result = await syncNativeLocalCalendar(
+        broadcast,
+        taskTimeSlots,
+        true,
+        false,
+      );
+      return {
+        syncedFromMac: result.syncedFromMac,
+        pushedToMac: result.pushedToMac,
+      };
     },
   );
   ipcMain.handle(

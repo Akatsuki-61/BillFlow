@@ -30,7 +30,6 @@ import {
   type BrushRange,
 } from "@/components/evilcharts/ui/echarts-brush";
 import {
-  DataZoomComponent,
   GridComponent,
   TooltipComponent,
   type DataZoomComponentOption,
@@ -54,7 +53,7 @@ import { LegendOverlay, type LegendVariant } from "@/components/evilcharts/ui/ec
 import type { ComposeOption, ImagePatternObject } from "echarts/core";
 import { BarChart, type BarSeriesOption } from "echarts/charts";
 import { sampleGradient } from "@/components/evilcharts/ui/echarts-dot";
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 import * as echarts from "echarts/core";
 
 // Re-export the shared types that were previously declared inline here, so
@@ -73,7 +72,7 @@ export type {
 // zoom. The brush's frame/handles/labels are raw zrender elements, not the
 // graphic component — see syncBrushOverlay. No LineChart: the main plot, the
 // loading skeleton, and the brush mini chart are ALL bar series.
-echarts.use([BarChart, GridComponent, TooltipComponent, DataZoomComponent]);
+echarts.use([BarChart, GridComponent, TooltipComponent]);
 
 type EChartsInstance = ReturnType<typeof echarts.init>;
 
@@ -1751,7 +1750,7 @@ export function EChartsBarChart<TData extends Record<string, unknown>>({
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class"],
+      attributeFilter: ["class", "data-theme"],
     });
 
     // Expandable hover, driven by the pointer's COLUMN rather than the bar element.
@@ -2181,7 +2180,7 @@ export function EChartsBarChart<TData extends Record<string, unknown>>({
 
       {isLoading && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <motion.div
+          <m.div
             initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
@@ -2189,7 +2188,7 @@ export function EChartsBarChart<TData extends Record<string, unknown>>({
           >
             <div className="border-border border-t-primary h-3 w-3 animate-spin rounded-full border" />
             <span>Loading</span>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </div>

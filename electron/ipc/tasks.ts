@@ -4,7 +4,7 @@ import { listPayments } from "./invoices";
 import { ipcMain } from "../security";
 import { randomUUID, createHash } from "crypto";
 import { and, eq, isNull, asc, desc } from "drizzle-orm";
-import { getDb } from "../db";
+import { getActiveProfileId, getDb, getRootDb } from "../db";
 import {
   tasks,
   subtasks,
@@ -15,6 +15,8 @@ import {
   calendarEvents,
   workOrders,
   taskTimeSlots,
+  settings,
+  userProfiles,
 } from "../db/schema";
 import {
   createTaskSchema,
@@ -32,12 +34,41 @@ import type {
 import { AppError } from "./errors";
 import { scheduleBackgroundNativeCalendarSync } from "./calendar";
 
-const defaultAssignee = {
-  name: "Chethaka",
-  avatarLetter: "C",
-  bgColor: "bg-surface-purple-100",
-  textColor: "text-content-purple-700",
-};
+function resolveDefaultAssignee(tx: Pick<ReturnType<typeof getDb>, "select">) {
+  const bizName = tx
+    .select({ businessName: settings.businessName })
+    .from(settings)
+    .where(eq(settings.id, "default"))
+    .get()
+    ?.businessName?.trim();
+  let profileName: string | undefined;
+  try {
+    const rootDb = getRootDb();
+    const activeId = getActiveProfileId();
+    profileName =
+      rootDb
+        .select({ name: userProfiles.name })
+        .from(userProfiles)
+        .where(eq(userProfiles.id, activeId))
+        .get()
+        ?.name?.trim() ||
+      rootDb
+        .select({ name: userProfiles.name })
+        .from(userProfiles)
+        .where(eq(userProfiles.isActive, true))
+        .get()
+        ?.name?.trim();
+  } catch {
+    // Fall back when root DB is not initialized in isolated unit tests
+  }
+  const resolvedName = bizName || profileName || "Workspace Owner";
+  return {
+    name: resolvedName,
+    avatarLetter: (resolvedName[0] || "W").toUpperCase(),
+    bgColor: "bg-surface-purple-100",
+    textColor: "text-content-purple-700",
+  };
+}
 
 export function listTasks(): TaskItem[] {
   const db = getDb();
@@ -424,6 +455,21 @@ function qualifyingInvoice(id: string) {
   return { invoice, received };
 }
 
+function parseClientSnapshot(
+  raw: string | null,
+): { name?: string; driveUrl?: string } | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as { name?: string; driveUrl?: string };
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function pendingTracking(): TrackingOffer[] {
   const db = getDb();
   return db.transaction((tx) => {
@@ -457,9 +503,7 @@ export function pendingTracking(): TrackingOffer[] {
       const client = row.clientId
         ? tx.select().from(clients).where(eq(clients.id, row.clientId)).get()
         : undefined;
-      const snapshot = row.clientSnapshot
-        ? (JSON.parse(row.clientSnapshot) as { name?: string })
-        : undefined;
+      const snapshot = parseClientSnapshot(row.clientSnapshot);
       offers.push({
         invoiceId: row.id,
         code: row.code,
@@ -503,12 +547,7 @@ export function decideTracking(idInput: string, choiceInput: "yes" | "no") {
               .where(eq(clients.id, invoice.clientId))
               .get()
           : undefined;
-        const snapshot = invoice.clientSnapshot
-          ? (JSON.parse(invoice.clientSnapshot) as {
-              name?: string;
-              driveUrl?: string;
-            })
-          : undefined;
+        const snapshot = parseClientSnapshot(invoice.clientSnapshot);
         for (const item of items) {
           const taskId = randomUUID();
           const inserted = tx
@@ -518,9 +557,10 @@ export function decideTracking(idInput: string, choiceInput: "yes" | "no") {
               invoiceItemId: item.id,
               invoiceId: id,
               clientId: invoice.clientId,
-              title: item.description,
+              title:
+                item.description.trim().slice(0, 240) || "Invoice deliverable",
               description: item.description,
-              assignee: defaultAssignee,
+              assignee: resolveDefaultAssignee(tx),
               clientName: snapshot?.name || client?.name,
               deliveryUrl: deliveryLink.parse(
                 invoice.deliveryUrl ||

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useId } from "react";
 import { ChevronDown, Check } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
   EXIT_MENU_POPOVER,
@@ -163,7 +163,7 @@ export function SelectDropdown<T extends string = string>({
 
       <AnimatePresence initial={false}>
         {isOpen && (
-          <motion.div
+          <m.div
             ref={menuRef}
             id={listboxId}
             role="listbox"
@@ -207,7 +207,7 @@ export function SelectDropdown<T extends string = string>({
                 const isHighlighted = index === highlightedIndex;
 
                 return (
-                  <motion.button
+                  <m.button
                     key={option.value}
                     type="button"
                     role="option"
@@ -238,7 +238,7 @@ export function SelectDropdown<T extends string = string>({
                       <span className="truncate">{option.label}</span>
                     </div>
                     {isSelected && (
-                      <motion.span
+                      <m.span
                         initial={reducedMotion ? false : { opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={SPRING_LIQUID_BUTTON}
@@ -249,13 +249,13 @@ export function SelectDropdown<T extends string = string>({
                           strokeWidth={2.4}
                           aria-hidden="true"
                         />
-                      </motion.span>
+                      </m.span>
                     )}
-                  </motion.button>
+                  </m.button>
                 );
               })}
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

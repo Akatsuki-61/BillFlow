@@ -13,6 +13,8 @@ import {
   closeDatabaseForTesting,
   getDb,
   getSqlite,
+  getRootDatabasePath,
+  getActiveProfileId,
   migrateDatabase,
 } from "../db";
 import {
@@ -54,7 +56,9 @@ import {
 import {
   completeProfileOnboarding,
   createProfile,
+  listProfilesState,
   switchProfile,
+  updateProfile,
   verifyProfilePassword,
 } from "../ipc/profiles";
 import {
@@ -66,6 +70,8 @@ import {
   registerFileHandlers,
   copyReceipt,
   managedAttachmentPath,
+  openAttachment,
+  openInvoicePdf,
 } from "../ipc/files";
 import { createExpense, removeExpense } from "../ipc/expenses";
 import { getAnalyticsSummary } from "../ipc/analytics";
@@ -85,6 +91,7 @@ import {
   configureIpcSecurity,
   isTrustedDocument,
   assertTrustedSender,
+  sanitizeExternalUrl,
 } from "../security";
 import { lockProfileSession, isWorkspaceUnlocked } from "../workspace-session";
 import { resolveStaticFile, documentCsp } from "../static-protocol";
@@ -1049,4 +1056,195 @@ it("merges disjoint records, skips identical rows and rolls back conflicts", () 
       .map((row) => row.id)
       .sort(),
   ).toEqual(["a", "existing"]);
+});
+
+it("blocks onboarding replay on locked default profile and keeps secondary profile DB active on error", () => {
+  const second = createProfile({
+    name: "Secondary",
+    role: "ai-development",
+    seedRoleCatalog: false,
+  }).profiles.find((p) => p.id !== "default")!;
+  switchProfile(second.id);
+  expect(getActiveProfileId()).toBe(second.id);
+  expect(() => completeProfileOnboarding({} as never)).toThrow();
+  expect(getActiveProfileId()).toBe(second.id);
+
+  switchProfile("default");
+  updateProfile("default", { password: "secret" });
+  lockProfileSession();
+  const state = listProfilesState();
+  expect(state.needsOnboarding).toBe(false);
+  expect(() =>
+    completeProfileOnboarding({
+      studioName: "Override",
+      defaultCurrency: "USD",
+      profiles: [{ ...slot, password: "new-password" }],
+    } as never),
+  ).toThrow(/already/);
+  expect(verifyProfilePassword("default", "secret").valid).toBe(true);
+});
+
+it("rejects profiles:verifyPassword while workspace is locked", () => {
+  completeProfileOnboarding({
+    studioName: "Audit",
+    defaultCurrency: "USD",
+    profiles: [{ ...slot, password: "secret" }],
+  } as never);
+  const event = trustedEvent();
+  configureIpcSecurity(event.sender, null, isWorkspaceUnlocked);
+  lockProfileSession();
+  expect(() =>
+    assertTrustedSender(event, "profiles:verifyPassword"),
+  ).toThrow(/LOCKED/);
+});
+
+it("sanitizes external URLs and blocks unsafe schemes, credentials, control chars, and mailto attachments", () => {
+  expect(sanitizeExternalUrl("https://example.com/pay?a=1")).toBe(
+    "https://example.com/pay?a=1",
+  );
+  expect(
+    sanitizeExternalUrl("mailto:client@example.com?subject=Hi&body=Pay"),
+  ).toBe("mailto:client@example.com?subject=Hi&body=Pay");
+  for (const unsafe of [
+    "file:///etc/passwd",
+    "javascript:alert(1)",
+    "https://user:pass@example.com/",
+    "https://example.com/\nX",
+    "mailto:client@example.com?attach=/etc/passwd&subject=Hi",
+    "mailto:client@example.com?subject=a&subject=b",
+  ]) {
+    expect(sanitizeExternalUrl(unsafe)).toBeNull();
+  }
+});
+
+it("neutralizes String.replace special patterns in buildInvoiceHtml supplement", async () => {
+  const actual = await vi.importActual<typeof import("../pdf-generator")>(
+    "../pdf-generator",
+  );
+  const html = actual.buildInvoiceHtml({
+    code: "INV-2026-900",
+    issueDate: "2026-11-18",
+    currency: "USD",
+    status: "UNPAID",
+    template: "noir-crimson",
+    amountCents: 10000,
+    items: [{ description: "Audit", quantity: 1, unitPriceCents: 10000 }],
+    paymentUrl: "https://pay.example.com/$&/$`",
+    client: {
+      name: "Acme",
+      billingAddress: "Suite $& and $`",
+    },
+    business: {
+      businessName: "Studio",
+    },
+  });
+  expect(html.match(/<!DOCTYPE html>/gi)).toHaveLength(1);
+  expect(html).toContain("Suite $&amp; and $`");
+  expect(html).not.toContain('<p><strong>Billing address</strong><br>Suite <div class="footer-bar"');
+});
+
+it("strips pdf_export_directory on backup export and preserves local folder on restore", () => {
+  client();
+  invoice();
+  const exported = exportWorkspace();
+  expect((exported.settings as { pdfExportDirectory: string | null }).pdfExportDirectory).toBeNull();
+  expect(exported.records?.settings?.[0]?.pdf_export_directory).toBeNull();
+
+  const tampered = structuredClone(exported);
+  tampered.records!.settings[0].pdf_export_directory = "/tmp/attacker-dir";
+  importWorkspace(tampered);
+  expect(getOrCreateSettings().pdfExportDirectory).toBe(dir);
+});
+
+it("detects invoice and work-order overpayments in assertWorkspaceIntegrity", () => {
+  client();
+  const inv = invoice();
+  getSqlite()
+    .prepare("UPDATE invoices SET paid_cents = amount_cents + 1 WHERE id = ?")
+    .run(inv.id);
+  expect(() => assertWorkspaceIntegrity(getSqlite())).toThrow(
+    /invoice overpayment/,
+  );
+
+  getSqlite()
+    .prepare("UPDATE invoices SET paid_cents = 0 WHERE id = ?")
+    .run(inv.id);
+  const t = task("t-over", "a", "done");
+  getDb()
+    .insert(vendors)
+    .values({ id: "v-over", name: "Vendor", service: "Work" })
+    .run();
+  const wo = createWorkOrder({
+    vendorId: "v-over",
+    taskId: t.id,
+    invoiceId: inv.id,
+    scope: "Overpay check",
+    feeCents: 2000,
+    currency: "USD",
+  });
+  getSqlite()
+    .prepare(
+      "INSERT INTO vendor_payouts(id,work_order_id,amount_cents,currency,paid_at,request_id) VALUES ('p-over',?,2500,'USD','2026-11-18','req-over')",
+    )
+    .run(wo.id);
+  expect(() => assertWorkspaceIntegrity(getSqlite())).toThrow(
+    /work order overpayment/,
+  );
+});
+
+it("rejects mismatched attachment sizes before reading and non-PDF magic bytes renamed as .pdf", async () => {
+  client();
+  const inv = invoice();
+  const { payment } = recordPayment({ invoiceId: inv.id, amountCents: 5000 });
+  const source = path.join(dir, "receipt.pdf");
+  fs.writeFileSync(source, "%PDF-1.4 valid");
+  const att = copyReceipt({ type: "payment", id: payment.id }, source, "att-size");
+  const { stored_name: storedName } = getSqlite()
+    .prepare("SELECT stored_name FROM attachments WHERE id = ?")
+    .get(att.id) as { stored_name: string };
+  const storedPath = managedAttachmentPath(storedName);
+  fs.chmodSync(storedPath, 0o600);
+  fs.writeFileSync(storedPath, "%PDF-1.4 tampered larger payload");
+  await expect(openAttachment(att.id)).rejects.toThrow(
+    /Receipt integrity check failed/,
+  );
+
+  const fakePdf = path.join(dir, "not-a-pdf.pdf");
+  fs.writeFileSync(fakePdf, "<html><body>not a pdf</body></html>");
+  getDb()
+    .insert(invoicePdfExports)
+    .values({
+      invoiceId: inv.id,
+      filePath: fakePdf,
+      exportedAt: new Date().toISOString(),
+    })
+    .run();
+  await expect(openInvoicePdf(inv.id)).rejects.toThrow(/Invalid invoice PDF/);
+});
+
+it("strips photoData from profiles.json with 0o600 permissions and rejects whitespace passwords", () => {
+  const tinyPng =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  createProfile({
+    name: "Visual Studio",
+    role: "design",
+    photoData: tinyPng,
+    seedRoleCatalog: false,
+  });
+  const mirrorPath = path.join(path.dirname(getRootDatabasePath()), "profiles.json");
+  const mirror = JSON.parse(fs.readFileSync(mirrorPath, "utf8")) as {
+    profiles: Record<string, unknown>[];
+  };
+  expect(mirror.profiles.some((p) => "photoData" in p)).toBe(false);
+  if (process.platform !== "win32") {
+    expect(fs.statSync(mirrorPath).mode & 0o777).toBe(0o600);
+  }
+  expect(() =>
+    createProfile({
+      name: "Whitespace Pass",
+      role: "general",
+      password: "    ",
+      seedRoleCatalog: false,
+    }),
+  ).toThrow(/whitespace/i);
 });

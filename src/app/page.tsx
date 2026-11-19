@@ -18,7 +18,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
 import {
   IconCrossfade,
@@ -27,9 +27,12 @@ import {
 } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
+import { DashboardMetricsProvider } from "@/components/dashboard/DashboardMetricsContext";
 import { useWidgetContext } from "@/context/WidgetContext";
 import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
+import { WorkflowQuickStartBar } from "@/components/onboarding/WorkflowQuickStartBar";
+import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
 import { DashboardPeriod } from "@/types/dashboard";
 
 const PERIOD_OPTIONS: SelectOption<DashboardPeriod>[] = [
@@ -61,6 +64,7 @@ export default function DashboardPage() {
   } = useWidgetContext();
 
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
+  const isMac = useIsMac();
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const lastSwapRef = useRef<{ pair: string; time: number }>({
     pair: "",
@@ -210,27 +214,33 @@ export default function DashboardPage() {
     const isCompact = size === "compact";
 
     if (widgetId === "workspace-insights") {
-      return isCompact ? "col-span-12 lg:col-span-6" : "col-span-12";
-    }
-    if (widgetId === "profit-trajectory-chart") {
-      return isCompact ? "col-span-12" : "col-span-12 lg:col-span-8";
+      return isCompact
+        ? "col-span-1 md:col-span-6 lg:col-span-6"
+        : "col-span-1 md:col-span-6 lg:col-span-12";
     }
     if (baseSize === "metric") {
       return isCompact
-        ? "col-span-12 sm:col-span-6 lg:col-span-3"
-        : "col-span-12 md:col-span-6 lg:col-span-4";
+        ? "col-span-1 md:col-span-2 lg:col-span-2"
+        : "col-span-1 md:col-span-3 lg:col-span-3";
     }
     if (baseSize === "full") {
       return isCompact
-        ? "col-span-12 lg:col-span-6"
-        : "col-span-12 lg:col-span-8";
+        ? "col-span-1 md:col-span-6 lg:col-span-6"
+        : "col-span-1 md:col-span-6 lg:col-span-12";
+    }
+    if (baseSize === "medium") {
+      return isCompact
+        ? "col-span-1 md:col-span-3 lg:col-span-3"
+        : "col-span-1 md:col-span-3 lg:col-span-4";
     }
     if (baseSize === "wide") {
-      return isCompact ? "col-span-12" : "col-span-12 lg:col-span-6";
+      return isCompact
+        ? "col-span-1 md:col-span-3 lg:col-span-4"
+        : "col-span-1 md:col-span-6 lg:col-span-6";
     }
     return isCompact
-      ? "col-span-12 md:col-span-6 lg:col-span-4"
-      : "col-span-12 lg:col-span-6";
+      ? "col-span-1 md:col-span-3 lg:col-span-4"
+      : "col-span-1 md:col-span-6 lg:col-span-6";
   };
 
   return (
@@ -342,7 +352,7 @@ export default function DashboardPage() {
                   size="small"
                   onClick={undoDashboard}
                   disabled={!canUndo}
-                  title="Undo last change (Cmd+Z)"
+                  title={`Undo last change (${formatShortcut("Cmd+Z", isMac)})`}
                   className="gap-1.5"
                 >
                   <RotateCcw className="w-3 h-3" />
@@ -409,6 +419,7 @@ export default function DashboardPage() {
       {/* =====================================================================
           UNIFIED BILLFLOW ZENTRA BENTO GRID
          ===================================================================== */}
+      <WorkflowQuickStartBar />
       {pinnedWidgets.length === 0 ? (
         <div className="p-12 text-center ui-card">
           <Layers className="w-10 h-10 text-content-neutral-400 mx-auto mb-3" />
@@ -441,14 +452,15 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : (
-        <div className="dashboard-grid grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4">
-          {pinnedWidgets.map((w, index) => {
+        <DashboardMetricsProvider period={period}>
+          <div className="dashboard-grid grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4">
+            {pinnedWidgets.map((w, index) => {
             const colSpan = getColSpanClass(w.id, w.size);
             const isCompact = (widgetSizes[w.id] || "normal") === "compact";
             const isOver = dragOverIndex === index;
 
             return (
-              <motion.div
+              <m.div
                 key={w.id}
                 layout="position"
                 transition={SPRING_NAV_GLIDE}
@@ -511,10 +523,11 @@ export default function DashboardPage() {
                   onRemove={() => removeFromDashboard(w.id)}
                   onContextMenu={handleContextMenu}
                 />
-              </motion.div>
+              </m.div>
             );
           })}
-        </div>
+          </div>
+        </DashboardMetricsProvider>
       )}
     </div>
   );

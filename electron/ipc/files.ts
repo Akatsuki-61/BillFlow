@@ -4,6 +4,7 @@ import { app, dialog, shell } from "electron";
 import { ipcMain } from "../security";
 import { eq } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
+import { z } from "zod";
 import fs from "fs";
 import path from "path";
 import { getActiveProfileId, getDb } from "../db";
@@ -94,6 +95,63 @@ export function listAttachments(input: AttachmentOwner): AttachmentItem[] {
     .map(publicAttachment);
 }
 // Source paths come only from the native picker; this helper is not exposed to the renderer.
+export function copyReceiptBytes(
+  input: AttachmentOwner,
+  bytes: Buffer,
+  originalName: string,
+  requestId: string,
+) {
+  const owner = attachmentOwnerSchema.parse(input);
+  recordId.parse(requestId);
+  checkOwner(owner);
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(attachments)
+    .where(eq(attachments.id, requestId))
+    .get();
+  if (existing) {
+    if (
+      (owner.type === "payment"
+        ? existing.paymentId
+        : owner.type === "expense"
+          ? existing.expenseId
+          : existing.payoutId) !== owner.id
+    )
+      throw new Error("Receipt request belongs to another record.");
+    return publicAttachment(existing);
+  }
+  if (bytes.length === 0 || bytes.length > MAX_RECEIPT_BYTES)
+    throw new Error("Receipt must be smaller than 20 MB.");
+  const { extension, mimeType } = receiptFormat(bytes);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const storedName = `${sha256}.${extension}`;
+  const { destination, created } = publishManagedAttachment(storedName, bytes);
+  const cleanName = path.basename(originalName || "").slice(0, 255) || `receipt.${extension}`;
+  try {
+    db.insert(attachments)
+      .values({
+        id: requestId,
+        paymentId: owner.type === "payment" ? owner.id : null,
+        expenseId: owner.type === "expense" ? owner.id : null,
+        payoutId: owner.type === "payout" ? owner.id : null,
+        originalName: cleanName,
+        storedName,
+        mimeType,
+        sizeBytes: bytes.length,
+        sha256,
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+    return publicAttachment(
+      db.select().from(attachments).where(eq(attachments.id, requestId)).get()!,
+    );
+  } catch (error) {
+    if (created) fs.rmSync(destination, { force: true });
+    throw error;
+  }
+}
+
 export function copyReceipt(
   input: AttachmentOwner,
   source: string,
@@ -123,34 +181,7 @@ export function copyReceipt(
   if (!stat.isFile() || stat.size === 0 || stat.size > MAX_RECEIPT_BYTES)
     throw new Error("Receipt must be a file smaller than 20 MB.");
   const bytes = fs.readFileSync(source);
-  if (bytes.length > MAX_RECEIPT_BYTES)
-    throw new Error("Receipt must be smaller than 20 MB.");
-  const { extension, mimeType } = receiptFormat(bytes);
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
-  const storedName = `${sha256}.${extension}`;
-  const { destination, created } = publishManagedAttachment(storedName, bytes);
-  try {
-    db.insert(attachments)
-      .values({
-        id: requestId,
-        paymentId: owner.type === "payment" ? owner.id : null,
-        expenseId: owner.type === "expense" ? owner.id : null,
-        payoutId: owner.type === "payout" ? owner.id : null,
-        originalName: path.basename(source),
-        storedName,
-        mimeType,
-        sizeBytes: bytes.length,
-        sha256,
-        createdAt: new Date().toISOString(),
-      })
-      .run();
-    return publicAttachment(
-      db.select().from(attachments).where(eq(attachments.id, requestId)).get()!,
-    );
-  } catch (error) {
-    if (created) fs.rmSync(destination, { force: true });
-    throw error;
-  }
+  return copyReceiptBytes(owner, bytes, path.basename(source), requestId);
 }
 export async function openAttachment(id: string) {
   const row = getDb()
@@ -165,7 +196,13 @@ export async function openAttachment(id: string) {
       "Receipt file is missing. Restore it from a complete backup.",
     );
   const stat = fs.lstatSync(file);
-  if (stat.isSymbolicLink() || !stat.isFile())
+  if (
+    stat.isSymbolicLink() ||
+    !stat.isFile() ||
+    stat.size <= 0 ||
+    stat.size > MAX_RECEIPT_BYTES ||
+    stat.size !== row.sizeBytes
+  )
     throw new Error("Receipt integrity check failed.");
   if (
     createHash("sha256").update(fs.readFileSync(file)).digest("hex") !==
@@ -195,6 +232,19 @@ export function pdfOutputDirectory() {
 function assertNonSymlinkFile(filePath: string, message: string) {
   const stat = fs.lstatSync(filePath);
   if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(message);
+}
+function assertPdfFileHeader(filePath: string, message: string) {
+  const header = Buffer.alloc(5);
+  let handle: number | undefined;
+  try {
+    handle = fs.openSync(filePath, "r");
+    const bytesRead = fs.readSync(handle, header, 0, 5, 0);
+    if (bytesRead < 5 || header.toString("ascii") !== "%PDF-") {
+      throw new Error(message);
+    }
+  } finally {
+    if (handle !== undefined) fs.closeSync(handle);
+  }
 }
 // The PDF generator calls this in the main process after saving its invoice.
 export function saveInvoicePdf(invoiceId: string, bytes: Buffer) {
@@ -267,6 +317,7 @@ export async function openWorkOrderPdf(
   assertNonSymlinkFile(filePath, "Invalid voucher PDF file.");
   if (path.extname(filePath).toLowerCase() !== ".pdf")
     throw new Error("Invalid voucher PDF path.");
+  assertPdfFileHeader(filePath, "Invalid voucher PDF file.");
   if (reveal) shell.showItemInFolder(filePath);
   else {
     const error = await shell.openPath(filePath);
@@ -286,21 +337,22 @@ export async function openInvoicePdf(invoiceId: string, reveal = false) {
   assertNonSymlinkFile(record.filePath, "Invalid invoice PDF file.");
   if (path.extname(record.filePath).toLowerCase() !== ".pdf")
     throw new Error("Invalid invoice PDF path.");
+  assertPdfFileHeader(record.filePath, "Invalid invoice PDF file.");
   if (reveal) shell.showItemInFolder(record.filePath);
   else {
     const error = await shell.openPath(record.filePath);
     if (error) throw new Error(error);
   }
 }
-const selections = new Map<
-  string,
-  {
-    sender: Electron.WebContents;
-    workspace: ReturnType<typeof captureWorkspace>;
-    source: string;
-    expires: number;
-  }
->();
+type StagedSelection = {
+  sender: Electron.WebContents;
+  workspace: ReturnType<typeof captureWorkspace>;
+  expires: number;
+  source?: string;
+  bytes?: Buffer;
+  originalName?: string;
+};
+const selections = new Map<string, StagedSelection>();
 const observedSenders = new WeakSet<Electron.WebContents>();
 function expireSelectionsOnNavigation(sender: Electron.WebContents) {
   if (observedSenders.has(sender)) return;
@@ -314,6 +366,55 @@ function expireSelectionsOnNavigation(sender: Electron.WebContents) {
   });
   sender.once("destroyed", revoke);
 }
+function storeReceiptSelection(
+  sender: Electron.WebContents,
+  workspace: ReturnType<typeof captureWorkspace>,
+  entry: Omit<StagedSelection, "sender" | "workspace" | "expires">,
+) {
+  for (const [id, selection] of selections) {
+    if (selection.expires < Date.now()) selections.delete(id);
+  }
+  if (selections.size >= 64) {
+    selections.delete(selections.keys().next().value!);
+  }
+  const token = randomUUID();
+  selections.set(token, {
+    sender,
+    workspace,
+    ...entry,
+    expires: Date.now() + 5 * 60 * 1000,
+  });
+  return token;
+}
+
+function stageValidatedReceiptPath(
+  sender: Electron.WebContents,
+  workspace: ReturnType<typeof captureWorkspace>,
+  source: string,
+) {
+  const stat = fs.lstatSync(source);
+  if (
+    stat.isSymbolicLink() ||
+    !stat.isFile() ||
+    stat.size <= 0 ||
+    stat.size > MAX_RECEIPT_BYTES
+  ) {
+    throw new Error("Receipt must be a file smaller than 20 MB.");
+  }
+  const magic = Buffer.alloc(Math.min(12, stat.size));
+  let handle: number | undefined;
+  try {
+    handle = fs.openSync(source, "r");
+    fs.readSync(handle, magic, 0, magic.length, 0);
+  } finally {
+    if (handle !== undefined) fs.closeSync(handle);
+  }
+  receiptFormat(magic);
+  const token = storeReceiptSelection(sender, workspace, { source });
+  // The historical path property now carries an opaque capability, never a disk path.
+  return { path: token, name: path.basename(source), size: stat.size };
+}
+
 async function selectReceiptFile(event: Electron.IpcMainInvokeEvent) {
   const workspace = captureWorkspace();
   expireSelectionsOnNavigation(event.sender);
@@ -326,24 +427,50 @@ async function selectReceiptFile(event: Electron.IpcMainInvokeEvent) {
   });
   workspace.assertCurrent();
   if (result.canceled || !result.filePaths[0]) return null;
-  const source = result.filePaths[0];
-  const stat = fs.statSync(source);
-  if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_RECEIPT_BYTES)
-    throw new Error("Receipt must be a file smaller than 20 MB.");
-  receiptFormat(fs.readFileSync(source));
-  for (const [id, selection] of selections)
-    if (selection.expires < Date.now()) selections.delete(id);
-  if (selections.size >= 64) selections.delete(selections.keys().next().value!);
-  const token = randomUUID();
-  selections.set(token, {
-    sender: event.sender,
-    workspace,
-    source,
-    expires: Date.now() + 5 * 60 * 1000,
-  });
-  // The historical path property now carries an opaque capability, never a disk path.
-  return { path: token, name: path.basename(source), size: stat.size };
+  return stageValidatedReceiptPath(event.sender, workspace, result.filePaths[0]);
 }
+
+export function stageReceiptFromPath(
+  event: Electron.IpcMainInvokeEvent,
+  sourcePath: string,
+) {
+  if (typeof sourcePath !== "string" || !path.isAbsolute(sourcePath)) {
+    throw new Error("Invalid receipt file path.");
+  }
+  const workspace = captureWorkspace();
+  expireSelectionsOnNavigation(event.sender);
+  return stageValidatedReceiptPath(event.sender, workspace, sourcePath);
+}
+
+const droppedReceiptNameSchema = z.string().trim().min(1).max(255);
+export function stageReceiptBytes(
+  event: Electron.IpcMainInvokeEvent,
+  name: string,
+  data: Uint8Array | ArrayBuffer,
+) {
+  const workspace = captureWorkspace();
+  expireSelectionsOnNavigation(event.sender);
+  const cleanName = path.basename(droppedReceiptNameSchema.parse(name));
+  if (!cleanName || cleanName === "." || cleanName === "..") {
+    throw new Error("Invalid receipt file name.");
+  }
+  const bytes =
+    data instanceof Uint8Array
+      ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+      : data instanceof ArrayBuffer
+        ? Buffer.from(data)
+        : null;
+  if (!bytes || bytes.length === 0 || bytes.length > MAX_RECEIPT_BYTES) {
+    throw new Error("Receipt must be a file smaller than 20 MB.");
+  }
+  receiptFormat(bytes.subarray(0, Math.min(12, bytes.length)));
+  const token = storeReceiptSelection(event.sender, workspace, {
+    bytes: Buffer.from(bytes),
+    originalName: cleanName,
+  });
+  return { path: token, name: cleanName, size: bytes.length };
+}
+
 export function registerFileHandlers(broadcast: () => void) {
   ipcMain.handle("attachments:list", (_e, owner: AttachmentOwner) =>
     listAttachments(owner),
@@ -373,12 +500,27 @@ export function registerFileHandlers(broadcast: () => void) {
         throw new Error("Select this receipt using the file picker again.");
       selections.delete(selected.path);
       selection.workspace.assertCurrent();
-      const receipt = copyReceipt(owner, selection.source, requestId);
+      const receipt = selection.bytes
+        ? copyReceiptBytes(
+            owner,
+            selection.bytes,
+            selection.originalName || "receipt",
+            requestId,
+          )
+        : copyReceipt(owner, selection.source!, requestId);
       broadcast();
       return receipt;
     },
   );
   ipcMain.handle("attachments:chooseFile", (event) => selectReceiptFile(event));
+  ipcMain.handle("attachments:stageDroppedPath", (event, filePath: string) =>
+    stageReceiptFromPath(event, filePath),
+  );
+  ipcMain.handle(
+    "attachments:stageDroppedFile",
+    (event, name: string, data: Uint8Array | ArrayBuffer) =>
+      stageReceiptBytes(event, name, data),
+  );
   ipcMain.handle("files:selectPdfDirectory", async () => {
     const workspace = captureWorkspace();
     const result = await dialog.showOpenDialog({
@@ -393,7 +535,7 @@ export function registerFileHandlers(broadcast: () => void) {
   ipcMain.handle("files:openDraft", async (_event, link: string) => {
     if (typeof link !== "string" || !isMessageDraftUrl(link))
       throw new Error("Invalid WhatsApp or SMS draft.");
-    await shell.openExternal(link);
+    await shell.openExternal(new URL(link).href);
   });
   ipcMain.handle("files:openInvoicePdf", (_e, id: string, reveal?: boolean) =>
     openInvoicePdf(id, reveal),

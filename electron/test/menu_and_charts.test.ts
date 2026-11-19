@@ -114,4 +114,42 @@ describe("macOS Menu & About Panel Configuration", () => {
     expect(chart?.title).toBe("Collections & Net Cashflow");
     expect(chart?.description).toContain("Recorded payments");
   });
+
+  it("omits reload and toggleDevTools entries in packaged View menus", () => {
+    const template = buildMenuTemplate(() => {}, true, undefined, false);
+    const viewMenu = template.find((m) => m.label === "View");
+    const roles = (viewMenu?.submenu as MenuItemConstructorOptions[]).map(
+      (item) => item.role,
+    );
+    expect(roles).not.toContain("toggleDevTools");
+    expect(roles).not.toContain("reload");
+    expect(roles).not.toContain("forceReload");
+  });
+
+  it("provides Settings in File menu and About/Updates in Help menu on Windows and Linux", () => {
+    const navigated: string[] = [];
+    const template = buildMenuTemplate((route) => navigated.push(route), false);
+    expect(template.map((m) => m.label)).toEqual([
+      "File",
+      "Edit",
+      "View",
+      "Tabs",
+      "Window",
+      "Help",
+    ]);
+
+    const fileMenu = template.find((m) => m.label === "File");
+    const fileItems = fileMenu!.submenu as MenuItemConstructorOptions[];
+    const settingsItem = fileItems.find((i) => i.label === "Settings...");
+    expect(settingsItem?.accelerator).toBe("CmdOrCtrl+,");
+    settingsItem?.click?.({} as MenuItem, undefined, {} as KeyboardEvent);
+    expect(navigated).toContain("/settings");
+
+    const helpMenu = template.find((m) => m.label === "Help");
+    const helpLabels = (helpMenu!.submenu as MenuItemConstructorOptions[]).map(
+      (i) => i.label,
+    );
+    expect(helpLabels).toContain("Check for Updates...");
+    expect(helpLabels).toContain("About BillFlow");
+  });
 });

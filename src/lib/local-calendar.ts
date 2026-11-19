@@ -308,6 +308,10 @@ export function autoFixAndLinkCalendarData(params: {
     taskMap.set(t.id, t);
     taskTitleToTask.set(t.title.toLowerCase().trim(), t);
   }
+  const taskTimePatches = new Map<
+    string,
+    { startTime: string; endTime: string | null }
+  >();
 
   const fixedEvents: CalendarEventItem[] = params.events.map((evt) => {
     let changed = false;
@@ -351,9 +355,15 @@ export function autoFixAndLinkCalendarData(params: {
           linkedTask.clientName || clientMap.get(linkedTask.clientId) || null;
         changed = true;
       }
-      if (!linkedTask.startTime && fixedTimes.startTime) {
-        linkedTask.startTime = fixedTimes.startTime;
-        linkedTask.endTime = fixedTimes.endTime;
+      if (
+        !linkedTask.startTime &&
+        fixedTimes.startTime &&
+        !taskTimePatches.has(linkedTask.id)
+      ) {
+        taskTimePatches.set(linkedTask.id, {
+          startTime: fixedTimes.startTime,
+          endTime: fixedTimes.endTime,
+        });
       }
     } else if (!fixedTaskId && fixedTaskTitle) {
       const matchedTask = taskTitleToTask.get(
@@ -362,9 +372,15 @@ export function autoFixAndLinkCalendarData(params: {
       if (matchedTask) {
         fixedTaskId = matchedTask.id;
         fixedTaskTitle = matchedTask.title;
-        if (!matchedTask.startTime && fixedTimes.startTime) {
-          matchedTask.startTime = fixedTimes.startTime;
-          matchedTask.endTime = fixedTimes.endTime;
+        if (
+          !matchedTask.startTime &&
+          fixedTimes.startTime &&
+          !taskTimePatches.has(matchedTask.id)
+        ) {
+          taskTimePatches.set(matchedTask.id, {
+            startTime: fixedTimes.startTime,
+            endTime: fixedTimes.endTime,
+          });
         }
         changed = true;
       }
@@ -380,9 +396,15 @@ export function autoFixAndLinkCalendarData(params: {
           fixedClientId = matchedByTitle.clientId;
           fixedClientName = matchedByTitle.clientName || null;
         }
-        if (!matchedByTitle.startTime && fixedTimes.startTime) {
-          matchedByTitle.startTime = fixedTimes.startTime;
-          matchedByTitle.endTime = fixedTimes.endTime;
+        if (
+          !matchedByTitle.startTime &&
+          fixedTimes.startTime &&
+          !taskTimePatches.has(matchedByTitle.id)
+        ) {
+          taskTimePatches.set(matchedByTitle.id, {
+            startTime: fixedTimes.startTime,
+            endTime: fixedTimes.endTime,
+          });
         }
         changed = true;
       }
@@ -410,8 +432,15 @@ export function autoFixAndLinkCalendarData(params: {
       : evt;
   });
 
+  const patchedTasks = taskTimePatches.size
+    ? fixedTasks.map((t) => {
+        const patch = taskTimePatches.get(t.id);
+        return patch ? { ...t, ...patch } : t;
+      })
+    : fixedTasks;
+
   return {
-    tasks: fixedTasks,
+    tasks: patchedTasks,
     events: fixedEvents,
     repairedCount,
   };
@@ -477,10 +506,14 @@ function formatUtcStamp(isoStr?: string): string {
     .replace(/\.\d{3}/, "");
 }
 
+function sanitizeIcsUidPart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
 export function buildVEventFromCalendarEvent(event: CalendarEventItem): string {
   const lines: string[] = [
     "BEGIN:VEVENT",
-    `UID:billflow-${activeProfileScope()}-evt-${event.id}@billflow.local`,
+    `UID:billflow-${sanitizeIcsUidPart(activeProfileScope())}-evt-${sanitizeIcsUidPart(event.id)}@billflow.local`,
     `DTSTAMP:${formatUtcStamp(event.updatedAt || event.createdAt)}`,
   ];
 
@@ -564,7 +597,7 @@ export function buildIcsBlocksFromTask(
 
   const veventLines: string[] = [
     "BEGIN:VEVENT",
-    `UID:billflow-${activeProfileScope()}-task-${task.id}@billflow.local`,
+    `UID:billflow-${sanitizeIcsUidPart(activeProfileScope())}-task-${sanitizeIcsUidPart(task.id)}@billflow.local`,
     `DTSTAMP:${dtStamp}`,
     dtStartLine,
     dtEndLine,
@@ -589,7 +622,7 @@ export function buildIcsBlocksFromTask(
 
   const vtodoLines: string[] = [
     "BEGIN:VTODO",
-    `UID:billflow-${activeProfileScope()}-todo-${task.id}@billflow.local`,
+    `UID:billflow-${sanitizeIcsUidPart(activeProfileScope())}-todo-${sanitizeIcsUidPart(task.id)}@billflow.local`,
     `DTSTAMP:${dtStamp}`,
     `DUE;VALUE=DATE:${formatIcsDateOnly(dueDateClean)}`,
     `SUMMARY:${escapeIcsText(task.title)}`,

@@ -1,5 +1,10 @@
 import { z } from "zod";
-export const recordId = z.string().trim().min(1).max(160);
+export const recordId = z
+  .string()
+  .trim()
+  .min(1)
+  .max(160)
+  .regex(/^[^\x00-\x1f\x7f\r\n\]]+$/, "Invalid record identifier.");
 export const currencySchema = z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]);
 export const minorAmount = z
   .number()
@@ -9,14 +14,20 @@ export const minorAmount = z
 export const taskStatus = z.enum(["todo", "in-progress", "review", "done"]);
 export const deliveryLink = z
   .string()
+  .max(2048)
   .url()
   .refine((v) => {
     try {
-      return ["https:", "http:"].includes(new URL(v).protocol);
+      const url = new URL(v);
+      return (
+        ["https:", "http:"].includes(url.protocol) &&
+        !url.username &&
+        !url.password
+      );
     } catch {
       return false;
     }
-  }, "Use an HTTP or HTTPS delivery URL")
+  }, "Use an HTTP or HTTPS delivery URL without credentials")
   .nullable()
   .optional()
   .or(z.literal(""));

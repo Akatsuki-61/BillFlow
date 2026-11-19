@@ -8,9 +8,10 @@ export default defineConfig({
   outDir: "dist-electron",
   format: ["cjs"],
   target: "node22",
-  external: ["electron", "better-sqlite3"],
-  noExternal: [/^drizzle-orm(?:\/|$)/, /^pdf-lib(?:\/|$)/, /^zod(?:\/|$)/],
+  external: ["electron", "better-sqlite3", "pdf-lib"],
+  noExternal: [/^drizzle-orm(?:\/|$)/, /^zod(?:\/|$)/],
   clean: true,
-  sourcemap: true,
+  sourcemap: false,
+  minify: true,
   dts: false,
 });

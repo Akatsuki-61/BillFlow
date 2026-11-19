@@ -129,6 +129,12 @@ export function generateInvoiceWhatsAppLink(data: WhatsAppInvoicePayload): strin
  * Generates an email `mailto:` link for sharing an invoice with pre-filled subject and body.
  * References the attached invoice PDF with a clear, concise note.
  */
+export function sanitizeMailtoRecipient(email?: string | null): string {
+  const trimmed = (email || "").trim();
+  if (!trimmed || /[\s\x00-\x1f\x7f?&#]/.test(trimmed)) return "";
+  return trimmed;
+}
+
 export function generateInvoiceEmailLink(data: {
   clientEmail?: string | null;
   clientName: string;
@@ -163,7 +169,8 @@ export function generateInvoiceEmailLink(data: {
 
   if (data.paymentUrl) lines.push(`Pay online: ${data.paymentUrl}`);
   const body = encodeURIComponent(lines.join("\n"));
-  return `mailto:${data.clientEmail || ""}?subject=${subject}&body=${body}`;
+  const recipient = sanitizeMailtoRecipient(data.clientEmail);
+  return `mailto:${recipient}?subject=${subject}&body=${body}`;
 }
 
 /**

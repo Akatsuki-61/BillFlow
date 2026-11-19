@@ -15,12 +15,15 @@ import {
 } from "./InvoiceStatusBulk";
 
 import { InvoiceTrash } from "./InvoiceTrash";
-import { PaymentCorrectionForm } from "./PaymentCorrectionForm";
+import { buildSampleInvoice } from "./sample-invoice";
+import { ImportCompletedTasksModal } from "./ImportCompletedTasksModal";
+import { PaymentInspectionModal } from "./PaymentInspectionModal";
 import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { Dialog } from "@/components/ui/Dialog";
 
 import { DataBreakdown, MonthlyBars } from "@/components/ui/DataGraphic";
 import { recentMonths, isPastDue, localDateKey } from "@/lib/visual-metrics";
+import { buildDuplicateInvoiceDraft } from "@/lib/invoice-duplicate";
 
 import {
   Button,
@@ -34,7 +37,7 @@ import {
   MotionPresence,
   MotionSurface,
 } from "@/components/ui/MotionSurface";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
   EXIT_MENU_POPOVER,
@@ -67,10 +70,17 @@ import {
   AlertTriangle,
   Download,
   FileSpreadsheet,
-  CheckSquare,
   ListChecks,
+  Copy,
 } from "lucide-react";
-import { OverdueSummaryDialog } from "./OverdueSummaryDialog";
+import dynamic from "next/dynamic";
+import { formatInvoicePaymentSummary } from "@/lib/payment-summary";
+
+const OverdueSummaryDialog = dynamic(
+  () =>
+    import("./OverdueSummaryDialog").then((m) => m.OverdueSummaryDialog),
+  { ssr: false, loading: () => null },
+);
 import {
   generateInvoicesCsv,
   generateInvoicesExcelWorkbook,
@@ -103,7 +113,11 @@ import type { AttachmentItem } from "@/types/workflow";
 import type { TaskItem } from "@/types/tasks";
 
 import "./invoices.css";
-import InvoiceDocumentSheet from "./InvoiceDocumentSheet";
+
+const InvoiceDocumentSheet = dynamic(
+  () => import("./InvoiceDocumentSheet"),
+  { ssr: false, loading: () => null },
+);
 
 const ACCENT_ICON_CLASS = "text-accent-deep-solid dark:text-accent";
 const ACCENT_EXPORT_BUTTON_CLASS =
@@ -192,56 +206,8 @@ export default function InvoicesView() {
   const [previewInvoice, setPreviewInvoice] =
     useState<InvoiceWithClient | null>(null);
 
-  const getSampleInvoice = (): InvoiceWithClient => ({
-    id: "sample-preview",
-    code: "INV-2026-001",
-    clientName: "Acme Cloud Corp",
-    clientEmail: "billing@acmecloud.com",
-    clientId: null,
-    currency: (settings?.defaultCurrency as Currency) || "USD",
-    status: "ADVANCE_PAID",
-    issueDate: new Date().toISOString(),
-    dueDate: new Date(Date.now() + 14 * 86400000).toISOString(),
-    amountCents: 9000000,
-    advanceCents: 4500000,
-    paidCents: 4500000,
-    taxCents: 0,
-    discountCents: 1000000,
-    notes:
-      "Milestone 1 (Website staging) begins upon advance receipt. Full code and deployment upon final settlement.",
-    deliveryUrl: "https://github.com/Chethaka/acme-web-platform",
-    items: [
-      {
-        id: "it-1",
-        invoiceId: "sample-preview",
-        description: "Business Website Development & Integration",
-        quantity: 1,
-        unitPriceCents: 8000000,
-        position: 0,
-      },
-      {
-        id: "it-2",
-        invoiceId: "sample-preview",
-        description: "AI Consulting Session & Support Automation Roadmap",
-        quantity: 1,
-        unitPriceCents: 2000000,
-        position: 1,
-      },
-    ],
-    payments: [
-      {
-        id: "pay-1",
-        invoiceId: "sample-preview",
-        amountCents: 4500000,
-        currency: (settings?.defaultCurrency as Currency) || "USD",
-        receivedAt: new Date().toISOString(),
-        reference: "50% upfront project deposit",
-        requestId: "req-1",
-      },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
+  const getSampleInvoice = (): InvoiceWithClient =>
+    buildSampleInvoice(settings);
 
   // Add Invoice Modal state
   const [showAddInvoiceModal, setShowAddInvoiceModal] =
@@ -496,9 +462,6 @@ export default function InvoicesView() {
     }
   };
 
-  const linkedClient = clients.find(
-    (client) => client.id === clientFilterParam,
-  );
   const isNewActive =
     isNewParam === "1" ||
     isNewParam === "true" ||
@@ -508,23 +471,9 @@ export default function InvoicesView() {
     isNewActive,
     searchParams.get("t"),
     clientFilterParam,
-    linkedClient?.currency,
     importTaskIdsParam,
   ]);
-  const [previousModalQueryKey, setPreviousModalQueryKey] = useState<
-    string | null
-  >(null);
-  if (previousModalQueryKey !== modalQueryKey) {
-    setPreviousModalQueryKey(modalQueryKey);
-    if (isNewActive) {
-      setShowAddInvoiceModal(true);
-      if (clientFilterParam) setNewClientId(clientFilterParam);
-      if (linkedClient) {
-        setNewCurrency(linkedClient.currency);
-        if (linkedClient.driveUrl) setNewDeliveryUrl(linkedClient.driveUrl);
-      }
-    }
-  }
+  const handledNewQueryRef = useRef<string | null>(null);
 
   // Handle ?invoice=ID&preview=1 to automatically open the InvoiceDocumentSheet preview
   const previewTargetInv =
@@ -588,7 +537,11 @@ export default function InvoicesView() {
   // Auto-populate New Invoice modal when redirected with ?action=new&importTaskIds=id1,id2...
   const importedFromQueryRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!importTaskIdsParam || tasks.length === 0) return;
+    if (!importTaskIdsParam) {
+      importedFromQueryRef.current = null;
+      return;
+    }
+    if (tasks.length === 0) return;
     if (importedFromQueryRef.current === importTaskIdsParam) return;
 
     const requestedIds = importTaskIdsParam
@@ -645,6 +598,11 @@ export default function InvoicesView() {
     });
 
     queueMicrotask(() => {
+      setNewStatus("UNPAID");
+      setNewPaymentUrl("");
+      setNewWorkflowStage(null);
+      setNewDiscount("");
+      setNewTaxRate("");
       setNewDueDate((prev) => prev || defaultDueStr);
       if (matchedClient) {
         setClientMode("existing");
@@ -778,6 +736,7 @@ export default function InvoicesView() {
     if (saveDraft) {
       saveInvoiceDraft();
     }
+    setNewStatus("UNPAID");
     setShowAddInvoiceModal(false);
     setShowImportTasksModal(false);
     if (
@@ -832,7 +791,15 @@ export default function InvoicesView() {
   // When opening Add Invoice modal, prefill the next code
   const handleOpenAddModal = async () => {
     requestId.current = null;
-    setClientMode(clients.length ? "existing" : "new");
+    const activeClients = clients.filter((record) => !record.archivedAt);
+    setClientMode(clientFilterParam || activeClients.length ? "existing" : "new");
+    setClientName("");
+    setClientEmail("");
+    setClientContact("");
+    setClientPhone("");
+    setClientWhatsApp("");
+    setClientCategory("Enterprise");
+    setNewStatus("UNPAID");
     setNewCurrency(settings?.defaultCurrency || activeCurrency || "USD");
     const due = new Date();
     due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
@@ -845,6 +812,8 @@ export default function InvoicesView() {
     setAdvancePercent(50);
     setSaveAsPermanentClient(true);
     setNewDeliveryUrl("");
+    setNewPaymentUrl("");
+    setNewWorkflowStage(null);
     setNewNotes("");
 
     try {
@@ -855,18 +824,22 @@ export default function InvoicesView() {
     }
 
     if (clientFilterParam) {
+      setClientMode("existing");
       setNewClientId(clientFilterParam);
       const match = clients.find((c) => c.id === clientFilterParam);
       if (match) {
         setNewCurrency(match.currency);
         if (match.driveUrl) setNewDeliveryUrl(match.driveUrl);
       }
-    } else if (!newClientId) {
-      const client = clients.find((record) => !record.archivedAt);
-      if (client) {
-        setNewClientId(client.id);
-        setNewCurrency(client.currency);
-        if (client.driveUrl) setNewDeliveryUrl(client.driveUrl);
+    } else {
+      const currentClient = activeClients.find((record) => record.id === newClientId);
+      const targetClient = currentClient ?? activeClients[0];
+      if (targetClient) {
+        setNewClientId(targetClient.id);
+        setNewCurrency(targetClient.currency);
+        if (targetClient.driveUrl) setNewDeliveryUrl(targetClient.driveUrl);
+      } else {
+        setNewClientId("");
       }
     }
 
@@ -878,6 +851,74 @@ export default function InvoicesView() {
     }
 
     setShowAddInvoiceModal(true);
+  };
+
+  const handleOpenAddModalRef = useRef(handleOpenAddModal);
+  useEffect(() => {
+    handleOpenAddModalRef.current = handleOpenAddModal;
+  });
+
+  useEffect(() => {
+    if (!isNewActive) {
+      handledNewQueryRef.current = null;
+      return;
+    }
+    if (importTaskIdsParam) return;
+    if (handledNewQueryRef.current === modalQueryKey) return;
+    handledNewQueryRef.current = modalQueryKey;
+    queueMicrotask(() => {
+      void handleOpenAddModalRef.current();
+    });
+  }, [isNewActive, importTaskIdsParam, modalQueryKey]);
+
+  const handleDuplicateInvoice = async (inv: InvoiceWithClient) => {
+    requestId.current = null;
+    const draft = buildDuplicateInvoiceDraft(
+      inv,
+      clients,
+      settings?.defaultDueDays ?? 14,
+    );
+    setClientMode(draft.clientMode);
+    setNewClientId(draft.clientId);
+    setClientName(draft.clientName);
+    setClientEmail(draft.clientEmail);
+    setClientContact(draft.clientContact);
+    setClientPhone(draft.clientPhone);
+    setClientWhatsApp(draft.clientWhatsApp);
+    setClientCategory(draft.clientCategory);
+    setSaveAsPermanentClient(draft.saveAsPermanentClient);
+    setNewCurrency(draft.currency);
+    setNewDueDate(draft.dueDate);
+    setNewStatus(draft.status);
+    setNewLineItems(draft.items);
+    setLinkedTaskIds([]);
+    setNewDiscount(draft.discount);
+    setNewTaxRate(draft.taxRate);
+    setRequireAdvance(draft.requireAdvance);
+    setAdvancePercent(draft.advancePercent);
+    setNewDeliveryUrl(draft.deliveryUrl);
+    setNewPaymentUrl(draft.paymentUrl);
+    setNewWorkflowStage(null);
+    setNewNotes(draft.notes);
+    setHasInvoiceDraft(false);
+
+    try {
+      const code = await getNextInvoiceCode();
+      setNewCode(code);
+    } catch {
+      setNewCode(`INV-${new Date().getFullYear()}-001`);
+    }
+    setShowAddInvoiceModal(true);
+  };
+
+  const handleCopyInvoiceSummary = async (inv: InvoiceWithClient) => {
+    try {
+      const text = formatInvoicePaymentSummary(inv, settings);
+      await navigator.clipboard.writeText(text);
+      showToast(`Copied payment summary for ${inv.code}`);
+    } catch {
+      showToast("Could not copy payment summary", "error");
+    }
   };
 
   // Filter invoices according to selected client, search query and tabs
@@ -977,10 +1018,14 @@ export default function InvoicesView() {
     }
     setStatusMenu(null);
     const rect = e.currentTarget.getBoundingClientRect();
-    const estimatedHeight = 395;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openUpward =
-      spaceBelow < estimatedHeight && rect.top > estimatedHeight;
+    const estimatedHeight =
+      415 +
+      (isElectron ? 44 : 0) +
+      (inv.payments && inv.payments.length > 0 ? 32 : 0) +
+      (!inv.clientId ? 32 : 0);
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const openUpward = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
 
     if (openUpward) {
       setActionMenu({
@@ -989,9 +1034,13 @@ export default function InvoicesView() {
         right: Math.max(8, window.innerWidth - rect.right),
       });
     } else {
+      const maxTop = Math.max(
+        8,
+        window.innerHeight - Math.min(estimatedHeight, window.innerHeight * 0.85) - 8,
+      );
       setActionMenu({
         invoice: inv,
-        top: Math.max(8, rect.bottom + 6),
+        top: Math.max(8, Math.min(rect.bottom + 6, maxTop)),
         right: Math.max(8, window.innerWidth - rect.right),
       });
     }
@@ -1813,14 +1862,63 @@ export default function InvoicesView() {
     slipFileInputRef.current?.click();
   };
 
+  const stageBrowserFile = async (file: File) => {
+    const maxReceiptBytes = 20 * 1024 * 1024;
+    if (file.size <= 0 || file.size > maxReceiptBytes) {
+      showToast("Receipt must be a non-empty file smaller than 20 MB.", "error");
+      return;
+    }
+    if (workflow?.attachments?.stageFile) {
+      try {
+        const staged = await workflow.attachments.stageFile(file);
+        if (staged) {
+          setSelectedSlip(staged);
+        }
+        return;
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : "Could not attach receipt file.",
+          "error",
+        );
+        return;
+      }
+    }
+    if (!workflow?.attachments?.stageDroppedFile) {
+      showToast("Receipt staging is unavailable in this environment.", "error");
+      return;
+    }
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const staged = await workflow.attachments.stageDroppedFile(
+        file.name,
+        bytes,
+      );
+      if (staged) {
+        setSelectedSlip(staged);
+      }
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Could not attach receipt file.",
+        "error",
+      );
+    }
+  };
+
   const handleSlipInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     e.target.value = "";
-    void handlePickReceipt();
+    if (!file) return;
+    void stageBrowserFile(file);
   };
   const handleSlipDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingSlip(false);
-    void handlePickReceipt();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) {
+      showToast("Drop a PDF, PNG, JPG, or WEBP receipt file.", "error");
+      return;
+    }
+    void stageBrowserFile(file);
   };
 
   // Submit Payment
@@ -2256,7 +2354,7 @@ export default function InvoicesView() {
               title="Set export format to RFC 4180 CSV (.csv)"
             >
               {exportFormat === "csv" && (
-                <motion.span
+                <m.span
                   layoutId="invoices-export-format-pill"
                   transition={SPRING_NAV_GLIDE}
                   className="absolute inset-0 rounded-full bg-accent-solid shadow-xs"
@@ -2276,7 +2374,7 @@ export default function InvoicesView() {
               title="Set export format to Microsoft Excel Workbook (.xls) via Convert Engine"
             >
               {exportFormat === "excel" && (
-                <motion.span
+                <m.span
                   layoutId="invoices-export-format-pill"
                   transition={SPRING_NAV_GLIDE}
                   className="absolute inset-0 rounded-full bg-accent-solid shadow-xs"
@@ -2516,7 +2614,7 @@ export default function InvoicesView() {
                         ? 100
                         : 0;
                   return (
-                    <motion.tr
+                    <m.tr
                       key={inv.id}
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -2716,7 +2814,7 @@ export default function InvoicesView() {
                           </Button>
                         </div>
                       </td>
-                    </motion.tr>
+                    </m.tr>
                   );
                 })
               )}
@@ -3375,219 +3473,26 @@ export default function InvoicesView() {
       {/* Import Completed Tasks Modal */}
       <MotionPresence>
         {showImportTasksModal && (
-          <Dialog onClose={() => setShowImportTasksModal(false)} width={680}>
-            <div className="app-dialog-header">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-accent-faint text-accent flex items-center justify-center">
-                  <ListChecks className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-content-neutral-900">
-                    Import Completed Tasks
-                  </h3>
-                  <p className="text-xs text-content-neutral-400">
-                    Select unbilled completed deliverables to add as line items
-                    and link to this invoice.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="app-dialog-body">
-              <div className="app-dialog-section p-5 space-y-4">
-                {/* Filter & Bulk Selection Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-line-neutral-100">
-                  <div className="flex items-center gap-2">
-                    {(activeDraftClientObj ||
-                      (clientMode === "new" && clientName.trim())) && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setImportTasksShowAllClients((prev) => !prev)
-                        }
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
-                          !importTasksShowAllClients
-                            ? "bg-accent/10 border-accent/30 text-accent"
-                            : "bg-surface-neutral-100 border-line-neutral-200 text-content-neutral-600 hover:text-content-neutral-900"
-                        }`}
-                      >
-                        {importTasksShowAllClients
-                          ? `Showing all clients (${allUnbilledTasks.length}) · Filter by ${activeDraftClientObj?.name || clientName.trim()}`
-                          : `Filtered: ${activeDraftClientObj?.name || clientName.trim()} (${clientFilteredUnbilledTasks.length}) · Show all clients`}
-                      </button>
-                    )}
-                  </div>
-
-                  {displayedImportTasks.length > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        type="button"
-                        onClick={handleSelectAllImportTasks}
-                        className="text-xs h-7 px-2.5"
-                      >
-                        Select All ({displayedImportTasks.length})
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        type="button"
-                        onClick={handleDeselectAllImportTasks}
-                        disabled={selectedImportTaskIds.length === 0}
-                        className="text-xs h-7 px-2.5"
-                      >
-                        Deselect All
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Task Rows */}
-                {displayedImportTasks.length === 0 ? (
-                  <div className="py-10 text-center space-y-2">
-                    <CheckSquare className="w-8 h-8 text-content-neutral-300 mx-auto" />
-                    <p className="text-sm font-semibold text-content-neutral-700">
-                      No unbilled completed tasks found
-                    </p>
-                    <p className="text-xs text-content-neutral-400 max-w-md mx-auto">
-                      {!importTasksShowAllClients && allUnbilledTasks.length > 0
-                        ? `No completed unbilled tasks match "${activeDraftClientObj?.name || clientName.trim()}", but ${allUnbilledTasks.length} completed task(s) exist across other clients.`
-                        : "Move tasks to the Done column on the Kanban board to import them into an invoice."}
-                    </p>
-                    {!importTasksShowAllClients &&
-                      allUnbilledTasks.length > 0 && (
-                        <div className="pt-2">
-                          <Button
-                            variant="secondary"
-                            size="small"
-                            type="button"
-                            onClick={() => setImportTasksShowAllClients(true)}
-                          >
-                            Show All Clients ({allUnbilledTasks.length})
-                          </Button>
-                        </div>
-                      )}
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
-                    {displayedImportTasks.map((task) => {
-                      const isChecked = selectedImportTaskIds.includes(task.id);
-                      const feeVal =
-                        importTaskFees[task.id] ?? getTaskDefaultFee(task);
-                      const loggedHours =
-                        task.activeMilliseconds && task.activeMilliseconds > 0
-                          ? (task.activeMilliseconds / 3600000).toFixed(1)
-                          : null;
-
-                      return (
-                        <div
-                          key={task.id}
-                          onClick={() => handleToggleImportTask(task)}
-                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                            isChecked
-                              ? "border-accent bg-accent/5 ring-1 ring-accent/25"
-                              : "border-line-neutral-200 bg-surface-neutral-50/60 hover:border-line-neutral-300"
-                          }`}
-                        >
-                          <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {}}
-                              className="mt-0.5 w-4 h-4 rounded text-accent focus:ring-accent cursor-pointer shrink-0"
-                              aria-label={`Select task ${task.title}`}
-                            />
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-semibold text-content-neutral-900 truncate">
-                                  {task.title}
-                                </span>
-                                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-surface border border-line-neutral-200 text-content-neutral-600">
-                                  {task.category}
-                                </span>
-                                {task.clientName && (
-                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent">
-                                    {task.clientName}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 text-[11px] text-content-neutral-400">
-                                <span>
-                                  Completed:{" "}
-                                  {task.completedAt
-                                    ? formatDateDisplay(task.completedAt)
-                                    : task.dueDate || "Done"}
-                                </span>
-                                {loggedHours && (
-                                  <span>Logged: {loggedHours}h</span>
-                                )}
-                                {task.outsourceBudget ? (
-                                  <span>
-                                    Est. Budget:{" "}
-                                    {formatCents(
-                                      Math.round(task.outsourceBudget * 100),
-                                      task.currency || newCurrency,
-                                    )}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Editable Fee Input */}
-                          <div
-                            className="flex items-center gap-2 shrink-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <label className="text-[10px] uppercase font-bold text-content-neutral-400">
-                              Fee ({newCurrency})
-                            </label>
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
-                              aria-label={`Fee for ${task.title}`}
-                              value={feeVal}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setImportTaskFees((prev) => ({
-                                  ...prev,
-                                  [task.id]: val,
-                                }));
-                                if (!isChecked) {
-                                  handleToggleImportTask(task);
-                                }
-                              }}
-                              className="ui-field w-28 px-2.5 py-1 text-xs text-right font-mono"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="app-dialog-footer">
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={() => setShowImportTasksModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                type="button"
-                disabled={selectedImportTaskIds.length === 0}
-                onClick={handleImportSelectedTasks}
-              >
-                Import Selected Tasks ({selectedImportTaskIds.length})
-              </Button>
-            </div>
-          </Dialog>
+          <ImportCompletedTasksModal
+            activeDraftClientObj={activeDraftClientObj}
+            clientMode={clientMode}
+            clientName={clientName}
+            newCurrency={newCurrency}
+            allUnbilledTasks={allUnbilledTasks}
+            clientFilteredUnbilledTasks={clientFilteredUnbilledTasks}
+            displayedImportTasks={displayedImportTasks}
+            importTasksShowAllClients={importTasksShowAllClients}
+            setImportTasksShowAllClients={setImportTasksShowAllClients}
+            selectedImportTaskIds={selectedImportTaskIds}
+            importTaskFees={importTaskFees}
+            setImportTaskFees={setImportTaskFees}
+            getTaskDefaultFee={getTaskDefaultFee}
+            onToggleTask={handleToggleImportTask}
+            onSelectAll={handleSelectAllImportTasks}
+            onDeselectAll={handleDeselectAllImportTasks}
+            onImportSelected={handleImportSelectedTasks}
+            onClose={() => setShowImportTasksModal(false)}
+          />
         )}
       </MotionPresence>
 
@@ -3882,156 +3787,18 @@ export default function InvoicesView() {
       {/* Payment Inspection & Receipts Modal */}
       <MotionPresence>
         {inspectingInvoice && (
-          <Dialog onClose={() => setInspectingInvoice(null)} width={620}>
-            <div className="app-dialog-header">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-surface-purple-100 text-content-purple-700 flex items-center justify-center">
-                  <Paperclip className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-content-neutral-900">
-                    Payments & Attached Receipts
-                  </h3>
-                  <p className="text-xs text-content-neutral-400">
-                    {inspectingInvoice.code} · {inspectingInvoice.clientName}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="app-dialog-body">
-              <div className="app-dialog-section p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                {isLoadingAttachments ? (
-                  <p className="text-xs text-content-neutral-500">
-                    Loading payment receipts...
-                  </p>
-                ) : !inspectingInvoice.payments ||
-                  inspectingInvoice.payments.length === 0 ? (
-                  <p className="text-xs text-content-neutral-500">
-                    No payments have been recorded for this invoice yet.
-                  </p>
-                ) : (
-                  inspectingInvoice.payments.map((payment, idx) => {
-                    const slips = paymentAttachments[payment.id] || [];
-
-                    return (
-                      <div
-                        key={payment.id || idx}
-                        className="p-3.5 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/60 space-y-2 text-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-content-neutral-900 text-sm">
-                            {formatCents(payment.amountCents, payment.currency)}
-                          </span>
-                          <span className="text-[11px] text-content-neutral-500">
-                            {formatDateDisplay(payment.receivedAt)}
-                          </span>
-                        </div>
-
-                        {payment.reference && (
-                          <div className="text-[11px] text-content-neutral-600 font-mono">
-                            Ref: {payment.reference}
-                          </div>
-                        )}
-
-                        {payment.correction ? (
-                          <div className="rounded-lg bg-surface-neutral-100 p-2 text-content-neutral-800">
-                            <p className="font-medium">
-                              {payment.correction.replacementPaymentId
-                                ? "Corrected"
-                                : "Reversed"}{" "}
-                              ·{" "}
-                              {formatDateDisplay(
-                                payment.correction.correctedAt,
-                              )}
-                            </p>
-                            <p className="mt-1 break-words">
-                              {payment.correction.reason}
-                            </p>
-                          </div>
-                        ) : (
-                          isElectron && (
-                            <PaymentCorrectionForm
-                              payment={payment}
-                              onSubmit={async (input) => {
-                                const updated =
-                                  await window.billflow!.invoices.correctPayment(
-                                    input,
-                                  );
-                                setInspectingInvoice(updated);
-                                await refresh();
-                                showToast(
-                                  input.replacement
-                                    ? "Payment corrected."
-                                    : "Payment reversed.",
-                                );
-                              }}
-                            />
-                          )
-                        )}
-
-                        {/* Attached slips */}
-                        <div className="pt-2 border-t border-line-neutral-200/60">
-                          {slips.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {slips.map((att) => (
-                                <div
-                                  key={att.id}
-                                  className="flex items-center justify-between p-2 rounded-lg bg-surface border border-line-neutral-200 text-xs"
-                                >
-                                  <div className="flex items-center gap-1.5 truncate">
-                                    <Paperclip className="w-3.5 h-3.5 text-accent" />
-                                    <span className="truncate">
-                                      {att.originalName}
-                                    </span>
-                                    <span className="text-[10px] text-content-neutral-400">
-                                      ({Math.round(att.sizeBytes / 1024)} KB)
-                                    </span>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="small"
-                                    onClick={() =>
-                                      workflow?.attachments.open(att.id)
-                                    }
-                                  >
-                                    View Slip
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] text-content-neutral-400 italic">
-                                No payment slip attached.
-                              </span>
-                              <Button
-                                variant="secondary"
-                                size="small"
-                                onClick={() =>
-                                  handleAttachReceiptToPayment(payment.id)
-                                }
-                              >
-                                Attach Slip
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-            <div className="app-dialog-footer">
-              <Button
-                variant="primary"
-                type="button"
-                onClick={() => setInspectingInvoice(null)}
-              >
-                Done
-              </Button>
-            </div>
-          </Dialog>
+          <PaymentInspectionModal
+            invoice={inspectingInvoice}
+            paymentAttachments={paymentAttachments}
+            isLoadingAttachments={isLoadingAttachments}
+            isElectron={isElectron}
+            workflow={workflow}
+            onClose={() => setInspectingInvoice(null)}
+            onUpdateInvoice={(updated) => setInspectingInvoice(updated)}
+            onRefresh={refresh}
+            onAttachReceipt={(paymentId) => handleAttachReceiptToPayment(paymentId)}
+            onToast={(msg) => showToast(msg)}
+          />
         )}
       </MotionPresence>
 
@@ -4575,17 +4342,19 @@ export default function InvoicesView() {
       </MotionPresence>
 
       {/* Overdue Invoices Summary & Collections Modal */}
-      <OverdueSummaryDialog
-        isOpen={showOverdueSummary}
-        onClose={() => setShowOverdueSummary(false)}
-        invoices={allInvoices}
-        primaryCurrency={primaryCurrency}
-        freelancerName={settings?.businessName || ""}
-        paymentInstructions={settings?.paymentDetails}
-        onFilterToOverdue={() => setActiveTab("Overdue")}
-        onInspectInvoice={(inv) => setInspectingInvoice(inv)}
-        showToast={showToast}
-      />
+      {showOverdueSummary && (
+        <OverdueSummaryDialog
+          isOpen={showOverdueSummary}
+          onClose={() => setShowOverdueSummary(false)}
+          invoices={allInvoices}
+          primaryCurrency={primaryCurrency}
+          freelancerName={settings?.businessName || ""}
+          paymentInstructions={settings?.paymentDetails}
+          onFilterToOverdue={() => setActiveTab("Overdue")}
+          onInspectInvoice={(inv) => setInspectingInvoice(inv)}
+          showToast={showToast}
+        />
+      )}
 
       {/* Floating Backdrop for outside clicks */}
       {(actionMenu || statusMenu) && (
@@ -4602,7 +4371,7 @@ export default function InvoicesView() {
       {/* Floating Status Menu */}
       <AnimatePresence initial={false}>
         {statusMenu && (
-          <motion.div
+          <m.div
             key={`status-menu-${statusMenu.invoice.id}`}
             initial={{
               opacity: 0,
@@ -4646,7 +4415,7 @@ export default function InvoicesView() {
                 value: "UNPAID",
                 label: "Unpaid",
                 desc: "No payments recorded yet",
-                dot: "bg-accent-faint0",
+                dot: "bg-accent",
               },
               {
                 value: "ADVANCE_PAID",
@@ -4675,7 +4444,7 @@ export default function InvoicesView() {
             ].map((opt, idx) => {
               const isCurrent = statusMenu.invoice.status === opt.value;
               return (
-                <motion.button
+                <m.button
                   key={opt.value}
                   type="button"
                   role="menuitem"
@@ -4708,17 +4477,17 @@ export default function InvoicesView() {
                   {isCurrent && (
                     <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 ml-2" />
                   )}
-                </motion.button>
+                </m.button>
               );
             })}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* Floating Actions Menu */}
       <AnimatePresence initial={false}>
         {actionMenu && (
-          <motion.div
+          <m.div
             key={`action-menu-${actionMenu.invoice.id}`}
             initial={{
               opacity: 0,
@@ -4851,6 +4620,34 @@ export default function InvoicesView() {
               onClick={() => {
                 const inv = actionMenu.invoice;
                 setActionMenu(null);
+                void handleCopyInvoiceSummary(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Copy className="w-3.5 h-3.5 text-content-neutral-400" />
+              <span>Copy Payment Summary</span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
+                void handleDuplicateInvoice(inv);
+              }}
+              className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Receipt className="w-3.5 h-3.5 text-content-neutral-400" />
+              <span>Duplicate as Draft</span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const inv = actionMenu.invoice;
+                setActionMenu(null);
                 handleOpenEdit(inv);
               }}
               className="w-full px-3.5 py-1.5 hover:bg-surface-neutral-50 flex items-center gap-2 cursor-pointer transition-colors"
@@ -4906,7 +4703,7 @@ export default function InvoicesView() {
               <Trash2 className="w-3.5 h-3.5 text-content-rose-500" />
               <span>{isElectron ? "Move to Trash" : "Delete Invoice"}</span>
             </button>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 

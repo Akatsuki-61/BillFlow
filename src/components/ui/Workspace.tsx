@@ -6,7 +6,7 @@ import {
   type ButtonHTMLAttributes,
   type ReactNode,
 } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 import { SPRING_NAV_GLIDE, SWITCH_KNOB_TRANSITION } from "@/lib/motion";
 
 export function Button({
@@ -83,7 +83,7 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
           >
             {isActive && (
-              <motion.span
+              <m.span
                 layoutId={`segmented-pill-${segmentGroupId}`}
                 className="ui-segmented-pill"
                 transition={reducedMotion ? { duration: 0 } : SPRING_NAV_GLIDE}
@@ -123,7 +123,7 @@ export function Switch({
         onChange(!checked);
       }}
     >
-      <motion.span
+      <m.span
         initial={false}
         animate={
           reducedMotion

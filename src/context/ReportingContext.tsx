@@ -8,7 +8,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useData } from "@/lib/data/DataProvider";
+import {
+  useActiveCurrency,
+  useCatalog,
+  useExpenses,
+  useInvoices,
+  useWorkOrders,
+} from "@/lib/data/DataProvider";
 import {
   convertCents,
   reportingRecords,
@@ -18,14 +24,13 @@ import { formatCents, formatDateDisplay } from "@/lib/format";
 import { openExternalLink } from "@/lib/deliveryUrl";
 
 function useReportingState() {
-  const {
-    invoices,
-    expenses,
-    workOrders,
-    catalogItems,
-    activeCurrency,
-    isLoading,
-  } = useData();
+  const { allInvoices: invoices, isLoading: invoicesLoading } = useInvoices();
+  const { allExpenses: expenses, isLoading: expensesLoading } = useExpenses();
+  const { workOrders, isLoading: workOrdersLoading } = useWorkOrders();
+  const { catalogItems, isLoading: catalogLoading } = useCatalog();
+  const { activeCurrency } = useActiveCurrency();
+  const isLoading =
+    invoicesLoading || expensesLoading || workOrdersLoading || catalogLoading;
   const [rates, setRates] = useState<ExchangeRateState>({
     snapshot: null,
     error: null,
@@ -83,17 +88,31 @@ function useReportingState() {
       convertCents(cents, from, to, rates.snapshot),
     [activeCurrency, rates.snapshot],
   );
-  return {
-    ...records,
-    checkedAt,
-    rates: rates.snapshot,
-    rateError: rates.error,
-    refreshing,
-    refreshRates,
-    convert,
-    isLoading,
-    ready: records.missingCurrencies.length === 0,
-  };
+  const ready = records.missingCurrencies.length === 0;
+  return useMemo(
+    () => ({
+      ...records,
+      checkedAt,
+      rates: rates.snapshot,
+      rateError: rates.error,
+      refreshing,
+      refreshRates,
+      convert,
+      isLoading,
+      ready,
+    }),
+    [
+      records,
+      checkedAt,
+      rates.snapshot,
+      rates.error,
+      refreshing,
+      refreshRates,
+      convert,
+      isLoading,
+      ready,
+    ],
+  );
 }
 const ReportingContext = createContext<ReturnType<
   typeof useReportingState

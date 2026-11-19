@@ -2,6 +2,7 @@ import { app, BrowserWindow, nativeTheme } from "electron";
 import { ipcMain } from "./security";
 import fs from "fs";
 import path from "path";
+import { atomicWrite } from "./managed-files";
 import { isThemePreference, type ThemePreference } from "../src/lib/theme";
 
 let preference: ThemePreference = "system";
@@ -45,8 +46,7 @@ export function registerThemeHandlers() {
     }
     if (value !== preference) {
       // Atomic replacement prevents partial preferences after an interrupted write.
-      fs.writeFileSync(filePath + ".tmp", JSON.stringify(value), "utf8");
-      fs.renameSync(filePath + ".tmp", filePath);
+      atomicWrite(filePath, JSON.stringify(value), 0o600);
     }
     preference = value;
     nativeTheme.themeSource = value;

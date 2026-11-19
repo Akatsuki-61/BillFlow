@@ -490,7 +490,8 @@ function backupBeforeUpgrade(
     const temporary = `${backup}.${randomUUID()}.tmp`;
     let handle: number | undefined;
     try {
-      handle = fs.openSync(temporary, "wx");
+      handle = fs.openSync(temporary, "wx", 0o600);
+      if (process.platform !== "win32") fs.fchmodSync(handle, 0o600);
       fs.writeFileSync(handle, sqlite.serialize());
       fs.fsyncSync(handle);
       fs.closeSync(handle);
@@ -501,6 +502,20 @@ function backupBeforeUpgrade(
       fs.rmSync(temporary, { force: true });
     }
   }
+}
+function hardenPrivateFile(filePath: string) {
+  if (process.platform === "win32" || !filePath || filePath === ":memory:")
+    return;
+  try {
+    if (fs.existsSync(filePath)) fs.chmodSync(filePath, 0o600);
+  } catch {
+    // Ignore permission hardening errors on virtual/read-only filesystems
+  }
+}
+function hardenSqliteFiles(dbPath: string) {
+  hardenPrivateFile(dbPath);
+  hardenPrivateFile(`${dbPath}-wal`);
+  hardenPrivateFile(`${dbPath}-shm`);
 }
 export function initDatabase(customPath?: string, customMigrations?: string) {
   startupError = null;
@@ -513,10 +528,15 @@ export function initDatabase(customPath?: string, customMigrations?: string) {
   const dbPath = customPath || getRootDatabasePath();
   const sqlite = new Database(dbPath);
   try {
+    sqlite.pragma("busy_timeout = 5000");
     sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("synchronous = NORMAL");
+    sqlite.pragma("temp_store = MEMORY");
     sqlite.pragma("foreign_keys = ON");
+    hardenSqliteFiles(dbPath);
     backupBeforeUpgrade(sqlite, dbPath, customMigrations);
     migrateDatabase(sqlite, customMigrations);
+    hardenSqliteFiles(dbPath);
     const initializedDb = drizzle(sqlite, { schema });
     rootDbInstance = initializedDb;
     rootSqliteInstance = sqlite;
@@ -543,7 +563,6 @@ export function getRootDb() {
 }
 
 export function switchWorkspaceDatabase(profileId: string) {
-  workspaceGeneration++;
   if (startupError) throw startupError;
   if (!/^[a-zA-Z0-9_-]+$/.test(profileId)) {
     throw new Error("Invalid profile identifier.");
@@ -553,6 +572,8 @@ export function switchWorkspaceDatabase(profileId: string) {
   }
 
   if (profileId === "default") {
+    const changed =
+      activeProfileId !== "default" || sqliteInstance !== rootSqliteInstance;
     if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
       sqliteInstance.close();
     }
@@ -560,29 +581,43 @@ export function switchWorkspaceDatabase(profileId: string) {
     sqliteInstance = rootSqliteInstance;
     activePath = rootDbPath;
     activeProfileId = "default";
+    if (changed) workspaceGeneration++;
     return { db: dbInstance!, sqlite: sqliteInstance!, dbPath: activePath! };
   }
 
   const rootDir = path.dirname(rootDbPath!);
   const profileDir = path.join(rootDir, "profiles", profileId);
-  fs.mkdirSync(profileDir, { recursive: true });
+  fs.mkdirSync(profileDir, { recursive: true, mode: 0o700 });
+  if (process.platform !== "win32") {
+    try {
+      fs.chmodSync(profileDir, 0o700);
+    } catch {
+      // Ignore permission errors on read-only/unsupported filesystems
+    }
+  }
   const targetDbPath = path.join(profileDir, "billflow.db");
 
   if (activePath === targetDbPath && dbInstance && sqliteInstance) {
+    if (activeProfileId !== profileId) workspaceGeneration++;
     activeProfileId = profileId;
     return { db: dbInstance, sqlite: sqliteInstance, dbPath: activePath };
   }
 
   const sqlite = new Database(targetDbPath);
   try {
+    sqlite.pragma("busy_timeout = 5000");
     sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("synchronous = NORMAL");
+    sqlite.pragma("temp_store = MEMORY");
     sqlite.pragma("foreign_keys = ON");
+    hardenSqliteFiles(targetDbPath);
     backupBeforeUpgrade(
       sqlite,
       targetDbPath,
       activeCustomMigrations || undefined,
     );
     migrateDatabase(sqlite, activeCustomMigrations || undefined);
+    hardenSqliteFiles(targetDbPath);
     const nextDb = drizzle(sqlite, { schema });
     if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
       sqliteInstance.close();
@@ -591,6 +626,7 @@ export function switchWorkspaceDatabase(profileId: string) {
     dbInstance = nextDb;
     activePath = targetDbPath;
     activeProfileId = profileId;
+    workspaceGeneration++;
     return { db: dbInstance, sqlite: sqliteInstance, dbPath: targetDbPath };
   } catch (error) {
     sqlite.close();
@@ -629,12 +665,23 @@ export function getSqlite() {
   return sqliteInstance || initDatabase().sqlite;
 }
 
-export function closeDatabaseForTesting() {
+export function closeAllDatabases() {
   workspaceGeneration++;
-  if (sqliteInstance && sqliteInstance !== rootSqliteInstance) {
-    sqliteInstance.close();
+  const handles = new Set<Database.Database>();
+  if (sqliteInstance) handles.add(sqliteInstance);
+  if (rootSqliteInstance) handles.add(rootSqliteInstance);
+  for (const handle of handles) {
+    try {
+      handle.pragma("wal_checkpoint(TRUNCATE)");
+    } catch {
+      // Ignore checkpoint errors if already closed or read-only
+    }
+    try {
+      handle.close();
+    } catch {
+      // Ignore close errors during shutdown
+    }
   }
-  rootSqliteInstance?.close();
   sqliteInstance = null;
   dbInstance = null;
   rootSqliteInstance = null;
@@ -644,4 +691,8 @@ export function closeDatabaseForTesting() {
   activeProfileId = "default";
   activeCustomMigrations = null;
   startupError = null;
+}
+
+export function closeDatabaseForTesting() {
+  closeAllDatabases();
 }

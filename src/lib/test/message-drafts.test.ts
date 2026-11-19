@@ -18,6 +18,8 @@ it("encodes draft text and limits native dispatch to approved targets", () => {
     "whatsapp://settings?text=test",
     "sms:+94771234567?body=test&body=again",
     "file:///Users/test",
+    "https://web.whatsapp.com/send?text=test\t",
+    "https://web.whatsapp.com/send?text=test\0",
   ])
     expect(isMessageDraftUrl(link)).toBe(false);
 });

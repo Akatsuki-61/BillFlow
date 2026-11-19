@@ -59,3 +59,16 @@ export function documentCsp(html: string): string {
     );
   return `default-src 'self'; script-src 'self' ${hashes.join(" ")}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'`;
 }
+
+const cspCache = new Map<string, { mtimeMs: number; csp: string }>();
+export function cachedDocumentCsp(filePath: string): string {
+  const stat = fs.statSync(filePath);
+  const hit = cspCache.get(filePath);
+  if (hit && hit.mtimeMs === stat.mtimeMs) return hit.csp;
+  const csp = documentCsp(fs.readFileSync(filePath, "utf8"));
+  if (cspCache.size >= 64) {
+    cspCache.delete(cspCache.keys().next().value!);
+  }
+  cspCache.set(filePath, { mtimeMs: stat.mtimeMs, csp });
+  return csp;
+}
