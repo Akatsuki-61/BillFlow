@@ -21,6 +21,7 @@ test("first launch creates one workspace and resumes optional permissions after 
   async function launch() {
     app = await _electron.launch({
       executablePath: process.env.BILLFLOW_APP_PATH!,
+      args: process.platform === "darwin" ? ["--use-mock-keychain"] : [],
       env: {
         ...env,
         BILLFLOW_USER_DATA: directory,

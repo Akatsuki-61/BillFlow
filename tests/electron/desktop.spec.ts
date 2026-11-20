@@ -50,6 +50,8 @@ async function launch() {
   ) as Record<string, string>;
   app = await electron.launch({
     executablePath: executable,
+    // Keep isolated macOS test builds out of the user's login Keychain.
+    args: process.platform === "darwin" ? ["--use-mock-keychain"] : [],
     env: {
       ...env,
       BILLFLOW_USER_DATA: directory,

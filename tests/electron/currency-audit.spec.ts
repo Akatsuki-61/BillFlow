@@ -37,6 +37,7 @@ test("reports foreign records in profile currency and preserves privacy, documen
   ) as Record<string, string>;
   app = await _electron.launch({
     executablePath: process.env.BILLFLOW_APP_PATH!,
+    args: process.platform === "darwin" ? ["--use-mock-keychain"] : [],
     env: {
       ...env,
       BILLFLOW_USER_DATA: directory,

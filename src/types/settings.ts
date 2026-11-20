@@ -54,7 +54,6 @@ export interface RollingBackupStatus {
   intervalHours: number;
   lastRunAt: string | null;
   hasPassphrase: boolean;
-  safeStorageAvailable: boolean;
   backupCount: number;
   dbQuickCheckOk: boolean;
   dbCheckedAt: string | null;

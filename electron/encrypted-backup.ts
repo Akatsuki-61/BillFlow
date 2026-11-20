@@ -170,7 +170,7 @@ export function decryptBackupPayload(
   }
 }
 
-export function isSafeStorageAvailable(): boolean {
+function isSafeStorageAvailable(): boolean {
   try {
     return Boolean(
       safeStorage &&
@@ -214,11 +214,11 @@ export function clearRollingBackupPassphrase(): void {
 
 export function loadRollingBackupPassphrase(): string | null {
   const keyFile = rollingKeyFilePath();
-  if (!fs.existsSync(keyFile) || !isSafeStorageAvailable()) return null;
+  if (!fs.existsSync(keyFile)) return null;
   const stat = fs.lstatSync(keyFile);
   if (stat.isSymbolicLink() || !stat.isFile()) return null;
   const encoded = fs.readFileSync(keyFile, "utf8").trim();
-  if (!encoded) return null;
+  if (!encoded || !isSafeStorageAvailable()) return null;
   const value = safeStorage.decryptString(Buffer.from(encoded, "base64"));
   return value || null;
 }
@@ -290,8 +290,9 @@ export function getRollingBackupStatus(): RollingBackupStatus {
     retention: current.rollingBackupRetention ?? 10,
     intervalHours: current.rollingBackupIntervalHours ?? 24,
     lastRunAt: current.rollingBackupLastAt ?? null,
+    // This status is read as Settings opens. Inspect the encrypted file
+    // without requesting Keychain access just to render the card.
     hasPassphrase: hasRollingBackupPassphrase(),
-    safeStorageAvailable: isSafeStorageAvailable(),
     backupCount,
     dbQuickCheckOk: health.quickCheckOk,
     dbCheckedAt: health.checkedAt,

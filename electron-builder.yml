@@ -82,12 +82,12 @@ dmg:
   title: "BillFlow ${version}"
   icon: build/icon.icns
   background: build/dmg-background.png
-  iconSize: 104
-  iconTextSize: 12
+  iconSize: 128
+  iconTextSize: 13
   contents:
-    - x: 175
-      y: 232
-    - x: 485
-      y: 232
+    - x: 162
+      y: 220
+    - x: 498
+      y: 220
       type: link
       path: /Applications

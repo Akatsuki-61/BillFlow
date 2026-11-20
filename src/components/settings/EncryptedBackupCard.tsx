@@ -391,13 +391,11 @@ export function EncryptedBackupCard() {
             </div>
             {rollingStatus?.hasPassphrase ? (
               <span className="text-[11px] font-semibold text-content-emerald-700">
-                Stored securely in OS keychain
+                Protected by your system keychain
               </span>
             ) : (
               <span className="text-[11px] text-content-neutral-500">
-                {rollingStatus?.safeStorageAvailable === false
-                  ? "OS keychain unavailable; pass a passphrase manually on Run Now"
-                  : "Set a passphrase (min 8 chars) to enable scheduled backups"}
+                Set a passphrase (min 8 characters) to enable scheduled backups
               </span>
             )}
           </div>
@@ -413,18 +411,16 @@ export function EncryptedBackupCard() {
               }
               className="ui-field flex-1 min-w-[200px] px-3 text-xs"
             />
-            {rollingStatus?.safeStorageAvailable !== false && (
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!isElectron || passphraseInput.length < 8 || isBusy}
-                onClick={() =>
-                  void handleConfigureRolling({ passphrase: passphraseInput })
-                }
-              >
-                Save to Keychain
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!isElectron || passphraseInput.length < 8 || isBusy}
+              onClick={() =>
+                void handleConfigureRolling({ passphrase: passphraseInput })
+              }
+            >
+              Save to Keychain
+            </Button>
             {rollingStatus?.hasPassphrase && (
               <Button
                 type="button"

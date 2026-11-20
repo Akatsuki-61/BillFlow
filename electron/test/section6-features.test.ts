@@ -71,6 +71,7 @@ function seedClient(input: {
 }
 
 const mockBadgeSet = vi.fn();
+const mockKeychainAvailability = vi.fn(() => true);
 const mockNotifications: Array<{ title: string; body: string }> = [];
 
 vi.mock("electron", () => {
@@ -100,7 +101,7 @@ vi.mock("electron", () => {
     },
     Notification: MockNotification,
     safeStorage: {
-      isEncryptionAvailable: () => true,
+      isEncryptionAvailable: () => mockKeychainAvailability(),
       encryptString: (text: string) =>
         Buffer.from(`enc:${Buffer.from(text, "utf8").toString("base64")}`),
       decryptString: (buf: Buffer) => {
@@ -147,6 +148,17 @@ describe("Section 6 high-impact features", () => {
   afterEach(() => {
     closeDatabaseForTesting();
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("reads encrypted backup status without opening the OS Keychain", () => {
+    expect(getRollingBackupStatus().hasPassphrase).toBe(false);
+    expect(mockKeychainAvailability).not.toHaveBeenCalled();
+
+    setRollingBackupPassphrase("vault-passphrase-99");
+    expect(mockKeychainAvailability).toHaveBeenCalledOnce();
+    mockKeychainAvailability.mockClear();
+    expect(getRollingBackupStatus().hasPassphrase).toBe(true);
+    expect(mockKeychainAvailability).not.toHaveBeenCalled();
   });
 
   it("runs PRAGMA quick_check on healthy DB and blocks startup on corrupt SQLite file", () => {

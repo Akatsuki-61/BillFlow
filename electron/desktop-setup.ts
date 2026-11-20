@@ -32,6 +32,9 @@ export function finishDesktopSetup() {
 }
 
 export function desktopNotificationsEnabled() {
+  if (process.env.BILLFLOW_USER_DATA && process.env.BILLFLOW_VERIFY_HIDDEN === "1") {
+    return false;
+  }
   const setup = getDesktopSetup();
   return setup ? !setup.permissionsPending && setup.notificationsEnabled : true;
 }
