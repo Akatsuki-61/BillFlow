@@ -29,9 +29,8 @@ import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { DashboardMetricsProvider } from "@/components/dashboard/DashboardMetricsContext";
 import { useWidgetContext } from "@/context/WidgetContext";
-import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
+import { DASHBOARD_WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
-import { WorkflowQuickStartBar } from "@/components/onboarding/WorkflowQuickStartBar";
 import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
 import { DashboardPeriod } from "@/types/dashboard";
 
@@ -130,7 +129,7 @@ export default function DashboardPage() {
     : -1;
 
   const targetWidgetMeta = contextMenu.widgetId
-    ? WIDGET_CATALOG.find((w) => w.id === contextMenu.widgetId)
+    ? DASHBOARD_WIDGET_CATALOG.find((w) => w.id === contextMenu.widgetId)
     : null;
 
   const isTargetCompact = contextMenu.widgetId
@@ -205,7 +204,7 @@ export default function DashboardPage() {
 
   // Pinned dashboard widgets resolved in current order
   const pinnedWidgets = dashboardWidgets
-    .map((id) => WIDGET_CATALOG.find((w) => w.id === id))
+    .map((id) => DASHBOARD_WIDGET_CATALOG.find((w) => w.id === id))
     .filter((w): w is NonNullable<typeof w> => Boolean(w));
 
   // Asymmetric Zentra 12-column Bento Span Assignment for BillFlow widgets
@@ -213,11 +212,6 @@ export default function DashboardPage() {
     const size = widgetSizes[widgetId] || "normal";
     const isCompact = size === "compact";
 
-    if (widgetId === "workspace-insights") {
-      return isCompact
-        ? "col-span-1 md:col-span-6 lg:col-span-6"
-        : "col-span-1 md:col-span-6 lg:col-span-12";
-    }
     if (baseSize === "metric") {
       return isCompact
         ? "col-span-1 md:col-span-2 lg:col-span-2"
@@ -389,7 +383,7 @@ export default function DashboardPage() {
 
             {/* Quick Pill Selector for all 24 BillFlow Widgets */}
             <div className="flex flex-wrap gap-2 pt-3 border-t border-line-neutral-100">
-              {WIDGET_CATALOG.map((w) => {
+              {DASHBOARD_WIDGET_CATALOG.map((w) => {
                 const pinned = isPinnedToDashboard(w.id);
                 return (
                   <button
@@ -419,7 +413,6 @@ export default function DashboardPage() {
       {/* =====================================================================
           UNIFIED BILLFLOW ZENTRA BENTO GRID
          ===================================================================== */}
-      <WorkflowQuickStartBar />
       {pinnedWidgets.length === 0 ? (
         <div className="p-12 text-center ui-card">
           <Layers className="w-10 h-10 text-content-neutral-400 mx-auto mb-3" />

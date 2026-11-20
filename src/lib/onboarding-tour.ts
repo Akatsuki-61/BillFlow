@@ -50,130 +50,42 @@ export const TOUR_STEPS: ReadonlyArray<TourStep> = [
   },
 ];
 
-export interface QuickStartStep {
-  id: "profile" | "client-or-catalog" | "invoice" | "task";
-  label: string;
-  href: string;
-  done: boolean;
-}
-
-export function getQuickStartProgress(input: {
-  businessName?: string | null;
-  clientsCount: number;
-  catalogCount: number;
-  invoicesCount: number;
-  tasksCount: number;
-}): {
-  steps: QuickStartStep[];
-  completedCount: number;
-  totalCount: number;
-  isComplete: boolean;
-} {
-  const steps: QuickStartStep[] = [
-    {
-      id: "profile",
-      label: "Studio profile & payment info",
-      href: "/settings?section=profile",
-      done: Boolean(input.businessName && input.businessName.trim().length > 0),
-    },
-    {
-      id: "client-or-catalog",
-      label: "Add first client or rate card",
-      href: input.clientsCount > 0 ? "/catalog?create=1" : "/clients?create=1",
-      done: input.clientsCount > 0 || input.catalogCount > 0,
-    },
-    {
-      id: "invoice",
-      label: "Create first invoice",
-      href: "/invoices?new=1",
-      done: input.invoicesCount > 0,
-    },
-    {
-      id: "task",
-      label: "Track a sprint deliverable",
-      href: "/tasks?create=1",
-      done: input.tasksCount > 0,
-    },
-  ];
-  const completedCount = steps.filter((s) => s.done).length;
-  return {
-    steps,
-    completedCount,
-    totalCount: steps.length,
-    isComplete: completedCount === steps.length,
-  };
-}
-
-type ReadStorage = Pick<Storage, "getItem">;
-type WriteStorage = Pick<Storage, "setItem">;
-type RemoveStorage = Pick<Storage, "removeItem">;
+export type TourStatus = "completed" | "dismissed";
 
 const tourKey = (profileId: string) =>
   `billflow_tour_completed_v1_${profileId || "default"}`;
-const quickStartKey = (profileId: string) =>
-  `billflow_quickstart_dismissed_v1_${profileId || "default"}`;
 
 function resolveStorage(): Storage | null {
   return typeof window !== "undefined" ? window.localStorage : null;
 }
 
-export function normalizeTourRoute(route: string): string {
-  const trimmed = route.trim();
-  if (!trimmed || trimmed === "/") return "/";
-  return trimmed.replace(/\/+$/, "") || "/";
-}
-
-export function isTourCompleted(
+export function getTourStatus(
   profileId: string,
-  storage: ReadStorage | null = resolveStorage(),
-): boolean {
+  storage?: Pick<Storage, "getItem"> | null,
+): TourStatus | null {
   try {
-    return storage?.getItem(tourKey(profileId)) === "1";
+    const local = storage === undefined ? resolveStorage() : storage;
+    const saved = local?.getItem(tourKey(profileId));
+    if (saved === "1") return "completed";
+    if (saved === "dismissed") return "dismissed";
+
+    // The old checklist included the tour invitation. Honor its dismissal.
+    const legacyDismissal = `billflow_quickstart_dismissed_v1_${profileId || "default"}`;
+    return local?.getItem(legacyDismissal) === "1" ? "dismissed" : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function markTourCompleted(
+export function saveTourStatus(
   profileId: string,
-  storage: WriteStorage | null = resolveStorage(),
+  status: TourStatus,
+  storage?: Pick<Storage, "setItem"> | null,
 ): void {
   try {
-    storage?.setItem(tourKey(profileId), "1");
+    const local = storage === undefined ? resolveStorage() : storage;
+    local?.setItem(tourKey(profileId), status === "completed" ? "1" : status);
   } catch {
-    // Storage unavailable
-  }
-}
-
-export function resetTourCompleted(
-  profileId: string,
-  storage: RemoveStorage | null = resolveStorage(),
-): void {
-  try {
-    storage?.removeItem(tourKey(profileId));
-  } catch {
-    // Storage unavailable
-  }
-}
-
-export function isQuickStartDismissed(
-  profileId: string,
-  storage: ReadStorage | null = resolveStorage(),
-): boolean {
-  try {
-    return storage?.getItem(quickStartKey(profileId)) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function dismissQuickStart(
-  profileId: string,
-  storage: WriteStorage | null = resolveStorage(),
-): void {
-  try {
-    storage?.setItem(quickStartKey(profileId), "1");
-  } catch {
-    // Storage unavailable
+    // Storage unavailable. The current workspace session still updates.
   }
 }

@@ -49,6 +49,20 @@ describe("Widget preference upgrades", () => {
     });
   });
 
+  it("removes Workspace Insights from Overview and preserves the Analytics layout", () => {
+    const storage = storedPreferences({
+      billflow_dashboard_widgets_v4_studio: '["sprint-tasks","workspace-insights","net-profit"]',
+      billflow_analytics_widgets_v3_studio: '["workspace-insights","paid-ratio"]',
+      billflow_widget_sizes_v4_studio: '{"net-profit":"compact","workspace-insights":"normal"}',
+    });
+    expect(loadWidgetPreferences(storage, "studio")).toEqual({
+      dashboardWidgets: ["sprint-tasks", "net-profit"],
+      analyticsWidgets: ["workspace-insights", "paid-ratio"],
+      widgetSizes: { "net-profit": "compact", "workspace-insights": "normal" },
+    });
+    expect(DEFAULT_DASHBOARD_WIDGET_IDS).not.toContain("workspace-insights");
+  });
+
   it("respects intentionally empty v4 preferences instead of restoring old selections", () => {
     const storage = storedPreferences({
       billflow_dashboard_widgets_v2: '["net-profit"]',

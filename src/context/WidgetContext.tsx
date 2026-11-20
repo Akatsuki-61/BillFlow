@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { Plus } from "lucide-react";
 import {
   WIDGET_CATALOG,
+  canPinToDashboard,
   DEFAULT_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_WIDGET_IDS,
   ALL_ANALYTICS_WIDGET_IDS,
@@ -238,6 +239,7 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
    */
   const pinToDashboard = useCallback(
     (id: string) => {
+      if (!canPinToDashboard(id)) return;
       const meta = WIDGET_CATALOG.find((w) => w.id === id);
       const title = meta ? meta.title : "Widget";
 
@@ -732,7 +734,7 @@ export function WidgetProvider({ children }: { children: React.ReactNode }) {
                 transition: "opacity 140ms ease",
                 zIndex: 30,
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shadow-lg border ${
+              className={`${canPinToDashboard(draggedWidgetId) ? "inline-flex" : "hidden"} items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shadow-lg border ${
                 isHomeDropOver
                   ? "bg-accent-solid text-white border-white/40 ring-4 ring-accent/30"
                   : "bg-[#1c1c1f] text-white dark:bg-white dark:text-[#111115] border-white/15"

@@ -62,7 +62,7 @@ nsis:
   shortcutName: BillFlow
   include: build/installer.nsh
 mac:
-  bundleVersion: "2"
+  bundleVersion: "3"
   entitlements: build/entitlements.mac.plist
   extendInfo:
     NSAppleEventsUsageDescription: "BillFlow uses Apple Calendar automation when you choose to connect Calendar."

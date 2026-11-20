@@ -7,6 +7,7 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { normalizeNavPath } from "../../src/lib/navigation";
 
 test("first launch creates one workspace and resumes optional permissions after restarting", async ({}, testInfo) => {
   const directory = fs.mkdtempSync(
@@ -168,9 +169,49 @@ test("first launch creates one workspace and resumes optional permissions after 
       email: "",
     });
     expect(state.catalog).toHaveLength(0);
+
+    const invite = page.getByRole("button", {
+      name: "Take the tour",
+      exact: true,
+    });
+    const tour = page.getByRole("region", { name: "BillFlow Guided Tour" });
+    const next = tour.getByRole("button", { name: "Next", exact: true });
+    const currentRoute = () => normalizeNavPath(new URL(page.url()).pathname);
+    await expect(page.getByText("Workspace Setup", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByText("Workspace Insights", { exact: true }),
+    ).toHaveCount(0);
+    await invite.click();
+    await next.click();
+    await expect.poll(currentRoute).toBe("/invoices");
+    await expect(
+      page.getByRole("link", { name: "Invoices", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      tour.getByRole("heading", { name: "Itemized Invoicing & Advance Deposits" }),
+    ).toBeFocused();
+    await tour.getByRole("button", { name: "Back", exact: true }).click();
+    await expect.poll(currentRoute).toBe("/");
+    for (const route of ["/invoices", "/tasks", "/outsourcing", "/"]) {
+      await next.click();
+      await expect.poll(currentRoute).toBe(route);
+    }
+    await tour.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(tour).toHaveCount(0);
+    await expect(invite).toHaveCount(0);
     await page.reload();
     await expect(
       page.getByRole("link", { name: "Invoices", exact: true }),
+    ).toBeVisible();
+    await expect(invite).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Profile (Alex Rivera) and workspace settings" })
+      .click();
+    await page.getByRole("button", { name: "Interactive Tour", exact: true }).click();
+    await expect(
+      tour.getByText("Quick Tour · 1 of 5", { exact: true }),
     ).toBeVisible();
   } finally {
     await app?.close();
