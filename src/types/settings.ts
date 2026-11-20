@@ -7,7 +7,11 @@ export type CurrencyDisplayMode = "symbol" | "code";
 
 export type NotificationPlacement =
   "top-left" | "top-right" | "bottom-left" | "bottom-right";
-export type WorkspaceTypeface = "inter" | "nunito" | "jakarta";
+export type WorkspaceTypeface =
+  | "inter"
+  | "nunito"
+  | "jakarta"
+  | "elegant-sans";
 export type LayoutDensity = "compact" | "comfortable" | "spacious";
 
 export interface AppSettings {

@@ -17,7 +17,7 @@ import {
   runRollingEncryptedBackup,
   setRollingBackupPassphrase,
 } from "../encrypted-backup";
-import { updateSettings } from "../ipc/settings";
+import { getOrCreateSettings, updateSettings } from "../ipc/settings";
 import {
   advanceScheduleDate,
   advanceSchedulePastDate,
@@ -523,5 +523,22 @@ describe("Section 6 high-impact features", () => {
     importWorkspace(backup, "replace");
     expect(listQuotes()).toHaveLength(1);
     expect(listRecurringRules()).toHaveLength(1);
+  });
+
+  it("persists and restores the Elegant Sans workspace typeface while rejecting unknown values", () => {
+    const updated = updateSettings({ typeface: "elegant-sans" });
+    expect(updated.typeface).toBe("elegant-sans");
+    expect(getOrCreateSettings().typeface).toBe("elegant-sans");
+
+    const backup = exportWorkspace();
+    updateSettings({ typeface: "inter" });
+    expect(getOrCreateSettings().typeface).toBe("inter");
+
+    importWorkspace(backup, "replace");
+    expect(getOrCreateSettings().typeface).toBe("elegant-sans");
+
+    expect(() =>
+      updateSettings({ typeface: "unknown-font" as never }),
+    ).toThrow();
   });
 });

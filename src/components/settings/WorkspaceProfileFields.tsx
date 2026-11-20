@@ -177,48 +177,71 @@ export function WorkspaceProfileFields({
         </div>
       </div>
 
-      <fieldset className="min-w-0 border-t border-line-neutral-200 pt-4">
-        <legend className="pr-3 text-sm font-semibold">Profile avatar</legend>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div className="flex items-center gap-4">
-            <ProfileAvatarTile
-              name={profile.name}
-              avatar={profile.avatar}
-              accent={profile.accent}
-              photoData={profile.photoData}
-            />
-            <ImageUpload
-              label="Profile photo"
-              value={profile.photoData}
-              showPreview={false}
-              onChange={(photoData) => onProfileChange({ photoData })}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="workspace-profile-icon"
-              className="block font-medium"
-            >
-              Profile icon
-            </label>
-            <select
-              id="workspace-profile-icon"
-              name="profileIcon"
-              className="ui-field w-full border border-line-neutral-300 px-3.5 capitalize"
-              value={profile.avatar}
-              onChange={(event) =>
-                onProfileChange({
-                  avatar: event.target.value as typeof profile.avatar,
-                })
-              }
-            >
-              {Object.keys(PROFILE_AVATAR_ICONS).map((icon) => (
-                <option key={icon} value={icon}>
-                  {icon[0].toUpperCase() + icon.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
+      <fieldset className="min-w-0 rounded-2xl border border-line-neutral-200 px-4 pb-4 pt-3">
+        <legend className="px-2 text-sm font-semibold">Profile avatar</legend>
+        <div className="flex flex-wrap items-center gap-4 border-b border-line-neutral-200 pb-4">
+          <ProfileAvatarTile
+            name={profile.name}
+            avatar={profile.avatar}
+            accent={profile.accent}
+            photoData={profile.photoData}
+            size="lg"
+          />
+          <ImageUpload
+            label="Profile photo"
+            value={profile.photoData}
+            showPreview={false}
+            onChange={(photoData) => onProfileChange({ photoData })}
+          />
+        </div>
+        <div className="grid gap-5 pt-4 sm:grid-cols-2">
+          <fieldset className="min-w-0">
+            <legend className="mb-2 text-xs font-medium">Profile icon</legend>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(PROFILE_AVATAR_ICONS).map(([icon, Icon]) => {
+                const label =
+                  icon === "cpu" ? "CPU" : icon[0].toUpperCase() + icon.slice(1);
+                return (
+                  <label
+                    key={icon}
+                    className="relative cursor-pointer"
+                    title={label}
+                  >
+                    <input
+                      type="radio"
+                      name="profileIcon"
+                      value={icon}
+                      className="peer sr-only"
+                      checked={profile.avatar === icon}
+                      onChange={() =>
+                        onProfileChange({
+                          avatar: icon as typeof profile.avatar,
+                        })
+                      }
+                    />
+                    <span className="sr-only">{label}</span>
+                    <span className="grid size-10 place-items-center rounded-xl border border-line-neutral-300 bg-surface text-content-neutral-700 hover:bg-surface-neutral-100 peer-checked:border-accent peer-checked:bg-accent-faint peer-checked:text-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent">
+                      <Icon
+                        className="size-4.5"
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
+                      {profile.avatar === icon && (
+                        <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border border-accent bg-surface text-accent">
+                          <Check size={10} strokeWidth={2.5} aria-hidden="true" />
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {profile.photoData && (
+              <p className="mt-2 text-content-neutral-600">
+                Remove the photo to show your selected icon.
+              </p>
+            )}
+          </fieldset>
           <fieldset className="min-w-0">
             <legend className="mb-2 text-xs font-medium">Accent color</legend>
             <div className="flex flex-wrap gap-2">
@@ -231,6 +254,7 @@ export function WorkspaceProfileFields({
                   <input
                     type="radio"
                     name="profileAccent"
+                    value={accent}
                     className="peer sr-only"
                     aria-label={style.label}
                     checked={profile.accent === accent}
@@ -241,7 +265,7 @@ export function WorkspaceProfileFields({
                     }
                   />
                   <span
-                    className="grid size-9 place-items-center rounded-full border border-line-neutral-300 text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+                    className="grid size-10 place-items-center rounded-full border border-line-neutral-300 text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
                     style={{ backgroundColor: style.swatch }}
                   >
                     {profile.accent === accent && (
@@ -251,7 +275,7 @@ export function WorkspaceProfileFields({
                 </label>
               ))}
             </div>
-            <p className="text-content-neutral-600">
+            <p className="mt-2 text-content-neutral-600">
               Used for the profile icon and workspace highlights.
             </p>
           </fieldset>

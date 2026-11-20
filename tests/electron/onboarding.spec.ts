@@ -71,10 +71,31 @@ test("first launch creates one workspace and resumes optional permissions after 
       .getByRole("combobox", { name: /currency/ })
       .selectOption("LKR");
     await picker.getByRole("button", { name: "Continue" }).click();
+    const password = picker.getByLabel("Password", { exact: true });
+    const confirmation = picker.getByLabel("Confirm password", { exact: true });
+    await expect(password).toBeFocused();
+    await picker.getByRole("button", { name: "Skip password" }).click();
+    await expect(picker.getByText("No password", { exact: true })).toBeVisible();
+    await picker.getByRole("button", { name: "Back" }).click();
+
+    const profilePassword = "RiveraWorkspace7";
+    await password.fill(profilePassword);
+    await confirmation.fill("does-not-match");
+    await picker.getByRole("button", { name: "Continue" }).click();
+    await expect(picker.getByRole("alert")).toHaveText(
+      "The passwords don’t match.",
+    );
+    await expect(confirmation).toBeFocused();
+    await confirmation.fill(profilePassword);
+    await confirmation.press("Enter");
     await expect(
       picker.getByRole("heading", { name: "Review your profile" }),
     ).toBeFocused();
     await expect(picker.getByText("Rivera Studio")).toBeVisible();
+    await expect(picker.getByText("Password set", { exact: true })).toBeVisible();
+    await expect(picker.getByText(profilePassword, { exact: true })).toHaveCount(
+      0,
+    );
     await page.screenshot({
       path: testInfo.outputPath("review.png"),
       scale: "css",
@@ -89,6 +110,7 @@ test("first launch creates one workspace and resumes optional permissions after 
     ).profiles;
     expect(profile.name).toBe("Alex Rivera");
     expect(profile.defaultCurrency).toBe("LKR");
+    expect(profile.hasPassword).toBe(true);
     await expect(
       page.getByRole("link", { name: "Invoices", exact: true }),
     ).toHaveCount(0);
@@ -101,6 +123,16 @@ test("first launch creates one workspace and resumes optional permissions after 
 
     await app!.close();
     page = await launch();
+    const unlock = page.getByRole("button", {
+      name: "Unlock Profile",
+      exact: true,
+    });
+    await expect(unlock).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Optional permissions" }),
+    ).toHaveCount(0);
+    await page.getByPlaceholder("Enter letters or numbers").fill(profilePassword);
+    await unlock.click();
     await expect(
       page.getByRole("heading", { name: "Optional permissions" }),
     ).toBeFocused();

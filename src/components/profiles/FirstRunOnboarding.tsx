@@ -27,6 +27,7 @@ const steps = [
   "company",
   "email",
   "currency",
+  "password",
   "review",
   "permissions",
 ] as const;
@@ -134,6 +135,13 @@ export function FirstRunOnboarding() {
     currency: "USD" as Currency,
   });
   const [step, setStep] = useState<Step>("picker");
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [passwordError, setPasswordError] = useState<{
+    field: "password" | "passwordConfirmation";
+    message: string;
+  } | null>(null);
   const [direction, setDirection] = useState(1);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -148,6 +156,8 @@ export function FirstRunOnboarding() {
 
   function go(next: Step, travel = 1) {
     setError("");
+    setPasswordError(null);
+    setShowPasswords(false);
     setDirection(travel);
     setStep(next);
   }
@@ -182,9 +192,40 @@ export function FirstRunOnboarding() {
     go(steps[index + 1]);
   }
 
+  function nextPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!password.trim()) {
+      setPasswordError({
+        field: "password",
+        message: "Enter a password that contains more than spaces.",
+      });
+      event.currentTarget
+        .querySelector<HTMLInputElement>("#setup-password")
+        ?.focus();
+      return;
+    }
+    if (password !== passwordConfirmation) {
+      setPasswordError({
+        field: "passwordConfirmation",
+        message: "The passwords don’t match.",
+      });
+      event.currentTarget
+        .querySelector<HTMLInputElement>("#setup-password-confirmation")
+        ?.focus();
+      return;
+    }
+    go("review");
+  }
+
+  function skipPassword() {
+    setPassword("");
+    setPasswordConfirmation("");
+    go("review");
+  }
+
   function saveProfile() {
-    void run("profile", () =>
-      completeOnboarding({
+    void run("profile", async () => {
+      await completeOnboarding({
         studioName: invoiceName,
         email: draft.email.trim(),
         defaultCurrency: draft.currency,
@@ -198,11 +239,14 @@ export function FirstRunOnboarding() {
             accent: starterProfile.accent,
             defaultCurrency: draft.currency,
             invoicePrefix: starterProfile.invoicePrefix,
+            password: password || undefined,
             seedRoleCatalog: false,
           },
         ],
-      }),
-    );
+      });
+      setPassword("");
+      setPasswordConfirmation("");
+    });
   }
 
   const titleStyle =
@@ -381,6 +425,120 @@ export function FirstRunOnboarding() {
                 </form>
               )}
 
+              {current === "password" && (
+                <form
+                  method="post"
+                  onSubmit={nextPassword}
+                  aria-labelledby="setup-security-title"
+                >
+                  <h1 id="setup-security-title" className={titleStyle}>
+                    Protect your profile
+                  </h1>
+                  <p id="setup-password-hint" className={hintStyle}>
+                    Optional. Use at least 4 characters. You’ll enter it when
+                    unlocking this profile.
+                  </p>
+                  <div className="mt-6 space-y-4">
+                    <div>
+                      <label
+                        htmlFor="setup-password"
+                        className="mb-2 block text-sm font-medium"
+                      >
+                        Password
+                      </label>
+                      <input
+                        id="setup-password"
+                        name="password"
+                        type={showPasswords ? "text" : "password"}
+                        autoComplete="new-password"
+                        enterKeyHint="next"
+                        required
+                        minLength={4}
+                        maxLength={128}
+                        data-setup-focus
+                        className={controlStyle}
+                        aria-invalid={
+                          passwordError?.field === "password" || undefined
+                        }
+                        aria-describedby={`setup-password-hint${passwordError?.field === "password" ? " setup-password-error" : ""}`}
+                        value={password}
+                        onChange={(event) => {
+                          setPassword(event.target.value);
+                          setPasswordError(null);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="setup-password-confirmation"
+                        className="mb-2 block text-sm font-medium"
+                      >
+                        Confirm password
+                      </label>
+                      <input
+                        id="setup-password-confirmation"
+                        name="passwordConfirmation"
+                        type={showPasswords ? "text" : "password"}
+                        autoComplete="new-password"
+                        enterKeyHint="next"
+                        required
+                        maxLength={128}
+                        className={controlStyle}
+                        aria-invalid={
+                          passwordError?.field === "passwordConfirmation" || undefined
+                        }
+                        aria-describedby={
+                          passwordError?.field === "passwordConfirmation"
+                            ? "setup-password-error"
+                            : undefined
+                        }
+                        value={passwordConfirmation}
+                        onChange={(event) => {
+                          setPasswordConfirmation(event.target.value);
+                          setPasswordError(null);
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={showPasswords}
+                      className="rounded px-1 py-1 text-sm text-slate-200 underline underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-sky-200"
+                      onClick={() => setShowPasswords(!showPasswords)}
+                    >
+                      Show passwords
+                    </button>
+                  </div>
+                  {passwordError && (
+                    <p
+                      id="setup-password-error"
+                      role="alert"
+                      className="mt-3 text-sm text-rose-200"
+                    >
+                      {passwordError.message}
+                    </p>
+                  )}
+                  <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      className={secondaryStyle}
+                      onClick={back}
+                    >
+                      <ArrowLeft size={16} aria-hidden="true" /> Back
+                    </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        className={secondaryStyle}
+                        onClick={skipPassword}
+                      >
+                        Skip password
+                      </button>
+                      {nextButton}
+                    </div>
+                  </div>
+                </form>
+              )}
+
               {current === "review" && (
                 <section aria-labelledby="setup-review-title">
                   <h1
@@ -415,6 +573,10 @@ export function FirstRunOnboarding() {
                       <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
                         <dt className="text-slate-300">Billing currency</dt>
                         <dd>{draft.currency}</dd>
+                      </div>
+                      <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                        <dt className="text-slate-300">Profile protection</dt>
+                        <dd>{password ? "Password set" : "No password"}</dd>
                       </div>
                     </dl>
                   </div>
