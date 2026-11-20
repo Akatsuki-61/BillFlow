@@ -72,6 +72,12 @@ This document records the individual module ownership, development timeline, and
     - **Recurring retainers & morning financial digest:** Added calendar cadence scheduling with month-end clamping (`electron/recurring-schedule.ts`), transactional invoice creation (`createInvoiceInTx`), auto PDF export, and local timers/OS alerts (`electron/ipc/recurring.ts`, `src/components/invoices/RecurringRulesTab.tsx`). Added once-per-day morning briefing alerts for overdue invoices, due tasks, and 7-day vendor payouts alongside `app.setBadgeCount()` and tray tooltip sync (`electron/digest.ts`, `src/app/settings/page.tsx`).
     - **Proposals/Quotes workflow & Project Margin (P&L) drawer:** Added isolated `quotes` and `quote_items` tables (`0016_section6_workflows.sql`), `QT-YYYY-NNN` numbering, `PROPOSAL` support across all five PDF and React templates, live preview, and 1-click transactional `convertQuoteToInvoice` (`electron/ipc/quotes.ts`, `src/components/invoices/QuotesTab.tsx`). Built client and invoice P&L analysis combining revenue, vendor work orders, expenses, and tracked task time with Accrual/Cash switching (`src/lib/project-margin.ts`, `src/components/analytics/ProjectMarginDrawer.tsx`, `electron/test/section6-features.test.ts`, `src/lib/test/project-margin.test.ts`).
 
+- **Settings, Full Reset & Guided Onboarding (Nov 20):**
+  - Consolidated workspace identity, avatar and accent controls, currency, and invoice prefix under Business profile. Reworked Workspace interface spacing and the Local activity history disclosure (`cd7d3d8`).
+  - Added separate active-profile and full-application resets. The full reset queues cleanup before the next database startup, removes managed data across profiles, and restarts BillFlow at the first-run picker (`electron/application-reset.ts`).
+  - Replaced the first-launch role setup with an empty picker, one question at a time, and a profile review. Added optional notifications and Apple Calendar Automation after profile creation. A persisted setup checkpoint lets BillFlow resume at permissions after a restart (`0017_guided_setup.sql`, `FirstRunOnboarding.tsx`, `electron/desktop-setup.ts`).
+  - Prepared `v0.3.0` by synchronizing package metadata, installer artwork, desktop build paths, and release notes. Added packaged coverage for keyboard navigation, retaining profile data and permission choices through a restart, and continuing after an unavailable permission.
+
 The earlier test counts above describe their original milestone; the current verification results are listed below. The November 17 pass did not exercise Windows runtime behavior, VoiceOver, real messaging dispatch or live macOS Calendar service round trips; calendar reconciliation was checked with native SQLite fixtures and generated helper tests.
 
 ---
@@ -201,19 +207,19 @@ The earlier test counts above describe their original milestone; the current ver
 | **Nov 19** | Nipun | `main` / Members | Merged `Nipun` into `main` and fast-forwarded `Nipun`, `Binuka`, `Lahiru`, and `Sandika` to match `main` (`f599529`); `UI-Rework` remains frozen at `3db5ae9` and excluded from synchronization. |
 | **Nov 19** | Nipun | `Nipun` | Implemented Section 6 workflows (excluding the work timer): SQLite startup `quick_check`, rolling AES-256-GCM encrypted backups, recurring retainers, morning financial digest & app badge sync, proposals/quotes with 1-click invoice conversion (`0016_section6_workflows.sql`), and client/invoice Project Margin (P&L) drawer. |
 | **Nov 19** | Nipun | `main` / Members | Integrated Section 6 workflows from `Nipun` into `main` and fast-forwarded `Nipun`, `Binuka`, `Lahiru`, and `Sandika` to match `main`; `UI-Rework` stays frozen at `3db5ae9` and excluded from synchronization. |
+| **Nov 20** | Nipun | `Nipun` | Consolidated Settings, added a full app reset, and implemented guided onboarding with optional desktop permissions that resume after restart. Prepared the `v0.3.0` Apple Silicon installer and updated the changelog. |
 
 ---
 
 ## Test & Build Verification
 
-Current verification for the November 19 `Nipun` -> `main` release state:
-- **Unit & Integration Framework:** Vitest (`vitest run`).
-- **Vitest Results:** `40` test files passed, `304` tests passed (100% pass rate), including `section6-features.test.ts`, `project-margin.test.ts` (`3` tests), `section3-integrity.test.ts` (`9` tests), `section4-optimizations.test.ts` (`7` tests), `section5-desktop-tweaks.test.ts` (`5` tests), `platform-shortcuts.test.ts` (`3` tests), `security-integrity.test.ts` (`54` tests), and zero-copy currency conversion checks.
-- **Type Checking:** `npx tsc --noEmit` compiles cleanly with zero errors.
-- **Linter:** `npm run lint` passes cleanly with zero errors.
-- **Production Build:** `npm run build` completes cleanly for the static renderer, Electron bundles (`dist-electron/main.js` `870.80 KB`, `dist-electron/preload.js` `7.32 KB`), and runtime third-party notices (`scripts/generate-runtime-notices.mjs`).
-- **Live Desktop QA (`agent-desktop`):** Verified the production Electron build under an isolated user-data directory across workspace onboarding, Client and Invoice Project Margin (P&L) drawers, Proposal Preview and 1-click conversion (`QT-2026-001` to `SE-2026-001`), Recurring Retainers creation and `Run Due Retainers` (`SE-2026-001` auto-generated at `$1,200.00`), and Settings -> Backup & data (`SQLite quick_check: Passed`, `Send Test Digest`, and Encrypted Backup card).
-- **Desktop End-to-End & Packaging Baseline:** The `6` Playwright Electron scenarios across `tests/electron/desktop.spec.ts` and `tests/electron/currency-audit.spec.ts` plus packaged macOS arm64 visual/axe-core checks were verified on the November 17 `44b6dfb` baseline; Playwright E2E and `.dmg`/`.exe` installers have not been re-run yet for the November 19 batch.
-- **Legacy Artifacts:** Previous `v0.1.2` and earlier `v0.2.0` artifacts remain under `release/` (`BillFlow-0.1.2-arm64.dmg`, `BillFlow-0.1.2.dmg`); the Intel macOS `0.2.0` `.dmg` has not yet been packaged locally.
+The November 20 `v0.3.0` build on `Nipun` passed the following checks.
+
+- Vitest passed **305 tests** across 41 files, including full-reset cleanup and migration coverage.
+- TypeScript and ESLint passed. The production build generated the renderer, Electron bundles, and third-party notices.
+- Playwright passed **seven packaged desktop scenarios** on macOS Apple Silicon. The onboarding test covers keyboard navigation, restart at permissions, and continuing when Apple Calendar is unavailable. Automated tests simulated native permission outcomes.
+- Built and verified the ad-hoc signed `BillFlow-0.3.0-arm64.dmg` for local testing.
+
+The November 19 build was also tested with isolated app data for project margins, proposal conversion, recurring invoice generation, the financial digest, and encrypted backups.
 
 For the product overview and freelance workflow specification, see [README.md](README.md) and [CHANGELOG.md](CHANGELOG.md).

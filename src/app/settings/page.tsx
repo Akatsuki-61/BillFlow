@@ -2,10 +2,13 @@
 import { WorkspaceActivityPanel } from "@/components/ui/WorkspaceActivityPanel";
 import { localDateKey } from "@/lib/visual-metrics";
 import { CurrencyRateSettings } from "@/context/ReportingContext";
-import { AppearanceFields } from "@/components/settings/WorkspaceAppearance";
+import { AppearanceFields, FinancialDigestSettings } from "@/components/settings/WorkspaceAppearance";
 import { SignatureEditor } from "@/components/settings/SignatureEditor";
 import { PhoneField } from "@/components/ui/PhoneField";
-import { ImageUpload } from "@/components/ui/ImageUpload";
+import {
+  WorkspaceProfileFields,
+  type WorkspaceProfileDraft,
+} from "@/components/settings/WorkspaceProfileFields";
 
 import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { MAX_BACKUP_BYTES } from "@/lib/backup-limits";
@@ -15,7 +18,6 @@ import { Dialog } from "@/components/ui/Dialog";
 
 import { Button, PageHeader } from "@/components/ui/Workspace";
 
-import Image from "next/image";
 import React, {
   useState,
   useEffect,
@@ -46,31 +48,26 @@ import {
   AlertTriangle,
   Save,
   Hash,
-  Mail,
-  Phone,
   Sun,
   Moon,
   Monitor,
-  Lock,
-  Plus,
-  SlidersHorizontal,
-  UsersRound,
-  Pencil,
   Eye,
 } from "lucide-react";
 import { useSettings, useData } from "@/lib/data/DataProvider";
-import type { UpdateSettingsInput, ExportDataPayload } from "@/types/settings";
+import {
+  APPLICATION_RESET_CONFIRMATION,
+  type AppSettings,
+  type UpdateSettingsInput,
+  type ExportDataPayload,
+} from "@/types/settings";
 import { useTheme } from "@/context/ThemeContext";
 import { useProfiles } from "@/context/ProfileContext";
-import { ProfileAvatarTile } from "@/components/profiles/ProfileAvatarTile";
 import { useSearchParams } from "next/navigation";
 import type {
   Currency,
   InvoiceTemplateId,
   InvoiceWithClient,
 } from "@/types/billing";
-import { getCurrencySymbol } from "@/lib/format";
-import type { AccentPreference } from "@/lib/theme";
 import dynamic from "next/dynamic";
 import { profileStorageKey } from "@/lib/profile-scope";
 import { InvoiceTemplateMiniPreview } from "@/components/settings/InvoiceTemplateMiniPreview";
@@ -133,19 +130,49 @@ const INVOICE_TEMPLATE_OPTIONS: Array<{
   },
 ];
 
-const ACCENT_OPTIONS: Array<{
-  id: AccentPreference;
-  name: string;
-  description: string;
-  color: string;
-}> = [
-  { id: "purple", name: "Purple", description: "Default", color: "#7c3aed" },
-  { id: "blue", name: "Blue", description: "Ocean", color: "#2563eb" },
-  { id: "emerald", name: "Emerald", description: "Forest", color: "#059669" },
-  { id: "rose", name: "Rose", description: "Ruby", color: "#e11d48" },
-  { id: "amber", name: "Amber", description: "Bronze", color: "#d97706" },
-  { id: "indigo", name: "Indigo", description: "Midnight", color: "#4f46e5" },
-];
+type ResetScope = "profile" | "application";
+
+const RESET_CONFIRMATION = {
+  profile: "DELETE PROFILE RECORDS",
+  application: APPLICATION_RESET_CONFIRMATION,
+};
+
+function settingsDraft(settings: AppSettings | null): UpdateSettingsInput {
+  return {
+    businessName: settings?.businessName ?? "",
+    professionalTitle: settings?.professionalTitle ?? "",
+    email: settings?.email ?? "",
+    phone: settings?.phone ?? "",
+    website: settings?.website ?? "",
+    taxId: settings?.taxId ?? "",
+    address: settings?.address ?? "",
+    paymentDetails: settings?.paymentDetails ?? "",
+    defaultCurrency: settings?.defaultCurrency ?? "USD",
+    invoicePrefix: settings?.invoicePrefix ?? "INV-",
+    nextInvoiceSeq: settings?.nextInvoiceSeq ?? 1,
+    defaultDueDays: settings?.defaultDueDays ?? 14,
+    defaultTaxRate: settings?.defaultTaxRate ?? 0,
+    defaultNotes: settings?.defaultNotes ?? "",
+    defaultInvoiceTemplate: settings?.defaultInvoiceTemplate ?? "geometric-teal",
+    dateFormat: settings?.dateFormat ?? "YYYY-MM-DD",
+    currencyDisplay: settings?.currencyDisplay ?? "symbol",
+    pdfExportDirectory: settings?.pdfExportDirectory || null,
+    defaultDeliveryUrl: settings?.defaultDeliveryUrl || null,
+    signatureData: settings?.signatureData ?? null,
+    typeface: settings?.typeface ?? null,
+    layoutDensity: settings?.layoutDensity ?? null,
+    notificationPlacement: settings?.notificationPlacement ?? null,
+  };
+}
+
+function changedSettings(draft: UpdateSettingsInput, saved: AppSettings | null) {
+  const baseline = settingsDraft(saved);
+  return Object.fromEntries(
+    (Object.keys(baseline) as Array<keyof UpdateSettingsInput>)
+      .filter((key) => draft[key] !== baseline[key])
+      .map((key) => [key, draft[key]]),
+  ) as UpdateSettingsInput;
+}
 
 function SettingsContent() {
   const searchParams = useSearchParams();
@@ -160,16 +187,8 @@ function SettingsContent() {
     : "profile";
   const { workflow, isElectron, error: dataError } = useData();
   const isMac = useIsMac();
-  const { preference, setPreference, accent, setAccent, ready } = useTheme();
-  const {
-    profiles,
-    activeProfile,
-    maxProfiles,
-    openProfileGate,
-    lockCurrentProfile,
-    switchProfile,
-    updateProfile,
-  } = useProfiles();
+  const { preference, setPreference, ready } = useTheme();
+  const { activeProfile, updateProfile, refreshProfiles } = useProfiles();
   const {
     settings,
     isLoading,
@@ -203,27 +222,9 @@ function SettingsContent() {
     type: "success" | "error";
   } | null>(null);
 
-  // Form State
-  const [formState, setFormState] = useState<UpdateSettingsInput>({
-    businessName: "",
-    professionalTitle: "",
-    email: "",
-    phone: "",
-    website: "",
-    taxId: "",
-    address: "",
-    paymentDetails: "",
-    defaultCurrency: "USD",
-    invoicePrefix: "INV-",
-    nextInvoiceSeq: 1,
-    defaultDueDays: 14,
-    defaultTaxRate: 0,
-    defaultNotes: "",
-    defaultInvoiceTemplate: "geometric-teal",
-    dateFormat: "YYYY-MM-DD",
-    currencyDisplay: "symbol",
-    pdfExportDirectory: null,
-  });
+  const formRef = useRef<HTMLFormElement>(null);
+  const [formState, setFormState] = useState(() => settingsDraft(settings));
+  const [profileDraft, setProfileDraft] = useState<WorkspaceProfileDraft>({});
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -247,45 +248,20 @@ function SettingsContent() {
   const importReadVersion = useRef(0);
   const [importMode, setImportMode] = useState<"replace" | "merge">("replace");
 
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetScope, setResetScope] = useState<ResetScope | null>(null);
+  const [resetError, setResetError] = useState("");
   const [resetConfirmation, setResetConfirmation] = useState("");
   const [isResetting, setIsResetting] = useState(false);
   const [previewTemplateId, setPreviewTemplateId] =
     useState<InvoiceTemplateId | null>(null);
 
-  // Reset the draft when newly loaded or saved settings replace the source.
-  const [previousSettings, setPreviousSettings] =
-    useState<typeof settings>(null);
+  const [previousSettings, setPreviousSettings] = useState(settings);
   if (previousSettings !== settings) {
     setPreviousSettings(settings);
-    if (settings) {
-      setFormState({
-        businessName: settings.businessName || "",
-        professionalTitle: settings.professionalTitle || "",
-        email: settings.email || "",
-        phone: settings.phone || "",
-        website: settings.website || "",
-        taxId: settings.taxId || "",
-        address: settings.address || "",
-        paymentDetails: settings.paymentDetails || "",
-        defaultCurrency: settings.defaultCurrency || "USD",
-        invoicePrefix: settings.invoicePrefix || "INV-",
-        nextInvoiceSeq: settings.nextInvoiceSeq || 1,
-        defaultDueDays: settings.defaultDueDays ?? 14,
-        defaultTaxRate: settings.defaultTaxRate ?? 0,
-        defaultNotes: settings.defaultNotes || "",
-        defaultInvoiceTemplate:
-          settings.defaultInvoiceTemplate || "geometric-teal",
-        dateFormat: settings.dateFormat || "YYYY-MM-DD",
-        currencyDisplay: settings.currencyDisplay || "symbol",
-        pdfExportDirectory: settings.pdfExportDirectory || null,
-        defaultDeliveryUrl: settings.defaultDeliveryUrl ?? null,
-        signatureData: settings.signatureData ?? null,
-        typeface: settings.typeface ?? null,
-        layoutDensity: settings.layoutDensity ?? null,
-        notificationPlacement: settings.notificationPlacement ?? null,
-      });
-    }
+    setFormState({
+      ...settingsDraft(settings),
+      ...changedSettings(formState, previousSettings),
+    });
   }
 
   // Load live DB path (re-evaluate when active profile changes)
@@ -295,40 +271,14 @@ function SettingsContent() {
       .catch(() => setDbPath("Local database file"));
   }, [getDbPath, activeProfile.id]);
 
-  // Determine dirty state
-  const isDirty = useMemo(() => {
-    if (!settings) return false;
-    return (
-      (formState.businessName ?? "") !== (settings.businessName ?? "") ||
-      (formState.professionalTitle ?? "") !==
-        (settings.professionalTitle ?? "") ||
-      (formState.email ?? "") !== (settings.email ?? "") ||
-      (formState.phone ?? "") !== (settings.phone ?? "") ||
-      (formState.website ?? "") !== (settings.website ?? "") ||
-      (formState.taxId ?? "") !== (settings.taxId ?? "") ||
-      (formState.address ?? "") !== (settings.address ?? "") ||
-      (formState.paymentDetails ?? "") !== (settings.paymentDetails ?? "") ||
-      formState.defaultCurrency !== settings.defaultCurrency ||
-      (formState.invoicePrefix ?? "") !== (settings.invoicePrefix ?? "") ||
-      formState.nextInvoiceSeq !== settings.nextInvoiceSeq ||
-      formState.defaultDueDays !== settings.defaultDueDays ||
-      formState.defaultTaxRate !== settings.defaultTaxRate ||
-      (formState.defaultNotes ?? "") !== (settings.defaultNotes ?? "") ||
-      (formState.defaultInvoiceTemplate || "geometric-teal") !==
-        (settings.defaultInvoiceTemplate || "geometric-teal") ||
-      formState.dateFormat !== settings.dateFormat ||
-      formState.currencyDisplay !== settings.currencyDisplay ||
-      (formState.defaultDeliveryUrl || null) !==
-        (settings.defaultDeliveryUrl || null) ||
-      formState.signatureData !== (settings.signatureData ?? null) ||
-      formState.typeface !== (settings.typeface ?? null) ||
-      formState.layoutDensity !== (settings.layoutDensity ?? null) ||
-      formState.notificationPlacement !==
-        (settings.notificationPlacement ?? null) ||
-      (formState.pdfExportDirectory || null) !==
-        (settings.pdfExportDirectory || null)
-    );
-  }, [formState, settings]);
+  const settingsPatch = changedSettings(formState, settings);
+  const profilePatch = Object.fromEntries(
+    (Object.keys(profileDraft) as Array<keyof WorkspaceProfileDraft>)
+      .filter((key) => profileDraft[key] !== (activeProfile[key] ?? null))
+      .map((key) => [key, profileDraft[key]]),
+  ) as WorkspaceProfileDraft;
+  const isDirty =
+    Object.keys(settingsPatch).length > 0 || Object.keys(profilePatch).length > 0;
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -359,7 +309,8 @@ function SettingsContent() {
   };
 
   const handleSave = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+    e?.preventDefault();
+    if (!isDirty || isSaving) return;
     setFormErrors({});
 
     // Validate email if provided
@@ -373,7 +324,15 @@ function SettingsContent() {
 
     setIsSaving(true);
     try {
-      await updateSettings(formState);
+      if (Object.keys(profilePatch).length > 0) {
+        await updateProfile(activeProfile.id, profilePatch);
+        setProfileDraft({});
+      }
+      if (Object.keys(settingsPatch).length > 0) {
+        const saved = await updateSettings(settingsPatch);
+        setFormState(settingsDraft(saved));
+        await refreshProfiles();
+      }
       if (typeof window !== "undefined") {
         localStorage.setItem(
           profileStorageKey("billflow_invoice_template"),
@@ -402,10 +361,7 @@ function SettingsContent() {
       );
     }
     try {
-      await updateSettings({
-        ...formState,
-        defaultInvoiceTemplate: templateId,
-      });
+      await updateSettings({ defaultInvoiceTemplate: templateId });
       const label =
         INVOICE_TEMPLATE_OPTIONS.find((t) => t.id === templateId)?.name ||
         templateId;
@@ -416,7 +372,7 @@ function SettingsContent() {
   };
 
   const saveFromShortcut = useEffectEvent(() => {
-    if (isDirty && !isSaving) void handleSave();
+    if (isDirty && !isSaving && !resetScope) formRef.current?.requestSubmit();
   });
 
   // Keyboard shortcut Cmd+S / Ctrl+S
@@ -671,24 +627,35 @@ function SettingsContent() {
     }
   };
 
-  const handleConfirmReset = async () => {
-    if (resetConfirmation !== "DELETE ALL DATA") return;
+  const openResetDialog = (scope: ResetScope) => {
+    setResetConfirmation("");
+    setResetError("");
+    setResetScope(scope);
+  };
+
+  const handleConfirmReset = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!resetScope || isResetting || resetConfirmation !== RESET_CONFIRMATION[resetScope]) return;
+
+    setResetError("");
     setIsResetting(true);
     try {
+      if (resetScope === "application") {
+        if (!window.billflow?.settings.resetApplication) {
+          throw new Error("Application reset requires the desktop app.");
+        }
+        await window.billflow.settings.resetApplication(resetConfirmation);
+        return;
+      }
       await resetData();
-      showToast(
-        "Business records and managed receipts cleared. Profile and appearance kept.",
-        "success",
-      );
-      setIsResetModalOpen(false);
-      setResetConfirmation("");
+      showToast("Records and managed receipts cleared for this profile.");
+      setResetScope(null);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to reset workspace.";
-      showToast(msg, "error");
-    } finally {
-      setIsResetting(false);
+      setResetError(
+        err instanceof Error ? err.message : "Could not clear BillFlow data.",
+      );
     }
+    setIsResetting(false);
   };
 
   // Preview generated invoice code
@@ -785,10 +752,6 @@ function SettingsContent() {
   ]);
 
   // Initial letter for the avatar
-  const avatarLetter = (
-    formState.businessName?.trim().charAt(0) || "Y"
-  ).toUpperCase();
-
   return (
     <div className="workspace-page settings-page motion-page max-w-none">
       {dataError && (
@@ -819,29 +782,7 @@ function SettingsContent() {
         )}
       </MotionPresence>
 
-      {/* Header */}
-      <PageHeader
-        title="Settings"
-        description="A workspace that works your way."
-      >
-        {isDirty && (
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-amber-50 text-content-amber-800 border border-line-amber-200/60">
-              <span className="w-1.5 h-1.5 rounded-full bg-surface-amber-500 animate-pulse" />
-              Unsaved changes
-            </span>
-            <Button
-              variant="primary"
-              type="button"
-              onClick={() => handleSave()}
-              disabled={isSaving}
-            >
-              <Save className="w-3.5 h-3.5" />
-              {isSaving ? "Saving..." : `Save (${formatShortcut("Cmd+S", isMac)})`}
-            </Button>
-          </div>
-        )}
-      </PageHeader>
+      <PageHeader title="Settings" />
 
       <div className="settings-layout">
         <aside className="settings-sidebar">
@@ -852,7 +793,7 @@ function SettingsContent() {
                 {
                   id: "profile",
                   title: "Business profile",
-                  detail: "Identity & payment details",
+                  detail: "Workspace, contact & payment",
                   icon: User,
                 },
                 {
@@ -864,13 +805,13 @@ function SettingsContent() {
                 {
                   id: "appearance",
                   title: "Appearance",
-                  detail: "Theme & accent color",
+                  detail: "Theme & interface",
                   icon: Palette,
                 },
                 {
                   id: "data",
                   title: "Backup & data",
-                  detail: "Storage, export & restore",
+                  detail: "Storage, backups & reset",
                   icon: Database,
                 },
               ] as const
@@ -926,15 +867,6 @@ function SettingsContent() {
         {/* Main Content Area */}
         <div className="workspace-form settings-content w-full max-w-none">
           <div key={activeTab} className="settings-section-heading">
-            <span className="settings-nav-label">
-              {activeTab === "profile"
-                ? "MAKE IT YOURS"
-                : activeTab === "invoices"
-                  ? "BILLING ESSENTIALS"
-                  : activeTab === "appearance"
-                    ? "YOUR LOOK & FEEL"
-                    : "KEEP IT SAFE"}
-            </span>
             <h2>
               {activeTab === "profile"
                 ? "Business profile"
@@ -946,14 +878,15 @@ function SettingsContent() {
             </h2>
             <p>
               {activeTab === "profile"
-                ? "The details your clients see on every invoice."
+                ? "Manage the active workspace and the business details shown on invoices."
                 : activeTab === "invoices"
                   ? "Set up the starting point for your next invoice."
                   : activeTab === "appearance"
-                    ? "Choose the palette that feels right for your workspace."
-                    : "Keep a complete copy of your records and receipts."}
+                    ? "Customize how BillFlow looks and feels."
+                    : "Manage your local storage, backups, and reset options."}
             </p>
           </div>
+          <form ref={formRef} onSubmit={handleSave} className="settings-section space-y-6">
           {activeTab === "appearance" ? (
             <div className="settings-section space-y-6">
               <AppearanceFields
@@ -1025,72 +958,7 @@ function SettingsContent() {
                   </div>
                 )}
               </section>
-
-              <section
-                className="ui-card p-5 space-y-4"
-                aria-labelledby="accent-heading"
-              >
-                <div>
-                  <h2
-                    id="accent-heading"
-                    className="text-base font-semibold text-content-neutral-900"
-                  >
-                    Accent color
-                  </h2>
-                  <p className="text-sm text-content-neutral-500 mt-1">
-                    Select your highlight color for buttons, navigation links,
-                    badges, and metrics.
-                  </p>
-                  <p
-                    className="text-xs text-content-neutral-500 mt-1"
-                    role="status"
-                  >
-                    Updates instantly across light and dark modes.
-                  </p>
-                </div>
-
-                <div
-                  role="radiogroup"
-                  aria-labelledby="accent-heading"
-                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-1"
-                >
-                  {ACCENT_OPTIONS.map((option) => {
-                    const isSelected = accent === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        aria-label={`${option.name} accent color (${option.description})`}
-                        onClick={(e) =>
-                          setAccent(option.id, { trigger: e.currentTarget })
-                        }
-                        className={`group relative flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                          isSelected
-                            ? "bg-accent-soft/40 border-accent shadow-xs ring-1 ring-accent/40"
-                            : "bg-surface border-line-neutral-200/80 hover:border-line-neutral-300 hover:bg-surface-neutral-50/70"
-                        }`}
-                      >
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center shadow-xs transition-transform group-hover:scale-105"
-                          style={{ backgroundColor: option.color }}
-                        >
-                          {isSelected && (
-                            <Check className="w-4 h-4 text-white stroke-[2.5]" />
-                          )}
-                        </div>
-                        <span className="mt-2 text-xs font-semibold text-content-neutral-900">
-                          {option.name}
-                        </span>
-                        <span className="text-[11px] text-content-neutral-500">
-                          {option.description}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
+              <FinancialDigestSettings />
             </div>
           ) : isLoading ? (
             <div className="bg-surface rounded-2xl border border-line-neutral-200/80 p-8 space-y-6 animate-pulse">
@@ -1099,218 +967,25 @@ function SettingsContent() {
               <div className="h-10 w-full bg-surface-neutral-100 rounded-lg" />
             </div>
           ) : (
-            <form onSubmit={handleSave} className="settings-section space-y-6">
+            <>
               {/* TAB 1: MY PROFILE */}
               {activeTab === "profile" && (
                 <div className="settings-section space-y-6">
-                  {/* Role Profiles & Password Locks Card */}
-                  <div className="ui-card p-6 space-y-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-sm font-semibold text-content-neutral-900">
-                            Role Profiles & Password Locks
-                          </h2>
-                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-neutral-100 text-content-neutral-700">
-                            {profiles.length} / {maxProfiles} Profiles
-                          </span>
-                        </div>
-                        <p className="text-xs text-content-neutral-500 mt-0.5 max-w-[65ch]">
-                          Keep Software Engineering, AI Development, and
-                          Technical Consulting in separate workspaces. Each
-                          profile has its own SQLite ledger, invoice sequence,
-                          and optional password lock.
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openProfileGate("onboarding")}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-line-neutral-200 bg-surface hover:bg-surface-neutral-100 text-content-neutral-800 cursor-pointer"
-                        >
-                          <SlidersHorizontal className="w-3.5 h-3.5 text-content-neutral-500" />
-                          Role Setup Wizard
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openProfileGate("select")}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-line-neutral-200 bg-surface hover:bg-surface-neutral-100 text-content-neutral-800 cursor-pointer"
-                        >
-                          <UsersRound className="w-3.5 h-3.5" />
-                          Switch Profile Screen
-                        </button>
-                        {profiles.length < maxProfiles && (
-                          <button
-                            type="button"
-                            onClick={() => openProfileGate("create")}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-accent-solid text-white hover:opacity-95 cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            Add Profile
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-                      {profiles.map((prof) => {
-                        const isCurrent = prof.id === activeProfile.id;
-                        return (
-                          <div
-                            key={prof.id}
-                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-colors ${
-                              isCurrent
-                                ? "bg-surface-neutral-50 border-content-neutral-900/30 ring-1 ring-content-neutral-900/15"
-                                : "bg-surface border-line-neutral-200"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <ProfileAvatarTile
-                                avatar={prof.avatar}
-                                photoData={prof.photoData}
-                                accent={prof.accent}
-                                size="sm"
-                                hasPassword={prof.hasPassword}
-                                isActive={isCurrent}
-                              />
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs font-semibold text-content-neutral-900 truncate">
-                                    {prof.name}
-                                  </span>
-                                  {isCurrent && (
-                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-                                      Active
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[11px] text-content-neutral-500 truncate">
-                                  {prof.subtitle}
-                                </div>
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <span className="text-[10px] font-mono text-content-neutral-600 bg-surface-neutral-100 px-1.5 py-0.5 rounded">
-                                    {prof.invoicePrefix} ·{" "}
-                                    {prof.defaultCurrency}
-                                  </span>
-                                  <span className="text-[10px] text-content-neutral-500">
-                                    {prof.hasPassword
-                                      ? "Password Locked"
-                                      : "Unlocked"}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
-                              {!isCurrent && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (prof.hasPassword) {
-                                      openProfileGate("select");
-                                    } else {
-                                      void switchProfile(prof.id);
-                                    }
-                                  }}
-                                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-surface-neutral-100 hover:bg-surface-neutral-200 text-content-neutral-800 cursor-pointer"
-                                >
-                                  Use
-                                </button>
-                              )}
-                              {isCurrent && prof.hasPassword && (
-                                <button
-                                  type="button"
-                                  onClick={lockCurrentProfile}
-                                  title="Lock this profile now"
-                                  className="p-1.5 rounded-lg hover:bg-surface-neutral-100 text-content-neutral-600 cursor-pointer"
-                                >
-                                  <Lock className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => openProfileGate("manage", prof)}
-                                title="Edit profile & password lock"
-                                className="p-1.5 rounded-lg hover:bg-surface-neutral-100 text-content-neutral-600 cursor-pointer"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Live Preview Card */}
-                  <div className="ui-card from-surface-purple-50/70 to-surface-neutral-50 border-line-purple-200/70 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="relative w-12 h-12 rounded-full overflow-hidden bg-accent-solid text-white flex items-center justify-center text-lg font-bold shadow-sm shrink-0">
-                        {activeProfile.photoData ? (
-                          <Image
-                            unoptimized
-                            src={activeProfile.photoData}
-                            alt=""
-                            fill
-                            sizes="48px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          avatarLetter
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-content-neutral-900 text-base">
-                            {formState.businessName?.trim() || "Your Name"}
-                          </span>
-                          <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md bg-surface-purple-100 text-content-purple-800">
-                            Appears on Invoices
-                          </span>
-                        </div>
-                        <p className="text-xs text-content-neutral-500 mt-0.5">
-                          {formState.professionalTitle?.trim() ||
-                            "Freelance Specialist / Sole Proprietor"}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-content-neutral-500 mt-1.5">
-                          {formState.email && (
-                            <span className="flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-content-neutral-400" />
-                              {formState.email}
-                            </span>
-                          )}
-                          {formState.phone && (
-                            <span className="flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-content-neutral-400" />
-                              {formState.phone}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <section className="ui-card p-6">
-                    <ImageUpload
-                      label="Workspace profile photo"
-                      value={activeProfile.photoData}
-                      onChange={async (photoData) => {
-                        await updateProfile(activeProfile.id, { photoData });
-                        showToast(
-                          photoData
-                            ? "Successfully uploaded"
-                            : "Successfully removed",
-                          "success",
-                        );
-                      }}
-                    />
-                  </section>
+                  <WorkspaceProfileFields
+                    draft={profileDraft}
+                    settings={formState}
+                    onProfileChange={(patch) =>
+                      setProfileDraft((previous) => ({ ...previous, ...patch }))
+                    }
+                    onSettingsChange={(patch) =>
+                      setFormState((previous) => ({ ...previous, ...patch }))
+                    }
+                  />
                   {/* Basic Personal Info */}
                   <div className="ui-card p-6 space-y-4">
                     <div>
                       <h2 className="text-sm font-semibold text-content-neutral-900">
-                        Your Details
+                        Invoice contact details
                       </h2>
                       <p className="text-xs text-content-neutral-500 mt-0.5">
                         Enter your name and contact details. These will appear
@@ -1324,7 +999,7 @@ function SettingsContent() {
                           htmlFor="settings-your-name-or-studio-name"
                           className="block text-xs font-medium text-content-neutral-700 mb-1"
                         >
-                          Your Name or Studio Name
+                          Business or studio name
                         </label>
                         <input
                           id="settings-your-name-or-studio-name"
@@ -1346,7 +1021,7 @@ function SettingsContent() {
                           htmlFor="settings-what-do-you-do-title"
                           className="block text-xs font-medium text-content-neutral-700 mb-1"
                         >
-                          What do you do? (Title)
+                          Professional title
                         </label>
                         <input
                           id="settings-what-do-you-do-title"
@@ -1403,13 +1078,14 @@ function SettingsContent() {
                       />
 
                       <div className="sm:col-span-2">
-                        <label className="block text-xs font-medium text-content-neutral-700 mb-1">
+                        <label htmlFor="settings-website" className="block text-xs font-medium text-content-neutral-700 mb-1">
                           Website or Portfolio{" "}
                           <span className="text-content-neutral-400 font-normal">
                             (Optional)
                           </span>
                         </label>
                         <input
+                          id="settings-website"
                           type="text"
                           value={formState.website || ""}
                           onChange={(e) =>
@@ -1461,13 +1137,14 @@ function SettingsContent() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-content-neutral-700 mb-1">
+                        <label htmlFor="settings-tax-id" className="block text-xs font-medium text-content-neutral-700 mb-1">
                           Tax / Business Number{" "}
                           <span className="text-content-neutral-400 font-normal">
                             (Optional)
                           </span>
                         </label>
                         <input
+                          id="settings-tax-id"
                           type="text"
                           value={formState.taxId || ""}
                           onChange={(e) =>
@@ -1732,78 +1409,17 @@ function SettingsContent() {
                   </div>
 
                   <CurrencyRateSettings />
-                  <WorkspaceActivityPanel />
-                  {/* Currency & Payment Due */}
-                  <div className="ui-card p-6 space-y-4">
+                  <div className="ui-card space-y-4">
                     <div>
-                      <h2 className="text-sm font-semibold text-content-neutral-900">
-                        Currency &amp; Payment Terms
+                      <h2 className="font-semibold text-content-neutral-900">
+                        Payment terms
                       </h2>
-                      <p className="text-xs text-content-neutral-500 mt-0.5">
-                        Choose this profile’s primary currency for all financial
-                        statistics. Foreign invoices, expenses and payables are
-                        converted using cached daily exchange rates. Each record
-                        and PDF keeps its original currency.
+                      <p className="text-content-neutral-600">
+                        Set the due date offset and tax rate for new invoices.
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-xs font-medium text-content-neutral-700">
-                            Primary currency
-                          </label>
-                          <span className="text-[11px] font-semibold text-accent">
-                            Active: {formState.defaultCurrency || "USD"} (
-                            {getCurrencySymbol(
-                              formState.defaultCurrency || "USD",
-                            ).trim()}
-                            )
-                          </span>
-                        </div>
-                        <select
-                          aria-label="Primary currency"
-                          value={formState.defaultCurrency || "USD"}
-                          onChange={async (e) => {
-                            const newCurrency = e.target.value as Currency;
-                            setFormState((prev) => ({
-                              ...prev,
-                              defaultCurrency: newCurrency,
-                            }));
-                            try {
-                              await updateSettings({
-                                defaultCurrency: newCurrency,
-                              });
-                              showToast(
-                                `Primary currency saved as ${newCurrency}. Financial statistics now convert to ${newCurrency}.`,
-                                "success",
-                              );
-                            } catch (err: unknown) {
-                              const msg =
-                                err instanceof Error
-                                  ? err.message
-                                  : "Failed to update currency";
-                              showToast(msg, "error");
-                            }
-                          }}
-                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-colors"
-                        >
-                          <option value="USD">USD ($ - US Dollar)</option>
-                          <option value="EUR">EUR (€ - Euro)</option>
-                          <option value="LKR">
-                            LKR (Rs. - Sri Lanka Rupee)
-                          </option>
-                          <option value="GBP">GBP (£ - British Pound)</option>
-                          <option value="CAD">
-                            CAD (CA$ - Canadian Dollar)
-                          </option>
-                        </select>
-                        <p className="text-[11px] text-content-neutral-400 mt-1">
-                          Amounts in different currencies are kept separate; no
-                          conversion is applied.
-                        </p>
-                      </div>
-
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label
                           htmlFor="settings-payment-due-within"
@@ -1875,35 +1491,6 @@ function SettingsContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label
-                          htmlFor="settings-invoice-prefix"
-                          className="block text-xs font-medium text-content-neutral-700 mb-1"
-                        >
-                          Invoice Prefix
-                        </label>
-                        <input
-                          id="settings-invoice-prefix"
-                          type="text"
-                          value={formState.invoicePrefix || "INV-"}
-                          onChange={(e) =>
-                            setFormState({
-                              ...formState,
-                              invoicePrefix: e.target.value,
-                            })
-                          }
-                          placeholder="INV-"
-                          className="ui-field w-full px-3.5 border border-line-neutral-200 focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-colors font-mono"
-                        />
-                        <p className="text-[11px] text-content-neutral-400 mt-1">
-                          Default is{" "}
-                          <code className="font-mono text-content-neutral-600">
-                            INV-
-                          </code>
-                          .
-                        </p>
-                      </div>
-
-                      <div>
-                        <label
                           htmlFor="settings-next-number"
                           className="block text-xs font-medium text-content-neutral-700 mb-1"
                         >
@@ -1973,6 +1560,7 @@ function SettingsContent() {
                       />
                     </div>
                   </div>
+                  <WorkspaceActivityPanel />
                 </div>
               )}
 
@@ -2145,39 +1733,45 @@ function SettingsContent() {
 
                   <EncryptedBackupCard />
 
-                  {/* Reset Data */}
-                  <div className="ui-card p-6 space-y-4 ui-card--danger">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-xl bg-surface-rose-50 text-content-rose-600 shrink-0">
-                        <AlertTriangle className="w-4 h-4" />
-                      </div>
+                  <section className="ui-card ui-card--danger space-y-4" aria-labelledby="reset-data-heading">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="size-5 shrink-0 text-content-rose-600" aria-hidden="true" />
+                      <h2 id="reset-data-heading" className="font-semibold text-content-rose-950">
+                        Reset data
+                      </h2>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-rose-200 pt-4">
                       <div>
-                        <h2 className="text-sm font-semibold text-content-rose-950">
-                          Start Over (Clear Data)
-                        </h2>
-                        <p className="text-xs text-content-rose-700 mt-0.5 leading-relaxed">
-                          Need a blank slate? This deletes all business records
-                          and managed receipts. Profile and appearance settings
-                          are kept.
+                        <h3 className="text-sm font-semibold text-content-rose-950">Active profile records</h3>
+                        <p className="mt-1 text-content-rose-700">
+                          Delete business records and managed receipts for {activeProfile.name}. Keep its settings and passcode.
                         </p>
                       </div>
+                      <Button variant="danger" type="button" disabled={!isElectron} onClick={() => openResetDialog("profile")}>
+                        Clear profile records
+                      </Button>
                     </div>
-
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-rose-200 pt-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-content-rose-950">Entire application</h3>
+                        <p className="mt-1 text-content-rose-700">
+                          Delete every profile, all records, receipts, and local preferences. BillFlow restarts at first-time setup.
+                        </p>
+                      </div>
                       <Button
                         variant="danger"
                         type="button"
-                        onClick={() => {
-                          setResetConfirmation("");
-                          setIsResetModalOpen(true);
-                        }}
+                        disabled={!isElectron}
+                        onClick={() => openResetDialog("application")}
                       >
-                        Clear All Records
+                        Clear full application
                       </Button>
                     </div>
-                  </div>
+                  </section>
                 </div>
               )}
+            </>
+          )}
 
               {/* Floating Save Bar */}
               <MotionPresence>
@@ -2199,35 +1793,9 @@ function SettingsContent() {
                           variant="ghost"
                           type="button"
                           onClick={() => {
-                            if (settings) {
-                              setFormState({
-                                businessName: settings.businessName || "",
-                                professionalTitle:
-                                  settings.professionalTitle || "",
-                                email: settings.email || "",
-                                phone: settings.phone || "",
-                                website: settings.website || "",
-                                taxId: settings.taxId || "",
-                                address: settings.address || "",
-                                paymentDetails: settings.paymentDetails || "",
-                                defaultCurrency:
-                                  settings.defaultCurrency || "USD",
-                                invoicePrefix: settings.invoicePrefix || "INV-",
-                                nextInvoiceSeq: settings.nextInvoiceSeq || 1,
-                                defaultDueDays: settings.defaultDueDays ?? 14,
-                                defaultTaxRate: settings.defaultTaxRate ?? 0,
-                                defaultNotes: settings.defaultNotes || "",
-                                defaultInvoiceTemplate:
-                                  settings.defaultInvoiceTemplate ||
-                                  "geometric-teal",
-                                dateFormat: settings.dateFormat || "YYYY-MM-DD",
-                                currencyDisplay:
-                                  settings.currencyDisplay || "symbol",
-                                pdfExportDirectory:
-                                  settings.pdfExportDirectory || null,
-                              });
-                              setFormErrors({});
-                            }
+                            setFormState(settingsDraft(settings));
+                            setProfileDraft({});
+                            setFormErrors({});
                           }}
                         >
                           Discard
@@ -2236,18 +1804,18 @@ function SettingsContent() {
                         <Button
                           variant="primary"
                           type="submit"
+                          title={formatShortcut("Cmd+S", isMac)}
                           disabled={isSaving}
                         >
                           <Save className="w-3.5 h-3.5" />
-                          {isSaving ? "Saving..." : "Save Changes"}
+                          {isSaving ? "Saving..." : "Save changes"}
                         </Button>
                       </div>
                     </MotionSurface>
                   </div>
                 )}
               </MotionPresence>
-            </form>
-          )}
+          </form>
         </div>
       </div>
 
@@ -2427,62 +1995,63 @@ function SettingsContent() {
         )}
       </MotionPresence>
 
-      {/* RESET CONFIRMATION MODAL */}
       <MotionPresence>
-        {isResetModalOpen && (
-          <Dialog onClose={() => setIsResetModalOpen(false)} width={460}>
-            <div className="app-dialog-header">
-              <div className="p-2 rounded-xl bg-surface-rose-50 text-content-rose-600 shrink-0">
-                <AlertTriangle className="w-4 h-4" />
+        {resetScope && (
+          <Dialog onClose={() => { if (!isResetting) setResetScope(null); }} width={480}>
+            <form onSubmit={handleConfirmReset} aria-labelledby="reset-confirmation-title">
+              <div className="app-dialog-header">
+                <div className="p-2 rounded-xl bg-surface-rose-50 text-content-rose-600 shrink-0">
+                  <AlertTriangle className="size-4" aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 id="reset-confirmation-title" className="text-sm font-semibold">
+                    {resetScope === "application" ? "Clear full application?" : "Clear profile records?"}
+                  </h3>
+                  <p className="mt-1 text-xs text-content-neutral-600">
+                    {resetScope === "application"
+                      ? "This permanently deletes all profiles, passcodes, records, managed attachments, preferences, and backups stored inside BillFlow. BillFlow will restart and open first-time setup. Files exported to other folders stay there."
+                      : `This permanently deletes the business records and managed receipts for ${activeProfile.name}. This profile keeps its settings and passcode.`}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-content-rose-950">
-                  Clear all records?
-                </h3>
-                <p className="text-xs text-content-rose-700 mt-1 leading-relaxed">
-                  This will delete all business records and managed receipts.
-                  Profile and appearance settings are kept. This cannot be
-                  undone.
-                </p>
-              </div>
-            </div>
-            <div className="app-dialog-body">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-content-neutral-700">
-                  Type{" "}
-                  <span className="font-mono font-bold text-content-rose-600">
-                    DELETE ALL DATA
-                  </span>{" "}
-                  to confirm:
+              <div className="app-dialog-body space-y-3">
+                <label htmlFor="reset-confirmation" className="block text-xs font-medium">
+                  Type <strong className="font-mono">{RESET_CONFIRMATION[resetScope]}</strong> to confirm.
                 </label>
                 <input
+                  id="reset-confirmation"
+                  name="confirmation"
                   type="text"
                   value={resetConfirmation}
-                  onChange={(e) => setResetConfirmation(e.target.value)}
-                  placeholder="DELETE ALL DATA"
-                  className="ui-field w-full px-3 border border-line-neutral-200 font-mono focus:border-line-rose-500 focus:ring-1 focus:ring-line-rose-500 outline-none transition-colors"
+                  onChange={(event) => setResetConfirmation(event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  required
+                  disabled={isResetting}
+                  className="ui-field w-full font-mono"
                 />
+                {resetError && <p role="alert" className="text-sm text-content-rose-700">{resetError}</p>}
               </div>
-            </div>
-            <div className="app-dialog-footer">
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={() => setIsResetModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                type="button"
-                disabled={
-                  resetConfirmation !== "DELETE ALL DATA" || isResetting
-                }
-                onClick={handleConfirmReset}
-              >
-                {isResetting ? "Clearing..." : "Clear Business Data"}
-              </Button>
-            </div>
+              <div className="app-dialog-footer">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  disabled={isResetting}
+                  onClick={() => setResetScope(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  type="submit"
+                  disabled={resetConfirmation !== RESET_CONFIRMATION[resetScope] || isResetting}
+                >
+                  {isResetting
+                    ? resetScope === "application" ? "Restarting…" : "Clearing…"
+                    : resetScope === "application" ? "Clear and restart" : "Clear profile records"}
+                </Button>
+              </div>
+            </form>
           </Dialog>
         )}
       </MotionPresence>

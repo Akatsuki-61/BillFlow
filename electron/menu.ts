@@ -7,6 +7,7 @@ import {
 } from "electron";
 import path from "path";
 import fs from "fs";
+import { version as packageVersion } from "../package.json";
 import { isWorkspaceUnlocked } from "./workspace-session";
 
 export function getAboutIconPath(): string | undefined {
@@ -41,7 +42,7 @@ export function getAboutIconPath(): string | undefined {
 export function setupAboutPanel(): void {
   if (process.platform !== "darwin") return;
   const iconPath = getAboutIconPath();
-  const currentVersion = app?.getVersion ? app.getVersion() : "0.2.0";
+  const currentVersion = app?.getVersion?.() ?? packageVersion;
   app.setAboutPanelOptions({
     applicationName: "BillFlow",
     applicationVersion: currentVersion,
@@ -62,7 +63,7 @@ export function buildMenuTemplate(
     : true,
 ): MenuItemConstructorOptions[] {
   const openAbout = () => {
-    const currentVersion = app?.getVersion ? app.getVersion() : "0.2.0";
+    const currentVersion = app?.getVersion?.() ?? packageVersion;
     if (isMac) {
       setupAboutPanel();
       app?.showAboutPanel?.();
@@ -86,7 +87,7 @@ export function buildMenuTemplate(
 
   const openCheckForUpdates = () => {
     const win = getMainWindow ? getMainWindow() : null;
-    const currentVersion = app?.getVersion ? app.getVersion() : "0.2.0";
+    const currentVersion = app?.getVersion?.() ?? packageVersion;
     const options = {
       type: "info" as const,
       title: "Check for Updates",

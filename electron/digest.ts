@@ -4,6 +4,7 @@ import { getDb, getSqlite } from "./db";
 import { settings } from "./db/schema";
 import { addDaysToDateKey } from "./recurring-schedule";
 import { ipcMain } from "./security";
+import { desktopNotificationsEnabled } from "./desktop-setup";
 import { isWorkspaceUnlocked } from "./workspace-session";
 import { getOrCreateSettings } from "./ipc/settings";
 import { formatError } from "./ipc/errors";
@@ -166,7 +167,7 @@ export function syncAppBadgeCount(options?: {
     ? computeFinancialDigest(options?.today).badgeCount
     : 0;
   try {
-    if (typeof app?.setBadgeCount === "function") {
+    if (desktopNotificationsEnabled() && typeof app?.setBadgeCount === "function") {
       app.setBadgeCount(count);
     }
   } catch {
@@ -215,6 +216,9 @@ export function maybeSendDailyDigest(options?: {
   }
 
   const summary = computeFinancialDigest(today);
+  if (!desktopNotificationsEnabled()) {
+    return { sent: false, reason: "DISABLED", summary };
+  }
   const currentSettings = getOrCreateSettings();
 
   if (!options?.force) {

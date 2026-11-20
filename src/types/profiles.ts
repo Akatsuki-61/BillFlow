@@ -91,6 +91,13 @@ export interface CompleteOnboardingInput {
   email?: string;
   defaultCurrency: Currency;
   profiles: OnboardingProfileSlot[];
+  guidedSetup?: true;
+}
+
+export interface DesktopSetup {
+  permissionsPending: boolean;
+  notificationsEnabled: boolean;
+  calendarConnected: boolean;
 }
 
 export interface ProfileListResponse {
@@ -99,6 +106,7 @@ export interface ProfileListResponse {
   activeProfileId: string;
   maxProfiles: number;
   needsOnboarding: boolean;
+  desktopSetup?: DesktopSetup | null;
 }
 
 export interface RoleStarterCatalogTemplate {

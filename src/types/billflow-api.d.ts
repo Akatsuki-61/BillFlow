@@ -127,6 +127,12 @@ export interface BillFlowAPI extends WorkflowAPI {
     completeOnboarding: (
       input: CompleteOnboardingInput,
     ) => Promise<ProfileListResponse>;
+    finishSetup: () => Promise<ProfileListResponse>;
+  };
+  integrations: {
+    requestNotifications: () => Promise<void>;
+    openNotificationSettings: () => Promise<void>;
+    connectCalendar: () => Promise<void>;
   };
   expenses: {
     list: (filter?: {
@@ -345,6 +351,7 @@ export interface BillFlowAPI extends WorkflowAPI {
       skipped?: number;
     }>;
     reset: () => Promise<{ success: boolean }>;
+    resetApplication: (confirmation: string) => Promise<void>;
     saveEncryptedBackup?: (passphrase: string) => Promise<SaveFileResult>;
     chooseRollingBackupDirectory?: () => Promise<string | null>;
     getRollingBackupStatus?: () => Promise<RollingBackupStatus>;

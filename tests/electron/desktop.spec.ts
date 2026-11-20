@@ -41,11 +41,7 @@ function listAsarEntries(archivePath: string): string[] {
 
 let app: ElectronApplication, page: Page, directory: string;
 test.describe.configure({ mode: "serial" });
-const executable =
-  process.env.BILLFLOW_APP_PATH ||
-  path.resolve(
-    "release/test-0.2.0/mac-arm64/BillFlow.app/Contents/MacOS/BillFlow",
-  );
+const executable = process.env.BILLFLOW_APP_PATH!;
 async function launch() {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
@@ -54,6 +50,8 @@ async function launch() {
   ) as Record<string, string>;
   app = await electron.launch({
     executablePath: executable,
+    // Keep isolated macOS test builds out of the user's login Keychain.
+    args: process.platform === "darwin" ? ["--use-mock-keychain"] : [],
     env: {
       ...env,
       BILLFLOW_USER_DATA: directory,
@@ -660,6 +658,9 @@ test("workspace operations connect search, alerts, ledgers, forecast, PDFs and b
   const backupPath = path.join(exportDir, "backup.json");
   await saveTo(backupPath);
   const settings = await search("backup restore");
+  await expect(
+    page.getByRole("option", { name: "Backup & data Settings", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   await settings.press("Enter");
   await page.getByRole("button", { name: "Save Backup" }).click();
   await expect(page.getByText("Backup is up to date.")).toBeVisible();
@@ -747,12 +748,12 @@ test("customizes profiles and connects invoice stages, standalone payables and t
       name: "Search workspace records and actions",
     });
     await search.fill(name);
-    await search.press("Enter");
+    await page.getByRole("option", { name: `${name} Settings`, exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Settings", exact: true }),
     ).toBeVisible();
   };
-  await openSettings("business profile");
+  await openSettings("Business profile");
   const png = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 48;
@@ -768,8 +769,9 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     buffer: Buffer.from(png, "base64"),
   });
   await expect(
-    page.getByRole("img", { name: "Workspace profile photo" }),
+    page.getByRole("img", { name: "Extension QA avatar" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect
     .poll(() =>
       page.evaluate(
@@ -786,13 +788,13 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     )
     .toBe(true);
 
-  await openSettings("appearance");
+  await openSettings("Appearance");
   await page
     .getByRole("combobox", { name: "Typeface", exact: true })
     .selectOption("nunito");
   await page.getByLabel("Layout density").selectOption("compact");
   await page.getByLabel("Notification placement").selectOption("top-left");
-  await page.getByRole("button", { name: "Save (Cmd+S)" }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute(
     "data-workspace-typeface",
     "nunito",
@@ -806,7 +808,7 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     "top-left",
   );
 
-  await openSettings("invoice defaults");
+  await openSettings("Invoice defaults");
   await page
     .getByLabel("Default delivery destination")
     .fill("https://example.invalid/deliverables");
@@ -818,7 +820,7 @@ test("customizes profiles and connects invoice stages, standalone payables and t
   await page.mouse.move(bounds.x + 140, bounds.y + 55, { steps: 6 });
   await page.mouse.up();
   await page.getByRole("button", { name: "Use drawing" }).click();
-  await page.getByRole("button", { name: "Save (Cmd+S)" }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -959,7 +961,7 @@ test("customizes profiles and connects invoice stages, standalone payables and t
       showSaveDialog: async () => ({ canceled: false, filePath }),
     });
   }, csvPath);
-  await openSettings("backup restore");
+  await openSettings("Backup & data");
   await page.getByRole("button", { name: "Export Workspace CSV" }).click();
   await expect.poll(() => fs.existsSync(csvPath)).toBe(true);
   const csv = fs.readFileSync(csvPath, "utf8");

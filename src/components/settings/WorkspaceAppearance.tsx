@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
-import { useSettings } from "@/lib/data/DataProvider";
-import type { UpdateSettingsInput } from "@/types/settings";
+import { useEffect, useState } from "react";
+import { Bell } from "lucide-react";
+import { Button } from "@/components/ui/Workspace";
+import { useToast } from "@/context/ToastContext";
+import { useProfiles } from "@/context/ProfileContext";
+import { useData, useSettings } from "@/lib/data/DataProvider";
+import type {
+  FinancialDigestSummary,
+  UpdateSettingsInput,
+} from "@/types/settings";
 
 export function WorkspaceAppearance() {
   const { settings } = useSettings();
@@ -26,13 +33,30 @@ export function AppearanceFields({
   onChange: (patch: UpdateSettingsInput) => void;
 }) {
   return (
-    <section className="ui-card p-5 space-y-3">
-      <h2 className="text-base font-semibold">Workspace interface</h2>
-      <div className="grid gap-3 md:grid-cols-3">
-        <label className="space-y-1 text-xs font-medium">
-          <span>Typeface</span>
+    <section
+      className="ui-card space-y-5"
+      aria-labelledby="workspace-interface-heading"
+    >
+      <div>
+        <h2 id="workspace-interface-heading" className="font-semibold">
+          Workspace interface
+        </h2>
+        <p className="text-content-neutral-600">
+          Set the text style, spacing, and position of in-app notifications.
+        </p>
+      </div>
+      <div className="grid gap-x-5 gap-y-4 border-t border-line-neutral-200 pt-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <label
+            htmlFor="workspace-typeface"
+            className="block text-xs font-medium"
+          >
+            Typeface
+          </label>
           <select
-            className="ui-field w-full"
+            id="workspace-typeface"
+            name="typeface"
+            className="ui-field w-full border border-line-neutral-300 px-3.5"
             value={value.typeface ?? "inter"}
             onChange={(event) =>
               onChange({
@@ -44,11 +68,18 @@ export function AppearanceFields({
             <option value="nunito">Nunito</option>
             <option value="jakarta">Plus Jakarta Sans</option>
           </select>
-        </label>
-        <label className="space-y-1 text-xs font-medium">
-          <span>Layout density</span>
+        </div>
+        <div>
+          <label
+            htmlFor="workspace-layout-density"
+            className="block text-xs font-medium"
+          >
+            Layout density
+          </label>
           <select
-            className="ui-field w-full"
+            id="workspace-layout-density"
+            name="layoutDensity"
+            className="ui-field w-full border border-line-neutral-300 px-3.5"
             value={value.layoutDensity ?? "comfortable"}
             onChange={(event) =>
               onChange({
@@ -61,11 +92,18 @@ export function AppearanceFields({
             <option value="comfortable">Comfortable</option>
             <option value="spacious">Spacious</option>
           </select>
-        </label>
-        <label className="space-y-1 text-xs font-medium">
-          <span>Notification placement</span>
+        </div>
+        <div>
+          <label
+            htmlFor="workspace-notification-placement"
+            className="block text-xs font-medium"
+          >
+            Notification placement
+          </label>
           <select
-            className="ui-field w-full"
+            id="workspace-notification-placement"
+            name="notificationPlacement"
+            className="ui-field w-full border border-line-neutral-300 px-3.5"
             value={value.notificationPlacement ?? "bottom-right"}
             onChange={(event) =>
               onChange({
@@ -79,8 +117,130 @@ export function AppearanceFields({
             <option value="top-right">Top right</option>
             <option value="top-left">Top left</option>
           </select>
-        </label>
+        </div>
       </div>
+    </section>
+  );
+}
+
+export function FinancialDigestSettings() {
+  const { desktopSetup, refreshProfiles } = useProfiles();
+  const { settings, updateSettings } = useSettings();
+  const { isElectron } = useData();
+  const { showToast } = useToast();
+  const [digestSummary, setDigestSummary] =
+    useState<FinancialDigestSummary | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+  const notificationsDisabled = desktopSetup?.notificationsEnabled === false;
+
+  useEffect(() => {
+    let active = true;
+    void window.billflow?.digest
+      ?.summary()
+      .then((summary) => {
+        if (active) setDigestSummary(summary);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleToggleDigest = async (enabled: boolean) => {
+    try {
+      await updateSettings({ digestEnabled: enabled });
+      showToast(
+        enabled
+          ? "Morning financial digest enabled."
+          : "Morning financial digest paused.",
+      );
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Could not update digest setting.",
+        "error",
+      );
+    }
+  };
+
+  const handleSendTestDigest = async () => {
+    if (!window.billflow?.digest?.sendTest) return;
+    setIsBusy(true);
+    try {
+      const res = await window.billflow.digest.sendTest();
+      setDigestSummary(res.summary);
+      showToast(res.summary.headline);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Could not send digest.",
+        "error",
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const enableNotifications = async () => {
+    if (!window.billflow) return;
+    setIsBusy(true);
+    try {
+      await window.billflow.integrations.requestNotifications();
+      await refreshProfiles();
+      showToast("Desktop notifications enabled in BillFlow. Delivery follows your system settings.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not enable notifications.", "error");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  return (
+    <section
+      className="ui-card space-y-4"
+      aria-labelledby="digest-settings-heading"
+    >
+      <div>
+        <h2 id="digest-settings-heading" className="font-semibold">
+          Financial digest
+        </h2>
+        <p className="text-content-neutral-600">
+          Get a daily notification for overdue invoices, tasks due today, and
+          upcoming vendor payouts.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-neutral-200 pt-4">
+        <div className="flex items-center gap-2">
+          <input
+            id="financial-digest-enabled"
+            name="digestEnabled"
+            type="checkbox"
+            disabled={!isElectron || notificationsDisabled}
+            checked={settings?.digestEnabled !== false}
+            onChange={(event) => void handleToggleDigest(event.target.checked)}
+            className="size-4 accent-accent"
+          />
+          <label
+            htmlFor="financial-digest-enabled"
+            className="!mb-0 font-medium"
+          >
+            Show daily financial digest
+          </label>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={!isElectron || isBusy}
+          onClick={() => void (notificationsDisabled ? enableNotifications() : handleSendTestDigest())}
+        >
+          <Bell size={15} aria-hidden="true" />
+          {notificationsDisabled ? "Enable desktop notifications" : "Send test notification"}
+        </Button>
+      </div>
+      {digestSummary && (
+        <div className="space-y-1 rounded-xl border border-line-neutral-200 p-3">
+          <p className="font-semibold">{digestSummary.headline}</p>
+          <p className="text-content-neutral-600">{digestSummary.body}</p>
+        </div>
+      )}
     </section>
   );
 }

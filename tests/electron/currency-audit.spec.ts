@@ -8,14 +8,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PDFDocument } from "pdf-lib";
-const evidence = path.resolve("release/audit-fixed-2026-11-17");
 let app: ElectronApplication;
 let directory: string;
 test.afterAll(async () => {
   await app?.close();
   if (directory) fs.rmSync(directory, { recursive: true, force: true });
 });
-test("reports foreign records in profile currency and preserves privacy, documents and locks", async () => {
+test("reports foreign records in profile currency and preserves privacy, documents and locks", async ({}, testInfo) => {
+  const evidence = testInfo.outputPath("screenshots");
   directory = fs.mkdtempSync(path.join(os.tmpdir(), "billflow-currency-e2e-"));
   fs.mkdirSync(evidence, { recursive: true });
   const rates = {
@@ -36,11 +36,8 @@ test("reports foreign records in profile currency and preserves privacy, documen
     ),
   ) as Record<string, string>;
   app = await _electron.launch({
-    executablePath:
-      process.env.BILLFLOW_APP_PATH ||
-      path.resolve(
-        "release/test-0.2.0/mac-arm64/BillFlow.app/Contents/MacOS/BillFlow",
-      ),
+    executablePath: process.env.BILLFLOW_APP_PATH!,
+    args: process.platform === "darwin" ? ["--use-mock-keychain"] : [],
     env: {
       ...env,
       BILLFLOW_USER_DATA: directory,
@@ -155,12 +152,13 @@ test("reports foreign records in profile currency and preserves privacy, documen
   const settingsSearch = page.getByRole("combobox", {
     name: "Search workspace records and actions",
   });
-  await settingsSearch.fill("invoice defaults");
+  await settingsSearch.fill("business profile");
   await settingsSearch.press("Enter");
   const primaryCurrency = page.getByRole("combobox", {
     name: "Primary currency",
   });
   await primaryCurrency.selectOption("USD");
+  await page.getByRole("button", { name: "Save changes" }).click();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -171,6 +169,7 @@ test("reports foreign records in profile currency and preserves privacy, documen
     )
     .toBe("USD");
   await primaryCurrency.selectOption("LKR");
+  await page.getByRole("button", { name: "Save changes" }).click();
   await expect
     .poll(() =>
       page.evaluate(() =>

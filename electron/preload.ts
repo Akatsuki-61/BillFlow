@@ -106,6 +106,14 @@ async function invoke(channel: string, ...args: unknown[]) {
     profileId = result.activeProfileId;
   return result;
 }
+
+async function requestIntegration(
+  channel: "integrations:requestNotifications" | "integrations:connectCalendar",
+): Promise<void> {
+  const message: string | null = await invoke(channel);
+  if (message) throw new Error(message);
+}
+
 const documentUrl = new URL(location.href);
 const trustedDocument =
   !documentUrl.username &&
@@ -176,6 +184,13 @@ if (process.isMainFrame && trustedDocument)
         input: CompleteOnboardingInput,
       ): Promise<ProfileListResponse> =>
         invoke("profiles:completeOnboarding", input),
+      finishSetup: (): Promise<ProfileListResponse> => invoke("profiles:finishSetup"),
+    },
+    integrations: {
+      requestNotifications: () => requestIntegration("integrations:requestNotifications"),
+      openNotificationSettings: (): Promise<void> =>
+        invoke("integrations:openNotificationSettings"),
+      connectCalendar: () => requestIntegration("integrations:connectCalendar"),
     },
     expenses: {
       list: (filter?: {
@@ -395,6 +410,8 @@ if (process.isMainFrame && trustedDocument)
       import: (payload: ExportDataPayload, mode?: "replace" | "merge") =>
         invoke("settings:import", payload, mode),
       reset: (): Promise<{ success: boolean }> => invoke("settings:reset"),
+      resetApplication: (confirmation: string): Promise<void> =>
+        invoke("settings:resetApplication", confirmation),
       saveEncryptedBackup: (passphrase: string) =>
         invoke("settings:saveEncryptedBackup", passphrase),
       chooseRollingBackupDirectory: (): Promise<string | null> =>

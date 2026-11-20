@@ -120,6 +120,13 @@
       "when": 1791258000000,
       "tag": "0016_section6_workflows",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791259000000,
+      "tag": "0017_guided_setup",
+      "breakpoints": true
     }
   ]
 }

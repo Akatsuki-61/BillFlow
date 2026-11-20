@@ -1517,9 +1517,6 @@ input[type="checkbox"] {
   margin-bottom: 24px;
   animation: page-arrive 260ms var(--motion-ease);
 }
-.settings-section-heading .settings-nav-label {
-  margin-bottom: 8px;
-}
 .settings-section-heading h2 {
   font-size: 26px;
   font-weight: 500;
@@ -1555,16 +1552,6 @@ input[type="checkbox"] {
 }
 .settings-content .settings-section {
   animation: page-arrive 240ms var(--motion-ease);
-}
-.settings-content [role="radiogroup"][aria-labelledby="accent-heading"] {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-.settings-content
-  [role="radiogroup"][aria-labelledby="accent-heading"]
-  [role="radio"] {
-  min-height: 110px;
-  border-radius: 16px;
 }
 @keyframes popover-arrive {
   from {

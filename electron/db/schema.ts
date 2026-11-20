@@ -119,6 +119,13 @@ export const catalogItems = sqliteTable("catalog_items", {
     .default(sql`(CURRENT_TIMESTAMP)`),
 });
 
+export const appSetup = sqliteTable("app_setup", {
+  id: integer("id").primaryKey(),
+  permissionsPending: integer("permissions_pending", { mode: "boolean" }).notNull().default(true),
+  notificationsEnabled: integer("notifications_enabled", { mode: "boolean" }).notNull().default(false),
+  calendarConnected: integer("calendar_connected", { mode: "boolean" }).notNull().default(false),
+});
+
 export const settings = sqliteTable("settings", {
   id: text("id").primaryKey().default("default"),
   businessName: text("business_name").notNull().default(""),

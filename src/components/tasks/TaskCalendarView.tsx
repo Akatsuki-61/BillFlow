@@ -9,6 +9,8 @@ import React, {
 } from "react";
 import { m } from "motion/react";
 import { SPRING_NAV_GLIDE } from "@/lib/motion";
+import { useProfiles } from "@/context/ProfileContext";
+import { useIsMac } from "@/lib/platform-shortcuts";
 import {
   ChevronLeft,
   ChevronRight,
@@ -238,6 +240,9 @@ export default function TaskCalendarView({
   onQuickCreateEvent,
   onNotify,
 }: TaskCalendarViewProps) {
+  const { desktopSetup, refreshProfiles } = useProfiles();
+  const isMac = useIsMac();
+  const needsCalendarConnection = isMac && desktopSetup?.calendarConnected === false;
   const today = new Date();
   const todayYear = today.getFullYear();
   const todayMonth = today.getMonth();
@@ -679,21 +684,33 @@ export default function TaskCalendarView({
     }
   };
 
-  // One-click silent sync & open in user's Local OS Calendar (macOS Calendar.app / .ics fallback)
-  // One-click silent background sync (does NOT open Calendar.app window)
-  const handleSilentSyncLocalCalendar = () => {
-    triggerBriefCalendarSync("Synchronized with local calendar in background.");
+  const handleSyncLocalCalendar = async () => {
+    const api = window.billflow;
+    if (!api?.events.syncNative) return;
+    setIsSyncingCalendar(true);
+    try {
+      if (needsCalendarConnection) {
+        await api.integrations.connectCalendar();
+        await refreshProfiles();
+      }
+      await api.events.syncNative(getAllTaskTimeSlots());
+      onNotifyRef.current?.("Calendar sync complete.");
+    } catch (error) {
+      onNotifyRef.current?.(error instanceof Error ? error.message : "Calendar sync failed.");
+    } finally {
+      setIsSyncingCalendar(false);
+    }
   };
 
   // Explicit action to open macOS Calendar.app window
   const handleOpenLocalCalendarApp = async () => {
     if (typeof window !== "undefined" && window.billflow?.events?.openNative) {
       try {
-        await window.billflow.events.openNative(getAllTaskTimeSlots());
-        onNotifyRef.current?.(
-          "Opened your macOS Calendar app ('BillFlow' calendar).",
-        );
-        return;
+        const result = await window.billflow.events.openNative(getAllTaskTimeSlots());
+        if (result.success) {
+          onNotifyRef.current?.("Opened your calendar app.");
+          return;
+        }
       } catch {
         // Fallback to .ics download below
       }
@@ -909,14 +926,14 @@ export default function TaskCalendarView({
             variant="secondary"
             size="small"
             disabled={isSyncingCalendar}
-            onClick={handleSilentSyncLocalCalendar}
+            onClick={() => void handleSyncLocalCalendar()}
             className="flex items-center gap-1.5 text-xs font-medium"
             title="Silently synchronize tasks and events with macOS Calendar in the background without opening the Calendar app"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${isSyncingCalendar ? "animate-spin" : ""}`}
             />
-            <span>Sync Local Calendar</span>
+            <span>{needsCalendarConnection ? "Connect Apple Calendar" : "Sync Local Calendar"}</span>
           </Button>
 
           <Button
@@ -1143,18 +1160,14 @@ export default function TaskCalendarView({
             variant="secondary"
             size="small"
             disabled={isSyncingCalendar}
-            onClick={() =>
-              triggerBriefCalendarSync(
-                "Application & Local calendar synchronized.",
-              )
-            }
+            onClick={() => void handleSyncLocalCalendar()}
             className="flex items-center gap-1.5"
             title="Synchronize Application Calendar and Local Calendar"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${isSyncingCalendar ? "animate-spin text-accent" : ""}`}
             />
-            <span>{isSyncingCalendar ? "Syncing..." : "Sync Calendar"}</span>
+            <span>{isSyncingCalendar ? "Syncing..." : needsCalendarConnection ? "Connect Apple Calendar" : "Sync Calendar"}</span>
           </Button>
 
           {/* Unified Create Task / Event Trigger (select Task or Event inside the creation modal) */}

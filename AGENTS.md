@@ -60,7 +60,7 @@ BillFlow is built around interconnected workflows rather than isolated screens. 
 5. **Automated Ledger Posting**: Marking an outsourcing voucher `Paid` automatically records a `Vendor Payout Expense` entry in the financial ledger, deducting the fee from the net profit calculation.
 
 ### Workflow D: Multi-Profile Workspace System
-1. **Role Onboarding**: First launch presents a setup wizard configuring the studio name, default currency, and starter profiles for Software Engineering, AI Development, and Consulting.
+1. **Guided onboarding** starts at an empty profile picker. Add a profile, enter your name and billing details one question at a time, and review your profile. Desktop notifications and Apple Calendar sync are optional.
 2. **Profile Isolation**: Up to 5 profiles exist in the local SQLite database. Each profile maintains its own role catalog, accent colors, theme preference, and default currency.
 3. **PIN & Password Protection**: Profiles can be protected with a local PIN or alphanumeric password with recovery hints.
 

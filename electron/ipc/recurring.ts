@@ -9,6 +9,7 @@ import {
   advanceSchedulePastDate,
 } from "../recurring-schedule";
 import { ipcMain } from "../security";
+import { desktopNotificationsEnabled } from "../desktop-setup";
 import {
   newRecurringRuleSchema,
   recurringRulePatchSchema,
@@ -310,6 +311,7 @@ function sendRecurringNotification(
 ) {
   try {
     if (
+      desktopNotificationsEnabled() &&
       typeof Notification === "function" &&
       (typeof Notification.isSupported !== "function" ||
         Notification.isSupported())
