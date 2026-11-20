@@ -7,6 +7,7 @@ import {
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { normalizeNavPath } from "../../src/lib/navigation";
 
 test("first launch creates one workspace and resumes optional permissions after restarting", async ({}, testInfo) => {
   const directory = fs.mkdtempSync(
@@ -71,10 +72,31 @@ test("first launch creates one workspace and resumes optional permissions after 
       .getByRole("combobox", { name: /currency/ })
       .selectOption("LKR");
     await picker.getByRole("button", { name: "Continue" }).click();
+    const password = picker.getByLabel("Password", { exact: true });
+    const confirmation = picker.getByLabel("Confirm password", { exact: true });
+    await expect(password).toBeFocused();
+    await picker.getByRole("button", { name: "Skip password" }).click();
+    await expect(picker.getByText("No password", { exact: true })).toBeVisible();
+    await picker.getByRole("button", { name: "Back" }).click();
+
+    const profilePassword = "RiveraWorkspace7";
+    await password.fill(profilePassword);
+    await confirmation.fill("does-not-match");
+    await picker.getByRole("button", { name: "Continue" }).click();
+    await expect(picker.getByRole("alert")).toHaveText(
+      "The passwords don’t match.",
+    );
+    await expect(confirmation).toBeFocused();
+    await confirmation.fill(profilePassword);
+    await confirmation.press("Enter");
     await expect(
       picker.getByRole("heading", { name: "Review your profile" }),
     ).toBeFocused();
     await expect(picker.getByText("Rivera Studio")).toBeVisible();
+    await expect(picker.getByText("Password set", { exact: true })).toBeVisible();
+    await expect(picker.getByText(profilePassword, { exact: true })).toHaveCount(
+      0,
+    );
     await page.screenshot({
       path: testInfo.outputPath("review.png"),
       scale: "css",
@@ -89,6 +111,7 @@ test("first launch creates one workspace and resumes optional permissions after 
     ).profiles;
     expect(profile.name).toBe("Alex Rivera");
     expect(profile.defaultCurrency).toBe("LKR");
+    expect(profile.hasPassword).toBe(true);
     await expect(
       page.getByRole("link", { name: "Invoices", exact: true }),
     ).toHaveCount(0);
@@ -101,6 +124,16 @@ test("first launch creates one workspace and resumes optional permissions after 
 
     await app!.close();
     page = await launch();
+    const unlock = page.getByRole("button", {
+      name: "Unlock Profile",
+      exact: true,
+    });
+    await expect(unlock).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Optional permissions" }),
+    ).toHaveCount(0);
+    await page.getByPlaceholder("Enter letters or numbers").fill(profilePassword);
+    await unlock.click();
     await expect(
       page.getByRole("heading", { name: "Optional permissions" }),
     ).toBeFocused();
@@ -136,9 +169,49 @@ test("first launch creates one workspace and resumes optional permissions after 
       email: "",
     });
     expect(state.catalog).toHaveLength(0);
+
+    const invite = page.getByRole("button", {
+      name: "Take the tour",
+      exact: true,
+    });
+    const tour = page.getByRole("region", { name: "BillFlow Guided Tour" });
+    const next = tour.getByRole("button", { name: "Next", exact: true });
+    const currentRoute = () => normalizeNavPath(new URL(page.url()).pathname);
+    await expect(page.getByText("Workspace Setup", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByText("Workspace Insights", { exact: true }),
+    ).toHaveCount(0);
+    await invite.click();
+    await next.click();
+    await expect.poll(currentRoute).toBe("/invoices");
+    await expect(
+      page.getByRole("link", { name: "Invoices", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      tour.getByRole("heading", { name: "Itemized Invoicing & Advance Deposits" }),
+    ).toBeFocused();
+    await tour.getByRole("button", { name: "Back", exact: true }).click();
+    await expect.poll(currentRoute).toBe("/");
+    for (const route of ["/invoices", "/tasks", "/outsourcing", "/"]) {
+      await next.click();
+      await expect.poll(currentRoute).toBe(route);
+    }
+    await tour.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(tour).toHaveCount(0);
+    await expect(invite).toHaveCount(0);
     await page.reload();
     await expect(
       page.getByRole("link", { name: "Invoices", exact: true }),
+    ).toBeVisible();
+    await expect(invite).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Profile (Alex Rivera) and workspace settings" })
+      .click();
+    await page.getByRole("button", { name: "Interactive Tour", exact: true }).click();
+    await expect(
+      tour.getByText("Quick Tour · 1 of 5", { exact: true }),
     ).toBeVisible();
   } finally {
     await app?.close();

@@ -239,7 +239,10 @@ export const updateSettingsSchema = z.object({
     .enum(["top-left", "top-right", "bottom-left", "bottom-right"])
     .nullable()
     .optional(),
-  typeface: z.enum(["inter", "nunito", "jakarta"]).nullable().optional(),
+  typeface: z
+    .enum(["inter", "nunito", "jakarta", "elegant-sans"])
+    .nullable()
+    .optional(),
   layoutDensity: z
     .enum(["compact", "comfortable", "spacious"])
     .nullable()

@@ -2919,6 +2919,38 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
   font-display: swap;
   src: url("/fonts/plusjakartasans.woff2") format("woff2");
 }
+@font-face {
+  font-family: "Elegant Sans";
+  font-style: normal;
+  font-weight: 100 400;
+  font-stretch: normal;
+  font-display: swap;
+  src: url("/fonts/elegant-sans-regular.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Elegant Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: normal;
+  font-display: swap;
+  src: url("/fonts/elegant-sans-medium.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Elegant Sans";
+  font-style: normal;
+  font-weight: 600 900;
+  font-stretch: normal;
+  font-display: swap;
+  src: url("/fonts/elegant-sans-bold.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Elegant Sans";
+  font-style: normal;
+  font-weight: 600 900;
+  font-stretch: condensed;
+  font-display: swap;
+  src: url("/fonts/elegant-sans-condensed-bold.ttf") format("truetype");
+}
 
 :root[data-workspace-typeface="nunito"] {
   --workspace-font: "Nunito", system-ui, sans-serif;
@@ -2926,11 +2958,23 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
 :root[data-workspace-typeface="jakarta"] {
   --workspace-font: "Plus Jakarta Sans", system-ui, sans-serif;
 }
+:root[data-workspace-typeface="elegant-sans"] {
+  --workspace-font: "Elegant Sans", system-ui, sans-serif;
+}
 
 :root[data-workspace-typeface] body,
 :root[data-workspace-typeface]
   :is(
     .page-header,
+    .workspace-heading h1,
+    .ui-metric-value,
+    .ui-card h2,
+    .ui-card h3,
+    [data-motion-surface="panel"] h2,
+    [data-motion-surface="panel"] h3,
+    .font-newspaper,
+    .font-editorial-serif,
+    .font-serif-heading,
     .record-title,
     .record-meta,
     .ui-field,

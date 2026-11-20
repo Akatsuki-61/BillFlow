@@ -391,6 +391,10 @@ test("installed payload contains only the desktop runtime and target native bina
     false,
   );
   expect(files).toContain("/out/fonts/nunito.woff2");
+  expect(files).toContain("/out/fonts/elegant-sans-regular.ttf");
+  expect(files).toContain("/out/fonts/elegant-sans-medium.ttf");
+  expect(files).toContain("/out/fonts/elegant-sans-bold.ttf");
+  expect(files).toContain("/out/fonts/elegant-sans-condensed-bold.ttf");
   expect(files).toContain("/dist-electron/preload.js");
   expect(
     fs.existsSync(
@@ -754,6 +758,12 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     ).toBeVisible();
   };
   await openSettings("Business profile");
+  const icons = page.getByRole("group", { name: "Profile icon", exact: true });
+  const globe = icons.getByRole("radio", { name: "Globe" });
+  await icons.locator('label[title="Globe"]').click();
+  await expect(globe).toBeChecked();
+  await globe.press("ArrowRight");
+  await expect(icons.getByRole("radio", { name: "Shield" })).toBeChecked();
   const png = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 48;
@@ -778,15 +788,17 @@ test("customizes profiles and connects invoice stages, standalone payables and t
         (id) =>
           window
             .billflow!.profiles.list()
-            .then((state) =>
-              Boolean(
-                state.profiles.find((profile) => profile.id === id)?.photoData,
-              ),
-            ),
+            .then((state) => {
+              const profile = state.profiles.find((profile) => profile.id === id);
+              return {
+                avatar: profile?.avatar,
+                hasPhoto: Boolean(profile?.photoData),
+              };
+            }),
         created.profileId,
       ),
     )
-    .toBe(true);
+    .toEqual({ avatar: "shield", hasPhoto: true });
 
   await openSettings("Appearance");
   await page
@@ -807,6 +819,33 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     "data-notification-placement",
     "top-left",
   );
+
+  await page
+    .getByRole("combobox", { name: "Typeface", exact: true })
+    .selectOption("elegant-sans");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-workspace-typeface",
+    "elegant-sans",
+  );
+  const elegantSansState = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return {
+      fontFamily: getComputedStyle(document.body).fontFamily,
+      loadedFaces: Array.from(document.fonts)
+        .filter((face) => face.family.includes("Elegant Sans"))
+        .map((face) => ({
+          family: face.family,
+          weight: face.weight,
+          stretch: face.stretch,
+          status: face.status,
+        })),
+    };
+  });
+  expect(elegantSansState.fontFamily).toContain("Elegant Sans");
+  expect(
+    elegantSansState.loadedFaces.some((face) => face.status === "loaded"),
+  ).toBe(true);
 
   await openSettings("Invoice defaults");
   await page

@@ -28,7 +28,7 @@ import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { DashboardMetricsProvider } from "@/components/dashboard/DashboardMetricsContext";
 import { useWidgetContext } from "@/context/WidgetContext";
-import { WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
+import { canPinToDashboard, WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
 import { Timeframe } from "@/types/analytics";
 import type { DashboardPeriod } from "@/types/dashboard";
 import "./analytics.css";
@@ -135,43 +135,31 @@ export default function AnalyticsView() {
     setContextMenu({ isOpen: false, x: 0, y: 0, widgetId: null });
   };
 
-  const isTargetPinned = contextMenu.widgetId
-    ? isPinnedToDashboard(contextMenu.widgetId)
-    : false;
-
-  const contextMenuItems: ContextMenuItem[] = contextMenu.widgetId
-    ? [
-        isTargetPinned
+  const contextMenuItems: ContextMenuItem[] = [];
+  const targetWidgetId = contextMenu.widgetId;
+  if (targetWidgetId) {
+    if (canPinToDashboard(targetWidgetId)) {
+      contextMenuItems.push(
+        isPinnedToDashboard(targetWidgetId)
           ? {
               label: "Remove from Dashboard",
               icon: <Minus className="w-3.5 h-3.5" />,
-              onClick: () => {
-                if (contextMenu.widgetId) {
-                  removeFromDashboard(contextMenu.widgetId);
-                }
-              },
+              onClick: () => removeFromDashboard(targetWidgetId),
             }
           : {
               label: "Send to Dashboard",
               icon: <Plus className="w-3.5 h-3.5 text-accent" />,
-              onClick: () => {
-                if (contextMenu.widgetId) {
-                  pinToDashboard(contextMenu.widgetId);
-                }
-              },
+              onClick: () => pinToDashboard(targetWidgetId),
             },
-        {
-          label: "Hide from Analytics",
-          icon: <EyeOff className="w-3.5 h-3.5" />,
-          onClick: () => {
-            if (contextMenu.widgetId) {
-              toggleAnalytics(contextMenu.widgetId);
-            }
-          },
-          tone: "danger",
-        },
-      ]
-    : [];
+      );
+    }
+    contextMenuItems.push({
+      label: "Hide from Analytics",
+      icon: <EyeOff className="w-3.5 h-3.5" />,
+      onClick: () => toggleAnalytics(targetWidgetId),
+      tone: "danger",
+    });
+  }
 
   // Categorize visible widgets while preserving user-arranged order in analyticsWidgets
   const visibleWidgets = analyticsWidgets
@@ -486,24 +474,26 @@ export default function AnalyticsView() {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <Button
-                          size="small"
-                          variant={isPinned ? "secondary" : "ghost"}
-                          onClick={() => {
-                            if (isPinned) {
-                              removeFromDashboard(widget.id);
-                            } else {
-                              pinToDashboard(widget.id);
+                        {canPinToDashboard(widget.id) && (
+                          <Button
+                            size="small"
+                            variant={isPinned ? "secondary" : "ghost"}
+                            onClick={() => {
+                              if (isPinned) {
+                                removeFromDashboard(widget.id);
+                              } else {
+                                pinToDashboard(widget.id);
+                              }
+                            }}
+                            title={
+                              isPinned
+                                ? "Remove from Dashboard"
+                                : "Add to Dashboard"
                             }
-                          }}
-                          title={
-                            isPinned
-                              ? "Remove from Dashboard"
-                              : "Add to Dashboard"
-                          }
-                        >
-                          {isPinned ? "Unpin" : "+ Pin"}
-                        </Button>
+                          >
+                            {isPinned ? "Unpin" : "+ Pin"}
+                          </Button>
+                        )}
                         <Switch
                           checked={isVisible}
                           onChange={() => toggleAnalytics(widget.id)}

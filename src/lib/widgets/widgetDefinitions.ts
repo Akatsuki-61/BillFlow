@@ -1,15 +1,16 @@
 import { WidgetMeta } from "@/types/widgets";
 
+const WORKSPACE_INSIGHTS_WIDGET_ID = "workspace-insights";
+
 export const WIDGET_CATALOG: WidgetMeta[] = [
-  // Overview Spotlight Hero Card
   {
-    id: "workspace-insights",
+    id: WORKSPACE_INSIGHTS_WIDGET_ID,
     title: "Workspace Insights",
     description:
       "Atmospheric spotlight card with live business intelligence and sprint recommendations",
     category: "activity",
     size: "full",
-    defaultOnDashboard: true,
+    defaultOnDashboard: false,
     defaultOnAnalytics: false,
   },
 
@@ -248,7 +249,6 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
 ];
 
 export const DEFAULT_DASHBOARD_WIDGET_IDS = [
-  "workspace-insights",
   "total-revenue",
   "net-profit",
   "pending-receivables",
@@ -264,3 +264,11 @@ export const DEFAULT_ANALYTICS_WIDGET_IDS = WIDGET_CATALOG.filter(
 ).map((w) => w.id);
 
 export const ALL_ANALYTICS_WIDGET_IDS = WIDGET_CATALOG.map((w) => w.id);
+
+export function canPinToDashboard(id: string | null): boolean {
+  return id !== null && id !== WORKSPACE_INSIGHTS_WIDGET_ID;
+}
+
+export const DASHBOARD_WIDGET_CATALOG = WIDGET_CATALOG.filter((widget) =>
+  canPinToDashboard(widget.id),
+);

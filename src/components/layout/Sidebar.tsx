@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 
 import { isNavActive } from "@/lib/navigation";
+import { canPinToDashboard } from "@/lib/widgets/widgetDefinitions";
 import { useData } from "@/lib/data/DataProvider";
 import { useReportingData } from "@/context/ReportingContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -533,8 +534,10 @@ export default function Sidebar() {
               const isActive = isNavActive(pathname, item.href);
               const isHome = item.id === "dashboard";
               const isHovered = hoveredNavId === item.id && !isActive;
+              const canDropOnHome =
+                isHome && canPinToDashboard(draggedWidgetId);
               const isHomeDropCandidate =
-                isHome && isDragging && dragSource === "analytics";
+                canDropOnHome && isDragging && dragSource === "analytics";
 
               return (
                 <Link
@@ -544,7 +547,7 @@ export default function Sidebar() {
                   aria-current={isActive ? "page" : undefined}
                   onMouseEnter={() => setHoveredNavId(item.id)}
                   onDragOver={
-                    isHome
+                    canDropOnHome
                       ? (e) => {
                           e.preventDefault();
                           e.dataTransfer.dropEffect = "copy";
@@ -555,7 +558,7 @@ export default function Sidebar() {
                       : undefined
                   }
                   onDragLeave={
-                    isHome
+                    canDropOnHome
                       ? (e) => {
                           const currentTarget = e.currentTarget;
                           const relatedTarget = e.relatedTarget as Node | null;
@@ -569,7 +572,7 @@ export default function Sidebar() {
                       : undefined
                   }
                   onDrop={
-                    isHome
+                    canDropOnHome
                       ? (e) => {
                           e.preventDefault();
                           setIsHomeDropOver(false);

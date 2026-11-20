@@ -1,5 +1,6 @@
 import type { WidgetDisplaySize } from "@/types/widgets";
 import {
+  canPinToDashboard,
   DEFAULT_ANALYTICS_WIDGET_IDS,
   DEFAULT_DASHBOARD_WIDGET_IDS,
 } from "./widgetDefinitions";
@@ -63,13 +64,11 @@ export function loadWidgetPreferences(storage: PreferenceStorage, profileId?: st
     dashboardWidgets: readPreference(
       storage, keys.dashboard, isWidgetList,
       [...DEFAULT_DASHBOARD_WIDGET_IDS],
-    ),
+    ).filter(canPinToDashboard),
     analyticsWidgets: readPreference(
       storage, keys.analytics, isWidgetList,
       [...DEFAULT_ANALYTICS_WIDGET_IDS],
     ),
-    widgetSizes: readPreference(
-      storage, keys.sizes, isWidgetSizes, {},
-    ),
+    widgetSizes: readPreference(storage, keys.sizes, isWidgetSizes, {}),
   };
 }

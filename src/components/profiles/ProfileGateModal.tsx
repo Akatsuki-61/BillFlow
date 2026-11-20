@@ -464,7 +464,7 @@ export function ProfileGateModal() {
         await updateProfile(formTargetId, {
           ...(passwordPatch !== undefined ? { password: passwordPatch } : {}),
           ...(existingProfile?.hasPassword && formCurrentPassword.trim()
-            ? { currentPassword: formCurrentPassword.trim() }
+            ? { currentPassword: formCurrentPassword }
             : {}),
         });
       }
@@ -493,7 +493,7 @@ export function ProfileGateModal() {
     try {
       setBusy(true);
       setErrorMsg(null);
-      await deleteProfile(formTargetId, deletePassword.trim() || undefined);
+      await deleteProfile(formTargetId, deletePassword || undefined);
       setConfirmDelete(false);
       setView("select");
     } catch (err) {

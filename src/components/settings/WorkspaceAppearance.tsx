@@ -67,6 +67,7 @@ export function AppearanceFields({
             <option value="inter">Inter</option>
             <option value="nunito">Nunito</option>
             <option value="jakarta">Plus Jakarta Sans</option>
+            <option value="elegant-sans">Elegant Sans</option>
           </select>
         </div>
         <div>

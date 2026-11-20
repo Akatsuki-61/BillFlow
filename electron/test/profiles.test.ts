@@ -17,6 +17,7 @@ import { listCatalogItems } from "../ipc/catalog";
 import { getOrCreateSettings, updateSettings } from "../ipc/settings";
 import { createInvoice, recordPayment } from "../ipc/invoices";
 import { decideTracking, listTasks } from "../ipc/tasks";
+import { lockProfileSession } from "../workspace-session";
 
 let directory: string;
 let databasePath: string;
@@ -46,6 +47,47 @@ describe("Netflix-Style Multi-Profile Engine, Password Locks & Role Onboarding",
     const mirror = JSON.parse(fs.readFileSync(jsonMirrorPath, "utf8"));
     expect(mirror.maxProfiles).toBe(5);
     expect(mirror.profiles).toHaveLength(1);
+  });
+
+  it("locks a protected first-run profile after a restart and preserves pending permissions", () => {
+    const password = "test-workspace-password";
+    const onboarded = completeProfileOnboarding({
+      studioName: "Rivera Studio",
+      defaultCurrency: "USD",
+      guidedSetup: true,
+      profiles: [
+        {
+          name: "Alex Rivera",
+          role: "general",
+          subtitle: "",
+          avatar: "globe",
+          accent: "blue",
+          defaultCurrency: "USD",
+          invoicePrefix: "INV-",
+          password,
+          seedRoleCatalog: false,
+        },
+      ],
+    });
+    expect(onboarded.profiles[0]).toMatchObject({
+      hasPassword: true,
+      lockType: "password",
+    });
+    expect(onboarded.isLocked).toBe(false);
+
+    closeDatabaseForTesting();
+    lockProfileSession();
+    initDatabase(databasePath);
+    expect(listProfilesState()).toMatchObject({
+      isLocked: true,
+      needsOnboarding: false,
+      desktopSetup: { permissionsPending: true },
+    });
+    expect(() => switchProfile("default")).toThrow(/Incorrect password/);
+    expect(switchProfile("default", password)).toMatchObject({
+      isLocked: false,
+      desktopSetup: { permissionsPending: true },
+    });
   });
 
   it("completes role onboarding for Software Engineering, AI Development, and Consulting with isolated catalogs", () => {
