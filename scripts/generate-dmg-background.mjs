@@ -9,8 +9,9 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const WIDTH = 660;
 const HEIGHT = 440;
 
-const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
-const version = pkg.version || "0.2.0";
+const { version } = JSON.parse(
+  await readFile(path.join(root, "package.json"), "utf8"),
+);
 
 const rawLogoBuffer = await readFile(
   path.join(root, "assets/brand/source/BillFlow-Logo-Colored-Icon.png"),

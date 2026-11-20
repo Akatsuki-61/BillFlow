@@ -36,11 +36,7 @@ test("reports foreign records in profile currency and preserves privacy, documen
     ),
   ) as Record<string, string>;
   app = await _electron.launch({
-    executablePath:
-      process.env.BILLFLOW_APP_PATH ||
-      path.resolve(
-        "release/test-0.2.0/mac-arm64/BillFlow.app/Contents/MacOS/BillFlow",
-      ),
+    executablePath: process.env.BILLFLOW_APP_PATH!,
     env: {
       ...env,
       BILLFLOW_USER_DATA: directory,

@@ -3,7 +3,7 @@
   <h1>BillFlow</h1>
   <p>Local-first desktop workspace for client billing, task execution, subcontractor payouts, and profit tracking.</p>
   <p>
-    <a href="package.json"><img src="https://img.shields.io/badge/Version-0.2.0-111827.svg" alt="Version 0.2.0" /></a>
+    <a href="package.json"><img src="https://img.shields.io/badge/Version-0.3.0-111827.svg" alt="Version 0.3.0" /></a>
     <a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/Electron-44.11-47848F.svg" alt="Electron 44.11" /></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16.4-000000.svg" alt="Next.js 16.4" /></a>
     <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-WAL-003B57.svg" alt="SQLite WAL" /></a>
@@ -62,7 +62,9 @@ Log business expenses with custom merchant icons, recurring flags, and SHA-256 c
 
 ### Multi-profile workspaces and backups
 
-Run up to 5 isolated local workspaces in one installation, starting from role presets for Software Engineering, AI Development, or Consulting. Each profile keeps its own database, receipts directory, catalog defaults, appearance settings (`Light`, `Dark`, or `System` with accent themes), and optional 4-digit PIN or alphanumeric passcode enforced in Electron's main process. Export or restore version 2 JSON backups that bundle tasks, schedules, and receipt bytes (`150 MiB` maximum backup size, `100 MiB` maximum per attachment, `50,000` rows per table).
+Start with one profile through guided first-run setup and choose whether to enable desktop notifications and Apple Calendar sync. Create up to 5 isolated local workspaces and use role presets when adding profiles. Each profile keeps its own database, receipts directory, catalog defaults, appearance settings, and optional PIN or password enforced in Electron's main process.
+
+Export or restore workspace backups, including tasks, schedules, and managed receipts. Version 2 JSON backups support up to `150 MiB` per backup, including up to `100 MiB` of attachments, and `50,000` rows per table. **Settings → Backup & data** supports clearing the active profile's records or clearing the full application and returning to first-run setup.
 
 ## System architecture
 
@@ -114,7 +116,7 @@ npm run dev
 
 ## Verification and packaging
 
-Run type checks, ESLint, and the Vitest suite (`210` tests across `27` files):
+Use these commands to check types, lint, and run the Vitest suite.
 
 ```bash
 npx tsc --noEmit
@@ -122,10 +124,12 @@ npm run lint
 npm test
 ```
 
-Build an ad-hoc signed local macOS Apple Silicon `.app` preview under `release/preview-0.2.0/mac-arm64/BillFlow.app` and run the Playwright desktop suite against it:
+Run `npm run pack:mac` to build an ad-hoc signed Apple Silicon preview at `release/preview-<version>/mac-arm64/BillFlow.app`.
+
+The Playwright workflow builds the test app at `release/test-<version>/mac-arm64/BillFlow.app` before running the suite.
 
 ```bash
-npm run pack:mac
+npm run pack:mac:test
 npm run test:desktop
 ```
 

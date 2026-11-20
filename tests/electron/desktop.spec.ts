@@ -41,11 +41,7 @@ function listAsarEntries(archivePath: string): string[] {
 
 let app: ElectronApplication, page: Page, directory: string;
 test.describe.configure({ mode: "serial" });
-const executable =
-  process.env.BILLFLOW_APP_PATH ||
-  path.resolve(
-    "release/test-0.2.0/mac-arm64/BillFlow.app/Contents/MacOS/BillFlow",
-  );
+const executable = process.env.BILLFLOW_APP_PATH!;
 async function launch() {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
@@ -660,6 +656,9 @@ test("workspace operations connect search, alerts, ledgers, forecast, PDFs and b
   const backupPath = path.join(exportDir, "backup.json");
   await saveTo(backupPath);
   const settings = await search("backup restore");
+  await expect(
+    page.getByRole("option", { name: "Backup & data Settings", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   await settings.press("Enter");
   await page.getByRole("button", { name: "Save Backup" }).click();
   await expect(page.getByText("Backup is up to date.")).toBeVisible();
@@ -747,12 +746,12 @@ test("customizes profiles and connects invoice stages, standalone payables and t
       name: "Search workspace records and actions",
     });
     await search.fill(name);
-    await search.press("Enter");
+    await page.getByRole("option", { name: `${name} Settings`, exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Settings", exact: true }),
     ).toBeVisible();
   };
-  await openSettings("business profile");
+  await openSettings("Business profile");
   const png = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 48;
@@ -787,7 +786,7 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     )
     .toBe(true);
 
-  await openSettings("appearance");
+  await openSettings("Appearance");
   await page
     .getByRole("combobox", { name: "Typeface", exact: true })
     .selectOption("nunito");
@@ -807,7 +806,7 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     "top-left",
   );
 
-  await openSettings("invoice defaults");
+  await openSettings("Invoice defaults");
   await page
     .getByLabel("Default delivery destination")
     .fill("https://example.invalid/deliverables");
@@ -960,7 +959,7 @@ test("customizes profiles and connects invoice stages, standalone payables and t
       showSaveDialog: async () => ({ canceled: false, filePath }),
     });
   }, csvPath);
-  await openSettings("backup restore");
+  await openSettings("Backup & data");
   await page.getByRole("button", { name: "Export Workspace CSV" }).click();
   await expect.poll(() => fs.existsSync(csvPath)).toBe(true);
   const csv = fs.readFileSync(csvPath, "utf8");

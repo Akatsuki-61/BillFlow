@@ -2,6 +2,22 @@
 
 Notable changes between BillFlow desktop releases.
 
+## v0.3.0 (2026-11-20)
+
+### Setup and Settings
+
+- Added an empty profile picker and guided first-run setup with one question at a time, a profile review, and an empty starter catalog.
+- Made desktop notifications and Apple Calendar Automation optional during setup. BillFlow saves the profile first and resumes at permissions after reopening.
+- Consolidated profile identity, avatar, accent, currency, and invoice prefix in Business profile. Improved spacing in Workspace interface and standardized the Local activity history disclosure.
+- Added a full application reset that clears local profiles, records, managed files, and preferences before restarting at setup. Backup & data also retains a separate reset for the active profile.
+
+### Billing and workspace operations
+
+- Added profile-currency reporting with cached exchange rates and original amounts preserved on financial records.
+- Added recurring retainers, proposals with one-click invoice conversion, a financial digest, and cash and accrual project-margin views.
+- Added encrypted rolling backups, restore preflight and recovery checkpoints, startup SQLite integrity checks, and a retryable PDF export history.
+- Improved offline PDF output, profile privacy, task-first outsourcing, window-state persistence, and dashboard performance.
+
 ## v0.2.0 (2026-11-13)
 
 ### Workspaces and authentication
