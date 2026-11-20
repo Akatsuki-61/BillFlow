@@ -12,6 +12,7 @@ Notable changes between BillFlow desktop releases.
 - Added a full application reset that clears local profiles, records, managed files, and preferences before restarting at setup. Backup & data also retains a separate reset for the active profile.
 - Removed the automatic Keychain check when opening Backup & data. Packaged macOS tests now use a mock Keychain and keep native notifications quiet.
 - Simplified the macOS installer with larger native Finder icons and a clear drag-to-Applications layout.
+- Set the second macOS package to build 2 and display its build number in About BillFlow.
 
 ### Billing and workspace operations
 

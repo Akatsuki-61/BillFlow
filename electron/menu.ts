@@ -46,7 +46,6 @@ export function setupAboutPanel(): void {
   app.setAboutPanelOptions({
     applicationName: "BillFlow",
     applicationVersion: currentVersion,
-    version: currentVersion,
     copyright: "Copyright © 2026 Akatsuki-61",
     authors: ["Akatsuki-61"],
     website: "https://github.com/Akatsuki-61/BillFlow",
