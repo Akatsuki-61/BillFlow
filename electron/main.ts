@@ -1,4 +1,5 @@
 import { registerStatementHandlers } from "./ipc/statements";
+import { getDesktopSetup, registerDesktopSetupHandlers } from "./desktop-setup";
 import { registerActivityHandlers } from "./workspace-activity";
 import { registerWorkspaceHandlers } from "./ipc/workspace";
 import { registerExchangeRateHandlers } from "./exchange-rates";
@@ -223,7 +224,7 @@ function broadcastDataChanged() {
 }
 
 async function runBackgroundMaintenance() {
-  if (maintenanceInFlight || !isWorkspaceUnlocked()) return;
+  if (maintenanceInFlight || !isWorkspaceUnlocked() || getDesktopSetup()?.permissionsPending) return;
   maintenanceInFlight = true;
   try {
     syncAppBadgeCount({ tray });
@@ -505,6 +506,7 @@ if (gotSingleInstanceLock) {
       registerProfileHandlers(broadcastDataChanged, () => {
         void runBackgroundMaintenance();
       });
+      registerDesktopSetupHandlers();
       registerClientHandlers(broadcastDataChanged);
       registerInvoiceHandlers(broadcastDataChanged);
       registerDashboardHandlers();

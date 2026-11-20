@@ -1,5 +1,6 @@
 import { imageDataSchema } from "../validation";
 import { atomicWrite } from "../managed-files";
+import { finishDesktopSetup, getDesktopSetup } from "../desktop-setup";
 import {
   initializeProfileSession,
   unlockProfileSession,
@@ -22,6 +23,7 @@ import {
 } from "../db";
 import {
   userProfiles,
+  appSetup,
   settings,
   clients,
   invoices,
@@ -141,6 +143,7 @@ const completeOnboardingSchema = z.object({
   email: z.string().trim().max(120).optional().default(""),
   defaultCurrency: currencyEnum.default("USD"),
   profiles: z.array(onboardingSlotSchema).min(1).max(MAX_PROFILES),
+  guidedSetup: z.literal(true).optional(),
 });
 
 const SCRYPT_OPTIONS = {
@@ -525,6 +528,7 @@ export function listProfilesState(): ProfileListResponse {
     activeProfileId: activeRow.id,
     maxProfiles: MAX_PROFILES,
     needsOnboarding,
+    desktopSetup: getDesktopSetup(),
     isLocked: !isWorkspaceUnlocked(),
   };
 }
@@ -1086,6 +1090,7 @@ function completeOnboardingTransaction(
   }
 
   switchWorkspaceDatabase("default");
+  if (value.guidedSetup) rootDb.insert(appSetup).values({ id: 1 }).run();
   unlockProfileSession("default");
   return listProfilesState();
 }
@@ -1168,11 +1173,17 @@ export function registerProfileHandlers(
       try {
         const result = completeProfileOnboarding(input);
         broadcast();
-        onWorkspaceUnlocked?.();
+        if (!result.desktopSetup?.permissionsPending) onWorkspaceUnlocked?.();
         return result;
       } catch (error) {
         throw formatError(error);
       }
     },
   );
+  ipcMain.handle("profiles:finishSetup", () => {
+    finishDesktopSetup();
+    const result = listProfilesState();
+    onWorkspaceUnlocked?.();
+    return result;
+  });
 }

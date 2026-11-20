@@ -15,18 +15,20 @@ import {
   type CreateProfileInput,
   type UpdateProfileInput,
   type CompleteOnboardingInput,
+  type DesktopSetup,
   type ProfileListResponse,
 } from "@/types/profiles";
 import { useTheme } from "@/context/ThemeContext";
 import { useDataRefresh } from "@/lib/data/DataProvider";
 
-export type ProfileModalMode = "select" | "manage" | "create" | "onboarding";
+export type ProfileModalMode = "select" | "manage" | "create";
 
 interface ProfileContextValue {
   profiles: UserProfile[];
   activeProfile: UserProfile;
   maxProfiles: number;
   needsOnboarding: boolean;
+  desktopSetup: DesktopSetup | null;
   isLoading: boolean;
   isGateOpen: boolean;
   isLocked: boolean;
@@ -44,6 +46,7 @@ interface ProfileContextValue {
   deleteProfile: (id: string, password?: string) => Promise<void>;
   verifyPassword: (id: string, password: string) => Promise<boolean>;
   completeOnboarding: (input: CompleteOnboardingInput) => Promise<void>;
+  finishSetup: () => Promise<void>;
   refreshProfiles: () => Promise<void>;
 }
 
@@ -89,7 +92,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   ]);
   const [activeProfileId, setActiveProfileId] = useState<string>("default");
   const [maxProfiles, setMaxProfiles] = useState<number>(MAX_PROFILES);
-  const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [desktopSetup, setDesktopSetup] = useState<DesktopSetup | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isGateOpen, setIsGateOpen] = useState<boolean>(false);
   const [isLocked, setIsLocked] = useState<boolean>(false);
@@ -141,6 +145,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setActiveProfileId(res.activeProfileId);
       setMaxProfiles(res.maxProfiles || MAX_PROFILES);
       setNeedsOnboarding(res.needsOnboarding);
+      setDesktopSetup(res.desktopSetup ?? null);
 
       const active =
         res.profiles.find((p) => p.id === res.activeProfileId) ??
@@ -164,8 +169,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (isInitialBoot && !initialBootHandledRef.current) {
         initialBootHandledRef.current = true;
         if (res.needsOnboarding) {
-          setModalMode("onboarding");
-          setIsGateOpen(true);
           setIsLocked(false);
           return;
         }
@@ -316,6 +319,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     [applyResponse, refreshData],
   );
 
+  const finishSetup = useCallback(async () => {
+    const response = await requireProfilesApi().finishSetup();
+    applyResponse(response);
+  }, [applyResponse]);
+
   const activeProfile = useMemo(
     () =>
       profiles.find((p) => p.id === activeProfileId) ??
@@ -330,6 +338,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       activeProfile,
       maxProfiles,
       needsOnboarding,
+      desktopSetup,
       isLoading,
       isGateOpen,
       isLocked,
@@ -344,6 +353,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       deleteProfile,
       verifyPassword,
       completeOnboarding,
+      finishSetup,
       refreshProfiles,
     }),
     [
@@ -351,6 +361,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       activeProfile,
       maxProfiles,
       needsOnboarding,
+      desktopSetup,
       isLoading,
       isGateOpen,
       isLocked,
@@ -365,6 +376,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       deleteProfile,
       verifyPassword,
       completeOnboarding,
+      finishSetup,
       refreshProfiles,
     ],
   );

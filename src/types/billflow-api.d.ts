@@ -127,6 +127,12 @@ export interface BillFlowAPI extends WorkflowAPI {
     completeOnboarding: (
       input: CompleteOnboardingInput,
     ) => Promise<ProfileListResponse>;
+    finishSetup: () => Promise<ProfileListResponse>;
+  };
+  integrations: {
+    requestNotifications: () => Promise<void>;
+    openNotificationSettings: () => Promise<void>;
+    connectCalendar: () => Promise<void>;
   };
   expenses: {
     list: (filter?: {

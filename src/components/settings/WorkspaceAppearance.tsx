@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/Workspace";
 import { useToast } from "@/context/ToastContext";
+import { useProfiles } from "@/context/ProfileContext";
 import { useData, useSettings } from "@/lib/data/DataProvider";
 import type {
   FinancialDigestSummary,
@@ -123,12 +124,14 @@ export function AppearanceFields({
 }
 
 export function FinancialDigestSettings() {
+  const { desktopSetup, refreshProfiles } = useProfiles();
   const { settings, updateSettings } = useSettings();
   const { isElectron } = useData();
   const { showToast } = useToast();
   const [digestSummary, setDigestSummary] =
     useState<FinancialDigestSummary | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const notificationsDisabled = desktopSetup?.notificationsEnabled === false;
 
   useEffect(() => {
     let active = true;
@@ -176,6 +179,20 @@ export function FinancialDigestSettings() {
     }
   };
 
+  const enableNotifications = async () => {
+    if (!window.billflow) return;
+    setIsBusy(true);
+    try {
+      await window.billflow.integrations.requestNotifications();
+      await refreshProfiles();
+      showToast("Desktop notifications enabled in BillFlow. Delivery follows your system settings.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not enable notifications.", "error");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   return (
     <section
       className="ui-card space-y-4"
@@ -196,7 +213,7 @@ export function FinancialDigestSettings() {
             id="financial-digest-enabled"
             name="digestEnabled"
             type="checkbox"
-            disabled={!isElectron}
+            disabled={!isElectron || notificationsDisabled}
             checked={settings?.digestEnabled !== false}
             onChange={(event) => void handleToggleDigest(event.target.checked)}
             className="size-4 accent-accent"
@@ -212,10 +229,10 @@ export function FinancialDigestSettings() {
           type="button"
           variant="secondary"
           disabled={!isElectron || isBusy}
-          onClick={() => void handleSendTestDigest()}
+          onClick={() => void (notificationsDisabled ? enableNotifications() : handleSendTestDigest())}
         >
           <Bell size={15} aria-hidden="true" />
-          Send test notification
+          {notificationsDisabled ? "Enable desktop notifications" : "Send test notification"}
         </Button>
       </div>
       {digestSummary && (

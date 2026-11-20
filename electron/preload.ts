@@ -106,6 +106,14 @@ async function invoke(channel: string, ...args: unknown[]) {
     profileId = result.activeProfileId;
   return result;
 }
+
+async function requestIntegration(
+  channel: "integrations:requestNotifications" | "integrations:connectCalendar",
+): Promise<void> {
+  const message: string | null = await invoke(channel);
+  if (message) throw new Error(message);
+}
+
 const documentUrl = new URL(location.href);
 const trustedDocument =
   !documentUrl.username &&
@@ -176,6 +184,13 @@ if (process.isMainFrame && trustedDocument)
         input: CompleteOnboardingInput,
       ): Promise<ProfileListResponse> =>
         invoke("profiles:completeOnboarding", input),
+      finishSetup: (): Promise<ProfileListResponse> => invoke("profiles:finishSetup"),
+    },
+    integrations: {
+      requestNotifications: () => requestIntegration("integrations:requestNotifications"),
+      openNotificationSettings: (): Promise<void> =>
+        invoke("integrations:openNotificationSettings"),
+      connectCalendar: () => requestIntegration("integrations:connectCalendar"),
     },
     expenses: {
       list: (filter?: {

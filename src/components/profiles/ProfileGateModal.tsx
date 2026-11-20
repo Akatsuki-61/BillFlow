@@ -21,20 +21,17 @@ import {
   X,
   ArrowLeft,
   Trash2,
-  SlidersHorizontal,
   KeyRound,
   Hash,
   Type,
 } from "lucide-react";
 import { useProfiles } from "@/context/ProfileContext";
 import {
-  MAX_PROFILES,
   PROFILE_ROLE_LIST,
   PROFILE_ROLE_PRESETS,
   type ProfileRole,
   type ProfileAvatar,
   type UserProfile,
-  type OnboardingProfileSlot,
 } from "@/types/profiles";
 import {
   ProfileAvatarTile,
@@ -45,7 +42,7 @@ import type { AccentPreference } from "@/lib/theme";
 import type { Currency } from "@/types/billing";
 import { useData } from "@/lib/data/DataProvider";
 
-type InternalView = "select" | "unlock" | "form" | "onboarding";
+type InternalView = "select" | "unlock" | "form";
 type LockInputMode = "pin" | "alphanumeric";
 
 const ACCENT_OPTIONS: AccentPreference[] = [
@@ -70,27 +67,6 @@ const AVATAR_OPTIONS: ProfileAvatar[] = [
 
 const CURRENCY_OPTIONS: Currency[] = ["USD", "LKR", "EUR", "GBP", "CAD"];
 
-function createDefaultOnboardingSlots(
-  defaultCurrency: Currency = "USD",
-): Array<OnboardingProfileSlot & { enabled: boolean }> {
-  return PROFILE_ROLE_LIST.map((preset) => ({
-    enabled:
-      preset.role === "software-engineering" ||
-      preset.role === "ai-development" ||
-      preset.role === "consulting",
-    name: preset.defaultName,
-    role: preset.role,
-    subtitle: preset.label,
-    avatar: preset.avatar,
-    accent: preset.accent,
-    defaultCurrency,
-    invoicePrefix: preset.invoicePrefix,
-    password: "",
-    passwordHint: "",
-    seedRoleCatalog: true,
-  }));
-}
-
 export function ProfileGateModal() {
   const {
     profiles,
@@ -105,7 +81,6 @@ export function ProfileGateModal() {
     createProfile,
     updateProfile,
     deleteProfile,
-    completeOnboarding,
   } = useProfiles();
   const { settings } = useData();
 
@@ -169,13 +144,6 @@ export function ProfileGateModal() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
 
-  // Onboarding state
-  const [studioName, setStudioName] = useState("");
-  const [studioCurrency, setStudioCurrency] = useState<Currency>("USD");
-  const [onboardingSlots, setOnboardingSlots] = useState<
-    Array<OnboardingProfileSlot & { enabled: boolean }>
-  >(() => createDefaultOnboardingSlots("USD"));
-
   const populateFormFromProfile = (profile: UserProfile | null) => {
     setErrorMsg(null);
     setConfirmDelete(false);
@@ -222,14 +190,7 @@ export function ProfileGateModal() {
       setErrorMsg(null);
       setBusy(false);
 
-      if (modalMode === "onboarding") {
-        setStudioName(settings?.businessName?.trim() || "");
-        const initialCurr =
-          (settings?.defaultCurrency as Currency) || "USD";
-        setStudioCurrency(initialCurr);
-        setOnboardingSlots(createDefaultOnboardingSlots(initialCurr));
-        setView("onboarding");
-      } else if (modalMode === "create") {
+      if (modalMode === "create") {
         populateFormFromProfile(null);
         setView("form");
       } else if (modalMode === "manage") {
@@ -544,67 +505,6 @@ export function ProfileGateModal() {
     }
   };
 
-  const enabledOnboardingSlots = onboardingSlots.filter((s) => s.enabled);
-
-  const handleCompleteOnboarding = async () => {
-    setErrorMsg(null);
-    if (!studioName.trim()) {
-      setErrorMsg("Please enter your name or studio name.");
-      return;
-    }
-    if (enabledOnboardingSlots.length === 0) {
-      setErrorMsg("Select at least one role profile to continue.");
-      return;
-    }
-    for (const slot of enabledOnboardingSlots) {
-      if (
-        slot.password &&
-        slot.password.trim().length > 0 &&
-        slot.password.trim().length < 4
-      ) {
-        setErrorMsg(
-          `Passcode for "${slot.name}" must be at least 4 characters or digits (or leave blank).`,
-        );
-        return;
-      }
-    }
-
-    try {
-      setBusy(true);
-      await completeOnboarding({
-        studioName: studioName.trim(),
-        email: settings?.email?.trim() || "",
-        defaultCurrency: studioCurrency,
-        profiles: enabledOnboardingSlots.slice(0, MAX_PROFILES).map((s) => ({
-          name: s.name.trim() || PROFILE_ROLE_PRESETS[s.role].defaultName,
-          role: s.role,
-          subtitle: s.subtitle.trim() || PROFILE_ROLE_PRESETS[s.role].label,
-          avatar: s.avatar,
-          accent: s.accent,
-          defaultCurrency: studioCurrency,
-          invoicePrefix:
-            s.invoicePrefix.trim() ||
-            PROFILE_ROLE_PRESETS[s.role].invoicePrefix,
-          password: s.password?.trim() || undefined,
-          seedRoleCatalog: s.seedRoleCatalog,
-        })),
-      });
-      if (typeof window !== "undefined") {
-        setTimeout(() => {
-          window.dispatchEvent(
-            new CustomEvent("billflow:start-tour", { detail: { auto: true } }),
-          );
-        }, 350);
-      }
-    } catch (err) {
-      setErrorMsg(
-        err instanceof Error ? err.message : "Failed to complete onboarding.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const ambientAccent =
     view === "form"
       ? formAccent
@@ -660,22 +560,6 @@ export function ProfileGateModal() {
         </div>
 
         <div className="flex items-center gap-3 app-no-drag">
-          {view === "select" && (
-            <button
-              type="button"
-              onClick={() => {
-                setStudioName(
-                  settings?.businessName?.trim() || "",
-                );
-                setView("onboarding");
-              }}
-              className="app-no-drag inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-zinc-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors cursor-pointer"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-300 pointer-events-none" />
-              Role Setup
-            </button>
-          )}
-
           {(!isLocked || view !== "select") && (
             <button
               type="button"
@@ -1418,189 +1302,6 @@ export function ProfileGateModal() {
         </m.div>
       )}
 
-      {/* =====================================================================
-          VIEW 4: FULL-SCREEN ROLE ONBOARDING SETUP
-         ===================================================================== */}
-      {view === "onboarding" && (
-        <m.div
-          key="view-onboarding"
-          initial={{ opacity: 0, y: 12, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1, transition: SPRING_MODAL_SHEET }}
-          exit={{ opacity: 0, y: -8, scale: 0.98, transition: EXIT_MODAL_SHEET }}
-          className="absolute inset-0 min-h-full flex items-center justify-center px-6 py-6"
-        >
-          <div className="w-full max-w-2xl">
-            <div className="border-b border-white/10 pb-5 mb-6">
-              <h1 className="text-2xl sm:text-3xl font-medium tracking-tight text-white">
-                Set Up Your Role Workspaces
-              </h1>
-              <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-                Customize your roles, profile names, and optional 4-digit PINs
-                or passcodes (up to 5 profiles).
-              </p>
-            </div>
-
-            {errorMsg && (
-              <div className="mb-4 px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs font-medium">
-                {errorMsg}
-              </div>
-            )}
-
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                    Your Name or Studio Name
-                  </label>
-                  <input
-                    type="text"
-                    value={studioName}
-                    onChange={(e) => setStudioName(e.target.value)}
-                    placeholder="e.g. Alex Rivera or Apex Studio"
-                    className="w-full h-11 px-3.5 rounded-xl bg-white/[0.05] border border-white/15 focus:border-white text-sm text-white outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                    Default Currency
-                  </label>
-                  <select
-                    value={studioCurrency}
-                    onChange={(e) => {
-                      const curr = e.target.value as Currency;
-                      setStudioCurrency(curr);
-                      setOnboardingSlots((prev) =>
-                        prev.map((s) => ({ ...s, defaultCurrency: curr })),
-                      );
-                    }}
-                    className="w-full h-11 px-3.5 rounded-xl bg-[#12141C] border border-white/15 focus:border-white text-sm text-white outline-none"
-                  >
-                    {CURRENCY_OPTIONS.map((curr) => (
-                      <option key={curr} value={curr}>
-                        {curr}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
-                {onboardingSlots.map((slot, idx) => (
-                  <m.div
-                    key={slot.role}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={listRowTransition(idx)}
-                    className={`p-3.5 rounded-2xl border transition-colors ${
-                      slot.enabled
-                        ? "bg-white/[0.05] border-white/20"
-                        : "bg-white/[0.015] border-white/5 opacity-55"
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <input
-                          type="checkbox"
-                          checked={slot.enabled}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setOnboardingSlots((prev) =>
-                              prev.map((item, i) =>
-                                i === idx
-                                  ? { ...item, enabled: checked }
-                                  : item,
-                              ),
-                            );
-                          }}
-                          className="w-4 h-4 accent-white rounded cursor-pointer"
-                        />
-                        <ProfileAvatarTile
-                          avatar={slot.avatar}
-                          accent={slot.accent}
-                          size="sm"
-                        />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1">
-                          <input
-                            type="text"
-                            value={slot.name}
-                            disabled={!slot.enabled}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setOnboardingSlots((prev) =>
-                                prev.map((item, i) =>
-                                  i === idx ? { ...item, name: val } : item,
-                                ),
-                              );
-                            }}
-                            placeholder="Profile Name"
-                            className="h-9 px-2.5 rounded-lg bg-black/40 border border-white/10 focus:border-white text-xs font-medium text-white outline-none"
-                          />
-                          <input
-                            type="text"
-                            value={slot.subtitle}
-                            disabled={!slot.enabled}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setOnboardingSlots((prev) =>
-                                prev.map((item, i) =>
-                                  i === idx
-                                    ? { ...item, subtitle: val }
-                                    : item,
-                                ),
-                              );
-                            }}
-                            placeholder="Custom Role Title"
-                            className="h-9 px-2.5 rounded-lg bg-black/40 border border-white/10 focus:border-white text-xs text-zinc-300 outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {slot.enabled && (
-                        <input
-                          type="password"
-                          value={slot.password || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setOnboardingSlots((prev) =>
-                              prev.map((item, i) =>
-                                i === idx ? { ...item, password: val } : item,
-                              ),
-                            );
-                          }}
-                          placeholder="4-digit PIN or password"
-                          className="h-9 px-3 rounded-lg bg-black/40 border border-white/15 focus:border-white text-xs text-white placeholder:text-zinc-500 sm:w-44 outline-none"
-                        />
-                      )}
-                    </div>
-                  </m.div>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between pt-5 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setView("select")}
-                  className="px-6 py-2.5 rounded-md border border-zinc-500 hover:border-white text-zinc-400 hover:text-white text-xs font-medium tracking-[0.14em] uppercase transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void handleCompleteOnboarding()}
-                  className="px-7 py-2.5 rounded-md bg-white hover:bg-zinc-200 disabled:opacity-50 text-zinc-950 font-bold text-xs tracking-[0.14em] uppercase transition-colors cursor-pointer"
-                >
-                  {busy
-                    ? "Creating..."
-                    : `Create ${enabledOnboardingSlots.length} Profile${
-                        enabledOnboardingSlots.length === 1 ? "" : "s"
-                      }`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </m.div>
-      )}
       </AnimatePresence>
       </div>
         </m.div>

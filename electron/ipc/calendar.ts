@@ -1,5 +1,6 @@
 import { shell } from "electron";
 import { ipcMain } from "../security";
+import { getDesktopSetup } from "../desktop-setup";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
 import { execFile } from "child_process";
@@ -1235,6 +1236,11 @@ export async function syncNativeLocalCalendar(
   if (!isWorkspaceUnlocked())
     throw new Error("Unlock your profile before syncing Calendar.");
 
+  const setup = getDesktopSetup();
+  if (setup && (!setup.calendarConnected || setup.permissionsPending)) {
+    return { syncedFromMac: 0, pushedToMac: 0, deletedFromMac: 0 };
+  }
+
   if (isSyncInFlight) {
     // Queue the latest request so we never drop any task edit or deletion
     queuedSyncPayload = {
@@ -1256,7 +1262,9 @@ export async function syncNativeLocalCalendar(
     // Only pull external macOS Calendar events if not in push-only mode
     let shouldPullViaJxa = false;
     if (!pushOnly) {
-      const sqliteResult = pullFromMacOsCalendarSqliteDb(forcePull);
+      const sqliteResult = setup
+        ? { accessible: false, changedCount: 0 }
+        : pullFromMacOsCalendarSqliteDb(forcePull);
       totalSyncedFromMac = sqliteResult.changedCount;
       if (totalSyncedFromMac > 0) {
         broadcast?.();
