@@ -721,14 +721,20 @@ export function updateProfile(
     .where(eq(userProfiles.id, id))
     .run();
 
-  provisionProfileWorkspace({
-    profileId: id,
-    professionalTitle: nextSubtitle,
-    defaultCurrency: nextCurrency,
-    invoicePrefix: nextPrefix,
-    role: nextRole,
-    seedRoleCatalog: false,
-  });
+  if (
+    value.subtitle !== undefined ||
+    value.defaultCurrency !== undefined ||
+    value.invoicePrefix !== undefined
+  ) {
+    provisionProfileWorkspace({
+      profileId: id,
+      professionalTitle: nextSubtitle,
+      defaultCurrency: nextCurrency,
+      invoicePrefix: nextPrefix,
+      role: nextRole,
+      seedRoleCatalog: false,
+    });
+  }
 
   return listProfilesState();
 }

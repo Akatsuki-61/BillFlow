@@ -143,7 +143,6 @@ export function ProfileGateModal() {
   const [formRole, setFormRole] = useState<ProfileRole>("software-engineering");
   const [formCustomRoleText, setFormCustomRoleText] = useState("");
   const [formAvatar, setFormAvatar] = useState<ProfileAvatar>("code");
-  const [formPhotoData, setFormPhotoData] = useState<string | null>(null);
   const [formAccent, setFormAccent] = useState<AccentPreference>("blue");
   const [formCurrency, setFormCurrency] = useState<Currency>("USD");
   const [formInvoicePrefix, setFormInvoicePrefix] = useState("SE-");
@@ -188,15 +187,6 @@ export function ProfileGateModal() {
 
     if (profile) {
       setFormTargetId(profile.id);
-      setFormName(profile.name);
-      setFormRole(profile.role);
-      setFormCustomRoleText(profile.subtitle);
-      setFormAvatar(profile.avatar);
-      setFormPhotoData(profile.photoData ?? null);
-      setFormAccent(profile.accent);
-      setFormCurrency(profile.defaultCurrency);
-      setFormInvoicePrefix(profile.invoicePrefix);
-      setFormSeedCatalog(false);
       setFormEnablePassword(profile.hasPassword);
       setFormLockMode(profile.lockType === "password" ? "alphanumeric" : "pin");
     } else {
@@ -210,7 +200,6 @@ export function ProfileGateModal() {
       setFormRole(nextPreset.role);
       setFormCustomRoleText(nextPreset.label);
       setFormAvatar(nextPreset.avatar);
-      setFormPhotoData(null);
       setFormAccent(nextPreset.accent);
       setFormCurrency(
         (settings?.defaultCurrency as Currency) ||
@@ -424,7 +413,7 @@ export function ProfileGateModal() {
     e.preventDefault();
     setErrorMsg(null);
     const trimmedName = formName.trim();
-    if (!trimmedName) {
+    if (!formTargetId && !trimmedName) {
       setErrorMsg("Profile name is required.");
       return;
     }
@@ -512,13 +501,6 @@ export function ProfileGateModal() {
         }
 
         await updateProfile(formTargetId, {
-          name: trimmedName,
-          role: formRole,
-          subtitle: roleSubtitle,
-          avatar: formAvatar,
-          accent: formAccent,
-          defaultCurrency: formCurrency,
-          invoicePrefix: formInvoicePrefix.trim() || "INV-",
           ...(passwordPatch !== undefined ? { password: passwordPatch } : {}),
           ...(existingProfile?.hasPassword && formCurrentPassword.trim()
             ? { currentPassword: formCurrentPassword.trim() }
@@ -526,7 +508,11 @@ export function ProfileGateModal() {
         });
       }
 
-      setView("select");
+      if (formTargetId && modalMode === "manage" && editingProfile) {
+        closeProfileGate();
+      } else {
+        setView("select");
+      }
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Could not save profile.",
@@ -724,11 +710,11 @@ export function ProfileGateModal() {
           className="absolute inset-0 min-h-full flex flex-col items-center justify-center px-6 py-8 text-center"
         >
           <h1 className="text-3xl sm:text-5xl font-medium tracking-tight text-white mb-3">
-            {isManageMode ? "Manage Profiles:" : "Who’s working?"}
+            {isManageMode ? "Manage profile access" : "Who’s working?"}
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mb-10 sm:mb-14">
             {isManageMode
-              ? "Select a profile to customize its role, invoice prefix, or passcode lock."
+              ? "Select a profile to change its passcode or delete it."
               : "Select your role workspace to load its isolated clients, invoices, and ledger."}
           </p>
 
@@ -831,7 +817,7 @@ export function ProfileGateModal() {
                   : "bg-transparent border border-zinc-500/80 hover:border-white text-zinc-400 hover:text-white font-medium rounded-md"
               }`}
             >
-              {isManageMode ? "Done" : "Manage Profiles"}
+              {isManageMode ? "Done" : "Manage access"}
             </button>
           </div>
         </m.div>
@@ -1005,31 +991,28 @@ export function ProfileGateModal() {
           exit={{ opacity: 0, y: -8, scale: 0.98, transition: EXIT_MODAL_SHEET }}
           className="absolute inset-0 min-h-full flex items-center justify-center px-6 py-6"
         >
-          <div className="w-full max-w-3xl">
+          <div className={formTargetId ? "w-full max-w-md" : "w-full max-w-3xl"}>
             <div className="border-b border-white/10 pb-5 mb-7">
               <h1 className="text-2xl sm:text-4xl font-medium tracking-tight text-white">
-                {formTargetId ? "Edit Profile" : "Add Profile"}
+                {formTargetId ? "Manage profile access" : "Add Profile"}
               </h1>
               <p className="text-xs sm:text-sm text-zinc-400 mt-1.5">
-                Each profile runs an isolated workspace with its own clients,
-                invoices, catalog, and ledger.
+                {formTargetId
+                  ? profiles.find((profile) => profile.id === formTargetId)?.name
+                  : "Create a workspace with its own clients, invoices, catalog, and ledger."}
               </p>
             </div>
 
             <form onSubmit={handleSaveProfileForm}>
-              <div className="grid grid-cols-1 md:grid-cols-[210px_1fr] gap-8 items-start">
-                {/* Left Column: Live Netflix Tile Preview & Style Controls */}
+              <div className={formTargetId ? undefined : "grid grid-cols-1 md:grid-cols-[210px_1fr] gap-8 items-start"}>
+                {!formTargetId && (
                 <div className="flex flex-col items-center md:items-start space-y-5">
                   <div className="flex flex-col items-center">
                     <ProfileAvatarTile
                       avatar={formAvatar}
-                      photoData={formPhotoData}
                       accent={formAccent}
                       size="xl"
                       hasPassword={formEnablePassword}
-                      layoutId={
-                        formTargetId ? `profile-avatar-${formTargetId}` : undefined
-                      }
                     />
                     <span className="mt-3 text-sm font-medium text-white truncate max-w-[160px]">
                       {formName.trim() || "Profile Name"}
@@ -1098,8 +1081,11 @@ export function ProfileGateModal() {
                   </div>
                 </div>
 
+                )}
                 {/* Right Column: Role Templates, Custom Role Input, & Passcode Lock */}
                 <div className="space-y-5">
+                  {!formTargetId && (
+                    <>
                   {/* Optional Quick-Fill Templates */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -1197,6 +1183,9 @@ export function ProfileGateModal() {
                       />
                     </div>
                   </div>
+
+                    </>
+                  )}
 
                   {/* Passcode Lock Card (4-Digit PIN OR Alphanumeric Password) */}
                   <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
@@ -1370,13 +1359,17 @@ export function ProfileGateModal() {
                     disabled={busy}
                     className="px-7 py-2.5 rounded-md bg-white hover:bg-zinc-200 disabled:opacity-50 text-zinc-950 font-bold text-xs sm:text-[13px] tracking-[0.14em] uppercase transition-colors cursor-pointer"
                   >
-                    {busy ? "Saving..." : "Save Profile"}
+                    {busy ? "Saving..." : formTargetId ? "Save access settings" : "Create profile"}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setErrorMsg(null);
-                      setView("select");
+                      if (formTargetId && modalMode === "manage" && editingProfile) {
+                        closeProfileGate();
+                      } else {
+                        setView("select");
+                      }
                     }}
                     className="px-6 py-2.5 rounded-md border border-zinc-500 hover:border-white text-zinc-400 hover:text-white font-medium text-xs sm:text-[13px] tracking-[0.14em] uppercase transition-colors cursor-pointer"
                   >

@@ -1,5 +1,7 @@
 import type { Currency, InvoiceTemplateId } from "./billing";
 
+export const APPLICATION_RESET_CONFIRMATION = "RESET BILLFLOW";
+
 export type DateFormat = "YYYY-MM-DD" | "DD/MM/YYYY" | "MM/DD/YYYY";
 export type CurrencyDisplayMode = "symbol" | "code";
 

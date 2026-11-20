@@ -12,6 +12,7 @@ import {
 import {
   configureIpcSecurity,
   currentIpcChannel,
+  ipcMain,
   isTrustedDocument,
   sanitizeExternalUrl,
 } from "./security";
@@ -21,6 +22,11 @@ import {
   resolveStaticFile,
 } from "./static-protocol";
 import { destroyPdfWindowPool } from "./pdf-generator";
+import { APPLICATION_RESET_CONFIRMATION } from "../src/types/settings";
+import {
+  applyQueuedApplicationReset,
+  queueApplicationReset,
+} from "./application-reset";
 import {
   app,
   BrowserWindow,
@@ -125,6 +131,7 @@ let tray: Tray | null = null;
 let maintenanceTimer: ReturnType<typeof setInterval> | null = null;
 let startupMaintenanceTimer: ReturnType<typeof setTimeout> | null = null;
 let maintenanceInFlight = false;
+let applicationResetQueued = false;
 const rendererCrashTimestamps: number[] = [];
 
 function appIconPath() {
@@ -439,7 +446,21 @@ function createWindow() {
 if (gotSingleInstanceLock) {
   app
     .whenReady()
-    .then(() => {
+    .then(async () => {
+      try {
+        await applyQueuedApplicationReset(app.getPath("userData"), async () => {
+          await session.defaultSession.clearData();
+          // Also clear Electron's storage-specific caches and partitions.
+          await session.defaultSession.clearStorageData();
+        });
+      } catch (error) {
+        dialog.showErrorBox(
+          "BillFlow reset could not finish",
+          `${error instanceof Error ? error.message : String(error)}\nRestart BillFlow to retry the reset.`,
+        );
+        app.quit();
+        return;
+      }
       if (process.platform === "darwin") app.dock?.setIcon(appIconPath());
       // Initialize database and migrations
       try {
@@ -489,6 +510,21 @@ if (gotSingleInstanceLock) {
       registerDashboardHandlers();
       registerThemeHandlers();
       registerSettingsHandlers(broadcastDataChanged);
+      ipcMain.handle(
+        "settings:resetApplication",
+        (_event, confirmation: unknown) => {
+          if (confirmation !== APPLICATION_RESET_CONFIRMATION) {
+            throw new Error(
+              `Type ${APPLICATION_RESET_CONFIRMATION} to confirm the application reset.`,
+            );
+          }
+          if (applicationResetQueued) return;
+          queueApplicationReset(app.getPath("userData"));
+          applicationResetQueued = true;
+          app.relaunch();
+          setImmediate(() => app.quit());
+        },
+      );
       registerEncryptedBackupHandlers(broadcastDataChanged);
       registerRecurringHandlers(broadcastDataChanged, navigateToRoute);
       registerDigestHandlers(navigateToRoute, () => syncAppBadgeCount({ tray }));

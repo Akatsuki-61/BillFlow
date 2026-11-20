@@ -345,6 +345,7 @@ export interface BillFlowAPI extends WorkflowAPI {
       skipped?: number;
     }>;
     reset: () => Promise<{ success: boolean }>;
+    resetApplication: (confirmation: string) => Promise<void>;
     saveEncryptedBackup?: (passphrase: string) => Promise<SaveFileResult>;
     chooseRollingBackupDirectory?: () => Promise<string | null>;
     getRollingBackupStatus?: () => Promise<RollingBackupStatus>;

@@ -768,8 +768,9 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     buffer: Buffer.from(png, "base64"),
   });
   await expect(
-    page.getByRole("img", { name: "Workspace profile photo" }),
+    page.getByRole("img", { name: "Extension QA avatar" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect
     .poll(() =>
       page.evaluate(
@@ -792,7 +793,7 @@ test("customizes profiles and connects invoice stages, standalone payables and t
     .selectOption("nunito");
   await page.getByLabel("Layout density").selectOption("compact");
   await page.getByLabel("Notification placement").selectOption("top-left");
-  await page.getByRole("button", { name: "Save (Cmd+S)" }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute(
     "data-workspace-typeface",
     "nunito",
@@ -818,7 +819,7 @@ test("customizes profiles and connects invoice stages, standalone payables and t
   await page.mouse.move(bounds.x + 140, bounds.y + 55, { steps: 6 });
   await page.mouse.up();
   await page.getByRole("button", { name: "Use drawing" }).click();
-  await page.getByRole("button", { name: "Save (Cmd+S)" }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect
     .poll(() =>
       page.evaluate(() =>

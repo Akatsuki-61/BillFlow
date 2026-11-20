@@ -395,6 +395,8 @@ if (process.isMainFrame && trustedDocument)
       import: (payload: ExportDataPayload, mode?: "replace" | "merge") =>
         invoke("settings:import", payload, mode),
       reset: (): Promise<{ success: boolean }> => invoke("settings:reset"),
+      resetApplication: (confirmation: string): Promise<void> =>
+        invoke("settings:resetApplication", confirmation),
       saveEncryptedBackup: (passphrase: string) =>
         invoke("settings:saveEncryptedBackup", passphrase),
       chooseRollingBackupDirectory: (): Promise<string | null> =>

@@ -100,25 +100,25 @@ const settingsCommands = [
     title: "Business profile",
     tab: "profile",
     keywords:
-      "name email bank account contact workspace studio phone website address tax id bank wise paypal password pin security",
+      "name role avatar photo accent color primary currency invoice prefix email bank account contact workspace studio phone website address tax id wise paypal password pin security",
   },
   {
     title: "Invoice defaults",
     tab: "invoices",
     keywords:
-      "payment terms template logo tax currency prefix PDF download folder export save due date notes numbering sequence signature delivery destination",
+      "payment terms template logo tax exchange rate PDF download folder export save due date notes numbering sequence signature delivery destination activity history",
   },
   {
-    title: "Backup & Restore",
+    title: "Backup & data",
     tab: "data",
     keywords:
-      "data backup import export storage database restore reset privacy",
+      "data backup import export storage database restore reset clear full application factory privacy",
   },
   {
     title: "Appearance",
     tab: "appearance",
     keywords:
-      "theme accent color dark light display date format typeface fonts density spacing notification placement",
+      "theme dark light display date format typeface fonts density spacing notification placement",
   },
 ];
 

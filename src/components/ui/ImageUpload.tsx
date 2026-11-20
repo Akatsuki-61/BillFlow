@@ -33,11 +33,13 @@ export function ImageUpload({
   value,
   onChange,
   signature = false,
+  showPreview = true,
 }: {
   label: string;
   value?: string | null;
   onChange: (value: string | null) => void | Promise<void>;
   signature?: boolean;
+  showPreview?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
@@ -98,7 +100,7 @@ export function ImageUpload({
     >
       <p className="text-xs font-medium">{label}</p>
       <div className="flex flex-wrap items-center gap-2">
-        {value && (
+        {value && showPreview && (
           <Image
             src={value}
             alt={label}

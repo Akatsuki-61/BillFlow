@@ -3093,10 +3093,11 @@ export default function InvoicesView() {
                 {/* Currency & Dates */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                    <label htmlFor="new-invoice-currency" className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                       Currency
                     </label>
                     <select
+                      id="new-invoice-currency"
                       value={newCurrency}
                       onChange={(e) =>
                         setNewCurrency(e.target.value as Currency)
@@ -3931,10 +3932,11 @@ export default function InvoicesView() {
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
+                      <label htmlFor="edit-invoice-currency" className="block text-[11px] font-bold uppercase tracking-wider text-content-neutral-500 mb-1.5">
                         Currency
                       </label>
                       <select
+                        id="edit-invoice-currency"
                         value={editCurrency}
                         onChange={(e) =>
                           setEditCurrency(e.target.value as Currency)
