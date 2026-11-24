@@ -76,6 +76,13 @@ import type {
   NewCalendarEventInput,
   CalendarEventPatchInput,
 } from "../src/types/calendar";
+import type {
+  AiDownloadProgressEvent,
+  AiExtractedInvoiceDraft,
+  AiExtractionInput,
+  AiModelTier,
+  AiStatus,
+} from "../src/types/ai";
 
 let operationEpoch = 0;
 let profileId: string | null = null;
@@ -533,6 +540,31 @@ if (process.isMainFrame && trustedDocument)
       selectPdfDirectory: () => invoke("files:selectPdfDirectory"),
       openInvoicePdf: (id: string, reveal?: boolean) =>
         invoke("files:openInvoicePdf", id, reveal),
+    },
+    ai: {
+      status: (): Promise<AiStatus> => invoke("ai:status"),
+      setTier: (tier: AiModelTier): Promise<AiStatus> =>
+        invoke("ai:setTier", tier),
+      extractInvoice: (
+        input: AiExtractionInput,
+      ): Promise<AiExtractedInvoiceDraft> => invoke("ai:extractInvoice", input),
+      downloadEnhancedModel: (): Promise<AiStatus> =>
+        invoke("ai:downloadEnhancedModel"),
+      cancelDownload: (): Promise<AiStatus> => invoke("ai:cancelDownload"),
+      removeEnhancedModel: (): Promise<AiStatus> =>
+        invoke("ai:removeEnhancedModel"),
+      onDownloadProgress: (
+        callback: (event: AiDownloadProgressEvent) => void,
+      ) => {
+        const listener = (
+          _e: Electron.IpcRendererEvent,
+          payload: AiDownloadProgressEvent,
+        ) => callback(payload);
+        ipcRenderer.on("ai:download-progress", listener);
+        return () => {
+          ipcRenderer.removeListener("ai:download-progress", listener);
+        };
+      },
     },
     onWorkspaceLocked: (callback: () => void) => {
       const listener = () => {

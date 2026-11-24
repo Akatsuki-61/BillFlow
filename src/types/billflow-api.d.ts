@@ -61,6 +61,13 @@ import type {
   NewCalendarEventInput,
   CalendarEventPatchInput,
 } from "./calendar";
+import type {
+  AiDownloadProgressEvent,
+  AiExtractedInvoiceDraft,
+  AiExtractionInput,
+  AiModelTier,
+  AiStatus,
+} from "./ai";
 
 import type { ThemePreference } from "../lib/theme";
 import type {
@@ -442,6 +449,19 @@ export interface BillFlowAPI extends WorkflowAPI {
       reason?: string;
       summary: FinancialDigestSummary;
     }>;
+  };
+  ai?: {
+    status: () => Promise<AiStatus>;
+    setTier: (tier: AiModelTier) => Promise<AiStatus>;
+    extractInvoice: (
+      input: AiExtractionInput,
+    ) => Promise<AiExtractedInvoiceDraft>;
+    downloadEnhancedModel: () => Promise<AiStatus>;
+    cancelDownload: () => Promise<AiStatus>;
+    removeEnhancedModel: () => Promise<AiStatus>;
+    onDownloadProgress: (
+      callback: (event: AiDownloadProgressEvent) => void,
+    ) => () => void;
   };
   onWorkspaceLocked?: (callback: () => void) => () => void;
   onDataChanged: (callback: (change?: WorkspaceChange) => void) => () => void;

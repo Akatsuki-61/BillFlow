@@ -63,6 +63,7 @@ import { registerTaskHandlers } from "./ipc/tasks";
 import { registerFileHandlers } from "./ipc/files";
 import { registerExpenseHandlers } from "./ipc/expenses";
 import { registerCalendarHandlers } from "./ipc/calendar";
+import { registerAiHandlers, disposeAiResources } from "./ipc/ai";
 import {
   registerEncryptedBackupHandlers,
   runRollingEncryptedBackup,
@@ -539,6 +540,7 @@ if (gotSingleInstanceLock) {
       registerFileHandlers(broadcastDataChanged);
       registerExpenseHandlers(broadcastDataChanged);
       registerCalendarHandlers(broadcastDataChanged);
+      registerAiHandlers(() => mainWindow);
 
       // Register production static file protocol
       const outDir = app.isPackaged
@@ -622,6 +624,7 @@ if (gotSingleInstanceLock) {
       maintenanceTimer = null;
     }
     destroyPdfWindowPool();
+    void disposeAiResources();
     tray?.destroy();
     tray = null;
   });
