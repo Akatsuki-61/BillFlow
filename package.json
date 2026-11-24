@@ -29,7 +29,9 @@
     "pack:mac:test": "npm run build && electron-builder --mac --arm64 --dir --config.directories.output=release/test-${npm_package_version} --config.electronFuses.enableNodeCliInspectArguments=true && codesign --force --deep --sign - release/test-${npm_package_version}/mac-arm64/BillFlow.app"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3"
+    "@huggingface/transformers": "^4.3.2",
+    "better-sqlite3": "^13.0.3",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
