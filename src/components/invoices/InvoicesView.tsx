@@ -74,8 +74,11 @@ import {
   Copy,
   TrendingUp,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { useAiCapture } from "@/context/AiCaptureContext";
+import { preprocessScreenshotForOcr } from "@/lib/image-preprocess";
+import type { AiPaymentSlipScanResult } from "@/types/ai";
 import dynamic from "next/dynamic";
 import { formatInvoicePaymentSummary } from "@/lib/payment-summary";
 
@@ -332,6 +335,10 @@ export default function InvoicesView() {
   const [isDraggingSlip, setIsDraggingSlip] = useState(false);
   const slipFileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [isScanningSlip, setIsScanningSlip] = useState(false);
+  const [slipScanResult, setSlipScanResult] =
+    useState<AiPaymentSlipScanResult | null>(null);
+  const [slipScanError, setSlipScanError] = useState<string | null>(null);
 
   // Payment Inspection Modal state
   const [inspectingInvoice, setInspectingInvoice] =
@@ -1990,9 +1997,82 @@ export default function InvoicesView() {
       `SLIP-${crypto.randomUUID().slice(0, 4).toUpperCase()}`,
     );
     setSelectedSlip(null);
+    setSlipScanResult(null);
+    setSlipScanError(null);
+    setIsScanningSlip(false);
     setShowPaymentModal(true);
     setActionMenu(null);
     setStatusMenu(null);
+  };
+
+  const runSlipOcrScan = async (options: {
+    file?: File | Blob;
+    stagedToken?: string;
+    fileName?: string;
+  }) => {
+    const api = window.billflow?.ai?.scanPaymentSlip;
+    if (!api || !paymentInvoice) return;
+    const isPdf = Boolean(
+      options.fileName?.toLowerCase().endsWith(".pdf") ||
+        (options.file && options.file.type === "application/pdf"),
+    );
+    if (isPdf) {
+      setSlipScanResult(null);
+      setSlipScanError(null);
+      return;
+    }
+
+    setIsScanningSlip(true);
+    setSlipScanError(null);
+    try {
+      const remainingCents = Math.max(
+        0,
+        paymentInvoice.amountCents - (paymentInvoice.paidCents || 0),
+      );
+      const advanceRemainingCents =
+        paymentInvoice.advanceCents &&
+        (paymentInvoice.paidCents || 0) < paymentInvoice.advanceCents
+          ? paymentInvoice.advanceCents - (paymentInvoice.paidCents || 0)
+          : 0;
+
+      let imageBase64: string | undefined;
+      if (options.file && options.file.type.startsWith("image/")) {
+        const processed = await preprocessScreenshotForOcr(options.file, {
+          autoInvertDark: true,
+        });
+        imageBase64 = processed.dataUrl;
+      }
+
+      const scanned = await api({
+        ...(imageBase64
+          ? { imageBase64 }
+          : options.stagedToken
+            ? { stagedToken: options.stagedToken }
+            : {}),
+        expectedAmountCents: remainingCents,
+        expectedAdvanceCents: advanceRemainingCents,
+        expectedCurrency: paymentInvoice.currency,
+      });
+
+      setSlipScanResult(scanned);
+      if (scanned.amount) setPaymentAmount(scanned.amount);
+      if (scanned.paymentDate) setPaymentDate(scanned.paymentDate);
+      if (scanned.reference) setPaymentReference(scanned.reference);
+      if (scanned.matchLabel) {
+        showToast(`Bank slip verified: ${scanned.matchLabel}.`);
+      } else if (scanned.amount) {
+        showToast("Auto-filled payment details from bank slip.");
+      }
+    } catch (err) {
+      setSlipScanResult(null);
+      setSlipScanError(
+        err instanceof Error
+          ? err.message
+          : "Could not read text from this payment slip.",
+      );
+    } finally {
+      setIsScanningSlip(false);
+    }
   };
 
   const handlePickReceipt = async () => {
@@ -2001,6 +2081,10 @@ export default function InvoicesView() {
         const file = await workflow.attachments.chooseFile();
         if (file) {
           setSelectedSlip(file);
+          void runSlipOcrScan({
+            stagedToken: file.path,
+            fileName: file.name,
+          });
           return;
         }
       } catch {
@@ -2021,6 +2105,7 @@ export default function InvoicesView() {
         const staged = await workflow.attachments.stageFile(file);
         if (staged) {
           setSelectedSlip(staged);
+          void runSlipOcrScan({ file, fileName: file.name });
         }
         return;
       } catch (err) {
@@ -2043,6 +2128,7 @@ export default function InvoicesView() {
       );
       if (staged) {
         setSelectedSlip(staged);
+        void runSlipOcrScan({ file, fileName: file.name });
       }
     } catch (err) {
       showToast(
@@ -2051,6 +2137,36 @@ export default function InvoicesView() {
       );
     }
   };
+
+  const stageBrowserFileRef = useRef(stageBrowserFile);
+  useEffect(() => {
+    stageBrowserFileRef.current = stageBrowserFile;
+  });
+
+  // Allow pasting a bank transfer slip screenshot directly inside the Record Payment modal
+  useEffect(() => {
+    if (!showPaymentModal || !paymentInvoice) return;
+    const onPaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const blob = item.getAsFile();
+          if (blob) {
+            event.preventDefault();
+            const ext = blob.type.split("/")[1] || "png";
+            const file = new File([blob], `bank-slip-${Date.now()}.${ext}`, {
+              type: blob.type,
+            });
+            void stageBrowserFileRef.current(file);
+            return;
+          }
+        }
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [showPaymentModal, paymentInvoice]);
 
   const handleSlipInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3892,49 +4008,131 @@ export default function InvoicesView() {
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-xs font-semibold text-content-neutral-800">
-                          Click to upload payment receipt, or drag and drop
+                          Click, drag &amp; drop, or paste (Cmd/Ctrl+V) payment slip
                         </p>
                         <p className="text-[11px] text-content-neutral-400">
-                          PDF, PNG, JPG or WEBP (up to 20 MB)
+                          Images auto-scan via local OCR to fill amount, date &amp; reference
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between p-3 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/70">
-                      <div className="flex items-center gap-2.5 overflow-hidden">
-                        <div className="w-8 h-8 rounded-lg bg-surface-purple-100 text-content-purple-700 flex items-center justify-center shrink-0">
-                          <FileText className="w-4 h-4" />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-line-neutral-200 bg-surface-neutral-50/70">
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <div className="w-8 h-8 rounded-lg bg-surface-purple-100 text-content-purple-700 flex items-center justify-center shrink-0">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="truncate">
+                            <p className="text-xs font-semibold text-content-neutral-900 truncate">
+                              {selectedSlip.name}
+                            </p>
+                            <p className="text-[11px] text-content-neutral-400">
+                              {(selectedSlip.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
                         </div>
-                        <div className="truncate">
-                          <p className="text-xs font-semibold text-content-neutral-900 truncate">
-                            {selectedSlip.name}
-                          </p>
-                          <p className="text-[11px] text-content-neutral-400">
-                            {(selectedSlip.size / 1024).toFixed(1)} KB
-                          </p>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isElectron &&
+                            !selectedSlip.name.toLowerCase().endsWith(".pdf") && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="small"
+                                disabled={isScanningSlip}
+                                onClick={() =>
+                                  void runSlipOcrScan({
+                                    stagedToken: selectedSlip.path,
+                                    fileName: selectedSlip.name,
+                                  })
+                                }
+                                className="text-xs h-7 px-2 text-accent"
+                                title="Re-read amount, date, and reference with local OCR"
+                              >
+                                <Sparkles className="w-3 h-3" />
+                                <span>Re-scan</span>
+                              </Button>
+                            )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="small"
+                            onClick={handlePickReceipt}
+                            className="text-xs h-7 px-2"
+                          >
+                            Change
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedSlip(null);
+                              setSlipScanResult(null);
+                              setSlipScanError(null);
+                            }}
+                            className="w-7 h-7 text-content-neutral-400 hover:text-content-rose-600"
+                            aria-label="Remove attached file"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="small"
-                          onClick={handlePickReceipt}
-                          className="text-xs h-7 px-2"
+
+                      {isScanningSlip && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-accent bg-accent-faint/40 text-xs text-accent">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                          <span>Reading bank transfer slip with offline OCR…</span>
+                        </div>
+                      )}
+
+                      {!isScanningSlip && slipScanResult && (
+                        <div
+                          className={`rounded-xl border px-3 py-2 text-xs space-y-1 ${
+                            slipScanResult.mismatch
+                              ? "border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
+                              : "border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200"
+                          }`}
                         >
-                          Change
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelectedSlip(null)}
-                          className="w-7 h-7 text-content-neutral-400 hover:text-content-rose-600"
-                          aria-label="Remove attached file"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
+                          <div className="flex items-center justify-between gap-2 font-medium">
+                            <span className="flex items-center gap-1.5">
+                              {slipScanResult.mismatch ? (
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                              )}
+                              <span>
+                                {slipScanResult.bankName
+                                  ? `${slipScanResult.bankName} · `
+                                  : ""}
+                                {slipScanResult.matchLabel ||
+                                  (slipScanResult.mismatch
+                                    ? "Amount / currency check warning"
+                                    : "Slip scanned & fields updated")}
+                              </span>
+                            </span>
+                            <span className="text-[10.5px] opacity-75 tabular-nums">
+                              {(slipScanResult.durationMs / 1000).toFixed(1)}s
+                            </span>
+                          </div>
+                          {slipScanResult.mismatch && (
+                            <p className="text-[11.5px]">
+                              {slipScanResult.mismatch.message}
+                            </p>
+                          )}
+                          {slipScanResult.warnings.map((w, idx) => (
+                            <p key={idx} className="text-[11px] opacity-85">
+                              {w}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      {!isScanningSlip && slipScanError && (
+                        <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/25 px-3 py-2 text-[11.5px] text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{slipScanError}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
