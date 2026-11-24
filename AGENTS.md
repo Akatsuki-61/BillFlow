@@ -16,6 +16,7 @@ BillFlow is a local-first desktop workspace designed for software freelancers an
 - **Service Catalog & Rate Cards**: Reusable service offerings (fixed-fee and hourly rates).
 - **Client Directory**: Contact metadata, WhatsApp numbers, currency preferences, and delivery repository/folder links.
 - **Itemized Invoicing & PDF Compilation**: Multi-currency invoices (USD, LKR, EUR), upfront deposit math, discount/tax calculations, and local vector PDF generation via `pdf-lib`.
+- **Smart Capture (Two-Tier Local AI & Offline OCR)**: Slide-over screenshot/text capture (`Cmd/Ctrl+Shift+I`) powered by bundled offline `tesseract.js` LSTM OCR + quantized `all-MiniLM-L6-v2` ONNX semantic catalog matching, plus an optional on-demand `Qwen2.5-0.5B-Instruct` local LLM tier configurable in **Settings → AI & Capture** (`electron/ai/`, `electron/ipc/ai.ts`).
 - **Multi-Channel Dispatch**: 1-click WhatsApp URI links (`https://wa.me/`) with pre-filled payment summaries and native email dispatch.
 - **Task Management & Synchronized Kanban**: 4-stage visual execution board (`To Do`, `In Progress`, `Under Review`, `Done`) with two-way task-to-invoice conversion and synchronized hover highlighting for cards sharing an invoice.
 - **Task Outsourcing & Vendor Ledger**: 1-click task delegation, payable invoice vouchers (`VND-INV-xxxx`), WhatsApp contractor dispatch, and automated ledger expense logging on payout settlement.

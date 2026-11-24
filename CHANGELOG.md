@@ -2,6 +2,16 @@
 
 Notable changes between BillFlow desktop releases.
 
+## Unreleased (`Nipun` branch)
+
+### Smart Capture (Two-Tier Local AI & Offline OCR)
+
+- Added the global **Smart Capture** slide-over drawer (`Cmd/Ctrl+Shift+I`, top-bar Sparkles trigger, and Invoices header action) to paste screenshots or message text from WhatsApp, Slack, Signal, or email and auto-fill BillFlow's default **New Invoice** dialog.
+- Added client-side screenshot preprocessing (`src/lib/image-preprocess.ts`) that detects dark-mode chat captures, auto-inverts them to dark-on-light text, upscales small screenshots, and enhances contrast before offline OCR.
+- Implemented a bundled **Standard** offline AI tier (~25.6 MB total via `scripts/prepare-ai-models.mjs` into `extraResources`): `tesseract.js` LSTM OCR (`eng.traineddata.gz`), quantized `Xenova/all-MiniLM-L6-v2` ONNX embeddings for deliverable/chitchat filtering and semantic Service Catalog price matching, and deterministic extraction of clients, currencies, relative/absolute due dates, delivery URLs, inline quantities/prices, and notes.
+- Implemented an optional **Enhanced** local LLM tier (`onnx-community/Qwen2.5-0.5B-Instruct` INT8 ONNX) managed in a new **Settings → AI & Capture** tab with one-click download, live progress bar, cancel, delete, idle RAM disposal, and automatic fallback to Standard.
+- Configured cross-platform macOS ARM64 and Windows x64 Electron packaging (`electron-builder.yml` ASAR unpacking for `onnxruntime-node`/`tesseract.js`/`tesseract.js-core` and exclusion of unused `onnxruntime-web`, Linux, non-target architecture, and legacy Tesseract binaries) plus updated runtime third-party notices.
+
 ## v0.3.0 (2026-11-20)
 
 ### Setup and Settings
