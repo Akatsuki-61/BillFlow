@@ -29,6 +29,7 @@ files:
   - "!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm*"
   - "!node_modules/tesseract.js-core/*-lstm.wasm.js"
 asar: true
+afterSign: scripts/after-sign-mac.cjs
 electronFuses:
   runAsNode: false
   enableNodeOptionsEnvironmentVariable: false
