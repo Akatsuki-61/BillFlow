@@ -48,6 +48,17 @@ Build multi-currency invoices with catalog items, custom discounts, taxes, and u
 
 Dispatch invoices or overdue reminders through prefilled `wa.me` WhatsApp links or email drafts, inspect past-due accounts receivable aging (`1-15`, `16-30`, `31-60`, `60+` days), and export active registers or aging reports to RFC 4180 CSV or Excel formats.
 
+### Smart Capture & Local AI Suite (two-tier local AI and offline OCR)
+
+BillFlow ships a unified two-tier on-device AI suite built on one shared local runtime so client messages, bank transfer slips, and expense receipts never leave your computer:
+
+- **Intent-Aware Smart Capture (`Cmd/Ctrl+Shift+I`):** Paste a screenshot (`Cmd/Ctrl+V` or drag-and-drop) or copied text from WhatsApp, Slack, Signal, or email. Dark-mode chat screenshots are automatically inverted and upscaled before OCR. Zero-shot neural intent detection classifies whether the message is best routed to **New Invoice**, **Proposal / Quote**, or directly to **Kanban Tasks** (with 1-click override), pre-filling clients, deliverables, due dates, currencies, delivery URLs, and semantically matched **Service Catalog** unit prices.
+- **Bank Transfer Slip Auto-Reader (Record Payment):** Dropping, selecting, or pasting a client's bank transfer slip screenshot automatically extracts the transferred amount, payment date, bank name, and reference/transaction ID, and flags underpayment, overpayment, or currency mismatches against the invoice's expected advance or remaining balance.
+- **Expense Receipt Scanner (Expenses):** Dropping, selecting, or pasting a receipt screenshot (or clicking **Scan Receipt**) extracts the merchant, date, amount, currency, and description while classifying the expense into BillFlow's OPEX categories (`SOFTWARE`, `AI INFRASTRUCTURE`, `HOSTING`, `TRAVEL`, `MEALS`, `OFFICE`, `HARDWARE`) using bundled `all-MiniLM-L6-v2` neural embeddings.
+- **Two Configurable Tiers in Settings → AI & Capture:**
+  - **Standard (Built-in Offline Default, ~25.6 MB bundled):** `tesseract.js` LSTM OCR (`eng.traineddata.gz`) + quantized `Xenova/all-MiniLM-L6-v2` sentence embeddings + deterministic document/entity parsers.
+  - **Enhanced (Optional Local LLM):** Downloads quantized `onnx-community/Qwen2.5-0.5B-Instruct` (INT8 ONNX, ~490 MB) once into `userData/models/` with live progress, cancel, delete, automatic idle RAM disposal, and automatic fallback to Standard.
+
 ### Task board, local calendar, and deliverable handoff
 
 Switch between Kanban (`To Do`, `In Progress`, `Under Review`, `Done`), List, and Calendar views. Active work time accumulates in the background on cards, and Calendar view supports drag-and-drop rescheduling alongside two-way local macOS Calendar `.ics` synchronization on desktop. Dragging a deliverable card to `Done` opens the Submit Work modal with direct links to that client's repository, staging URL, or Drive folder.
@@ -75,7 +86,8 @@ Export or restore workspace backups, including tasks, schedules, and managed rec
 | Styling and motion | Tailwind CSS v4, Motion | Custom surface tokens, Newsreader and Inter typography, reduced-motion support |
 | Database and validation | SQLite (`better-sqlite3`), Drizzle ORM, Zod | WAL journal mode, foreign-key cascades, versioned schema migrations, schema-checked IPC payloads |
 | Documents and analytics | `pdf-lib`, Electron `printToPDF`, Apache ECharts 6 | Local PDF invoices and contractor vouchers, multi-currency financial and turnaround charts |
-| Testing | Vitest, Playwright | Database integrity, security, offline PDF generation, and packaged Electron end-to-end tests |
+| Local AI and OCR | `tesseract.js`, `@huggingface/transformers`, `onnxruntime-node` | Offline LSTM screenshot OCR, bundled `all-MiniLM-L6-v2` semantic catalog matching, optional on-demand `Qwen2.5-0.5B-Instruct` local LLM |
+| Testing | Vitest, Playwright | Database integrity, security, offline PDF generation, local OCR/AI pipeline, and packaged Electron end-to-end tests |
 
 ## Running from source
 
@@ -95,11 +107,13 @@ npm install
 
 `npm install` runs `electron-builder install-app-deps` automatically to align native `better-sqlite3` bindings with Electron 44.
 
-Launch the desktop app in development mode (Next.js dev server bound to `127.0.0.1` plus Electron shell with live watch):
+Launch the desktop app in development mode (Next.js dev server bound to `127.0.0.1` plus Electron shell with live watch; automatically fetches the ~25.6 MB bundled Standard OCR + MiniLM models into `assets/ai-models/` on first run):
 
 ```bash
 npm run dev:electron
 ```
+
+You can also pre-fetch the bundled Standard AI models independently at any time with `npm run ai:prepare-models`.
 
 Build the static renderer and main-process bundle, then start the packaged local desktop entrypoint without a Next.js server:
 
@@ -149,7 +163,7 @@ npm run dist:win         # Windows x64 NSIS setup (.exe)
 | Windows packaged app | `%APPDATA%\BillFlow\billflow.db` |
 | Development (`npm run dev:electron`) | `./.billflow-dev/billflow.db` |
 
-Additional local files stay in the same `userData` directory: SHA-256 receipt attachments under `attachments/`, isolated secondary workspaces under `profiles/<profile-id>/`, theme state in `appearance.json`, and automatic `billflow.db.before-upgrade-*.bak` recovery copies created ahead of pending Drizzle migrations. Generated PDFs export to the folder configured in Settings (defaulting to Downloads).
+Additional local files stay in the same `userData` directory: SHA-256 receipt attachments under `attachments/`, isolated secondary workspaces under `profiles/<profile-id>/`, theme state in `appearance.json`, local AI tier preference in `ai-config.json`, optional Enhanced LLM weights under `models/` (shared across profiles and excluded from profile backups), and automatic `billflow.db.before-upgrade-*.bak` recovery copies created ahead of pending Drizzle migrations. Generated PDFs export to the folder configured in Settings (defaulting to Downloads).
 
 ## Project background and credits
 
@@ -157,7 +171,7 @@ BillFlow was originally developed for **EER4189 Software Design in Group** (Grou
 
 | Contributor | GitHub | Area |
 | :--- | :--- | :--- |
-| Nipun Yatawara | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron shell, SQLite/Drizzle schema, multi-profile workspaces, task-to-invoice flow, motion tokens |
+| Nipun Yatawara | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron shell, SQLite/Drizzle schema, multi-profile workspaces, task-to-invoice flow, local AI/OCR Smart Capture, motion tokens |
 | GVSL-Lahiru | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Lead QA, deliverable handoff workflow, overdue aging summaries, CSV exports, navigation polish |
 | Binuka Reshan | [@Binukareshane](https://github.com/Binukareshane) | Subcontractor outsourcing engine, payable vouchers (`VND-INV-xxxx`), WhatsApp dispatch, ledger expense posting, Excel exports |
 | Sandika | [@Sandika-2003](https://github.com/Sandika-2003) | Service catalog, bulk CSV/Excel imports, UI integration, invoice sheet preview, macOS Calendar `.ics` sync |

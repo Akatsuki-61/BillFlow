@@ -52,7 +52,9 @@ import {
   Moon,
   Monitor,
   Eye,
+  Sparkles,
 } from "lucide-react";
+import { AiSettingsPanel } from "@/components/settings/AiSettingsPanel";
 import { useSettings, useData } from "@/lib/data/DataProvider";
 import {
   APPLICATION_RESET_CONFIRMATION,
@@ -84,7 +86,7 @@ const EncryptedBackupCard = dynamic(
   { ssr: false, loading: () => null },
 );
 
-type SettingsTab = "profile" | "invoices" | "data" | "appearance";
+type SettingsTab = "profile" | "invoices" | "ai" | "data" | "appearance";
 
 const INVOICE_TEMPLATE_OPTIONS: Array<{
   id: InvoiceTemplateId;
@@ -180,6 +182,7 @@ function SettingsContent() {
   const initialTab: SettingsTab = [
     "profile",
     "invoices",
+    "ai",
     "data",
     "appearance",
   ].includes(requestedTab || "")
@@ -203,7 +206,7 @@ function SettingsContent() {
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   useWorkspaceCommand("section", (section) => {
-    if (!["profile", "invoices", "data", "appearance"].includes(section))
+    if (!["profile", "invoices", "ai", "data", "appearance"].includes(section))
       return false;
     setActiveTab(section as SettingsTab);
     return true;
@@ -803,6 +806,12 @@ function SettingsContent() {
                   icon: Receipt,
                 },
                 {
+                  id: "ai",
+                  title: "AI & Capture",
+                  detail: "Local OCR & model level",
+                  icon: Sparkles,
+                },
+                {
                   id: "appearance",
                   title: "Appearance",
                   detail: "Theme & interface",
@@ -872,22 +881,28 @@ function SettingsContent() {
                 ? "Business profile"
                 : activeTab === "invoices"
                   ? "Invoice preferences"
-                  : activeTab === "appearance"
-                    ? "Appearance"
-                    : "Backup & data"}
+                  : activeTab === "ai"
+                    ? "AI & Smart Capture"
+                    : activeTab === "appearance"
+                      ? "Appearance"
+                      : "Backup & data"}
             </h2>
             <p>
               {activeTab === "profile"
                 ? "Manage the active workspace and the business details shown on invoices."
                 : activeTab === "invoices"
                   ? "Set up the starting point for your next invoice."
-                  : activeTab === "appearance"
-                    ? "Customize how BillFlow looks and feels."
-                    : "Manage your local storage, backups, and reset options."}
+                  : activeTab === "ai"
+                    ? "Choose between built-in offline AI and the optional downloadable local LLM."
+                    : activeTab === "appearance"
+                      ? "Customize how BillFlow looks and feels."
+                      : "Manage your local storage, backups, and reset options."}
             </p>
           </div>
           <form ref={formRef} onSubmit={handleSave} className="settings-section space-y-6">
-          {activeTab === "appearance" ? (
+          {activeTab === "ai" ? (
+            <AiSettingsPanel onNotify={showToast} />
+          ) : activeTab === "appearance" ? (
             <div className="settings-section space-y-6">
               <AppearanceFields
                 value={formState}

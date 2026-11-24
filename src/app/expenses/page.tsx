@@ -24,7 +24,7 @@ import { m } from "motion/react";
 import { SPRING_NAV_GLIDE, listRowTransition } from "@/lib/motion";
 import { useToast } from "@/context/ToastContext";
 
-import React, { useState, useMemo, Suspense } from "react";
+import React, { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import {
   Download,
   Printer,
@@ -46,7 +46,13 @@ import {
   Trash2,
   RotateCcw,
   Upload,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
+import { preprocessScreenshotForOcr } from "@/lib/image-preprocess";
+import type { AiExpenseReceiptScanResult } from "@/types/ai";
 import { useExpenses, useInvoices, useData } from "@/lib/data/DataProvider";
 import type { ExpenseItem } from "@/types/expenses";
 import type { Currency, InvoiceWithClient } from "@/types/billing";
@@ -270,6 +276,10 @@ function ExpensesContent() {
     null,
   );
   const [hasExpenseDraft, setHasExpenseDraft] = useState(false);
+  const [isScanningReceipt, setIsScanningReceipt] = useState(false);
+  const [receiptScanResult, setReceiptScanResult] =
+    useState<AiExpenseReceiptScanResult | null>(null);
+  const [receiptScanError, setReceiptScanError] = useState<string | null>(null);
 
   const isExpenseFormDirty = () => {
     return Boolean(
@@ -312,12 +322,18 @@ function ExpensesContent() {
     setEditingExpense(null);
     setStagedReceipt(null);
     setIsDraggingModalReceipt(false);
+    setReceiptScanResult(null);
+    setReceiptScanError(null);
+    setIsScanningReceipt(false);
   };
 
   const openLogExpenseModal = async () => {
     setEditingExpense(null);
     setStagedReceipt(null);
     setIsDraggingModalReceipt(false);
+    setReceiptScanResult(null);
+    setReceiptScanError(null);
+    setIsScanningReceipt(false);
     setFormData({
       merchant: "",
       description: "",
@@ -335,6 +351,88 @@ function ExpensesContent() {
       setHasExpenseDraft(false);
     }
     setIsLogModalOpen(true);
+  };
+
+  const runExpenseReceiptScan = async (options: {
+    file?: File | Blob;
+    stagedToken?: string;
+    fileName?: string;
+  }) => {
+    const api = window.billflow?.ai?.scanExpenseReceipt;
+    if (!api) return;
+    const isPdf = Boolean(
+      options.fileName?.toLowerCase().endsWith(".pdf") ||
+        (options.file && options.file.type === "application/pdf"),
+    );
+    if (isPdf) {
+      setReceiptScanResult(null);
+      setReceiptScanError(null);
+      return;
+    }
+
+    setIsScanningReceipt(true);
+    setReceiptScanError(null);
+    try {
+      let imageBase64: string | undefined;
+      if (options.file && options.file.type.startsWith("image/")) {
+        const processed = await preprocessScreenshotForOcr(options.file, {
+          autoInvertDark: true,
+        });
+        imageBase64 = processed.dataUrl;
+      }
+
+      const scanned = await api({
+        ...(imageBase64
+          ? { imageBase64 }
+          : options.stagedToken
+            ? { stagedToken: options.stagedToken }
+            : {}),
+      });
+
+      setReceiptScanResult(scanned);
+      setFormData((prev) => ({
+        ...prev,
+        ...(scanned.merchant ? { merchant: scanned.merchant } : {}),
+        ...(scanned.description ? { description: scanned.description } : {}),
+        ...(scanned.amount ? { amount: scanned.amount } : {}),
+        ...(scanned.currency ? { currency: scanned.currency } : {}),
+        ...(scanned.incurredAt ? { date: scanned.incurredAt } : {}),
+        category: scanned.category || prev.category,
+      }));
+      showToast(
+        `Receipt scanned: ${scanned.merchant || "Expense"} classified as ${scanned.category}.`,
+      );
+    } catch (err) {
+      setReceiptScanResult(null);
+      setReceiptScanError(
+        err instanceof Error
+          ? err.message
+          : "Could not scan text from this receipt.",
+      );
+    } finally {
+      setIsScanningReceipt(false);
+    }
+  };
+
+  const handleOpenScanReceiptFlow = async () => {
+    await openLogExpenseModal();
+    if (workflow.attachments.chooseFile) {
+      try {
+        const chosen = await workflow.attachments.chooseFile();
+        if (chosen) {
+          setStagedReceipt(chosen);
+          void runExpenseReceiptScan({
+            stagedToken: chosen.path,
+            fileName: chosen.name,
+          });
+        }
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : "Could not select receipt.",
+          "error",
+        );
+      }
+    }
   };
 
   const openEditExpenseModal = (item: ExpenseItem) => {
@@ -382,6 +480,62 @@ function ExpensesContent() {
     showToast("Receipt staging is unavailable in this environment.", "error");
     return null;
   };
+
+  const handleModalReceiptFileRef = useRef(async (file: File) => {
+    try {
+      const staged = await stageExpenseReceiptFile(file);
+      if (staged) {
+        setStagedReceipt(staged);
+        void runExpenseReceiptScan({ file, fileName: file.name });
+      }
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Could not stage receipt file.",
+        "error",
+      );
+    }
+  });
+  useEffect(() => {
+    handleModalReceiptFileRef.current = async (file: File) => {
+      try {
+        const staged = await stageExpenseReceiptFile(file);
+        if (staged) {
+          setStagedReceipt(staged);
+          void runExpenseReceiptScan({ file, fileName: file.name });
+        }
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : "Could not stage receipt file.",
+          "error",
+        );
+      }
+    };
+  });
+
+  // Allow pasting a receipt screenshot directly inside the Log Expense modal
+  useEffect(() => {
+    if (!isLogModalOpen) return;
+    const onPaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const blob = item.getAsFile();
+          if (blob) {
+            event.preventDefault();
+            const ext = blob.type.split("/")[1] || "png";
+            const file = new File([blob], `expense-receipt-${Date.now()}.${ext}`, {
+              type: blob.type,
+            });
+            void handleModalReceiptFileRef.current(file);
+            return;
+          }
+        }
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [isLogModalOpen]);
 
   const toggleDeductible = async (item: ExpenseItem) => {
     try {
@@ -683,6 +837,15 @@ function ExpensesContent() {
           >
             <Printer className="w-4 h-4" strokeWidth={2.2} />
             <span>Print Report</span>
+          </Button>
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => void handleOpenScanReceiptFlow()}
+            title="Scan a receipt image with offline OCR + AI category detection"
+          >
+            <Sparkles className="w-4 h-4 text-accent" />
+            <span>Scan Receipt</span>
           </Button>
         </div>
         <Button variant="primary" onClick={openLogExpenseModal}>
@@ -1405,7 +1568,7 @@ function ExpensesContent() {
                           Receipt Proof (Optional)
                         </span>
                         <span className="text-content-neutral-400 text-[11px] font-normal">
-                          Drop a PDF, PNG, JPEG, or WebP receipt or choose a file
+                          Drop, pick, or paste (Cmd/Ctrl+V) a receipt image to auto-fill via local OCR &amp; AI
                         </span>
                       </div>
                       <Button
@@ -1416,7 +1579,13 @@ function ExpensesContent() {
                           if (!workflow.attachments.chooseFile) return;
                           try {
                             const chosen = await workflow.attachments.chooseFile();
-                            if (chosen) setStagedReceipt(chosen);
+                            if (chosen) {
+                              setStagedReceipt(chosen);
+                              void runExpenseReceiptScan({
+                                stagedToken: chosen.path,
+                                fileName: chosen.name,
+                              });
+                            }
                           } catch (err) {
                             showToast(
                               err instanceof Error
@@ -1427,7 +1596,7 @@ function ExpensesContent() {
                           }
                         }}
                       >
-                        Choose Receipt
+                        Choose &amp; Scan
                       </Button>
                     </div>
 
@@ -1452,17 +1621,7 @@ function ExpensesContent() {
                         setIsDraggingModalReceipt(false);
                         const file = e.dataTransfer.files?.[0];
                         if (!file) return;
-                        try {
-                          const staged = await stageExpenseReceiptFile(file);
-                          if (staged) setStagedReceipt(staged);
-                        } catch (err) {
-                          showToast(
-                            err instanceof Error
-                              ? err.message
-                              : "Could not stage receipt file.",
-                            "error",
-                          );
-                        }
+                        await handleModalReceiptFileRef.current(file);
                       }}
                       className={`rounded-lg border border-dashed px-3 py-2.5 text-xs transition-colors flex items-center justify-between gap-2 ${
                         isDraggingModalReceipt
@@ -1477,20 +1636,82 @@ function ExpensesContent() {
                             ? `Ready to attach: ${stagedReceipt.name}`
                             : editingExpense?.attachments?.length
                               ? `${editingExpense.attachments.length} receipt attached (${editingExpense.attachments.map((a) => a.originalName).join(", ")})`
-                              : "Drop receipt file here"}
+                              : "Drop or paste receipt image here to auto-scan"}
                         </span>
                       </span>
                       {stagedReceipt && (
-                        <button
-                          type="button"
-                          onClick={() => setStagedReceipt(null)}
-                          aria-label="Clear staged receipt"
-                          className="p-0.5 rounded hover:bg-surface-neutral-100 text-content-neutral-500 shrink-0 cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {!stagedReceipt.name.toLowerCase().endsWith(".pdf") && (
+                            <button
+                              type="button"
+                              disabled={isScanningReceipt}
+                              onClick={() =>
+                                void runExpenseReceiptScan({
+                                  stagedToken: stagedReceipt.path,
+                                  fileName: stagedReceipt.name,
+                                })
+                              }
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-accent hover:bg-accent-faint cursor-pointer"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              <span>Re-scan</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStagedReceipt(null);
+                              setReceiptScanResult(null);
+                              setReceiptScanError(null);
+                            }}
+                            aria-label="Clear staged receipt"
+                            className="p-0.5 rounded hover:bg-surface-neutral-100 text-content-neutral-500 shrink-0 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
+
+                    {isScanningReceipt && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border-accent bg-accent-faint/40 text-xs text-accent">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                        <span>Scanning receipt &amp; classifying category locally…</span>
+                      </div>
+                    )}
+
+                    {!isScanningReceipt && receiptScanResult && (
+                      <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/75 dark:bg-emerald-950/30 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-200 space-y-1">
+                        <div className="flex items-center justify-between gap-2 font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            <span>
+                              Auto-filled ·{" "}
+                              {receiptScanResult.categorySource === "neural"
+                                ? "MiniLM AI category"
+                                : "Merchant category"}
+                              : <strong>{receiptScanResult.category}</strong> (
+                              {Math.round(receiptScanResult.categoryConfidence * 100)}%)
+                            </span>
+                          </span>
+                          <span className="text-[10.5px] opacity-75 tabular-nums">
+                            {(receiptScanResult.durationMs / 1000).toFixed(1)}s
+                          </span>
+                        </div>
+                        {receiptScanResult.warnings.map((w, idx) => (
+                          <p key={idx} className="text-[11px] opacity-85">
+                            {w}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {!isScanningReceipt && receiptScanError && (
+                      <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/25 px-3 py-2 text-[11.5px] text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{receiptScanError}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

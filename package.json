@@ -9,11 +9,12 @@
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
     "brand:generate": "node scripts/generate-brand-assets.mjs",
-    "dev:electron": "concurrently -k \"next dev --hostname 127.0.0.1\" \"npm:electron:watch\"",
+    "dev:electron": "node scripts/prepare-ai-models.mjs && concurrently -k \"next dev --hostname 127.0.0.1\" \"npm:electron:watch\"",
     "electron:watch": "wait-on tcp:127.0.0.1:3000 && tsup --watch --onSuccess \"electron .\"",
+    "ai:prepare-models": "node scripts/prepare-ai-models.mjs",
     "build:renderer": "next build",
     "build:electron": "tsup && node scripts/generate-runtime-notices.mjs",
-    "build": "next build && tsup && node scripts/generate-runtime-notices.mjs",
+    "build": "node scripts/prepare-ai-models.mjs && next build && tsup && node scripts/generate-runtime-notices.mjs",
     "start": "node scripts/start-desktop.mjs",
     "lint": "eslint",
     "test": "vitest run",
@@ -29,7 +30,9 @@
     "pack:mac:test": "npm run build && electron-builder --mac --arm64 --dir --config.directories.output=release/test-${npm_package_version} --config.electronFuses.enableNodeCliInspectArguments=true && codesign --force --deep --sign - release/test-${npm_package_version}/mac-arm64/BillFlow.app"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3"
+    "@huggingface/transformers": "^4.3.2",
+    "better-sqlite3": "^13.0.3",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

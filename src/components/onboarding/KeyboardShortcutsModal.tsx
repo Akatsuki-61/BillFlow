@@ -12,6 +12,7 @@ const SHORTCUT_GROUPS = [
     title: "Navigation",
     items: [
       { keys: "Cmd/Ctrl + K", desc: "Open universal search & actions" },
+      { keys: "Cmd/Ctrl + Shift + I", desc: "Open Smart Capture (OCR & AI invoice extractor)" },
       { keys: "Cmd/Ctrl + 1..8", desc: "Jump directly to any workspace tab" },
       { keys: "Cmd/Ctrl + ,", desc: "Open workspace settings" },
       { keys: "Cmd/Ctrl + /", desc: "Toggle this shortcuts reference" },

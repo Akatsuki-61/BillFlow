@@ -15,6 +15,19 @@ files:
   - "!node_modules/better-sqlite3/{deps,src,build}/**/*"
   - "!node_modules/better-sqlite3/binding.gyp"
   - "!node_modules/node-addon-api/**/*"
+  - "!node_modules/onnxruntime-web/**/*"
+  - "!node_modules/@huggingface/transformers/{src,types}/**/*"
+  - "!node_modules/@huggingface/transformers/dist/transformers.web.*"
+  - "!node_modules/@huggingface/transformers/dist/*.map"
+  - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**/*"
+  - "!node_modules/onnxruntime-node/script/**/*"
+  - "!node_modules/tesseract.js-core/tesseract-core.js"
+  - "!node_modules/tesseract.js-core/tesseract-core.wasm*"
+  - "!node_modules/tesseract.js-core/tesseract-core-simd.js"
+  - "!node_modules/tesseract.js-core/tesseract-core-simd.wasm*"
+  - "!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.js"
+  - "!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm*"
+  - "!node_modules/tesseract.js-core/*-lstm.wasm.js"
 asar: true
 electronFuses:
   runAsNode: false
@@ -26,6 +39,9 @@ electronFuses:
 npmRebuild: true
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
+  - "**/node_modules/onnxruntime-node/**"
+  - "**/node_modules/tesseract.js/**"
+  - "**/node_modules/tesseract.js-core/**"
 extraResources:
   - from: build/THIRD_PARTY_NOTICES.txt
     to: THIRD_PARTY_NOTICES.txt
@@ -37,6 +53,8 @@ extraResources:
     to: brand/tray
   - from: drizzle
     to: drizzle
+  - from: assets/ai-models
+    to: ai-models
 win:
   files:
     - dist-electron/**/*
@@ -47,6 +65,21 @@ win:
     - "!node_modules/better-sqlite3/binding.gyp"
     - "!node_modules/node-addon-api/**/*"
     - "!node_modules/better-sqlite3/prebuilds/!(win32-${arch}).node"
+    - "!node_modules/onnxruntime-web/**/*"
+    - "!node_modules/@huggingface/transformers/{src,types}/**/*"
+    - "!node_modules/@huggingface/transformers/dist/transformers.web.*"
+    - "!node_modules/@huggingface/transformers/dist/*.map"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**/*"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**/*"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/!(${arch})/**/*"
+    - "!node_modules/onnxruntime-node/script/**/*"
+    - "!node_modules/tesseract.js-core/tesseract-core.js"
+    - "!node_modules/tesseract.js-core/tesseract-core.wasm*"
+    - "!node_modules/tesseract.js-core/tesseract-core-simd.js"
+    - "!node_modules/tesseract.js-core/tesseract-core-simd.wasm*"
+    - "!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.js"
+    - "!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm*"
+    - "!node_modules/tesseract.js-core/*-lstm.wasm.js"
   icon: build/icon.ico
   target:
     - target: nsis
@@ -75,6 +108,22 @@ mac:
     - "!node_modules/better-sqlite3/binding.gyp"
     - "!node_modules/node-addon-api/**/*"
     - "!node_modules/better-sqlite3/prebuilds/!(darwin-${arch}).node"
+    - "!node_modules/onnxruntime-web/**/*"
+    - "!node_modules/@huggingface/transformers/{src,types}/**/*"
+    - "!node_modules/@huggingface/transformers/dist/transformers.web.*"
+    - "!node_modules/@huggingface/transformers/dist/*.map"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**/*"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/**/*"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/!(${arch})/**/*"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/arm64/libonnxruntime.1.*.dylib"
+    - "!node_modules/onnxruntime-node/script/**/*"
+    - "!node_modules/tesseract.js-core/tesseract-core.js"
+    - "!node_modules/tesseract.js-core/tesseract-core.wasm*"
+    - "!node_modules/tesseract.js-core/tesseract-core-simd.js"
+    - "!node_modules/tesseract.js-core/tesseract-core-simd.wasm*"
+    - "!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.js"
+    - "!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm*"
+    - "!node_modules/tesseract.js-core/*-lstm.wasm.js"
   icon: build/icon.icns
   target:
     - dmg

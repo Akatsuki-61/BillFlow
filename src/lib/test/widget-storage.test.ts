@@ -102,4 +102,18 @@ describe("Widget preference upgrades", () => {
     expect(loadWidgetPreferences(storedPreferences())).toEqual(defaults);
     expect(loadWidgetPreferences({ getItem: () => { throw new Error("Unavailable"); } })).toEqual(defaults);
   });
+
+  it("updates the previous default layout while keeping resized layouts", () => {
+    const previousDefault = [
+      "total-revenue", "net-profit", "pending-receivables", "active-clients",
+      "profit-trajectory-chart", "revenue-expenses-chart", "sprint-tasks", "recent-invoices",
+    ];
+    const storage = storedPreferences({
+      [WIDGET_STORAGE_KEYS.dashboard]: JSON.stringify(previousDefault),
+    });
+    expect(loadWidgetPreferences(storage).dashboardWidgets).toEqual(DEFAULT_DASHBOARD_WIDGET_IDS);
+
+    storage.values.set(WIDGET_STORAGE_KEYS.sizes, '{"net-profit":"compact"}');
+    expect(loadWidgetPreferences(storage).dashboardWidgets).toEqual(previousDefault);
+  });
 });

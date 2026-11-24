@@ -19,6 +19,8 @@ import {
   CurrencyAttribution,
 } from "@/components/ui/CurrencyFeedback";
 import { ReportingProvider } from "@/context/ReportingContext";
+import { AiCaptureProvider } from "@/context/AiCaptureContext";
+import { SmartCaptureDrawer } from "@/components/ai/SmartCaptureDrawer";
 import { WorkspaceTour } from "@/components/onboarding/WorkspaceTour";
 import { KeyboardShortcutsModal } from "@/components/onboarding/KeyboardShortcutsModal";
 import "./globals.css";
@@ -62,18 +64,21 @@ export default function RootLayout({
               <ReportingProvider>
                 <ProfileProvider>
                   <ProfileWorkspace>
-                    <AdvanceTrackingPrompt />
-                    <CurrencyFeedback />
-                    <WidgetProvider>
-                      <TitleBar />
-                      <Sidebar />
-                      <WorkspaceTour />
-                      <KeyboardShortcutsModal />
-                      <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
-                        {children}
-                        <CurrencyAttribution />
-                      </main>
-                    </WidgetProvider>
+                    <AiCaptureProvider>
+                      <AdvanceTrackingPrompt />
+                      <CurrencyFeedback />
+                      <WidgetProvider>
+                        <TitleBar />
+                        <Sidebar />
+                        <SmartCaptureDrawer />
+                        <WorkspaceTour />
+                        <KeyboardShortcutsModal />
+                        <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">
+                          {children}
+                          <CurrencyAttribution />
+                        </main>
+                      </WidgetProvider>
+                    </AiCaptureProvider>
                   </ProfileWorkspace>
                   <ProfileGateHost />
                 </ProfileProvider>

@@ -40,7 +40,10 @@ import {
   UsersRound,
   Compass,
   Keyboard,
+  Sparkles,
 } from "lucide-react";
+
+import { useAiCapture } from "@/context/AiCaptureContext";
 
 import { isNavActive } from "@/lib/navigation";
 import { canPinToDashboard } from "@/lib/widgets/widgetDefinitions";
@@ -121,6 +124,12 @@ const settingsCommands = [
     keywords:
       "theme dark light display date format typeface fonts density spacing notification placement",
   },
+  {
+    title: "AI & Capture",
+    tab: "ai",
+    keywords:
+      "ai ocr screenshot smart capture llm local model qwen minilm whatsapp email extract invoice",
+  },
 ];
 
 type SearchResult = {
@@ -147,6 +156,8 @@ export default function Sidebar() {
     workOrders,
   } = useData();
   const { preference, setPreference } = useTheme();
+  const { isOpen: aiCaptureOpen, toggleDrawer: toggleAiCapture } =
+    useAiCapture();
   const { convert, currency: reportingCurrency } = useReportingData();
   const {
     profiles,
@@ -177,7 +188,6 @@ export default function Sidebar() {
   const [activityDay, setActivityDay] = useState(localDateKey);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [hoveredNavId, setHoveredNavId] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -491,9 +501,7 @@ export default function Sidebar() {
       <header
         className={`workspace-nav w-full shrink-0 bg-canvas select-none z-30 ${dragClass}`}
       >
-        <div
-          className={`w-full px-8 h-[68px] grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4 ${dragClass}`}
-        >
+        <div className={`workspace-nav-inner ${dragClass}`}>
           {/* Left: Brand Identity */}
           <div className={`flex items-center justify-self-start ${dragClass}`}>
             <Link
@@ -526,18 +534,21 @@ export default function Sidebar() {
           {/* Center: Middle-Aligned Horizontal Navigation */}
           <nav
             aria-label="Main Navigation"
-            onMouseLeave={() => setHoveredNavId(null)}
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            className="flex items-center justify-center justify-self-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar py-1 max-w-full app-no-drag"
+            className="workspace-nav-track app-no-drag"
           >
             {mainNavItems.map((item) => {
               const isActive = isNavActive(pathname, item.href);
               const isHome = item.id === "dashboard";
-              const isHovered = hoveredNavId === item.id && !isActive;
               const canDropOnHome =
                 isHome && canPinToDashboard(draggedWidgetId);
               const isHomeDropCandidate =
                 canDropOnHome && isDragging && dragSource === "analytics";
+              const dropState =
+                isHome && isHomeDropOver
+                  ? "over"
+                  : isHomeDropCandidate
+                    ? "ready"
+                    : undefined;
 
               return (
                 <Link
@@ -545,7 +556,7 @@ export default function Sidebar() {
                   href={item.href}
                   data-tour={`nav-${item.id}`}
                   aria-current={isActive ? "page" : undefined}
-                  onMouseEnter={() => setHoveredNavId(item.id)}
+                  data-drop-state={dropState}
                   onDragOver={
                     canDropOnHome
                       ? (e) => {
@@ -586,40 +597,45 @@ export default function Sidebar() {
                         }
                       : undefined
                   }
-                  className={`workspace-nav-link relative isolate px-4 py-2 rounded-[12px] text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors duration-150 active:scale-[0.97] ${
-                    isHome && isHomeDropOver
-                      ? "bg-accent/25 dark:bg-accent/35 text-accent"
-                      : isHomeDropCandidate
-                        ? "bg-accent/12 dark:bg-accent/20 text-accent"
-                        : isActive
-                          ? "text-white dark:text-[#111115]"
-                          : "text-content-neutral-700 hover:text-content-neutral-950"
-                  }`}
+                  className="workspace-nav-link"
                 >
-                  {isHovered &&
-                    !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
-                      <m.span
-                        className="absolute inset-0 -z-20 rounded-[15px] bg-black/[0.045] dark:bg-white/[0.065]"
-                        layoutId="main-nav-hover"
-                        transition={SPRING_NAV_GLIDE}
-                      />
-                    )}
-                  {isActive &&
-                    !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
-                      <m.span
-                        className="nav-active-pill absolute inset-0 -z-10 rounded-[12px] bg-[#1c1c1f] dark:bg-[#f4f4f6] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.22)]"
-                        layoutId="main-nav-active"
-                        transition={SPRING_NAV_GLIDE}
-                      />
-                    )}
-                  <span className="relative z-10">{item.name}</span>
+                  {isActive && !dropState && (
+                    <m.span
+                      aria-hidden="true"
+                      className="nav-active-pill"
+                      layoutId="main-nav-active"
+                      transition={SPRING_NAV_GLIDE}
+                    />
+                  )}
+                  {item.name}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Right: Circular Utility Controls (Search, Activity/Support, Profile/Settings) */}
+          {/* Right: Circular Utility Controls (Smart Capture, Search, Activity/Support, Profile/Settings) */}
           <div className="flex items-center justify-self-end gap-2.5 shrink-0 app-no-drag">
+            {/* Smart Invoice Capture Drawer Trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                closeSearch();
+                setNotificationsOpen(false);
+                setProfileOpen(false);
+                toggleAiCapture();
+              }}
+              aria-expanded={aiCaptureOpen}
+              aria-label="Smart Capture from screenshot or message"
+              title={`Smart Capture (${formatShortcut("Cmd+Shift+I", isMac)})`}
+              className={`w-10 h-10 rounded-full border flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer transition-colors ${
+                aiCaptureOpen
+                  ? "border-accent bg-accent-faint text-accent"
+                  : "border-line-neutral-200 bg-surface/85 hover:bg-surface text-content-neutral-800"
+              }`}
+            >
+              <Sparkles className="w-[17px] h-[17px]" strokeWidth={1.9} />
+            </button>
+
             {/* Quick Search Popover */}
             <div className="relative" ref={searchRef}>
               <button

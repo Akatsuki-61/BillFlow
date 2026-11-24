@@ -34,7 +34,7 @@ import { useData } from "@/lib/data/DataProvider";
 
 interface FAQItem {
   id: string;
-  category: "billing" | "tasks" | "outsourcing" | "data" | "troubleshooting";
+  category: "billing" | "ai" | "tasks" | "outsourcing" | "data" | "troubleshooting";
   question: string;
   answer: string;
   actionText?: string;
@@ -68,6 +68,42 @@ const FAQ_DATABASE: FAQItem[] = [
       "Yes. You can set a global default currency (USD, LKR, or EUR) in Settings, or assign a specific currency to individual clients. Payment instructions—such as your local bank account, IBAN, Swift code, or transfer notes—are maintained in Settings and printed automatically on every exported PDF.",
     actionText: "Manage Payment Details",
     actionHref: "/settings?tab=profile",
+  },
+  {
+    id: "smart-capture-ai",
+    category: "ai",
+    question: "How does Smart Capture turn screenshots or chat messages into invoices, quotes, or tasks?",
+    answer:
+      "Open Smart Capture from the Sparkles icon in the top bar (or press Cmd/Ctrl+Shift+I) and paste a screenshot or message from WhatsApp, Slack, Signal, or email. BillFlow runs offline Tesseract OCR (auto-inverting dark-mode chat screenshots) and bundled all-MiniLM-L6-v2 embeddings to match clients, extract deliverables, due dates, currencies, delivery URLs, and suggested Service Catalog prices, and recommend whether to route to New Invoice, Proposal / Quote, or Kanban Tasks.",
+    actionText: "Configure Local AI",
+    actionHref: "/settings?tab=ai",
+  },
+  {
+    id: "bank-slip-scanner",
+    category: "ai",
+    question: "How does the Bank Transfer Slip Auto-Reader work in Record Payment?",
+    answer:
+      "When recording a payment on any invoice, drop, select, or paste (Cmd/Ctrl+V) the client's bank transfer slip image. Offline OCR automatically extracts the transferred amount, payment date, bank name, and reference/transaction ID, pre-fills the form, and flags underpayments, overpayments, or currency mismatches against your expected advance or balance.",
+    actionText: "Open Invoices",
+    actionHref: "/invoices",
+  },
+  {
+    id: "expense-receipt-scanner",
+    category: "ai",
+    question: "Can BillFlow scan expense receipts and pick the category automatically?",
+    answer:
+      "Yes. On the Expenses page, click 'Scan Receipt' or drop/paste a receipt image inside the Log Expense modal. BillFlow extracts the merchant, description, total amount, currency, and date, attaches the receipt proof automatically, and classifies the OPEX category (SOFTWARE, AI INFRASTRUCTURE, HOSTING, TRAVEL, MEALS, OFFICE, or HARDWARE) using bundled MiniLM neural embeddings.",
+    actionText: "Open Expenses",
+    actionHref: "/expenses",
+  },
+  {
+    id: "ai-tiers-privacy",
+    category: "ai",
+    question: "What is the difference between Standard and Enhanced AI tiers, and does any data leave my PC?",
+    answer:
+      "Nothing ever leaves your computer. The built-in Standard tier (~25.6 MB bundled) runs 100% offline using Tesseract LSTM OCR + all-MiniLM-L6-v2 embeddings for instant (<1s) extraction. Under Settings → AI & Capture, you can optionally download the Enhanced Local LLM (Qwen2.5-0.5B-Instruct, ~490 MB stored in local app data) for rewriting messy conversational chats; it unloads from RAM when idle and can be deleted anytime.",
+    actionText: "AI & Capture Settings",
+    actionHref: "/settings?tab=ai",
   },
   {
     id: "auto-task-prompt",
@@ -166,6 +202,7 @@ const FAQ_DATABASE: FAQItem[] = [
 const CATEGORIES = [
   { id: "all", label: "All Topics" },
   { id: "billing", label: "Invoicing & Billing" },
+  { id: "ai", label: "Local AI & OCR" },
   { id: "tasks", label: "Tasks & Delivery" },
   { id: "outsourcing", label: "Subcontracting" },
   { id: "data", label: "Data & Privacy" },
