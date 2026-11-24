@@ -40,7 +40,10 @@ import {
   UsersRound,
   Compass,
   Keyboard,
+  Sparkles,
 } from "lucide-react";
+
+import { useAiCapture } from "@/context/AiCaptureContext";
 
 import { isNavActive } from "@/lib/navigation";
 import { canPinToDashboard } from "@/lib/widgets/widgetDefinitions";
@@ -121,6 +124,12 @@ const settingsCommands = [
     keywords:
       "theme dark light display date format typeface fonts density spacing notification placement",
   },
+  {
+    title: "AI & Capture",
+    tab: "ai",
+    keywords:
+      "ai ocr screenshot smart capture llm local model qwen minilm whatsapp email extract invoice",
+  },
 ];
 
 type SearchResult = {
@@ -147,6 +156,8 @@ export default function Sidebar() {
     workOrders,
   } = useData();
   const { preference, setPreference } = useTheme();
+  const { isOpen: aiCaptureOpen, toggleDrawer: toggleAiCapture } =
+    useAiCapture();
   const { convert, currency: reportingCurrency } = useReportingData();
   const {
     profiles,
@@ -602,8 +613,29 @@ export default function Sidebar() {
             })}
           </nav>
 
-          {/* Right: Circular Utility Controls (Search, Activity/Support, Profile/Settings) */}
+          {/* Right: Circular Utility Controls (Smart Capture, Search, Activity/Support, Profile/Settings) */}
           <div className="flex items-center justify-self-end gap-2.5 shrink-0 app-no-drag">
+            {/* Smart Invoice Capture Drawer Trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                closeSearch();
+                setNotificationsOpen(false);
+                setProfileOpen(false);
+                toggleAiCapture();
+              }}
+              aria-expanded={aiCaptureOpen}
+              aria-label="Smart Capture from screenshot or message"
+              title={`Smart Capture (${formatShortcut("Cmd+Shift+I", isMac)})`}
+              className={`w-10 h-10 rounded-full border flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer transition-colors ${
+                aiCaptureOpen
+                  ? "border-accent bg-accent-faint text-accent"
+                  : "border-line-neutral-200 bg-surface/85 hover:bg-surface text-content-neutral-800"
+              }`}
+            >
+              <Sparkles className="w-[17px] h-[17px]" strokeWidth={1.9} />
+            </button>
+
             {/* Quick Search Popover */}
             <div className="relative" ref={searchRef}>
               <button

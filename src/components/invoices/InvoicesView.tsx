@@ -73,7 +73,9 @@ import {
   ListChecks,
   Copy,
   TrendingUp,
+  Sparkles,
 } from "lucide-react";
+import { useAiCapture } from "@/context/AiCaptureContext";
 import dynamic from "next/dynamic";
 import { formatInvoicePaymentSummary } from "@/lib/payment-summary";
 
@@ -169,6 +171,11 @@ export default function InvoicesView() {
   const reporting = useReportingData();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const {
+    openDrawer: openSmartCapture,
+    pendingInvoiceDraft,
+    consumePendingInvoiceDraft,
+  } = useAiCapture();
 
   const {
     invoices: allInvoices,
@@ -905,6 +912,112 @@ export default function InvoicesView() {
       void handleOpenAddModalRef.current();
     });
   }, [isNewActive, importTaskIdsParam, modalQueryKey]);
+
+  // Auto-populate and open the default New Invoice modal when handed off from Smart Capture
+  useEffect(() => {
+    if (!pendingInvoiceDraft) return;
+    const draft = consumePendingInvoiceDraft();
+    if (!draft) return;
+
+    requestId.current = null;
+    const activeClients = clients.filter((record) => !record.archivedAt);
+    const matchedClient = draft.matchedClientId
+      ? activeClients.find((c) => c.id === draft.matchedClientId)
+      : undefined;
+
+    const due = new Date();
+    due.setDate(due.getDate() + (settings?.defaultDueDays ?? 14));
+    const fallbackDueDate = localDateKey(due);
+
+    const mappedItems: LineItemDraft[] =
+      draft.items.length > 0
+        ? draft.items.map((item, idx) => ({
+            id: `ai-${Date.now()}-${idx}`,
+            ...(item.catalogId ? { catalogId: item.catalogId } : {}),
+            description: item.description,
+            quantity: Math.max(1, item.quantity || 1),
+            unitPrice: item.unitPrice ?? "",
+          }))
+        : [{ id: "1", description: "", quantity: 1, unitPrice: "" }];
+
+    queueMicrotask(() => {
+      setNewStatus("UNPAID");
+      setLinkedTaskIds([]);
+      setNewDiscount("");
+      setNewTaxRate("");
+      setRequireAdvance(true);
+      setAdvancePercent(50);
+      setNewPaymentUrl("");
+      setNewWorkflowStage(null);
+      setHasInvoiceDraft(false);
+
+      if (matchedClient) {
+        setClientMode("existing");
+        setNewClientId(matchedClient.id);
+        setClientName("");
+        setClientEmail("");
+        setClientContact("");
+        setClientPhone("");
+        setClientWhatsApp("");
+        setNewCurrency(
+          draft.currency || matchedClient.currency || settings?.defaultCurrency || activeCurrency || "USD",
+        );
+        setNewDeliveryUrl(draft.deliveryUrl || matchedClient.driveUrl || "");
+      } else if (draft.suggestedClient) {
+        setClientMode("new");
+        setNewClientId("");
+        setClientName(draft.suggestedClient.name || "");
+        setClientEmail(draft.suggestedClient.email || "");
+        setClientContact(draft.suggestedClient.contactPerson || "");
+        setClientPhone(draft.suggestedClient.phone || "");
+        setClientWhatsApp(draft.suggestedClient.whatsappPhone || "");
+        setClientCategory("Enterprise");
+        setSaveAsPermanentClient(true);
+        setNewCurrency(
+          draft.currency || settings?.defaultCurrency || activeCurrency || "USD",
+        );
+        setNewDeliveryUrl(draft.deliveryUrl || "");
+      } else {
+        setClientMode(activeClients.length ? "existing" : "new");
+        setNewClientId(activeClients[0]?.id ?? "");
+        setClientName("");
+        setClientEmail("");
+        setClientContact("");
+        setClientPhone("");
+        setClientWhatsApp("");
+        setNewCurrency(
+          draft.currency ||
+            activeClients[0]?.currency ||
+            settings?.defaultCurrency ||
+            activeCurrency ||
+            "USD",
+        );
+        setNewDeliveryUrl(
+          draft.deliveryUrl || activeClients[0]?.driveUrl || "",
+        );
+      }
+
+      setNewDueDate(draft.dueDate || fallbackDueDate);
+      setNewLineItems(mappedItems);
+      setNewNotes(draft.notes || "");
+      setShowAddInvoiceModal(true);
+      showToast(
+        `Auto-filled ${draft.items.length || 1} deliverable${draft.items.length === 1 ? "" : "s"} from Smart Capture — review pricing and save.`,
+      );
+    });
+
+    void getNextInvoiceCode()
+      .then((code) => setNewCode(code))
+      .catch(() => setNewCode(`INV-${new Date().getFullYear()}-001`));
+  }, [
+    pendingInvoiceDraft,
+    consumePendingInvoiceDraft,
+    clients,
+    settings?.defaultDueDays,
+    settings?.defaultCurrency,
+    activeCurrency,
+    getNextInvoiceCode,
+  ]);
 
   const handleDuplicateInvoice = async (inv: InvoiceWithClient) => {
     requestId.current = null;
@@ -2127,6 +2240,15 @@ export default function InvoicesView() {
           >
             <CreditCard className="w-3.5 h-3.5 text-accent" />
             <span>Advance Queue</span>
+          </button>
+          <button
+            type="button"
+            onClick={openSmartCapture}
+            className="zentra-control-pill hover:!border-accent/50"
+            title="Paste a screenshot or client message to auto-fill a new invoice"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${ACCENT_ICON_CLASS}`} />
+            <span>Smart Capture</span>
           </button>
           <Button variant="primary" type="button" onClick={handleOpenAddModal}>
             <Plus className="w-4 h-4" strokeWidth={2.2} />
