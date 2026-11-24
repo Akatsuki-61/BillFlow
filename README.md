@@ -48,14 +48,16 @@ Build multi-currency invoices with catalog items, custom discounts, taxes, and u
 
 Dispatch invoices or overdue reminders through prefilled `wa.me` WhatsApp links or email drafts, inspect past-due accounts receivable aging (`1-15`, `16-30`, `31-60`, `60+` days), and export active registers or aging reports to RFC 4180 CSV or Excel formats.
 
-### Smart Capture (two-tier local AI and offline OCR)
+### Smart Capture & Local AI Suite (two-tier local AI and offline OCR)
 
-Paste a screenshot (`Cmd/Ctrl+V` or drag-and-drop) or copied text from WhatsApp, Slack, Signal, or email into the global **Smart Capture** drawer (`Cmd/Ctrl+Shift+I`) to auto-fill BillFlow's **New Invoice** dialog without manual retyping. Dark-mode chat screenshots are automatically detected, inverted, upscaled, and contrast-enhanced before offline OCR.
+BillFlow ships a unified two-tier on-device AI suite built on one shared local runtime so client messages, bank transfer slips, and expense receipts never leave your computer:
 
-BillFlow ships a two-tier on-device AI pipeline built on one shared local runtime so client messages and screenshots never leave the computer:
-
-- **Standard (Built-in Offline Default, ~25.6 MB bundled):** `tesseract.js` LSTM OCR (`eng.traineddata.gz`) + quantized `Xenova/all-MiniLM-L6-v2` sentence embeddings + deterministic entity parser. Matches existing SQLite clients (or drafts new client details), extracts due dates (including relative phrases like `"next Friday"`), currencies, delivery links, and deliverables, and semantically matches items against your **Service Catalog** to suggest unit prices in under a second.
-- **Enhanced (Optional Local LLM in Settings → AI & Capture):** Downloads quantized `onnx-community/Qwen2.5-0.5B-Instruct` (INT8 ONNX, ~490 MB) once into `userData/models/` with live progress, cancel, and delete controls. Rewrites casual, unpunctuated chat messages into crisp invoice line items while fusing with exact deterministic link/date/client extraction and MiniLM catalog pricing, and automatically unloads from RAM when idle.
+- **Intent-Aware Smart Capture (`Cmd/Ctrl+Shift+I`):** Paste a screenshot (`Cmd/Ctrl+V` or drag-and-drop) or copied text from WhatsApp, Slack, Signal, or email. Dark-mode chat screenshots are automatically inverted and upscaled before OCR. Zero-shot neural intent detection classifies whether the message is best routed to **New Invoice**, **Proposal / Quote**, or directly to **Kanban Tasks** (with 1-click override), pre-filling clients, deliverables, due dates, currencies, delivery URLs, and semantically matched **Service Catalog** unit prices.
+- **Bank Transfer Slip Auto-Reader (Record Payment):** Dropping, selecting, or pasting a client's bank transfer slip screenshot automatically extracts the transferred amount, payment date, bank name, and reference/transaction ID, and flags underpayment, overpayment, or currency mismatches against the invoice's expected advance or remaining balance.
+- **Expense Receipt Scanner (Expenses):** Dropping, selecting, or pasting a receipt screenshot (or clicking **Scan Receipt**) extracts the merchant, date, amount, currency, and description while classifying the expense into BillFlow's OPEX categories (`SOFTWARE`, `AI INFRASTRUCTURE`, `HOSTING`, `TRAVEL`, `MEALS`, `OFFICE`, `HARDWARE`) using bundled `all-MiniLM-L6-v2` neural embeddings.
+- **Two Configurable Tiers in Settings → AI & Capture:**
+  - **Standard (Built-in Offline Default, ~25.6 MB bundled):** `tesseract.js` LSTM OCR (`eng.traineddata.gz`) + quantized `Xenova/all-MiniLM-L6-v2` sentence embeddings + deterministic document/entity parsers.
+  - **Enhanced (Optional Local LLM):** Downloads quantized `onnx-community/Qwen2.5-0.5B-Instruct` (INT8 ONNX, ~490 MB) once into `userData/models/` with live progress, cancel, delete, automatic idle RAM disposal, and automatic fallback to Standard.
 
 ### Task board, local calendar, and deliverable handoff
 
