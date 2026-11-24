@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import {
   AlertTriangle,
@@ -10,8 +11,10 @@ import {
   Calendar,
   Check,
   ChevronDown,
+  ClipboardList,
   ClipboardPaste,
   Cpu,
+  FileText,
   Image as ImageIcon,
   Link2,
   Loader2,
@@ -26,12 +29,16 @@ import {
   X,
 } from "lucide-react";
 import { useAiCapture } from "@/context/AiCaptureContext";
+import { useProfiles } from "@/context/ProfileContext";
+import { useToast } from "@/context/ToastContext";
 import { useData } from "@/lib/data/DataProvider";
 import { preprocessScreenshotForOcr } from "@/lib/image-preprocess";
 import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
+import { localDateKey } from "@/lib/visual-metrics";
 import { EASE_ENTER, EASE_EXIT } from "@/lib/motion";
 import { Button } from "@/components/ui/Workspace";
 import type {
+  AiCaptureIntent,
   AiExtractedDeliverable,
   AiExtractedInvoiceDraft,
 } from "@/types/ai";
@@ -41,8 +48,17 @@ interface EditableDeliverable extends AiExtractedDeliverable {
 }
 
 export function SmartCaptureDrawer() {
-  const { isOpen, closeDrawer, aiStatus, handoffToInvoice } = useAiCapture();
-  const { isElectron } = useData();
+  const router = useRouter();
+  const {
+    isOpen,
+    closeDrawer,
+    aiStatus,
+    handoffToInvoice,
+    handoffToQuote,
+  } = useAiCapture();
+  const { isElectron, workflow, activeCurrency, settings } = useData();
+  const { activeProfile } = useProfiles();
+  const { showToast } = useToast();
   const reducedMotion = useReducedMotion();
   const isMac = useIsMac();
 
@@ -60,6 +76,9 @@ export function SmartCaptureDrawer() {
 
   const [result, setResult] = useState<AiExtractedInvoiceDraft | null>(null);
   const [editableItems, setEditableItems] = useState<EditableDeliverable[]>([]);
+  const [targetDestination, setTargetDestination] =
+    useState<AiCaptureIntent>("invoice");
+  const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [showRawOcr, setShowRawOcr] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -187,6 +206,7 @@ export function SmartCaptureDrawer() {
           : {}),
       });
       setResult(extracted);
+      setTargetDestination(extracted.detectedIntent || "invoice");
       setEditableItems(
         extracted.items.map((item) => ({
           ...item,
@@ -206,9 +226,8 @@ export function SmartCaptureDrawer() {
     }
   };
 
-  const handleCreateInvoice = () => {
-    if (!result) return;
-    const chosenItems: AiExtractedDeliverable[] = editableItems
+  const buildCuratedItems = (): AiExtractedDeliverable[] =>
+    editableItems
       .filter((item) => item.selected && item.description.trim().length > 0)
       .map((item) => ({
         id: item.id,
@@ -222,10 +241,84 @@ export function SmartCaptureDrawer() {
         confidence: item.confidence,
       }));
 
-    handoffToInvoice({
+  const handleDispatchAction = async () => {
+    if (!result) return;
+    const chosenItems = buildCuratedItems();
+    const curatedDraft: AiExtractedInvoiceDraft = {
       ...result,
       items: chosenItems,
-    });
+    };
+
+    if (targetDestination === "invoice") {
+      handoffToInvoice(curatedDraft);
+      return;
+    }
+
+    if (targetDestination === "quote") {
+      handoffToQuote(curatedDraft);
+      return;
+    }
+
+    // Direct Kanban Tasks creation
+    if (chosenItems.length === 0) {
+      setError("Select at least one deliverable to add to the Kanban board.");
+      return;
+    }
+    setIsCreatingTasks(true);
+    setError(null);
+    try {
+      const due = new Date();
+      due.setDate(due.getDate() + (settings?.defaultDueDays ?? 7));
+      const dueDate = result.dueDate || localDateKey(due);
+      const currency =
+        result.currency || settings?.defaultCurrency || activeCurrency || "USD";
+      const ownerName = activeProfile?.name || "You";
+      const assignee = {
+        name: ownerName,
+        avatarLetter: ownerName.slice(0, 1).toUpperCase() || "B",
+        bgColor: "bg-indigo-100",
+        textColor: "text-indigo-700",
+      };
+
+      for (const item of chosenItems) {
+        await workflow.tasks.create({
+          id: `task-${crypto.randomUUID().slice(0, 8)}`,
+          title: item.description.slice(0, 140),
+          description: result.notes || result.cleanedText.slice(0, 300),
+          status: "todo",
+          priority: "medium",
+          category: "Development",
+          assignee,
+          dueDate,
+          currency,
+          ...(result.matchedClientId
+            ? { clientId: result.matchedClientId }
+            : {}),
+          ...(result.matchedClientName || result.suggestedClient?.name
+            ? {
+                clientName:
+                  result.matchedClientName || result.suggestedClient?.name,
+              }
+            : {}),
+          ...(result.deliveryUrl ? { deliveryUrl: result.deliveryUrl } : {}),
+          subtasks: [],
+        });
+      }
+
+      showToast(
+        `Added ${chosenItems.length} task${chosenItems.length === 1 ? "" : "s"} directly to your Kanban board.`,
+      );
+      closeDrawer();
+      router.push("/tasks");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not create tasks on the board.",
+      );
+    } finally {
+      setIsCreatingTasks(false);
+    }
   };
 
   const handleUpdateItem = (
@@ -522,7 +615,7 @@ export function SmartCaptureDrawer() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-content-neutral-700">
-                      Extracted Invoice Draft
+                      Extracted Draft &amp; Intent
                     </h3>
                     <span className="text-[11px] text-content-neutral-500 tabular-nums">
                       {result.engineUsed === "enhanced"
@@ -530,6 +623,65 @@ export function SmartCaptureDrawer() {
                         : "Standard Local ML"}{" "}
                       · {(result.durationMs / 1000).toFixed(1)}s
                     </span>
+                  </div>
+
+                  {/* AI Detected Intent & 3-Way Destination Switcher */}
+                  <div className="rounded-xl border border-border-accent/60 bg-accent-faint/30 p-3 space-y-2.5">
+                    <div className="flex items-start justify-between gap-2 text-xs">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 font-semibold text-content-neutral-950">
+                          <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+                          <span>
+                            AI Recommendation:{" "}
+                            {result.detectedIntent === "quote"
+                              ? "Proposal / Quote"
+                              : result.detectedIntent === "tasks"
+                                ? "Kanban Tasks"
+                                : "New Invoice"}
+                          </span>
+                          <span className="text-[10.5px] font-medium px-1.5 py-0.5 rounded-full bg-surface border border-line-neutral-200 text-content-neutral-600 tabular-nums">
+                            {Math.round((result.intentConfidence || 0.7) * 100)}%
+                          </span>
+                        </div>
+                        <p className="text-[11.5px] text-content-neutral-600">
+                          {result.intentReason}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      role="radiogroup"
+                      aria-label="Destination workspace workflow"
+                      className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-surface border border-line-neutral-200"
+                    >
+                      {(
+                        [
+                          { id: "invoice", label: "Invoice", icon: Receipt },
+                          { id: "quote", label: "Quote", icon: FileText },
+                          { id: "tasks", label: "Tasks", icon: ClipboardList },
+                        ] as const
+                      ).map((opt) => {
+                        const Icon = opt.icon;
+                        const active = targetDestination === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            onClick={() => setTargetDestination(opt.id)}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                              active
+                                ? "bg-accent text-white shadow-xs"
+                                : "text-content-neutral-600 hover:text-content-neutral-950 hover:bg-surface-neutral-100"
+                            }`}
+                          >
+                            <Icon className="w-3.5 h-3.5" />
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {/* Warnings */}
@@ -771,12 +923,36 @@ export function SmartCaptureDrawer() {
                 <Button
                   type="button"
                   variant="primary"
-                  disabled={!result}
-                  onClick={handleCreateInvoice}
+                  disabled={!result || isCreatingTasks}
+                  onClick={() => void handleDispatchAction()}
                 >
-                  <Receipt className="w-4 h-4" />
-                  <span>Create Invoice</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  {isCreatingTasks ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Adding Tasks…</span>
+                    </>
+                  ) : targetDestination === "quote" ? (
+                    <>
+                      <FileText className="w-4 h-4" />
+                      <span>Create Proposal / Quote</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  ) : targetDestination === "tasks" ? (
+                    <>
+                      <ClipboardList className="w-4 h-4" />
+                      <span>
+                        Add {selectedCount || 1} Task
+                        {selectedCount === 1 ? "" : "s"} to Board
+                      </span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      <Receipt className="w-4 h-4" />
+                      <span>Create Invoice</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

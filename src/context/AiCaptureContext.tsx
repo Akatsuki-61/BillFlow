@@ -31,6 +31,9 @@ interface AiCaptureContextValue {
   pendingInvoiceDraft: AiExtractedInvoiceDraft | null;
   handoffToInvoice: (draft: AiExtractedInvoiceDraft) => void;
   consumePendingInvoiceDraft: () => AiExtractedInvoiceDraft | null;
+  pendingQuoteDraft: AiExtractedInvoiceDraft | null;
+  handoffToQuote: (draft: AiExtractedInvoiceDraft) => void;
+  consumePendingQuoteDraft: () => AiExtractedInvoiceDraft | null;
 }
 
 const AiCaptureContext = createContext<AiCaptureContextValue | null>(null);
@@ -48,6 +51,9 @@ export function AiCaptureProvider({
   const [pendingInvoiceDraft, setPendingInvoiceDraft] =
     useState<AiExtractedInvoiceDraft | null>(null);
   const pendingRef = useRef<AiExtractedInvoiceDraft | null>(null);
+  const [pendingQuoteDraft, setPendingQuoteDraft] =
+    useState<AiExtractedInvoiceDraft | null>(null);
+  const pendingQuoteRef = useRef<AiExtractedInvoiceDraft | null>(null);
 
   const refreshStatus = useCallback(async () => {
     const api = window.billflow?.ai;
@@ -99,6 +105,8 @@ export function AiCaptureProvider({
       setIsOpen(false);
       pendingRef.current = null;
       setPendingInvoiceDraft(null);
+      pendingQuoteRef.current = null;
+      setPendingQuoteDraft(null);
     };
     const cleanupLock = window.billflow?.onWorkspaceLocked?.(handleLocked);
 
@@ -191,6 +199,23 @@ export function AiCaptureProvider({
     return current;
   }, []);
 
+  const handoffToQuote = useCallback(
+    (draft: AiExtractedInvoiceDraft) => {
+      pendingQuoteRef.current = draft;
+      setPendingQuoteDraft(draft);
+      setIsOpen(false);
+      router.push("/invoices?view=quotes");
+    },
+    [router],
+  );
+
+  const consumePendingQuoteDraft = useCallback(() => {
+    const current = pendingQuoteRef.current;
+    pendingQuoteRef.current = null;
+    setPendingQuoteDraft(null);
+    return current;
+  }, []);
+
   return (
     <AiCaptureContext.Provider
       value={{
@@ -208,6 +233,9 @@ export function AiCaptureProvider({
         pendingInvoiceDraft,
         handoffToInvoice,
         consumePendingInvoiceDraft,
+        pendingQuoteDraft,
+        handoffToQuote,
+        consumePendingQuoteDraft,
       }}
     >
       {children}

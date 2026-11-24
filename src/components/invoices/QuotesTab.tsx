@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useAiCapture } from "@/context/AiCaptureContext";
 import {
   ArrowRightCircle,
   CheckCircle2,
@@ -104,6 +105,7 @@ function toPreviewInvoice(quote: QuoteWithClient): InvoiceWithClient {
 export function QuotesTab({ onConvertedToInvoice }: QuotesTabProps) {
   const { showToast } = useToast();
   const { isElectron } = useData();
+  const { pendingQuoteDraft, consumePendingQuoteDraft } = useAiCapture();
   const {
     quotes,
     getNextQuoteCode,
@@ -187,6 +189,71 @@ export function QuotesTab({ onConvertedToInvoice }: QuotesTabProps) {
     }
     setIsFormOpen(true);
   };
+
+  // Auto-populate and open the New Proposal/Quote modal when handed off from Smart Capture
+  useEffect(() => {
+    if (!pendingQuoteDraft) return;
+    const draft = consumePendingQuoteDraft();
+    if (!draft) return;
+
+    const today = localDateKey();
+    const matchedClient = draft.matchedClientId
+      ? activeClients.find((c) => c.id === draft.matchedClientId)
+      : undefined;
+    const targetClient = matchedClient ?? activeClients[0];
+
+    const mappedItems: QuoteLineDraft[] =
+      draft.items.length > 0
+        ? draft.items.map((item) => ({
+            id: crypto.randomUUID(),
+            ...(item.catalogId ? { catalogId: item.catalogId } : {}),
+            description: item.description,
+            quantity: Math.max(1, item.quantity || 1),
+            unitPrice: item.unitPrice ?? "0",
+          }))
+        : [{ id: crypto.randomUUID(), description: "", quantity: 1, unitPrice: "0" }];
+
+    queueMicrotask(() => {
+      setEditingQuote(null);
+      setFormClientId(targetClient?.id || "");
+      setFormTitle(draft.items[0]?.description?.slice(0, 80) || "Project Proposal");
+      setFormCurrency(
+        draft.currency ||
+          targetClient?.currency ||
+          settings?.defaultCurrency ||
+          "USD",
+      );
+      setFormIssueDate(today);
+      setFormValidUntil(draft.dueDate || defaultValidUntil(today));
+      setFormTemplate(settings?.defaultInvoiceTemplate || "geometric-teal");
+      setFormDiscount("0");
+      setFormTaxPercent(String(settings?.defaultTaxRate ?? 0));
+      setFormAdvancePercent("50");
+      setFormDeliveryUrl(draft.deliveryUrl || targetClient?.driveUrl || "");
+      setFormNotes(draft.notes || "");
+      setFormItems(mappedItems);
+      setIsFormOpen(true);
+      showToast(
+        `Auto-filled Proposal / Quote with ${draft.items.length || 1} deliverable${draft.items.length === 1 ? "" : "s"} from Smart Capture.`,
+      );
+    });
+
+    if (isElectron) {
+      void getNextQuoteCode()
+        .then((code) => setFormCode(code))
+        .catch(() => setFormCode(""));
+    }
+  }, [
+    pendingQuoteDraft,
+    consumePendingQuoteDraft,
+    activeClients,
+    settings?.defaultCurrency,
+    settings?.defaultInvoiceTemplate,
+    settings?.defaultTaxRate,
+    isElectron,
+    getNextQuoteCode,
+    showToast,
+  ]);
 
   const openEditQuoteModal = (quote: QuoteWithClient) => {
     if (quote.status === "CONVERTED") return;
