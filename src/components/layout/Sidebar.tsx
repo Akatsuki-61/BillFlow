@@ -488,16 +488,16 @@ export default function Sidebar() {
   return (
     <MotionConfig reducedMotion="user">
       <header
-        className={`workspace-nav w-full shrink-0 select-none z-30 ${dragClass}`}
+        className={`workspace-nav w-full shrink-0 bg-canvas select-none z-30 ${dragClass}`}
       >
         <div className={`workspace-nav-inner ${dragClass}`}>
           {/* Left: Brand Identity */}
           <div className={`flex items-center justify-self-start ${dragClass}`}>
             <Link
               href="/"
-              className="flex items-center gap-2 shrink-0 rounded-lg app-no-drag"
+              className="flex items-center gap-2.5 shrink-0 group focus:outline-none app-no-drag cursor-pointer"
             >
-              <div className="w-8 h-8 flex items-center justify-center shrink-0 pointer-events-none">
+              <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 pointer-events-none">
                 <Image
                   src="/brand/logo-color.png"
                   alt=""
@@ -514,7 +514,7 @@ export default function Sidebar() {
                   className="hidden dark:block"
                 />
               </div>
-              <span className="text-[22px] font-bold tracking-[-0.05em] text-content-neutral-950 leading-none pointer-events-none">
+              <span className="text-[21px] font-semibold tracking-[-0.04em] text-content-neutral-950 leading-none pointer-events-none">
                 BillFlow
               </span>
             </Link>
@@ -602,8 +602,8 @@ export default function Sidebar() {
             })}
           </nav>
 
-          {/* Right: Workspace utilities */}
-          <div className="workspace-nav-utilities app-no-drag">
+          {/* Right: Circular Utility Controls (Search, Activity/Support, Profile/Settings) */}
+          <div className="flex items-center justify-self-end gap-2.5 shrink-0 app-no-drag">
             {/* Quick Search Popover */}
             <div className="relative" ref={searchRef}>
               <button
@@ -614,7 +614,7 @@ export default function Sidebar() {
                 aria-controls="search-popover"
                 aria-label="Search workspace"
                 title={`Search workspace (${formatShortcut("Cmd+K", isMac)})`}
-                className="workspace-nav-action"
+                className="w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer"
               >
                 <Search className="w-[17px] h-[17px]" strokeWidth={1.9} />
               </button>
@@ -755,11 +755,11 @@ export default function Sidebar() {
                 aria-controls="notifications-popover"
                 aria-label="Workspace notifications"
                 title="Notifications & Activity"
-                className="workspace-nav-action relative"
+                className="relative w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer"
               >
                 <Bell className="w-[17px] h-[17px]" strokeWidth={1.9} />
                 {activeAlerts.length > 0 && (
-                  <span className="absolute top-2 right-2 size-1.5 rounded-full bg-rose-500 ring-2 ring-surface" />
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-surface" />
                 )}
               </button>
 
@@ -836,7 +836,7 @@ export default function Sidebar() {
             </div>
 
             {/* Active Profile Avatar Button (distinct framed profile picture with studio artwork) */}
-            <div className="relative" ref={profileRef}>
+            <div className="relative ml-0.5" ref={profileRef}>
               <button
                 type="button"
                 onClick={() => {
@@ -856,10 +856,10 @@ export default function Sidebar() {
                       ? activeProfileStyle.swatch
                       : activeProfileStyle.border,
                   boxShadow: profileOpen
-                    ? `0 0 0 2px ${activeProfileStyle.ring}`
-                    : undefined,
+                    ? `0 0 0 3px ${activeProfileStyle.ring}, 0 8px 18px -4px ${activeProfileStyle.glow}`
+                    : `0 4px 12px -3px ${activeProfileStyle.glow}`,
                 }}
-                className="relative size-9 p-[2px] rounded-full border bg-surface flex items-center justify-center cursor-pointer transition-[border-color,box-shadow] duration-150"
+                className="relative w-10 h-10 p-[2px] rounded-full border-2 bg-surface flex items-center justify-center cursor-pointer group transition-[transform,border-color,box-shadow] duration-200 hover:scale-105"
               >
                 <span
                   className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.22)_inset]"
