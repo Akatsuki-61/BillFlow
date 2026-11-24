@@ -61,9 +61,17 @@ export function AiCaptureProvider({
   }, []);
 
   useEffect(() => {
-    void refreshStatus();
+    let active = true;
+    void window.billflow?.ai
+      ?.status?.()
+      .then((next) => {
+        if (active) setAiStatus(next);
+      })
+      .catch(() => {});
+
     const cleanupProgress = window.billflow?.ai?.onDownloadProgress?.(
       (event) => {
+        if (!active) return;
         setDownloadEvent(event);
         setAiStatus((prev) =>
           prev
@@ -77,7 +85,12 @@ export function AiCaptureProvider({
             : prev,
         );
         if (event.progress === 100 || event.state !== "downloading") {
-          void refreshStatus();
+          void window.billflow?.ai
+            ?.status?.()
+            .then((next) => {
+              if (active) setAiStatus(next);
+            })
+            .catch(() => {});
         }
       },
     );
@@ -90,10 +103,11 @@ export function AiCaptureProvider({
     const cleanupLock = window.billflow?.onWorkspaceLocked?.(handleLocked);
 
     return () => {
+      active = false;
       cleanupProgress?.();
       cleanupLock?.();
     };
-  }, [refreshStatus]);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

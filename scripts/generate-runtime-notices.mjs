@@ -12,6 +12,8 @@ const packages = [
   "next",
   "react",
   "react-dom",
+  "tesseract.js",
+  "@huggingface/transformers",
 ];
 const notices = packages.map((name) => {
   const directory = path.join("node_modules", name);

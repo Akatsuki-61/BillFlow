@@ -210,10 +210,16 @@ export function SmartCaptureDrawer() {
     if (!result) return;
     const chosenItems: AiExtractedDeliverable[] = editableItems
       .filter((item) => item.selected && item.description.trim().length > 0)
-      .map(({ selected: _selected, ...rest }) => ({
-        ...rest,
-        description: rest.description.trim(),
-        quantity: Math.max(1, rest.quantity || 1),
+      .map((item) => ({
+        id: item.id,
+        description: item.description.trim(),
+        quantity: Math.max(1, item.quantity || 1),
+        unitPrice: item.unitPrice,
+        priceSource: item.priceSource,
+        catalogId: item.catalogId,
+        catalogTitle: item.catalogTitle,
+        catalogMatchScore: item.catalogMatchScore,
+        confidence: item.confidence,
       }));
 
     handoffToInvoice({
@@ -369,7 +375,6 @@ export function SmartCaptureDrawer() {
                 {imagePreviewUrl ? (
                   <div className="space-y-2.5">
                     <div className="relative rounded-xl overflow-hidden border border-line-neutral-200 bg-surface max-h-48 flex items-center justify-center">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={imagePreviewUrl}
                         alt="Pasted client screenshot"
