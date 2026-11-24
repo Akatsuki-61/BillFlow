@@ -177,7 +177,6 @@ export default function Sidebar() {
   const [activityDay, setActivityDay] = useState(localDateKey);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [hoveredNavId, setHoveredNavId] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -489,18 +488,16 @@ export default function Sidebar() {
   return (
     <MotionConfig reducedMotion="user">
       <header
-        className={`workspace-nav w-full shrink-0 bg-canvas select-none z-30 ${dragClass}`}
+        className={`workspace-nav w-full shrink-0 select-none z-30 ${dragClass}`}
       >
-        <div
-          className={`w-full px-8 h-[68px] grid grid-cols-[auto_1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4 ${dragClass}`}
-        >
+        <div className={`workspace-nav-inner ${dragClass}`}>
           {/* Left: Brand Identity */}
           <div className={`flex items-center justify-self-start ${dragClass}`}>
             <Link
               href="/"
-              className="flex items-center gap-2.5 shrink-0 group focus:outline-none app-no-drag cursor-pointer"
+              className="flex items-center gap-2 shrink-0 rounded-lg app-no-drag"
             >
-              <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 pointer-events-none">
+              <div className="w-8 h-8 flex items-center justify-center shrink-0 pointer-events-none">
                 <Image
                   src="/brand/logo-color.png"
                   alt=""
@@ -517,7 +514,7 @@ export default function Sidebar() {
                   className="hidden dark:block"
                 />
               </div>
-              <span className="text-[21px] font-semibold tracking-[-0.04em] text-content-neutral-950 leading-none pointer-events-none">
+              <span className="text-[22px] font-bold tracking-[-0.05em] text-content-neutral-950 leading-none pointer-events-none">
                 BillFlow
               </span>
             </Link>
@@ -526,18 +523,21 @@ export default function Sidebar() {
           {/* Center: Middle-Aligned Horizontal Navigation */}
           <nav
             aria-label="Main Navigation"
-            onMouseLeave={() => setHoveredNavId(null)}
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            className="flex items-center justify-center justify-self-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar py-1 max-w-full app-no-drag"
+            className="workspace-nav-track app-no-drag"
           >
             {mainNavItems.map((item) => {
               const isActive = isNavActive(pathname, item.href);
               const isHome = item.id === "dashboard";
-              const isHovered = hoveredNavId === item.id && !isActive;
               const canDropOnHome =
                 isHome && canPinToDashboard(draggedWidgetId);
               const isHomeDropCandidate =
                 canDropOnHome && isDragging && dragSource === "analytics";
+              const dropState =
+                isHome && isHomeDropOver
+                  ? "over"
+                  : isHomeDropCandidate
+                    ? "ready"
+                    : undefined;
 
               return (
                 <Link
@@ -545,7 +545,7 @@ export default function Sidebar() {
                   href={item.href}
                   data-tour={`nav-${item.id}`}
                   aria-current={isActive ? "page" : undefined}
-                  onMouseEnter={() => setHoveredNavId(item.id)}
+                  data-drop-state={dropState}
                   onDragOver={
                     canDropOnHome
                       ? (e) => {
@@ -586,40 +586,24 @@ export default function Sidebar() {
                         }
                       : undefined
                   }
-                  className={`workspace-nav-link relative isolate px-4 py-2 rounded-[12px] text-[14px] font-medium whitespace-nowrap cursor-pointer transition-colors duration-150 active:scale-[0.97] ${
-                    isHome && isHomeDropOver
-                      ? "bg-accent/25 dark:bg-accent/35 text-accent"
-                      : isHomeDropCandidate
-                        ? "bg-accent/12 dark:bg-accent/20 text-accent"
-                        : isActive
-                          ? "text-white dark:text-[#111115]"
-                          : "text-content-neutral-700 hover:text-content-neutral-950"
-                  }`}
+                  className="workspace-nav-link"
                 >
-                  {isHovered &&
-                    !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
-                      <m.span
-                        className="absolute inset-0 -z-20 rounded-[15px] bg-black/[0.045] dark:bg-white/[0.065]"
-                        layoutId="main-nav-hover"
-                        transition={SPRING_NAV_GLIDE}
-                      />
-                    )}
-                  {isActive &&
-                    !(isHome && (isHomeDropOver || isHomeDropCandidate)) && (
-                      <m.span
-                        className="nav-active-pill absolute inset-0 -z-10 rounded-[12px] bg-[#1c1c1f] dark:bg-[#f4f4f6] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.22)]"
-                        layoutId="main-nav-active"
-                        transition={SPRING_NAV_GLIDE}
-                      />
-                    )}
-                  <span className="relative z-10">{item.name}</span>
+                  {isActive && !dropState && (
+                    <m.span
+                      aria-hidden="true"
+                      className="nav-active-pill"
+                      layoutId="main-nav-active"
+                      transition={SPRING_NAV_GLIDE}
+                    />
+                  )}
+                  {item.name}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Right: Circular Utility Controls (Search, Activity/Support, Profile/Settings) */}
-          <div className="flex items-center justify-self-end gap-2.5 shrink-0 app-no-drag">
+          {/* Right: Workspace utilities */}
+          <div className="workspace-nav-utilities app-no-drag">
             {/* Quick Search Popover */}
             <div className="relative" ref={searchRef}>
               <button
@@ -630,7 +614,7 @@ export default function Sidebar() {
                 aria-controls="search-popover"
                 aria-label="Search workspace"
                 title={`Search workspace (${formatShortcut("Cmd+K", isMac)})`}
-                className="w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer"
+                className="workspace-nav-action"
               >
                 <Search className="w-[17px] h-[17px]" strokeWidth={1.9} />
               </button>
@@ -771,11 +755,11 @@ export default function Sidebar() {
                 aria-controls="notifications-popover"
                 aria-label="Workspace notifications"
                 title="Notifications & Activity"
-                className="relative w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer"
+                className="workspace-nav-action relative"
               >
                 <Bell className="w-[17px] h-[17px]" strokeWidth={1.9} />
                 {activeAlerts.length > 0 && (
-                  <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-surface" />
+                  <span className="absolute top-2 right-2 size-1.5 rounded-full bg-rose-500 ring-2 ring-surface" />
                 )}
               </button>
 
@@ -852,7 +836,7 @@ export default function Sidebar() {
             </div>
 
             {/* Active Profile Avatar Button (distinct framed profile picture with studio artwork) */}
-            <div className="relative ml-0.5" ref={profileRef}>
+            <div className="relative" ref={profileRef}>
               <button
                 type="button"
                 onClick={() => {
@@ -872,10 +856,10 @@ export default function Sidebar() {
                       ? activeProfileStyle.swatch
                       : activeProfileStyle.border,
                   boxShadow: profileOpen
-                    ? `0 0 0 3px ${activeProfileStyle.ring}, 0 8px 18px -4px ${activeProfileStyle.glow}`
-                    : `0 4px 12px -3px ${activeProfileStyle.glow}`,
+                    ? `0 0 0 2px ${activeProfileStyle.ring}`
+                    : undefined,
                 }}
-                className="relative w-10 h-10 p-[2px] rounded-full border-2 bg-surface flex items-center justify-center cursor-pointer group transition-[transform,border-color,box-shadow] duration-200 hover:scale-105"
+                className="relative size-9 p-[2px] rounded-full border bg-surface flex items-center justify-center cursor-pointer transition-[border-color,box-shadow] duration-150"
               >
                 <span
                   className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.22)_inset]"

@@ -20,6 +20,9 @@ import {
   Minimize2,
   X,
   Lightbulb,
+  TrendingUp,
+  Clock,
+  UsersRound,
 } from "lucide-react";
 import {
   useClients,
@@ -316,6 +319,7 @@ function WidgetContent({
   );
 
   const isCompact = displaySize === "compact";
+  const isDashboard = source === "dashboard";
 
   // Helper to render a Zentra Metric Card with a Dot-Matrix + Striped Bar
   const renderZentraMetric = ({
@@ -384,7 +388,7 @@ function WidgetContent({
               <div
                 className={`${
                   isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
               >
                 {value}
               </div>
@@ -415,7 +419,7 @@ function WidgetContent({
           </div>
         </div>
 
-        <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+        <div className="dashboard-widget-footer mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
           <span className="truncate text-[12px]">
             {footerLabel || badgeText}
           </span>
@@ -618,6 +622,9 @@ function WidgetContent({
             <div>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+                  {isDashboard && (
+                    <ArrowUpRight aria-hidden="true" className="dashboard-widget-mark" />
+                  )}
                   Gross Volume & Revenue
                 </h3>
               </div>
@@ -626,7 +633,7 @@ function WidgetContent({
                 <span
                   className={`${
                     isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                  } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                  } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
                 >
                   {totalRevenueStr}
                 </span>
@@ -691,8 +698,10 @@ function WidgetContent({
               </div>
             </div>
 
-            <div className="mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span className="truncate text-[12px]">{paidRatioPct}% collected</span>
+            <div className="dashboard-widget-footer mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span className="dashboard-widget-footer-copy truncate text-[12px]">
+                {paidRatioPct}% collected
+              </span>
               <Link
                 href="/invoices"
                 className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
@@ -715,12 +724,15 @@ function WidgetContent({
           >
             <div>
               <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+                {isDashboard && (
+                  <TrendingUp aria-hidden="true" className="dashboard-widget-mark" />
+                )}
                 {isLoss ? "Net Loss & Margin" : "Net Profit & Margin"}
               </h3>
               <div
                 className={`mt-3 ${
                   isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
               >
                 {netProfitStr}
               </div>
@@ -738,8 +750,10 @@ function WidgetContent({
                 />
               </div>
             </div>
-            <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span className="truncate text-[12px]">{marginPct}% net margin</span>
+            <div className="dashboard-widget-footer relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span className="dashboard-widget-footer-copy truncate text-[12px]">
+                {marginPct}% net margin
+              </span>
               <Link
                 href="/analytics"
                 className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
@@ -763,6 +777,12 @@ function WidgetContent({
             <div>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+                  {isDashboard && (
+                    <Clock
+                      aria-hidden="true"
+                      className="dashboard-widget-mark dashboard-widget-mark--receivables"
+                    />
+                  )}
                   Pending Receivables
                 </h3>
               </div>
@@ -772,7 +792,7 @@ function WidgetContent({
                   <div
                     className={`${
                       isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                    } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                    } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
                   >
                     {pendingReceivablesStr}
                   </div>
@@ -811,8 +831,8 @@ function WidgetContent({
               />
             </div>
 
-            <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span className="truncate text-[12px]">
+            <div className="dashboard-widget-footer relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span className="dashboard-widget-footer-copy truncate text-[12px]">
                 {pendingCount}{" "}
                 {pendingCount === 1 ? "invoice awaiting" : "invoices awaiting"}
               </span>
@@ -844,6 +864,12 @@ function WidgetContent({
             <div>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+                  {isDashboard && (
+                    <UsersRound
+                      aria-hidden="true"
+                      className="dashboard-widget-mark dashboard-widget-mark--clients"
+                    />
+                  )}
                   Customers & Clients
                 </h3>
               </div>
@@ -853,7 +879,7 @@ function WidgetContent({
                   <div
                     className={`${
                       isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                    } font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                    } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
                   >
                     {totalClientsCount.toLocaleString()}
                   </div>
@@ -875,8 +901,10 @@ function WidgetContent({
               <ActiveClientsMonthlyDots />
             </div>
 
-            <div className="relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span className="truncate text-[12px]">{activeClientsCount} active accounts</span>
+            <div className="dashboard-widget-footer relative z-10 mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+              <span className="dashboard-widget-footer-copy truncate text-[12px]">
+                {activeClientsCount} active accounts
+              </span>
               <Link
                 href="/clients"
                 className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
@@ -2029,6 +2057,7 @@ function WidgetContent({
 
   return (
     <div
+      data-size={isDashboard ? displaySize : undefined}
       draggable={isDraggable}
       onDragStart={(e) => {
         if (!isDraggable) return;
@@ -2056,7 +2085,7 @@ function WidgetContent({
           onContextMenu(e, widgetId);
         }
       }}
-      className={`group relative h-full transition-[opacity,box-shadow,translate] duration-200 ${
+      className={`${isDashboard ? "dashboard-widget " : ""}group relative h-full transition-[opacity,box-shadow,translate] duration-200 ${
         isDraggable
           ? "cursor-grab active:cursor-grabbing hover:-translate-y-0.5"
           : ""
@@ -2078,8 +2107,8 @@ function WidgetContent({
           <div className="w-9 h-1 rounded-full bg-content-neutral-400/45 dark:bg-white/25" />
         </div>
       )}
-      {source === "dashboard" && isEditing && (
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-1 p-1 bg-surface/95 rounded-full border border-line-neutral-200 shadow-md backdrop-blur-xs select-none">
+      {isDashboard && isEditing && (
+        <div className="dashboard-widget-controls absolute top-3 right-3 z-30 flex items-center gap-1 p-1 bg-surface/95 rounded-full border border-line-neutral-200 shadow-md backdrop-blur-xs select-none">
           {isEditing && onMoveLeft && (
             <button
               type="button"
