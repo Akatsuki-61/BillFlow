@@ -250,13 +250,13 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
 
 export const DEFAULT_DASHBOARD_WIDGET_IDS = [
   "total-revenue",
-  "net-profit",
+  "collected-revenue",
   "pending-receivables",
-  "active-clients",
-  "profit-trajectory-chart",
-  "revenue-expenses-chart",
-  "sprint-tasks",
+  "net-profit",
+  "cash-flow",
+  "collection-rate-gauge",
   "recent-invoices",
+  "active-clients",
 ];
 
 export const DEFAULT_ANALYTICS_WIDGET_IDS = WIDGET_CATALOG.filter(
@@ -269,6 +269,38 @@ export function canPinToDashboard(id: string | null): boolean {
   return id !== null && id !== WORKSPACE_INSIGHTS_WIDGET_ID;
 }
 
-export const DASHBOARD_WIDGET_CATALOG = WIDGET_CATALOG.filter((widget) =>
-  canPinToDashboard(widget.id),
-);
+const ledgerTitles: Record<string, string> = {
+  "total-revenue": "Gross invoiced",
+  "pending-receivables": "Outstanding",
+  "net-profit": "Net profit",
+  "collection-rate-gauge": "Payment breakdown",
+  "recent-invoices": "Recent invoices",
+  "active-clients": "Active clients",
+};
+
+export const DASHBOARD_WIDGET_CATALOG: WidgetMeta[] = [
+  ...WIDGET_CATALOG.filter((widget) => canPinToDashboard(widget.id)).map((widget) => ({
+    ...widget,
+    title: ledgerTitles[widget.id] ?? widget.title,
+    size: widget.id === "active-clients" ? ("medium" as const) : widget.size,
+    defaultOnDashboard: DEFAULT_DASHBOARD_WIDGET_IDS.includes(widget.id),
+  })),
+  {
+    id: "collected-revenue",
+    title: "Collected",
+    description: "Payments received against invoices issued in the selected period",
+    category: "financial",
+    size: "metric",
+    defaultOnDashboard: true,
+    defaultOnAnalytics: false,
+  },
+  {
+    id: "cash-flow",
+    title: "Cash flow",
+    description: "Six months of collected payments and paid costs",
+    category: "charts",
+    size: "wide",
+    defaultOnDashboard: true,
+    defaultOnAnalytics: false,
+  },
+];

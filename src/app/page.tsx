@@ -29,10 +29,14 @@ import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { DashboardMetricsProvider } from "@/components/dashboard/DashboardMetricsContext";
 import { useWidgetContext } from "@/context/WidgetContext";
-import { DASHBOARD_WIDGET_CATALOG } from "@/lib/widgets/widgetDefinitions";
+import {
+  DASHBOARD_WIDGET_CATALOG,
+  DEFAULT_DASHBOARD_WIDGET_IDS,
+} from "@/lib/widgets/widgetDefinitions";
 import { SelectDropdown, SelectOption } from "@/components/ui/SelectDropdown";
 import { formatShortcut, useIsMac } from "@/lib/platform-shortcuts";
 import { DashboardPeriod } from "@/types/dashboard";
+import "@/components/dashboard/ledger-widgets.css";
 
 const PERIOD_OPTIONS: SelectOption<DashboardPeriod>[] = [
   { value: "month", label: "This Month" },
@@ -207,34 +211,43 @@ export default function DashboardPage() {
     .map((id) => DASHBOARD_WIDGET_CATALOG.find((w) => w.id === id))
     .filter((w): w is NonNullable<typeof w> => Boolean(w));
 
-  // Asymmetric Zentra 12-column Bento Span Assignment for BillFlow widgets
+  // Ledger's two wide cards share their rows with narrower companion cards.
   const getColSpanClass = (widgetId: string, baseSize: string) => {
     const size = widgetSizes[widgetId] || "normal";
     const isCompact = size === "compact";
+    if (!isCompact && (widgetId === "cash-flow" || widgetId === "recent-invoices")) {
+      return "col-span-2 md:col-span-4 lg:col-span-8";
+    }
+    if (!isCompact && (widgetId === "collection-rate-gauge" || widgetId === "active-clients")) {
+      return "col-span-2 md:col-span-2 lg:col-span-4";
+    }
 
     if (baseSize === "metric") {
+      const span = DEFAULT_DASHBOARD_WIDGET_IDS.includes(widgetId)
+        ? "col-span-1"
+        : "col-span-2";
       return isCompact
-        ? "col-span-1 md:col-span-2 lg:col-span-2"
-        : "col-span-1 md:col-span-3 lg:col-span-3";
+        ? `${span} md:col-span-2 lg:col-span-2`
+        : `${span} md:col-span-3 lg:col-span-3`;
     }
     if (baseSize === "full") {
       return isCompact
-        ? "col-span-1 md:col-span-6 lg:col-span-6"
-        : "col-span-1 md:col-span-6 lg:col-span-12";
+        ? "col-span-2 md:col-span-6 lg:col-span-6"
+        : "col-span-2 md:col-span-6 lg:col-span-12";
     }
     if (baseSize === "medium") {
       return isCompact
-        ? "col-span-1 md:col-span-3 lg:col-span-3"
-        : "col-span-1 md:col-span-3 lg:col-span-4";
+        ? "col-span-2 md:col-span-3 lg:col-span-3"
+        : "col-span-2 md:col-span-3 lg:col-span-4";
     }
     if (baseSize === "wide") {
       return isCompact
-        ? "col-span-1 md:col-span-3 lg:col-span-4"
-        : "col-span-1 md:col-span-6 lg:col-span-6";
+        ? "col-span-2 md:col-span-3 lg:col-span-4"
+        : "col-span-2 md:col-span-6 lg:col-span-6";
     }
     return isCompact
-      ? "col-span-1 md:col-span-3 lg:col-span-4"
-      : "col-span-1 md:col-span-6 lg:col-span-6";
+      ? "col-span-2 md:col-span-3 lg:col-span-4"
+      : "col-span-2 md:col-span-6 lg:col-span-6";
   };
 
   return (
@@ -446,7 +459,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <DashboardMetricsProvider period={period}>
-          <div className="dashboard-grid grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4">
+          <div className="dashboard-grid grid grid-cols-2 gap-3 md:grid-cols-6 md:gap-4 lg:grid-cols-12">
             {pinnedWidgets.map((w, index) => {
             const colSpan = getColSpanClass(w.id, w.size);
             const isCompact = (widgetSizes[w.id] || "normal") === "compact";

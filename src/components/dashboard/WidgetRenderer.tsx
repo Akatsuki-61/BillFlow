@@ -20,9 +20,6 @@ import {
   Minimize2,
   X,
   Lightbulb,
-  TrendingUp,
-  Clock,
-  UsersRound,
 } from "lucide-react";
 import {
   useClients,
@@ -41,6 +38,8 @@ import { useWidgetContext } from "@/context/WidgetContext";
 import { computeCashflowRunwayCard } from "@/lib/widgets/chartData";
 import "../analytics/analytics.css";
 import { useDashboardMetrics } from "./DashboardMetricsContext";
+import { LedgerWidget } from "./LedgerWidget";
+import { DEFAULT_DASHBOARD_WIDGET_IDS } from "@/lib/widgets/widgetDefinitions";
 
 function ChartLoadingSkeleton() {
   return (
@@ -622,9 +621,6 @@ function WidgetContent({
             <div>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
-                  {isDashboard && (
-                    <ArrowUpRight aria-hidden="true" className="dashboard-widget-mark" />
-                  )}
                   Gross Volume & Revenue
                 </h3>
               </div>
@@ -724,9 +720,6 @@ function WidgetContent({
           >
             <div>
               <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
-                {isDashboard && (
-                  <TrendingUp aria-hidden="true" className="dashboard-widget-mark" />
-                )}
                 {isLoss ? "Net Loss & Margin" : "Net Profit & Margin"}
               </h3>
               <div
@@ -777,12 +770,6 @@ function WidgetContent({
             <div>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
-                  {isDashboard && (
-                    <Clock
-                      aria-hidden="true"
-                      className="dashboard-widget-mark dashboard-widget-mark--receivables"
-                    />
-                  )}
                   Pending Receivables
                 </h3>
               </div>
@@ -864,12 +851,6 @@ function WidgetContent({
             <div>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
-                  {isDashboard && (
-                    <UsersRound
-                      aria-hidden="true"
-                      className="dashboard-widget-mark dashboard-widget-mark--clients"
-                    />
-                  )}
                   Customers & Clients
                 </h3>
               </div>
@@ -2177,7 +2158,9 @@ function WidgetContent({
         </div>
       )}
 
-      {renderContent()}
+      {isDashboard && DEFAULT_DASHBOARD_WIDGET_IDS.includes(widgetId) ? (
+        <LedgerWidget widgetId={widgetId} compact={isCompact} />
+      ) : renderContent()}
     </div>
   );
 }

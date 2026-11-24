@@ -60,15 +60,32 @@ function isWidgetSizes(value: unknown): value is Record<string, WidgetDisplaySiz
 
 export function loadWidgetPreferences(storage: PreferenceStorage, profileId?: string) {
   const keys = getScopedWidgetStorageKeys(profileId);
+  const dashboardWidgets = readPreference(
+    storage, keys.dashboard, isWidgetList,
+    [...DEFAULT_DASHBOARD_WIDGET_IDS],
+  ).filter(canPinToDashboard);
+  const previousDefault = [
+    "total-revenue",
+    "net-profit",
+    "pending-receivables",
+    "active-clients",
+    "profit-trajectory-chart",
+    "revenue-expenses-chart",
+    "sprint-tasks",
+    "recent-invoices",
+  ];
+  const widgetSizes = readPreference(storage, keys.sizes, isWidgetSizes, {});
+  const usedPreviousDefault =
+    dashboardWidgets.length === previousDefault.length &&
+    dashboardWidgets.every((id, index) =>
+      id === previousDefault[index] && widgetSizes[id] !== "compact",
+    );
   return {
-    dashboardWidgets: readPreference(
-      storage, keys.dashboard, isWidgetList,
-      [...DEFAULT_DASHBOARD_WIDGET_IDS],
-    ).filter(canPinToDashboard),
+    dashboardWidgets: usedPreviousDefault ? [...DEFAULT_DASHBOARD_WIDGET_IDS] : dashboardWidgets,
     analyticsWidgets: readPreference(
       storage, keys.analytics, isWidgetList,
       [...DEFAULT_ANALYTICS_WIDGET_IDS],
     ),
-    widgetSizes: readPreference(storage, keys.sizes, isWidgetSizes, {}),
+    widgetSizes,
   };
 }

@@ -1878,28 +1878,6 @@ input[type="checkbox"] {
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.dashboard-widget > .ui-card h3:has(> .dashboard-widget-mark) {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: clamp(0.875rem, 4.7cqi, 1.0625rem);
-  letter-spacing: -0.02em;
-}
-.dashboard-widget-mark {
-  flex: none;
-  inline-size: 24px;
-  block-size: 24px;
-  padding: 5px;
-  border-radius: 7px;
-  color: var(--theme-accent);
-  background: color-mix(in srgb, currentColor 12%, transparent);
-}
-.dashboard-widget-mark--receivables {
-  color: var(--widget-amber);
-}
-.dashboard-widget-mark--clients {
-  color: var(--widget-green);
-}
 .dashboard-widget .dashboard-widget-value {
   font-size: clamp(1.625rem, 12cqi, 2.75rem);
   font-weight: 650;
