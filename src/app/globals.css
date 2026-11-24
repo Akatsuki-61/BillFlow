@@ -1315,9 +1315,10 @@ input[type="checkbox"] {
 
 /* Segmented navigation */
 .workspace-nav-track {
-  --nav-track: #eeecf1;
-  --nav-selection: #fff;
-  --nav-hover: #e4e0ea;
+  --nav-track: #e6e6eb;
+  --nav-selection: #18181c;
+  --nav-selection-text: #ffffff;
+  --nav-hover: rgba(17, 17, 21, 0.065);
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -1333,8 +1334,9 @@ input[type="checkbox"] {
 }
 :root[data-theme="dark"] .workspace-nav-track {
   --nav-track: var(--ui-inset);
-  --nav-selection: #30303c;
-  --nav-hover: var(--ui-hover);
+  --nav-selection: #f4f4f6;
+  --nav-selection-text: #111115;
+  --nav-hover: rgba(255, 255, 255, 0.075);
 }
 .workspace-nav-link {
   position: relative;
@@ -1342,20 +1344,24 @@ input[type="checkbox"] {
   display: block;
   padding: 0.4375rem 0.8125rem;
   border-radius: 9px;
-  color: var(--ui-secondary);
+  color: var(--ui-muted);
   font-size: 0.8125rem;
   font-weight: 550;
   line-height: 1.5;
   white-space: nowrap;
   transition: color 150ms ease, background-color 150ms ease;
 }
-.workspace-nav-link:hover {
+.workspace-nav-link:not([aria-current="page"]):hover {
   color: var(--ui-text);
   background: var(--nav-hover);
 }
 .workspace-nav-link[aria-current="page"] {
-  color: var(--ui-text);
-  font-weight: 670;
+  color: var(--nav-selection-text);
+  font-weight: 650;
+}
+.workspace-nav-link[aria-current="page"]:hover {
+  color: var(--nav-selection-text);
+  background: transparent;
 }
 .nav-active-pill {
   position: absolute;
@@ -1363,7 +1369,12 @@ input[type="checkbox"] {
   z-index: -1;
   border-radius: inherit;
   background: var(--nav-selection);
-  box-shadow: 0 1px 3px rgb(28 22 37 / 13%), inset 0 0 0 1px var(--ui-border);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.24);
+}
+@media (forced-colors: active) {
+  .nav-active-pill {
+    outline: 2px solid Highlight;
+  }
 }
 .workspace-nav-link[data-drop-state] {
   color: var(--ui-text);
@@ -1835,20 +1846,20 @@ input[type="checkbox"] {
   letter-spacing: -0.035em;
 }
 
-/* Overview tiles keep their own surfaces and chart colors. */
+/* Overview tiles align with the workspace neutral card surface. */
 .dashboard-widget {
   container-type: inline-size;
-  --widget-surface: #fdfcfe;
-  --widget-border: #e9e5ed;
-  --widget-shadow: 0 1px 2px rgb(32 24 43 / 7%), 0 5px 16px rgb(32 24 43 / 3%);
+  --widget-surface: var(--ui-surface);
+  --widget-border: var(--ui-border);
+  --widget-shadow: var(--ui-shadow);
   --widget-green: #438a79;
   --widget-rose: #b46b86;
   --widget-amber: #b67954;
 }
 :root[data-theme="dark"] .dashboard-widget {
-  --widget-surface: #1d1c25;
-  --widget-border: #302e3b;
-  --widget-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  --widget-surface: var(--ui-surface);
+  --widget-border: var(--ui-border);
+  --widget-shadow: var(--ui-shadow);
   --widget-green: #61aa95;
   --widget-rose: #d188a3;
   --widget-amber: #d39a76;
@@ -1861,6 +1872,12 @@ input[type="checkbox"] {
   border: 1px solid var(--widget-border);
   border-radius: 23px;
   box-shadow: var(--widget-shadow);
+}
+:root[data-theme="light"] .dashboard-grid .dashboard-widget > .ui-card {
+  border-color: #ffffff;
+  box-shadow:
+    0 2px 3px rgb(0 0 0 / 4%),
+    0 0 0 1px rgb(20 20 20 / 3%);
 }
 .dashboard-widget[data-size="compact"] > .ui-card {
   --widget-padding: clamp(0.875rem, 6cqi, 1rem);

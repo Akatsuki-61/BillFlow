@@ -1,18 +1,18 @@
 .ledger-widget {
-  --ledger-text: #1b1a24;
-  --ledger-muted: #62616d;
-  --ledger-line: #eae7ec;
-  --ledger-surface: #fff;
-  --ledger-metric-surface: #faf9fc;
-  --ledger-inset: #f6f3fa;
-  --ledger-purple: #5946ab;
-  --ledger-accent: #9c8ad8;
-  --ledger-accent-end: #b9a9e5;
-  --ledger-selected: #725cc7;
-  --ledger-selected-end: #a995e2;
-  --ledger-secondary: #ded7ee;
+  --ledger-text: var(--ui-text);
+  --ledger-muted: var(--ui-muted);
+  --ledger-line: var(--ui-border);
+  --ledger-surface: var(--ui-surface);
+  --ledger-metric-surface: var(--ui-surface);
+  --ledger-inset: var(--ui-hover);
+  --ledger-purple: var(--theme-accent);
+  --ledger-accent: color-mix(in oklab, var(--theme-accent) 72%, var(--ui-surface));
+  --ledger-accent-end: color-mix(in oklab, var(--theme-accent) 48%, var(--ui-surface));
+  --ledger-selected: var(--theme-accent-solid);
+  --ledger-selected-end: color-mix(in oklab, var(--theme-accent) 82%, var(--ui-surface));
+  --ledger-secondary: color-mix(in oklab, var(--ui-muted) 26%, var(--ui-surface));
   --ledger-paid: #479383;
-  --ledger-open: #8a76cd;
+  --ledger-open: color-mix(in oklab, var(--theme-accent) 78%, var(--ui-text));
   --ledger-late: #c8805d;
   display: flex;
   flex-direction: column;
@@ -21,31 +21,33 @@
   padding: 22px 24px;
   background: var(--ledger-surface);
   color: var(--ledger-text);
-  border: 1px solid white;
-  border-radius: 23px;
-  box-shadow: 0 1px 2px rgb(28 25 35 / 9%), 0 8px 19px rgb(34 23 52 / 2%);
+  border: 1px solid #ffffff;
+  border-radius: 24px;
+  box-shadow:
+    0 2px 3px rgb(0 0 0 / 4%),
+    0 0 0 1px rgb(20 20 20 / 3%);
   font-size: 0.875rem;
   line-height: 1.45;
 }
 
 :root[data-theme="dark"] .ledger-widget {
-  --ledger-text: #f4f2fa;
-  --ledger-muted: #b9b5c6;
-  --ledger-line: #383443;
-  --ledger-surface: #201d29;
-  --ledger-metric-surface: #24202e;
-  --ledger-inset: #302839;
-  --ledger-purple: #c6b6ff;
-  --ledger-accent: #a28de3;
-  --ledger-accent-end: #7d65ba;
-  --ledger-selected: #c1abff;
-  --ledger-selected-end: #8a73ca;
-  --ledger-secondary: #685e82;
+  --ledger-text: var(--ui-text);
+  --ledger-muted: var(--ui-muted);
+  --ledger-line: var(--ui-border);
+  --ledger-surface: var(--ui-surface);
+  --ledger-metric-surface: var(--ui-surface);
+  --ledger-inset: var(--ui-subtle);
+  --ledger-purple: var(--theme-accent);
+  --ledger-accent: color-mix(in oklab, var(--theme-accent) 78%, var(--ui-surface));
+  --ledger-accent-end: color-mix(in oklab, var(--theme-accent) 46%, var(--ui-surface));
+  --ledger-selected: var(--theme-accent);
+  --ledger-selected-end: var(--theme-accent-solid);
+  --ledger-secondary: color-mix(in oklab, var(--ui-muted) 32%, var(--ui-surface));
   --ledger-paid: #66b6a1;
-  --ledger-open: #a998e3;
+  --ledger-open: var(--theme-accent);
   --ledger-late: #df9b78;
-  border-color: var(--ledger-line);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 26%);
+  border-color: var(--ui-border);
+  box-shadow: var(--ui-shadow);
 }
 
 .ledger-widget--metric {
