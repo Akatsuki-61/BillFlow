@@ -88,7 +88,9 @@ BillFlow is built around interconnected workflows rather than isolated screens. 
 │  │         Main Process (Node.js + Electron Core)         │  │
 │  │                                                       │  │
 │  │  • IPC Controllers: invoices, tasks, clients,         │  │
-│  │    expenses, vendors, profiles, backup, calendar      │  │
+│  │    expenses, vendors, profiles, backup, calendar, ai  │  │
+│  │  • Local AI Engine: tesseract.js LSTM OCR +           │  │
+│  │    @huggingface/transformers (MiniLM & Qwen2.5 ONNX)  │  │
 │  │  • Persistence: SQLite 3 via better-sqlite3 + Drizzle │  │
 │  │  • PDF Engine: pdf-lib (vector PDF generation)        │  │
 │  │  • File Storage: userData/receipts and backups        │  │
@@ -97,6 +99,7 @@ BillFlow is built around interconnected workflows rather than isolated screens. 
 ```
 
 - **Runtime**: Node.js LTS (v20/v22), Electron 44, Next.js 16 (App Router), React 19, TypeScript 5.
+- **Local AI & OCR**: `tesseract.js` (bundled offline `eng.traineddata.gz`), `@huggingface/transformers` + `onnxruntime-node` (bundled `Xenova/all-MiniLM-L6-v2` quantized ONNX + optional on-demand `onnx-community/Qwen2.5-0.5B-Instruct` INT8 ONNX in `userData/models/`).
 - **Embedded Database**: Local SQLite 3 (`billflow.db`) inside Electron `app.getPath("userData")`. Managed with Drizzle ORM schemas (`electron/db/schema.ts`) and versioned migrations in `drizzle/`.
 - **IPC Interface**: Typed bridge exposed via `electron/preload.ts` and declared in `src/types/billflow-api.d.ts`. All handlers validate payloads using Zod schemas (`electron/validation.ts`, `electron/workflow-validation.ts`).
 - **Data Integrity**: Financial figures are stored as integer minor units (cents) with an explicit currency token. Foreign keys maintain referential integrity with cascade rules.

@@ -2,7 +2,11 @@
 
 Notable changes between BillFlow desktop releases.
 
-## Unreleased (`Nipun` branch)
+## Unreleased (`main`)
+
+### Dashboard & Workspace Navigation
+
+- Replaced overview widgets with Ledger designs (`LedgerWidget.tsx`, `ledger-widgets.css`) and refined workspace header navigation tabs.
 
 ### Smart Capture & Local AI Suite (Two-Tier Local AI & Offline OCR)
 
@@ -11,6 +15,7 @@ Notable changes between BillFlow desktop releases.
 - Added **Expense Receipt Scanner** inside **Expenses** (`src/app/expenses/page.tsx`, `ai:scanExpenseReceipt`) with a **Scan Receipt** header action, paste/drop auto-scan, merchant/total/date extraction, and `all-MiniLM-L6-v2` neural OPEX category classification.
 - Added client-side screenshot preprocessing (`src/lib/image-preprocess.ts`) that detects dark-mode chat captures, auto-inverts them to dark-on-light text, upscales small screenshots, and enhances contrast before offline OCR.
 - Implemented a bundled **Standard** offline AI tier (~25.6 MB total via `scripts/prepare-ai-models.mjs` into `extraResources`) plus an optional **Enhanced** local LLM tier (`onnx-community/Qwen2.5-0.5B-Instruct` INT8 ONNX) managed in **Settings → AI & Capture** with download progress, cancel, delete, idle RAM disposal, and fallback to Standard.
+- Added **Local AI & OCR** FAQs to the in-app Help & Support screen (`src/app/support/page.tsx`).
 - Configured cross-platform macOS ARM64 and Windows x64 Electron packaging (`electron-builder.yml` ASAR unpacking and surgical platform binary trimming) plus updated runtime third-party notices.
 
 ## v0.3.0 (2026-11-20)
