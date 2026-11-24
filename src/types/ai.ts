@@ -4,6 +4,17 @@ export type AiModelTier = "standard" | "enhanced";
 
 export type AiDownloadState = "idle" | "downloading" | "error";
 
+export type AiCaptureIntent = "invoice" | "quote" | "tasks";
+
+export type AiExpenseCategory =
+  | "SOFTWARE"
+  | "AI INFRASTRUCTURE"
+  | "HOSTING"
+  | "TRAVEL"
+  | "MEALS"
+  | "OFFICE"
+  | "HARDWARE";
+
 export interface AiStatus {
   activeTier: AiModelTier;
   ocrReady: boolean;
@@ -71,5 +82,57 @@ export interface AiExtractedInvoiceDraft {
   deliveryUrl?: string | null;
   notes?: string | null;
   items: AiExtractedDeliverable[];
+  detectedIntent: AiCaptureIntent;
+  intentConfidence: number;
+  intentReason: string;
+  warnings: string[];
+}
+
+export interface AiPaymentSlipScanInput {
+  imageBase64?: string;
+  stagedToken?: string;
+  expectedAmountCents?: number;
+  expectedAdvanceCents?: number;
+  expectedCurrency?: Currency;
+}
+
+export interface AiPaymentSlipMismatch {
+  kind: "underpaid" | "overpaid" | "currency_mismatch";
+  message: string;
+}
+
+export interface AiPaymentSlipScanResult {
+  ocrText: string;
+  amount: string | null;
+  amountCents: number | null;
+  currency: Currency | null;
+  paymentDate: string | null;
+  reference: string | null;
+  bankName: string | null;
+  confidence: number;
+  durationMs: number;
+  matchLabel: string | null;
+  mismatch: AiPaymentSlipMismatch | null;
+  warnings: string[];
+}
+
+export interface AiExpenseReceiptScanInput {
+  imageBase64?: string;
+  stagedToken?: string;
+  text?: string;
+}
+
+export interface AiExpenseReceiptScanResult {
+  ocrText: string;
+  merchant: string | null;
+  description: string | null;
+  amount: string | null;
+  amountCents: number | null;
+  currency: Currency | null;
+  incurredAt: string | null;
+  category: AiExpenseCategory;
+  categoryConfidence: number;
+  categorySource: "neural" | "heuristic";
+  durationMs: number;
   warnings: string[];
 }

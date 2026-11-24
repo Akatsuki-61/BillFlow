@@ -5,8 +5,12 @@ import { getDb } from "../db";
 import { clients as clientsTable, catalogItems as catalogTable } from "../db/schema";
 import type {
   AiDownloadProgressEvent,
+  AiExpenseReceiptScanInput,
+  AiExpenseReceiptScanResult,
   AiExtractedInvoiceDraft,
   AiExtractionInput,
+  AiPaymentSlipScanInput,
+  AiPaymentSlipScanResult,
   AiStatus,
 } from "../../src/types/ai";
 import type { Currency } from "../../src/types/billing";
@@ -23,8 +27,14 @@ import {
   type CatalogMatchCandidate,
   type ClientMatchCandidate,
 } from "../ai/entity-parser";
+import {
+  parseBankTransferSlip,
+  parseExpenseReceiptDeterministically,
+} from "../ai/document-parsers";
 import { disposeOcrWorker, runLocalOcr } from "../ai/ocr";
 import {
+  classifyCaptureIntentWithStandardModel,
+  classifyExpenseCategoryWithStandardModel,
   disposeStandardModel,
   enrichDeliverablesWithStandardModel,
 } from "../ai/semantic-standard";
@@ -32,8 +42,10 @@ import {
   disposeEnhancedLlm,
   runEnhancedLlmExtraction,
 } from "../ai/llm-enhanced";
+import { peekStagedAttachmentBytes } from "./files";
 
 const tierSchema = z.enum(["standard", "enhanced"]);
+const currencySchema = z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]);
 
 const extractInputSchema = z
   .object({
@@ -48,6 +60,28 @@ const extractInputSchema = z
       Boolean(v.imageBase64 && v.imageBase64.trim().length > 0),
     { message: "Paste a client message or screenshot before analyzing." },
   );
+
+const paymentSlipScanSchema = z
+  .object({
+    imageBase64: z.string().max(24_000_000).optional(),
+    stagedToken: z.string().min(8).max(128).optional(),
+    expectedAmountCents: z.number().int().min(0).optional(),
+    expectedAdvanceCents: z.number().int().min(0).optional(),
+    expectedCurrency: currencySchema.optional(),
+  })
+  .refine((v) => Boolean(v.imageBase64 || v.stagedToken), {
+    message: "Provide a bank slip image to scan.",
+  });
+
+const expenseReceiptScanSchema = z
+  .object({
+    imageBase64: z.string().max(24_000_000).optional(),
+    stagedToken: z.string().min(8).max(128).optional(),
+    text: z.string().max(40_000).optional(),
+  })
+  .refine((v) => Boolean(v.imageBase64 || v.stagedToken || v.text?.trim()), {
+    message: "Provide a receipt image or text to scan.",
+  });
 
 function loadActiveClientsForMatching(): ClientMatchCandidate[] {
   const rows = getDb().select().from(clientsTable).all();
@@ -159,17 +193,22 @@ export async function extractInvoiceFromMessage(
     }
   }
 
-  // Step 3: Bundled Standard MiniLM semantic filtering + Service Catalog auto-pricing match
-  const enriched = await enrichDeliverablesWithStandardModel(
-    items,
-    catalogCandidates,
-    currency ?? deterministic.matchedClient?.currency ?? null,
-  );
+  // Step 3: Bundled Standard MiniLM semantic filtering + Service Catalog auto-pricing + Intent classification
+  const [enriched, intent] = await Promise.all([
+    enrichDeliverablesWithStandardModel(
+      items,
+      catalogCandidates,
+      currency ?? deterministic.matchedClient?.currency ?? null,
+    ),
+    classifyCaptureIntentWithStandardModel(
+      deterministic.cleanedText || combinedText,
+    ),
+  ]);
   items = enriched.items;
 
   if (items.length === 0) {
     warnings.push(
-      "Could not detect specific deliverables automatically. You can still add line items directly in the invoice dialog.",
+      "Could not detect specific deliverables automatically. You can still add line items directly in the form.",
     );
   }
 
@@ -188,7 +227,128 @@ export async function extractInvoiceFromMessage(
     deliveryUrl: deterministic.deliveryUrl,
     notes,
     items,
+    detectedIntent: intent.intent,
+    intentConfidence: intent.confidence,
+    intentReason: intent.reason,
     warnings,
+  };
+}
+
+function resolveScanImageDataUrl(
+  imageBase64: string | undefined,
+  stagedToken: string | undefined,
+  sender?: Electron.WebContents,
+): string {
+  if (imageBase64 && imageBase64.trim()) return imageBase64;
+  if (stagedToken && sender) {
+    const staged = peekStagedAttachmentBytes(sender, stagedToken);
+    if (!staged.mimeType.startsWith("image/")) {
+      throw new Error(
+        "Automatic OCR scanning supports PNG, JPEG, and WebP images. PDFs can still be attached directly.",
+      );
+    }
+    return `data:${staged.mimeType};base64,${staged.bytes.toString("base64")}`;
+  }
+  throw new Error("No readable image was provided for scanning.");
+}
+
+export async function scanPaymentSlip(
+  rawInput: AiPaymentSlipScanInput,
+  sender?: Electron.WebContents,
+): Promise<AiPaymentSlipScanResult> {
+  const startedAt = Date.now();
+  const input = paymentSlipScanSchema.parse(rawInput);
+  const dataUrl = resolveScanImageDataUrl(
+    input.imageBase64,
+    input.stagedToken,
+    sender,
+  );
+  const ocr = await runLocalOcr(dataUrl);
+  if (!ocr.text) {
+    throw new Error(
+      "No readable text was found on this payment slip. Try a clearer image or enter the payment manually.",
+    );
+  }
+
+  const parsed = parseBankTransferSlip(ocr.text, {
+    expectedAmountCents: input.expectedAmountCents,
+    expectedAdvanceCents: input.expectedAdvanceCents,
+    expectedCurrency: input.expectedCurrency,
+  });
+
+  if (ocr.confidence > 0 && ocr.confidence < 0.5) {
+    parsed.warnings.push(
+      "Low OCR confidence on this slip — double-check the extracted amount and reference.",
+    );
+  }
+
+  return {
+    ocrText: ocr.text,
+    amount: parsed.amount,
+    amountCents: parsed.amountCents,
+    currency: parsed.currency,
+    paymentDate: parsed.paymentDate,
+    reference: parsed.reference,
+    bankName: parsed.bankName,
+    confidence: ocr.confidence,
+    durationMs: Date.now() - startedAt,
+    matchLabel: parsed.matchLabel,
+    mismatch: parsed.mismatch,
+    warnings: parsed.warnings,
+  };
+}
+
+export async function scanExpenseReceipt(
+  rawInput: AiExpenseReceiptScanInput,
+  sender?: Electron.WebContents,
+): Promise<AiExpenseReceiptScanResult> {
+  const startedAt = Date.now();
+  const input = expenseReceiptScanSchema.parse(rawInput);
+  const warnings: string[] = [];
+
+  let ocrText = (input.text || "").trim();
+  if (input.imageBase64 || input.stagedToken) {
+    const dataUrl = resolveScanImageDataUrl(
+      input.imageBase64,
+      input.stagedToken,
+      sender,
+    );
+    const ocr = await runLocalOcr(dataUrl);
+    if (!ocr.text && !ocrText) {
+      throw new Error(
+        "No readable text was found on this receipt. Try a clearer photo or enter the expense manually.",
+      );
+    }
+    if (ocr.confidence > 0 && ocr.confidence < 0.5) {
+      warnings.push(
+        "Low OCR confidence on this receipt — verify merchant and total before saving.",
+      );
+    }
+    ocrText = ocrText ? `${ocrText}\n${ocr.text}` : ocr.text;
+  }
+
+  const parsed = parseExpenseReceiptDeterministically(ocrText);
+  const classified = await classifyExpenseCategoryWithStandardModel({
+    merchant: parsed.merchant,
+    description: parsed.description,
+    ocrText,
+    heuristicCategory: parsed.heuristicCategory,
+    matchedKnownMerchant: parsed.matchedKnownMerchant,
+  });
+
+  return {
+    ocrText,
+    merchant: parsed.merchant,
+    description: parsed.description,
+    amount: parsed.amount,
+    amountCents: parsed.amountCents,
+    currency: parsed.currency,
+    incurredAt: parsed.incurredAt,
+    category: classified.category,
+    categoryConfidence: classified.confidence,
+    categorySource: classified.source,
+    durationMs: Date.now() - startedAt,
+    warnings: [...warnings, ...parsed.warnings],
   };
 }
 
@@ -224,6 +384,23 @@ export function registerAiHandlers(
     "ai:extractInvoice",
     async (_event, input: unknown): Promise<AiExtractedInvoiceDraft> => {
       return extractInvoiceFromMessage(input as AiExtractionInput);
+    },
+  );
+
+  ipcMain.handle(
+    "ai:scanPaymentSlip",
+    async (event, input: unknown): Promise<AiPaymentSlipScanResult> => {
+      return scanPaymentSlip(input as AiPaymentSlipScanInput, event.sender);
+    },
+  );
+
+  ipcMain.handle(
+    "ai:scanExpenseReceipt",
+    async (event, input: unknown): Promise<AiExpenseReceiptScanResult> => {
+      return scanExpenseReceipt(
+        input as AiExpenseReceiptScanInput,
+        event.sender,
+      );
     },
   );
 

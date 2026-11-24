@@ -78,9 +78,13 @@ import type {
 } from "../src/types/calendar";
 import type {
   AiDownloadProgressEvent,
+  AiExpenseReceiptScanInput,
+  AiExpenseReceiptScanResult,
   AiExtractedInvoiceDraft,
   AiExtractionInput,
   AiModelTier,
+  AiPaymentSlipScanInput,
+  AiPaymentSlipScanResult,
   AiStatus,
 } from "../src/types/ai";
 
@@ -548,6 +552,13 @@ if (process.isMainFrame && trustedDocument)
       extractInvoice: (
         input: AiExtractionInput,
       ): Promise<AiExtractedInvoiceDraft> => invoke("ai:extractInvoice", input),
+      scanPaymentSlip: (
+        input: AiPaymentSlipScanInput,
+      ): Promise<AiPaymentSlipScanResult> => invoke("ai:scanPaymentSlip", input),
+      scanExpenseReceipt: (
+        input: AiExpenseReceiptScanInput,
+      ): Promise<AiExpenseReceiptScanResult> =>
+        invoke("ai:scanExpenseReceipt", input),
       downloadEnhancedModel: (): Promise<AiStatus> =>
         invoke("ai:downloadEnhancedModel"),
       cancelDownload: (): Promise<AiStatus> => invoke("ai:cancelDownload"),

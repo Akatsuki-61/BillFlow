@@ -63,9 +63,13 @@ import type {
 } from "./calendar";
 import type {
   AiDownloadProgressEvent,
+  AiExpenseReceiptScanInput,
+  AiExpenseReceiptScanResult,
   AiExtractedInvoiceDraft,
   AiExtractionInput,
   AiModelTier,
+  AiPaymentSlipScanInput,
+  AiPaymentSlipScanResult,
   AiStatus,
 } from "./ai";
 
@@ -456,6 +460,12 @@ export interface BillFlowAPI extends WorkflowAPI {
     extractInvoice: (
       input: AiExtractionInput,
     ) => Promise<AiExtractedInvoiceDraft>;
+    scanPaymentSlip: (
+      input: AiPaymentSlipScanInput,
+    ) => Promise<AiPaymentSlipScanResult>;
+    scanExpenseReceipt: (
+      input: AiExpenseReceiptScanInput,
+    ) => Promise<AiExpenseReceiptScanResult>;
     downloadEnhancedModel: () => Promise<AiStatus>;
     cancelDownload: () => Promise<AiStatus>;
     removeEnhancedModel: () => Promise<AiStatus>;

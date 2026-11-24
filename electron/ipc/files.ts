@@ -387,6 +387,48 @@ function storeReceiptSelection(
   return token;
 }
 
+/**
+ * Non-consuming, sender-verified read of a staged receipt capability token for
+ * local OCR scanning (so the subsequent attachment save still succeeds).
+ */
+export function peekStagedAttachmentBytes(
+  sender: Electron.WebContents,
+  token: string,
+): { bytes: Buffer; originalName: string; mimeType: string } {
+  const selection = selections.get(token);
+  if (
+    !selection ||
+    selection.sender !== sender ||
+    selection.expires < Date.now()
+  ) {
+    throw new Error(
+      "Receipt preview expired. Please re-select the receipt file.",
+    );
+  }
+  if (selection.bytes) {
+    const { mimeType } = receiptFormat(selection.bytes);
+    return {
+      bytes: selection.bytes,
+      originalName: selection.originalName || "receipt",
+      mimeType,
+    };
+  }
+  if (!selection.source) {
+    throw new Error("Staged receipt has no readable source.");
+  }
+  assertNonSymlinkFile(selection.source, "Receipt cannot be a symbolic link.");
+  const bytes = fs.readFileSync(selection.source);
+  if (bytes.length === 0 || bytes.length > MAX_RECEIPT_BYTES) {
+    throw new Error("Receipt must be smaller than 20 MB.");
+  }
+  const { mimeType } = receiptFormat(bytes);
+  return {
+    bytes,
+    originalName: path.basename(selection.source),
+    mimeType,
+  };
+}
+
 function stageValidatedReceiptPath(
   sender: Electron.WebContents,
   workspace: ReturnType<typeof captureWorkspace>,
