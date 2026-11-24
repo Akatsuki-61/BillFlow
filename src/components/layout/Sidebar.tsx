@@ -525,7 +525,7 @@ export default function Sidebar() {
                   className="hidden dark:block"
                 />
               </div>
-              <span className="text-[21px] font-semibold tracking-[-0.04em] text-content-neutral-950 leading-none pointer-events-none">
+              <span className="text-[20px] font-medium tracking-[-0.035em] text-content-neutral-950 leading-none pointer-events-none">
                 BillFlow
               </span>
             </Link>
@@ -613,7 +613,7 @@ export default function Sidebar() {
             })}
           </nav>
 
-          {/* Right: Circular Utility Controls (Smart Capture, Search, Activity/Support, Profile/Settings) */}
+          {/* Right: Delicate 42px Hairline Utility Circles (Smart Capture, Search, Bell, Profile) */}
           <div className="flex items-center justify-self-end gap-2.5 shrink-0 app-no-drag">
             {/* Smart Invoice Capture Drawer Trigger */}
             <button
@@ -627,13 +627,13 @@ export default function Sidebar() {
               aria-expanded={aiCaptureOpen}
               aria-label="Smart Capture from screenshot or message"
               title={`Smart Capture (${formatShortcut("Cmd+Shift+I", isMac)})`}
-              className={`w-10 h-10 rounded-full border flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer transition-colors ${
+              className={`w-[42px] h-[42px] rounded-full border flex items-center justify-center cursor-pointer transition-colors ${
                 aiCaptureOpen
-                  ? "border-accent bg-accent-faint text-accent"
-                  : "border-line-neutral-200 bg-surface/85 hover:bg-surface text-content-neutral-800"
+                  ? "border-accent bg-accent-faint text-accent shadow-[0_2px_10px_-2px_color-mix(in_srgb,var(--theme-accent-solid)_30%,transparent)]"
+                  : "border-line-neutral-300/80 dark:border-line-neutral-200 bg-transparent hover:bg-surface-bright text-content-neutral-900"
               }`}
             >
-              <Sparkles className="w-[17px] h-[17px]" strokeWidth={1.9} />
+              <Sparkles className="w-[17px] h-[17px]" strokeWidth={1.6} />
             </button>
 
             {/* Quick Search Popover */}
@@ -646,9 +646,9 @@ export default function Sidebar() {
                 aria-controls="search-popover"
                 aria-label="Search workspace"
                 title={`Search workspace (${formatShortcut("Cmd+K", isMac)})`}
-                className="w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer"
+                className="w-[42px] h-[42px] rounded-full border border-line-neutral-300/80 dark:border-line-neutral-200 bg-transparent hover:bg-surface-bright flex items-center justify-center text-content-neutral-900 cursor-pointer"
               >
-                <Search className="w-[17px] h-[17px]" strokeWidth={1.9} />
+                <Search className="w-[17px] h-[17px]" strokeWidth={1.6} />
               </button>
 
               <MotionPresence>
@@ -787,11 +787,11 @@ export default function Sidebar() {
                 aria-controls="notifications-popover"
                 aria-label="Workspace notifications"
                 title="Notifications & Activity"
-                className="relative w-10 h-10 rounded-full border border-line-neutral-200 bg-surface/85 hover:bg-surface flex items-center justify-center text-content-neutral-800 shadow-[0_1px_2px_rgba(0,0,0,0.03)] cursor-pointer"
+                className="relative w-[42px] h-[42px] rounded-full border border-line-neutral-300/80 dark:border-line-neutral-200 bg-transparent hover:bg-surface-bright flex items-center justify-center text-content-neutral-900 cursor-pointer"
               >
-                <Bell className="w-[17px] h-[17px]" strokeWidth={1.9} />
+                <Bell className="w-[17px] h-[17px]" strokeWidth={1.6} />
                 {activeAlerts.length > 0 && (
-                  <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-surface" />
+                  <span className="absolute top-[10px] right-[11px] w-[7px] h-[7px] rounded-full bg-[#ff4d2a] ring-[1.5px] ring-canvas" />
                 )}
               </button>
 
@@ -867,7 +867,7 @@ export default function Sidebar() {
               </MotionPresence>
             </div>
 
-            {/* Active Profile Avatar Button (distinct framed profile picture with studio artwork) */}
+            {/* Active Profile Avatar Button (crisp 2px iridescent conic ring + white inner spacer) */}
             <div className="relative ml-0.5" ref={profileRef}>
               <button
                 type="button"
@@ -881,20 +881,15 @@ export default function Sidebar() {
                 aria-label={`Profile (${activeProfile.name}) and workspace settings`}
                 title={`${activeProfile.name} · ${activeProfile.subtitle}`}
                 style={{
-                  borderColor:
-                    profileOpen ||
-                    isNavActive(pathname, "/settings") ||
-                    isNavActive(pathname, "/support")
-                      ? activeProfileStyle.swatch
-                      : activeProfileStyle.border,
                   boxShadow: profileOpen
-                    ? `0 0 0 3px ${activeProfileStyle.ring}, 0 8px 18px -4px ${activeProfileStyle.glow}`
-                    : `0 4px 12px -3px ${activeProfileStyle.glow}`,
+                    ? `0 0 0 3px ${activeProfileStyle.ring}`
+                    : "0 2px 8px -2px rgba(0,0,0,0.12)",
                 }}
-                className="relative w-10 h-10 p-[2px] rounded-full border-2 bg-surface flex items-center justify-center cursor-pointer group transition-[transform,border-color,box-shadow] duration-200 hover:scale-105"
+                className="relative w-[42px] h-[42px] p-[2px] rounded-full profile-iridescent-ring flex items-center justify-center cursor-pointer group transition-[transform,box-shadow] duration-200 hover:scale-105"
               >
+                <span className="relative w-full h-full rounded-full p-[1.5px] bg-canvas flex items-center justify-center">
                 <span
-                  className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.22)_inset]"
+                  className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center"
                   style={{
                     background: activeProfileStyle.bg,
                     color: activeProfileStyle.iconColor,
@@ -959,30 +954,25 @@ export default function Sidebar() {
                       src={activeProfile.photoData}
                       alt=""
                       fill
-                      sizes="40px"
+                      sizes="42px"
                       className="z-10 object-cover"
                     />
                   ) : (
                     <ActiveProfileIcon
                       className="w-4 h-4 relative z-10"
-                      strokeWidth={2.1}
+                      strokeWidth={2}
                     />
                   )}
                 </span>
+                </span>
 
-                {/* Profile status / lock badge */}
-                {activeProfile.hasPassword ? (
+                {activeProfile.hasPassword && (
                   <span
                     aria-hidden="true"
                     className="absolute -bottom-0.5 -right-0.5 z-20 w-3.5 h-3.5 rounded-full bg-zinc-900 text-zinc-100 ring-2 ring-canvas flex items-center justify-center shadow-xs"
                   >
                     <Lock className="w-2 h-2" strokeWidth={2.4} />
                   </span>
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    className="absolute bottom-0 right-0 z-20 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-canvas"
-                  />
                 )}
               </button>
 

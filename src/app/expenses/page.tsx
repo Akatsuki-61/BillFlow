@@ -809,7 +809,7 @@ function ExpensesContent() {
               setCurrentPage(1);
             }}
             options={EXPENSE_CATEGORY_OPTIONS}
-            buttonClassName="ui-field h-[38px] px-3.5 flex items-center justify-between gap-2 border border-line-neutral-200/90 font-semibold text-content-neutral-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-line-neutral-300 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/40 w-44"
+            buttonClassName="zentra-control-pill--white w-44"
             menuClassName="w-48"
           />
 
@@ -966,31 +966,19 @@ function ExpensesContent() {
       </ReportingGuard>
 
       {/* Expenses Table */}
-      <div className="ui-card overflow-hidden">
+      <div className="ui-card !p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="record-table w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-line-neutral-200/60 bg-surface-bright">
-                <th className="w-16 py-3.5 px-6"></th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest">
-                  DATE
-                </th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest">
-                  MERCHANT / DESCRIPTION
-                </th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest">
-                  CATEGORY
-                </th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest">
-                  AMOUNT
-                </th>
-                <th className="py-3.5 px-4 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest text-center">
-                  DEDUCTIBLE
-                </th>
-                <th className="py-3.5 px-6 text-[11px] font-semibold text-content-neutral-400 uppercase tracking-widest text-center">
-                  RECEIPT
-                </th>
-                <th className="w-24 py-3.5 px-4"></th>
+              <tr>
+                <th className="w-16"></th>
+                <th>Date</th>
+                <th>Merchant &amp; Description</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th className="text-center">Deductible</th>
+                <th className="text-center">Receipt</th>
+                <th className="w-24"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line-neutral-100 text-xs">

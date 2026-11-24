@@ -2,6 +2,7 @@
 
 import { Check, KeyRound, Lock, Plus, UsersRound } from "lucide-react";
 import { useProfiles } from "@/context/ProfileContext";
+import { useTheme } from "@/context/ThemeContext";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { Button } from "@/components/ui/Workspace";
 import {
@@ -44,6 +45,7 @@ export function WorkspaceProfileFields({
     openProfileGate,
     lockCurrentProfile,
   } = useProfiles();
+  const { setAccent } = useTheme();
   const profile = { ...activeProfile, ...draft };
 
   return (
@@ -258,11 +260,16 @@ export function WorkspaceProfileFields({
                     className="peer sr-only"
                     aria-label={style.label}
                     checked={profile.accent === accent}
-                    onChange={() =>
+                    onChange={(e) => {
+                      const nextAccent = accent as typeof profile.accent;
                       onProfileChange({
-                        accent: accent as typeof profile.accent,
-                      })
-                    }
+                        accent: nextAccent,
+                      });
+                      setAccent(nextAccent, {
+                        persistProfile: false,
+                        trigger: e.currentTarget,
+                      });
+                    }}
                   />
                   <span
                     className="grid size-10 place-items-center rounded-full border border-line-neutral-300 text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"

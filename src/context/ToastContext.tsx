@@ -9,8 +9,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { AlertCircle, CheckCircle2, X } from "lucide-react";
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { MotionPresence } from "@/components/ui/MotionSurface";
+import { ToastBanner } from "@/components/ui/ToastBanner";
 
 export type ToastVariant = "success" | "error" | "info";
 
@@ -97,44 +97,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       <MotionPresence>
         {toast && (
-          <MotionSurface
+          <ToastBanner
             key={toast.id}
-            kind="toast"
-            role="status"
-            aria-live="polite"
-            className={`bf-toast-popup fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl shadow-[0_14px_30px_-6px_rgba(0,0,0,0.38)] border max-w-md ${
-              toast.type === "error"
-                ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
-                : "bg-surface-neutral-900 border-line-neutral-700 text-white"
-            }`}
-          >
-            {toast.type === "error" ? (
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-            ) : (
-              <CheckCircle2 className="success-confirm-pulse rounded-full w-4 h-4 text-content-emerald-400 shrink-0" />
-            )}
-            <span className="min-w-0 flex-1 leading-snug">{toast.message}</span>
-            {toast.action && (
-              <button
-                type="button"
-                onClick={() => {
-                  toast.action?.onClick();
-                  dismissToast();
-                }}
-                className="shrink-0 text-xs font-semibold underline underline-offset-2 text-accent hover:opacity-90 cursor-pointer"
-              >
-                {toast.action.label}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={dismissToast}
-              aria-label="Dismiss notification"
-              className="shrink-0 p-0.5 rounded-md text-white/60 hover:text-white cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </MotionSurface>
+            message={toast.message}
+            variant={toast.type}
+            action={
+              toast.action
+                ? {
+                    label: toast.action.label,
+                    onClick: () => {
+                      toast.action?.onClick();
+                      dismissToast();
+                    },
+                  }
+                : undefined
+            }
+            onDismiss={dismissToast}
+          />
         )}
       </MotionPresence>
     </ToastContext.Provider>

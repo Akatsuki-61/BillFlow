@@ -55,10 +55,10 @@
 .vendor-directory-card {
   margin-top: 1.25rem;
   overflow: hidden;
-  border-radius: var(--ui-radius-card, 24px);
-  border: 1px solid var(--ui-border);
-  background-color: var(--theme-surface);
-  box-shadow: var(--ui-shadow);
+  border-radius: var(--ui-radius-card, 26px);
+  border: 1px solid var(--ui-card-rim);
+  background-color: var(--ui-surface);
+  box-shadow: var(--ui-card-shadow);
 }
 
 .vendor-directory-header {
@@ -114,14 +114,14 @@
 }
 
 .vendor-search-input {
-  padding-left: 2.125rem;
-  padding-right: 0.75rem;
-  padding-top: 0.45rem;
-  padding-bottom: 0.45rem;
-  font-size: 12.5px;
-  background-color: var(--ui-subtle);
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
+  height: 40px;
+  padding-left: 2.25rem;
+  padding-right: 0.875rem;
+  font-size: 13px;
+  background-color: var(--ui-surface-pure);
+  border: 1px solid var(--ui-card-rim);
+  box-shadow: var(--ui-white-pill-shadow);
+  border-radius: 12px;
   width: 12rem;
   color: var(--theme-text-primary);
   transition:
@@ -312,10 +312,10 @@
 }
 
 .outsourcing-modal-panel {
-  background-color: var(--theme-surface);
-  border-radius: var(--ui-radius-card, 24px);
+  background-color: var(--ui-surface);
+  border-radius: var(--ui-radius-card, 26px);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-card-rim);
   width: 100%;
   max-width: 32rem;
   overflow: hidden;

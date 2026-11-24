@@ -522,19 +522,23 @@ function ClientsContent() {
       <MotionPresence>
         {notification && (
           <MotionSurface
+            key={notification.message}
             kind="toast"
-            className={`fixed top-14 right-6 z-[9999] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium border ${
-              notification.type === "error"
-                ? "bg-surface-rose-950 border-line-rose-800 text-content-rose-100"
-                : "bg-surface-neutral-900 border-line-neutral-700 text-white"
-            }`}
+            role="status"
+            aria-live="polite"
+            className={`bf-toast-popup zentra-toast ${
+              notification.type === "error" ? "zentra-toast--error" : ""
+            } fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]`}
           >
-            {notification.type === "error" ? (
-              <AlertCircle className="w-5 h-5 text-content-rose-400 shrink-0" />
-            ) : (
-              <CheckCircle2 className="success-confirm-pulse rounded-full w-5 h-5 text-content-emerald-400 shrink-0" />
-            )}
-            <span>{notification.message}</span>
+            <span className="zentra-toast-icon" aria-hidden="true">
+              {notification.type === "error" ? (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              ) : (
+                <CheckCircle2 className="success-confirm-pulse rounded-full w-4 h-4 shrink-0" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1 leading-snug">{notification.message}</span>
+            <span aria-hidden="true" className="zentra-toast-progress" />
           </MotionSurface>
         )}
       </MotionPresence>

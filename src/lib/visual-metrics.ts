@@ -55,11 +55,30 @@ export function issuedInPeriod<T extends Invoice>(
       return false;
     if (period === "all") return true;
     const date = new Date(`${invoice.issueDate.slice(0, 10)}T12:00:00`);
-    if (
-      Number.isNaN(date.getTime()) ||
-      date.getFullYear() !== now.getFullYear()
-    )
-      return false;
+    if (Number.isNaN(date.getTime())) return false;
+    if (period === "week") {
+      const dayOfWeek = (now.getDay() + 6) % 7;
+      const weekStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - dayOfWeek,
+        0,
+        0,
+        0,
+        0,
+      );
+      const weekEnd = new Date(
+        weekStart.getFullYear(),
+        weekStart.getMonth(),
+        weekStart.getDate() + 6,
+        23,
+        59,
+        59,
+        999,
+      );
+      return date >= weekStart && date <= weekEnd;
+    }
+    if (date.getFullYear() !== now.getFullYear()) return false;
     if (period === "year") return true;
     if (period === "month") return date.getMonth() === now.getMonth();
     return Math.floor(date.getMonth() / 3) === Math.floor(now.getMonth() / 3);

@@ -197,7 +197,7 @@ export function SelectDropdown<T extends string = string>({
             style={{
               transformOrigin: align === "right" ? "top right" : "top left",
             }}
-            className={`absolute z-50 mt-2 min-w-[170px] bg-surface/95 dark:bg-[#19191f]/95 backdrop-blur-md rounded-[16px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] border border-line-neutral-200/80 dark:border-[#2c2c37] select-none ${
+            className={`absolute z-50 mt-2 min-w-[180px] bg-[var(--ui-surface-pure)]/96 backdrop-blur-md rounded-[18px] p-1.5 shadow-[0_14px_34px_-8px_rgba(0,0,0,0.16)] dark:shadow-[0_18px_40px_-8px_rgba(0,0,0,0.62)] border border-[var(--ui-border)] select-none ${
               align === "right" ? "right-0" : "left-0"
             } ${menuClassName}`}
           >

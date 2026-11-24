@@ -6,9 +6,9 @@ import {
 } from "./widgetDefinitions";
 
 export const WIDGET_STORAGE_KEYS = {
-  dashboard: "billflow_dashboard_widgets_v4",
-  analytics: "billflow_analytics_widgets_v4",
-  sizes: "billflow_widget_sizes_v4",
+  dashboard: "billflow_dashboard_widgets_v5",
+  analytics: "billflow_analytics_widgets_v5",
+  sizes: "billflow_widget_sizes_v5",
 } as const;
 
 export function getScopedWidgetStorageKeys(profileId?: string) {
@@ -29,10 +29,10 @@ function readPreference<T>(
   fallback: T,
 ): T {
   // Current preferences win; otherwise recover the latest valid older version.
-  for (const version of [4, 3, 2]) {
+  for (const version of [5, 4, 3, 2]) {
     try {
-      const candidateKey = key.includes("_v4")
-        ? key.replace("_v4", `_v${version}`)
+      const candidateKey = key.includes("_v5")
+        ? key.replace("_v5", `_v${version}`)
         : key;
       const stored = storage.getItem(candidateKey);
       if (stored === null) continue;
@@ -58,13 +58,8 @@ function isWidgetSizes(value: unknown): value is Record<string, WidgetDisplaySiz
   );
 }
 
-export function loadWidgetPreferences(storage: PreferenceStorage, profileId?: string) {
-  const keys = getScopedWidgetStorageKeys(profileId);
-  const dashboardWidgets = readPreference(
-    storage, keys.dashboard, isWidgetList,
-    [...DEFAULT_DASHBOARD_WIDGET_IDS],
-  ).filter(canPinToDashboard);
-  const previousDefault = [
+const LEGACY_DEFAULTS: readonly (readonly string[])[] = [
+  [
     "total-revenue",
     "net-profit",
     "pending-receivables",
@@ -73,13 +68,41 @@ export function loadWidgetPreferences(storage: PreferenceStorage, profileId?: st
     "revenue-expenses-chart",
     "sprint-tasks",
     "recent-invoices",
-  ];
+  ],
+  [
+    "total-revenue",
+    "collected-revenue",
+    "pending-receivables",
+    "net-profit",
+    "cash-flow",
+    "collection-rate-gauge",
+    "recent-invoices",
+    "active-clients",
+  ],
+  [
+    "profit-trajectory-chart",
+    "total-revenue",
+    "net-profit",
+    "pending-receivables",
+    "workspace-insights",
+    "active-clients",
+  ],
+];
+
+export function loadWidgetPreferences(storage: PreferenceStorage, profileId?: string) {
+  const keys = getScopedWidgetStorageKeys(profileId);
+  const dashboardWidgets = readPreference(
+    storage, keys.dashboard, isWidgetList,
+    [...DEFAULT_DASHBOARD_WIDGET_IDS],
+  ).filter(canPinToDashboard);
   const widgetSizes = readPreference(storage, keys.sizes, isWidgetSizes, {});
-  const usedPreviousDefault =
-    dashboardWidgets.length === previousDefault.length &&
-    dashboardWidgets.every((id, index) =>
-      id === previousDefault[index] && widgetSizes[id] !== "compact",
-    );
+  const usedPreviousDefault = LEGACY_DEFAULTS.some(
+    (legacy) =>
+      dashboardWidgets.length === legacy.length &&
+      dashboardWidgets.every(
+        (id, index) => id === legacy[index] && widgetSizes[id] !== "compact",
+      ),
+  );
   return {
     dashboardWidgets: usedPreviousDefault ? [...DEFAULT_DASHBOARD_WIDGET_IDS] : dashboardWidgets,
     analyticsWidgets: readPreference(

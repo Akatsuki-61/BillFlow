@@ -49,28 +49,30 @@ describe("Widget preference upgrades", () => {
     });
   });
 
-  it("removes Workspace Insights from Overview and preserves the Analytics layout", () => {
+  it("removes Workspace Insights from Overview and preserves scoped profile layouts", () => {
     const storage = storedPreferences({
-      billflow_dashboard_widgets_v4_studio: '["sprint-tasks","workspace-insights","net-profit"]',
-      billflow_analytics_widgets_v3_studio: '["workspace-insights","paid-ratio"]',
-      billflow_widget_sizes_v4_studio: '{"net-profit":"compact","workspace-insights":"normal"}',
+      billflow_dashboard_widgets_v5_studio: '["sprint-tasks","workspace-insights","net-profit"]',
+      billflow_analytics_widgets_v3_studio: '["paid-ratio"]',
+      billflow_widget_sizes_v5_studio: '{"net-profit":"compact","workspace-insights":"normal"}',
     });
     expect(loadWidgetPreferences(storage, "studio")).toEqual({
       dashboardWidgets: ["sprint-tasks", "net-profit"],
-      analyticsWidgets: ["workspace-insights", "paid-ratio"],
+      analyticsWidgets: ["paid-ratio"],
       widgetSizes: { "net-profit": "compact", "workspace-insights": "normal" },
     });
     expect(DEFAULT_DASHBOARD_WIDGET_IDS).not.toContain("workspace-insights");
+    expect(DEFAULT_DASHBOARD_WIDGET_IDS).toHaveLength(5);
   });
 
-  it("respects intentionally empty v4 preferences instead of restoring old selections", () => {
+  it("respects intentionally empty v5 preferences instead of restoring old selections", () => {
     const storage = storedPreferences({
       billflow_dashboard_widgets_v2: '["net-profit"]',
-      billflow_dashboard_widgets_v4: "[]",
+      billflow_dashboard_widgets_v4: '["total-revenue"]',
+      billflow_dashboard_widgets_v5: "[]",
       billflow_analytics_widgets_v3: '["paid-ratio"]',
-      billflow_analytics_widgets_v4: "[]",
+      billflow_analytics_widgets_v5: "[]",
       billflow_widget_sizes_v2: '{"net-profit":"compact"}',
-      billflow_widget_sizes_v4: "{}",
+      billflow_widget_sizes_v5: "{}",
     });
     expect(loadWidgetPreferences(storage)).toEqual({
       dashboardWidgets: [], analyticsWidgets: [], widgetSizes: {},
@@ -79,11 +81,12 @@ describe("Widget preference upgrades", () => {
 
   it("recovers malformed preferences independently from valid older values", () => {
     const storage = storedPreferences({
-      billflow_dashboard_widgets_v4: "{broken",
+      billflow_dashboard_widgets_v5: "{broken",
+      billflow_dashboard_widgets_v4: "not-json",
       billflow_dashboard_widgets_v3: '[42]',
       billflow_dashboard_widgets_v2: '["net-profit"]',
-      billflow_analytics_widgets_v4: '["paid-ratio"]',
-      billflow_widget_sizes_v4: '{"net-profit":"invalid"}',
+      billflow_analytics_widgets_v5: '["paid-ratio"]',
+      billflow_widget_sizes_v5: '{"net-profit":"invalid"}',
       billflow_widget_sizes_v2: '{"net-profit":"normal"}',
     });
     expect(loadWidgetPreferences(storage)).toEqual({
@@ -103,17 +106,26 @@ describe("Widget preference upgrades", () => {
     expect(loadWidgetPreferences({ getItem: () => { throw new Error("Unavailable"); } })).toEqual(defaults);
   });
 
-  it("updates the previous default layout while keeping resized layouts", () => {
-    const previousDefault = [
+  it("upgrades both legacy 8-card default layouts to the 6-card Zentra bento while keeping resized layouts", () => {
+    const previousDefaultV3 = [
       "total-revenue", "net-profit", "pending-receivables", "active-clients",
       "profit-trajectory-chart", "revenue-expenses-chart", "sprint-tasks", "recent-invoices",
     ];
+    const previousDefaultV4 = [
+      "total-revenue", "collected-revenue", "pending-receivables", "net-profit",
+      "cash-flow", "collection-rate-gauge", "recent-invoices", "active-clients",
+    ];
     const storage = storedPreferences({
-      [WIDGET_STORAGE_KEYS.dashboard]: JSON.stringify(previousDefault),
+      [WIDGET_STORAGE_KEYS.dashboard]: JSON.stringify(previousDefaultV3),
     });
     expect(loadWidgetPreferences(storage).dashboardWidgets).toEqual(DEFAULT_DASHBOARD_WIDGET_IDS);
 
+    const storageV4 = storedPreferences({
+      billflow_dashboard_widgets_v4: JSON.stringify(previousDefaultV4),
+    });
+    expect(loadWidgetPreferences(storageV4).dashboardWidgets).toEqual(DEFAULT_DASHBOARD_WIDGET_IDS);
+
     storage.values.set(WIDGET_STORAGE_KEYS.sizes, '{"net-profit":"compact"}');
-    expect(loadWidgetPreferences(storage).dashboardWidgets).toEqual(previousDefault);
+    expect(loadWidgetPreferences(storage).dashboardWidgets).toEqual(previousDefaultV3);
   });
 });

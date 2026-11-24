@@ -9,7 +9,12 @@ import {
   buildAudienceGrowthData,
   computeCashflowRunwayCard,
 } from "../widgets/chartData";
-import { computeDashboardMetrics } from "../../components/dashboard/DashboardMetricsContext";
+import {
+  buildDotMatrixBuckets,
+  buildSteppedRetentionSeries,
+  computeDashboardMetrics,
+  getPeriodWindowBounds,
+} from "../../components/dashboard/DashboardMetricsContext";
 import type { InvoiceWithClient, CatalogItem } from "../../types/billing";
 import type { TaskItem } from "../../types/tasks";
 import type { AnalyticsSummaryPayload } from "../../types/analytics";
@@ -336,5 +341,128 @@ describe("Widget & Chart Data Pipeline Integrity", () => {
       "inv-prior-overdue",
     ]);
     expect(metrics.overdueTotalStr).toBe("$1,000.00");
+  });
+
+  it("computes Zentra date comparison ranges, 12-col dot matrices, stepped retention bins, and period deltas", () => {
+    const bounds = getPeriodWindowBounds("quarter", fixedNow);
+    expect(bounds.periodRangeLabel).toBe("Oct 01 – Dec 31");
+    expect(bounds.previousRangeLabel).toBe("Jul 01 – Sep 30");
+
+    // Weekly period bounds (2026-11-18 is Wednesday -> Mon Nov 16 to Sun Nov 22)
+    const weekBounds = getPeriodWindowBounds("week", fixedNow);
+    expect(weekBounds.periodRangeLabel).toBe("Nov 16 – Nov 22");
+    expect(weekBounds.previousRangeLabel).toBe("Nov 09 – Nov 15");
+
+    const weeklyMetrics = computeDashboardMetrics({
+      invoices: [
+        {
+          id: "inv-this-week",
+          code: "INV-W1",
+          clientId: "c1",
+          clientName: "Acme",
+          status: "PAID",
+          currency: "USD",
+          issueDate: "2026-11-17",
+          dueDate: "2026-11-24",
+          amountCents: 200000,
+          paidCents: 200000,
+          createdAt: "2026-11-17T00:00:00Z",
+          updatedAt: "2026-11-17T00:00:00Z",
+        },
+        {
+          id: "inv-last-week",
+          code: "INV-W0",
+          clientId: "c1",
+          clientName: "Acme",
+          status: "PAID",
+          currency: "USD",
+          issueDate: "2026-11-11",
+          dueDate: "2026-11-18",
+          amountCents: 100000,
+          paidCents: 100000,
+          createdAt: "2026-11-11T00:00:00Z",
+          updatedAt: "2026-11-11T00:00:00Z",
+        },
+      ] as InvoiceWithClient[],
+      expenses: [],
+      workOrders: [],
+      clients: [],
+      tasks: [],
+      period: "week",
+      currency: "USD",
+      now: fixedNow,
+    });
+    expect(weeklyMetrics.filteredInvoices.map((i) => i.id)).toEqual(["inv-this-week"]);
+    expect(weeklyMetrics.grossDeltaPct).toBe(100);
+
+    const { buckets, peakLabel } = buildDotMatrixBuckets(
+      ["2026-11-15", "2026-11-16", "2026-11-17", "2026-10-12"],
+      fixedNow,
+      14,
+    );
+    expect(buckets).toHaveLength(12);
+    expect(buckets.some((b) => b.isPeak)).toBe(true);
+    expect(peakLabel).toBe("Nov");
+
+    const stepped = buildSteppedRetentionSeries(
+      [
+        { key: "2026-06", label: "Jun", revenueCents: 10000, expensesCents: 4000, profitCents: 6000, marginPct: 60 },
+        { key: "2026-07", label: "Jul", revenueCents: 10000, expensesCents: 2000, profitCents: 8000, marginPct: 80 },
+        { key: "2026-08", label: "Aug", revenueCents: 10000, expensesCents: 5000, profitCents: 5000, marginPct: 50 },
+        { key: "2026-09", label: "Sep", revenueCents: 10000, expensesCents: 3000, profitCents: 7000, marginPct: 70 },
+        { key: "2026-10", label: "Oct", revenueCents: 10000, expensesCents: 3500, profitCents: 6500, marginPct: 65 },
+        { key: "2026-11", label: "Nov", revenueCents: 10000, expensesCents: 1500, profitCents: 8500, marginPct: 85 },
+      ],
+      75,
+    );
+    expect(stepped.points).toHaveLength(24);
+    expect(stepped.peakPct).toBe(85);
+    expect(stepped.peakIndex).toBeGreaterThanOrEqual(20);
+
+    const metrics = computeDashboardMetrics({
+      invoices: [
+        {
+          id: "inv-q3",
+          code: "INV-Q3",
+          clientId: "c1",
+          clientName: "Acme",
+          status: "PAID",
+          currency: "USD",
+          issueDate: "2026-08-12",
+          dueDate: "2026-08-26",
+          amountCents: 100000,
+          paidCents: 100000,
+          createdAt: "2026-08-12T00:00:00Z",
+          updatedAt: "2026-08-12T00:00:00Z",
+        },
+        {
+          id: "inv-q4",
+          code: "INV-Q4",
+          clientId: "c1",
+          clientName: "Acme",
+          status: "PAID",
+          currency: "USD",
+          issueDate: "2026-11-10",
+          dueDate: "2026-11-24",
+          amountCents: 150000,
+          paidCents: 150000,
+          createdAt: "2026-11-10T00:00:00Z",
+          updatedAt: "2026-11-10T00:00:00Z",
+        },
+      ] as InvoiceWithClient[],
+      expenses: [],
+      workOrders: [],
+      clients: [],
+      tasks: [],
+      period: "quarter",
+      currency: "USD",
+      now: fixedNow,
+    });
+
+    expect(metrics.grossDeltaPct).toBe(50);
+    expect(metrics.pipelineStages).toHaveLength(5);
+    expect(metrics.pipelineStages[0].conversionPct).toBe(100);
+    expect(metrics.invoiceDotBuckets).toHaveLength(12);
+    expect(metrics.steppedRetentionSeries).toHaveLength(24);
   });
 });

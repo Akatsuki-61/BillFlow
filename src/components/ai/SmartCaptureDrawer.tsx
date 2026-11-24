@@ -766,7 +766,7 @@ export function SmartCaptureDrawer() {
                           }
                           className={`w-[18px] h-[18px] rounded-[6px] border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
                             item.selected
-                              ? "bg-[#18181c] border-[#18181c] text-white dark:bg-[#f4f4f6] dark:border-[#f4f4f6] dark:text-[#111115]"
+                              ? "bg-accent-solid border-accent-solid text-white shadow-2xs"
                               : "border-line-neutral-300 bg-transparent"
                           }`}
                         >

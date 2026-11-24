@@ -9,6 +9,8 @@ import {
   WorkspaceProfileFields,
   type WorkspaceProfileDraft,
 } from "@/components/settings/WorkspaceProfileFields";
+import { PROFILE_ACCENT_STYLES } from "@/components/profiles/ProfileAvatarTile";
+import type { AccentPreference } from "@/lib/theme";
 
 import { useWorkspaceCommand } from "@/lib/use-workspace-command";
 import { MAX_BACKUP_BYTES } from "@/lib/backup-limits";
@@ -190,7 +192,7 @@ function SettingsContent() {
     : "profile";
   const { workflow, isElectron, error: dataError } = useData();
   const isMac = useIsMac();
-  const { preference, setPreference, ready } = useTheme();
+  const { preference, setPreference, accent, setAccent, ready } = useTheme();
   const { activeProfile, updateProfile, refreshProfiles } = useProfiles();
   const {
     settings,
@@ -765,23 +767,25 @@ function SettingsContent() {
       {/* Toast Notification */}
       <MotionPresence>
         {notification && (
-          <div className="fixed top-14 right-6 z-[9999] pointer-events-none">
-            <MotionSurface
-              kind="toast"
-              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm font-medium shadow-[0px_4px_12px_rgba(0,0,0,0.08)] pointer-events-auto ${
-                notification.type === "success"
-                  ? "bg-surface text-content-emerald-800 border-line-emerald-200"
-                  : "bg-surface text-content-rose-800 border-line-rose-200"
-              }`}
-            >
-              {notification.type === "success" ? (
-                <CheckCircle2 className="w-4 h-4 text-content-emerald-600 shrink-0" />
+          <MotionSurface
+            key={notification.message}
+            kind="toast"
+            role="status"
+            aria-live="polite"
+            className={`bf-toast-popup zentra-toast ${
+              notification.type === "error" ? "zentra-toast--error" : ""
+            } fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]`}
+          >
+            <span className="zentra-toast-icon" aria-hidden="true">
+              {notification.type === "error" ? (
+                <AlertCircle className="w-4 h-4 shrink-0" />
               ) : (
-                <AlertCircle className="w-4 h-4 text-content-rose-600 shrink-0" />
+                <CheckCircle2 className="success-confirm-pulse rounded-full w-4 h-4 shrink-0" />
               )}
-              <span>{notification.message}</span>
-            </MotionSurface>
-          </div>
+            </span>
+            <span className="min-w-0 flex-1 leading-snug">{notification.message}</span>
+            <span aria-hidden="true" className="zentra-toast-progress" />
+          </MotionSurface>
         )}
       </MotionPresence>
 
@@ -970,6 +974,65 @@ function SettingsContent() {
                         </span>
                       </button>
                     ))}
+                  </div>
+                )}
+              </section>
+              <section
+                className="ui-card p-6 space-y-4"
+                aria-labelledby="accent-color-heading"
+              >
+                <div>
+                  <h2
+                    id="accent-color-heading"
+                    className="text-base font-semibold text-content-neutral-900"
+                  >
+                    Signature accent color
+                  </h2>
+                  <p className="text-sm text-content-neutral-500 mt-1">
+                    Applies to primary buttons, switches, focus rings, and notification toast borders across Light and Dark modes.
+                  </p>
+                </div>
+                {ready && (
+                  <div
+                    className="flex flex-wrap items-center gap-3 pt-1"
+                    role="radiogroup"
+                    aria-label="Signature accent color"
+                  >
+                    {(
+                      Object.entries(PROFILE_ACCENT_STYLES) as Array<
+                        [
+                          AccentPreference,
+                          (typeof PROFILE_ACCENT_STYLES)[keyof typeof PROFILE_ACCENT_STYLES],
+                        ]
+                      >
+                    ).map(([accentKey, style]) => {
+                      const isSelected = accent === accentKey;
+                      return (
+                        <button
+                          key={accentKey}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={(e) => {
+                            setAccent(accentKey, { trigger: e.currentTarget });
+                            showToast(`Accent color updated to ${style.label}`);
+                          }}
+                          className={`inline-flex items-center gap-2.5 h-[42px] px-3.5 rounded-[12px] border text-[13px] font-medium transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-[var(--ui-surface-pure)] border-accent text-content-neutral-950 shadow-[0_0_0_2px_var(--theme-accent-soft)]"
+                              : "bg-[var(--ui-surface-pure)] border-[var(--ui-border)] text-content-neutral-700 hover:border-line-neutral-300"
+                          }`}
+                        >
+                          <span
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 shadow-2xs"
+                            style={{ backgroundColor: style.swatch }}
+                          >
+                            {isSelected && <Check size={12} strokeWidth={2.75} aria-hidden="true" />}
+                          </span>
+                          <span>{style.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </section>
@@ -1811,6 +1874,9 @@ function SettingsContent() {
                             setFormState(settingsDraft(settings));
                             setProfileDraft({});
                             setFormErrors({});
+                            setAccent(activeProfile.accent, {
+                              persistProfile: false,
+                            });
                           }}
                         >
                           Discard

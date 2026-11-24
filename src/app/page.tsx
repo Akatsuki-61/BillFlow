@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   Layers,
-  CheckCircle2,
   Check,
   RotateCcw,
   Maximize2,
@@ -26,6 +25,7 @@ import {
   MotionSurface,
 } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
+import { ToastBanner } from "@/components/ui/ToastBanner";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
 import { DashboardMetricsProvider } from "@/components/dashboard/DashboardMetricsContext";
 import { useWidgetContext } from "@/context/WidgetContext";
@@ -39,9 +39,10 @@ import { DashboardPeriod } from "@/types/dashboard";
 import "@/components/dashboard/ledger-widgets.css";
 
 const PERIOD_OPTIONS: SelectOption<DashboardPeriod>[] = [
-  { value: "month", label: "This Month" },
-  { value: "quarter", label: "This Quarter" },
-  { value: "year", label: "This Year" },
+  { value: "week", label: "Weekly" },
+  { value: "month", label: "Monthly" },
+  { value: "quarter", label: "Quarterly" },
+  { value: "year", label: "Yearly" },
   { value: "all", label: "All Time" },
 ];
 
@@ -211,23 +212,38 @@ export default function DashboardPage() {
     .map((id) => DASHBOARD_WIDGET_CATALOG.find((w) => w.id === id))
     .filter((w): w is NonNullable<typeof w> => Boolean(w));
 
-  // Ledger's two wide cards share their rows with narrower companion cards.
+  // 5-Card Asymmetric Zentra Bento Layout (Row 1: 8+4; Row 2: 5 tall + [7 stacked 2x])
   const getColSpanClass = (widgetId: string, baseSize: string) => {
     const size = widgetSizes[widgetId] || "normal";
     const isCompact = size === "compact";
-    if (!isCompact && (widgetId === "cash-flow" || widgetId === "recent-invoices")) {
-      return "col-span-2 md:col-span-4 lg:col-span-8";
-    }
-    if (!isCompact && (widgetId === "collection-rate-gauge" || widgetId === "active-clients")) {
-      return "col-span-2 md:col-span-2 lg:col-span-4";
+
+    if (!isCompact) {
+      if (widgetId === "profit-trajectory-chart") {
+        return "col-span-2 md:col-span-6 lg:col-span-8";
+      }
+      if (widgetId === "total-revenue") {
+        return "col-span-2 md:col-span-6 lg:col-span-4";
+      }
+      if (widgetId === "net-profit") {
+        return "col-span-2 md:col-span-3 md:row-span-2 lg:col-span-5 lg:row-span-2";
+      }
+      if (widgetId === "pending-receivables" || widgetId === "active-clients") {
+        return "col-span-2 md:col-span-3 lg:col-span-7";
+      }
+      if (widgetId === "cash-flow" || widgetId === "recent-invoices") {
+        return "col-span-2 md:col-span-4 lg:col-span-8";
+      }
+      if (widgetId === "collection-rate-gauge") {
+        return "col-span-2 md:col-span-2 lg:col-span-4";
+      }
     }
 
     if (baseSize === "metric") {
       const span = DEFAULT_DASHBOARD_WIDGET_IDS.includes(widgetId)
-        ? "col-span-1"
+        ? "col-span-2"
         : "col-span-2";
       return isCompact
-        ? `${span} md:col-span-2 lg:col-span-2`
+        ? `${span} md:col-span-2 lg:col-span-3`
         : `${span} md:col-span-3 lg:col-span-3`;
     }
     if (baseSize === "full") {
@@ -252,28 +268,13 @@ export default function DashboardPage() {
 
   return (
     <div className="workspace-page dashboard-page motion-page">
-      {/* Toast Notification with Undo Action */}
+      {/* Unified Accent Toast Notification with Undo Action */}
       <MotionPresence>
         {toastMessage && (
-          <MotionSurface
-            kind="toast"
-            className="fixed bottom-6 right-6 z-[9999] flex items-center justify-between gap-3 px-4 py-2.5 bg-toast text-white rounded-2xl shadow-xl text-[12.5px] font-medium min-w-[280px]"
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="success-confirm-pulse rounded-full text-success-bright text-[14px] shrink-0" />
-              <span>{toastMessage}</span>
-            </div>
-            {toastAction && (
-              <button
-                type="button"
-                onClick={toastAction.onClick}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11.5px] font-semibold bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer border border-white/25 shrink-0"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>{toastAction.label}</span>
-              </button>
-            )}
-          </MotionSurface>
+          <ToastBanner
+            message={toastMessage}
+            action={toastAction}
+          />
         )}
       </MotionPresence>
 
@@ -287,43 +288,43 @@ export default function DashboardPage() {
       />
 
       {/* Zentra Overview Top Sub-Header */}
-      <header className="flex flex-wrap items-center justify-between gap-4 pt-1 pb-1">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[40px] font-medium tracking-[-0.035em] text-content-neutral-950 leading-none">
+      <header className="flex flex-wrap items-center justify-between gap-4 pt-1 pb-2">
+        <div className="flex items-center gap-3.5">
+          <h1 className="text-[40px] sm:text-[44px] font-normal tracking-[-0.035em] text-content-neutral-950 leading-none">
             Overview
           </h1>
         </div>
 
-        {/* Right: Connected Date Comparison Pill Group + Granularity + Add Widget */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Right: Single Period Selector (Weekly/Monthly/Quarterly/Yearly/All Time) + Add widget + */}
+        <div className="flex items-center gap-2.5 flex-wrap">
           <SelectDropdown<DashboardPeriod>
             value={period}
             onChange={setPeriod}
             options={PERIOD_OPTIONS}
-            icon={<Calendar className="w-3.5 h-3.5" />}
-            ariaLabel="Overview period"
-            buttonClassName="overview-period-picker font-sans text-[12.5px] font-medium text-content-neutral-900 cursor-pointer"
-            menuClassName="w-44"
+            icon={<Calendar className="w-4 h-4 text-content-neutral-600" strokeWidth={1.65} />}
+            ariaLabel="Reporting period"
+            buttonClassName="zentra-control-pill--white"
+            menuClassName="w-40"
           />
 
           <button
             type="button"
             onClick={() => setIsDashboardEditing(!isDashboardEditing)}
-            className={`zentra-control-pill ${
+            className={
               isDashboardEditing
-                ? "!bg-[#1c1c1f] !text-white dark:!bg-white dark:!text-[#111115]"
-                : ""
-            }`}
+                ? "ui-button ui-button--primary !min-h-[40px] !h-[40px] !px-4 !rounded-[12px] !text-[13px]"
+                : "zentra-control-pill"
+            }
           >
-            <span>{isDashboardEditing ? "Done editing" : "Manage Widget"}</span>
+            <span>{isDashboardEditing ? "Done" : "Add widget"}</span>
             <IconCrossfade
-              iconKey={isDashboardEditing ? "done" : "manage"}
+              iconKey={isDashboardEditing ? "done" : "add"}
               className="w-3.5 h-3.5"
             >
               {isDashboardEditing ? (
-                <Check className="w-3.5 h-3.5" />
+                <Check className="w-3.5 h-3.5" strokeWidth={2.2} />
               ) : (
-                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5" strokeWidth={2} />
               )}
             </IconCrossfade>
           </button>
@@ -335,18 +336,18 @@ export default function DashboardPage() {
         {isDashboardEditing && (
           <MotionSurface
             kind="panel"
-            className="flex flex-col gap-4 p-5 rounded-[24px] bg-surface border border-line-neutral-200 shadow-sm"
+            className="flex flex-col gap-4 p-5 rounded-[26px] bg-[var(--ui-surface)] border border-[var(--ui-card-rim)] shadow-[var(--ui-card-shadow)]"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#1c1c1f] text-white dark:bg-white dark:text-black flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-full bg-accent-solid text-white flex items-center justify-center shrink-0">
                   <SlidersHorizontal className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-[14.5px] font-semibold text-content-neutral-950 leading-tight">
+                  <h3 className="text-[15px] font-medium text-content-neutral-950 leading-tight">
                     Customize BillFlow Overview Bento Grid
                   </h3>
-                  <p className="text-[12px] text-content-neutral-500 mt-0.5">
+                  <p className="text-[12.5px] text-content-neutral-500 mt-0.5">
                     Toggle widgets below to pin or unpin them, drag tiles to
                     reorder, or right-click any card to resize.
                   </p>
@@ -394,8 +395,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Quick Pill Selector for all 24 BillFlow Widgets */}
-            <div className="flex flex-wrap gap-2 pt-3 border-t border-line-neutral-100">
+            {/* Quick Pill Selector for all BillFlow Widgets */}
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-[var(--ui-border-hairline)]">
               {DASHBOARD_WIDGET_CATALOG.map((w) => {
                 const pinned = isPinnedToDashboard(w.id);
                 return (
@@ -403,14 +404,14 @@ export default function DashboardPage() {
                     key={w.id}
                     type="button"
                     onClick={() => toggleDashboard(w.id)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all cursor-pointer border ${
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium transition-all cursor-pointer border ${
                       pinned
-                        ? "bg-[#1c1c1f] text-white border-[#1c1c1f] dark:bg-white dark:text-[#111115] dark:border-white"
-                        : "bg-surface-neutral-50 text-content-neutral-600 border-line-neutral-200 hover:border-line-neutral-300"
+                        ? "bg-accent-solid text-white border-accent-solid shadow-xs"
+                        : "bg-[var(--ui-surface-pure)] text-content-neutral-600 border-[var(--ui-border)] hover:border-border-accent hover:text-content-neutral-950"
                     }`}
                   >
                     {pinned ? (
-                      <Check className="w-3 h-3 text-emerald-400 dark:text-emerald-600" />
+                      <Check className="w-3 h-3 text-white" strokeWidth={2.4} />
                     ) : (
                       <Plus className="w-3 h-3 text-content-neutral-400" />
                     )}
@@ -459,7 +460,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <DashboardMetricsProvider period={period}>
-          <div className="dashboard-grid grid grid-cols-2 gap-3 md:grid-cols-6 md:gap-4 lg:grid-cols-12">
+          <div className="dashboard-grid grid grid-cols-2 grid-flow-dense gap-3.5 md:grid-cols-6 md:gap-4 lg:grid-cols-12">
             {pinnedWidgets.map((w, index) => {
             const colSpan = getColSpanClass(w.id, w.size);
             const isCompact = (widgetSizes[w.id] || "normal") === "compact";

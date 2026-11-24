@@ -25,7 +25,12 @@ function periodLabel(period: DashboardPeriod) {
       year: "numeric",
     }).format(new Date());
   }
-  return { quarter: "This quarter", year: "This year", all: "All time" }[period];
+  return {
+    week: "This week",
+    quarter: "This quarter",
+    year: "This year",
+    all: "All time",
+  }[period];
 }
 
 function WidgetHeading({

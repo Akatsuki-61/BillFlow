@@ -39,10 +39,10 @@
   overflow: hidden;
   width: 100%;
   background-color: var(--ui-surface);
-  border-radius: var(--ui-radius-card, 24px);
-  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-card, 26px);
+  border: 1px solid var(--ui-card-rim);
   padding: 1.25rem 1.5rem;
-  box-shadow: var(--ui-shadow);
+  box-shadow: var(--ui-card-shadow);
 }
 
 @media (min-width: 640px) {
@@ -92,8 +92,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.55rem 1rem;
-  background-color: var(--ui-inset);
+  height: 40px;
+  padding: 0 14px;
+  background-color: var(--ui-control-muted);
   border: 1px solid transparent;
   border-radius: 12px;
   color: var(--foreground);
@@ -104,7 +105,8 @@
 }
 
 .invoices-btn-secondary:hover {
-  background-color: var(--ui-hover);
+  background-color: var(--ui-control-muted-hover);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 20%, transparent);
 }
 
 /* Modals */
@@ -123,8 +125,8 @@
 .invoices-modal-panel {
   background-color: var(--ui-surface);
   width: 100%;
-  border-radius: var(--ui-radius-card, 24px);
-  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-card, 26px);
+  border: 1px solid var(--ui-card-rim);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   overflow: hidden;
   padding: 1.5rem;
@@ -135,8 +137,8 @@
   position: absolute;
   right: 1.5rem;
   width: 13rem;
-  background-color: var(--ui-surface);
-  border-radius: 16px;
+  background-color: var(--ui-surface-pure);
+  border-radius: 18px;
   box-shadow: var(--ui-shadow-md);
   border: 1px solid var(--ui-border);
   padding: 0.4rem;

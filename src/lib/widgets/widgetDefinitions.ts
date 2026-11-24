@@ -3,17 +3,6 @@ import { WidgetMeta } from "@/types/widgets";
 const WORKSPACE_INSIGHTS_WIDGET_ID = "workspace-insights";
 
 export const WIDGET_CATALOG: WidgetMeta[] = [
-  {
-    id: WORKSPACE_INSIGHTS_WIDGET_ID,
-    title: "Workspace Insights",
-    description:
-      "Atmospheric spotlight card with live business intelligence and sprint recommendations",
-    category: "activity",
-    size: "full",
-    defaultOnDashboard: false,
-    defaultOnAnalytics: false,
-  },
-
   // 6 Core Financial KPIs
   {
     id: "total-revenue",
@@ -249,13 +238,10 @@ export const WIDGET_CATALOG: WidgetMeta[] = [
 ];
 
 export const DEFAULT_DASHBOARD_WIDGET_IDS = [
+  "profit-trajectory-chart",
   "total-revenue",
-  "collected-revenue",
-  "pending-receivables",
   "net-profit",
-  "cash-flow",
-  "collection-rate-gauge",
-  "recent-invoices",
+  "pending-receivables",
   "active-clients",
 ];
 
@@ -269,19 +255,20 @@ export function canPinToDashboard(id: string | null): boolean {
   return id !== null && id !== WORKSPACE_INSIGHTS_WIDGET_ID;
 }
 
-const ledgerTitles: Record<string, string> = {
-  "total-revenue": "Gross invoiced",
-  "pending-receivables": "Outstanding",
-  "net-profit": "Net profit",
+const dashboardTitles: Record<string, string> = {
+  "profit-trajectory-chart": "Payments",
+  "total-revenue": "Gross Volume",
+  "net-profit": "Net Margin",
+  "pending-receivables": "Invoices",
+  "active-clients": "Clients",
   "collection-rate-gauge": "Payment breakdown",
   "recent-invoices": "Recent invoices",
-  "active-clients": "Active clients",
 };
 
 export const DASHBOARD_WIDGET_CATALOG: WidgetMeta[] = [
   ...WIDGET_CATALOG.filter((widget) => canPinToDashboard(widget.id)).map((widget) => ({
     ...widget,
-    title: ledgerTitles[widget.id] ?? widget.title,
+    title: dashboardTitles[widget.id] ?? widget.title,
     size: widget.id === "active-clients" ? ("medium" as const) : widget.size,
     defaultOnDashboard: DEFAULT_DASHBOARD_WIDGET_IDS.includes(widget.id),
   })),
@@ -291,7 +278,7 @@ export const DASHBOARD_WIDGET_CATALOG: WidgetMeta[] = [
     description: "Payments received against invoices issued in the selected period",
     category: "financial",
     size: "metric",
-    defaultOnDashboard: true,
+    defaultOnDashboard: false,
     defaultOnAnalytics: false,
   },
   {
@@ -300,7 +287,7 @@ export const DASHBOARD_WIDGET_CATALOG: WidgetMeta[] = [
     description: "Six months of collected payments and paid costs",
     category: "charts",
     size: "wide",
-    defaultOnDashboard: true,
+    defaultOnDashboard: false,
     defaultOnAnalytics: false,
   },
 ];

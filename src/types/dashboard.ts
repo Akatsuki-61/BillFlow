@@ -1,4 +1,4 @@
-export type DashboardPeriod = "month" | "quarter" | "year" | "all";
+export type DashboardPeriod = "week" | "month" | "quarter" | "year" | "all";
 
 export interface MetricTile {
   id: string;

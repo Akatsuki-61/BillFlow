@@ -18,14 +18,12 @@
   flex-direction: column;
   height: 100%;
   min-inline-size: 0;
-  padding: 22px 24px;
+  padding: 24px 26px;
   background: var(--ledger-surface);
   color: var(--ledger-text);
-  border: 1px solid #ffffff;
-  border-radius: 24px;
-  box-shadow:
-    0 2px 3px rgb(0 0 0 / 4%),
-    0 0 0 1px rgb(20 20 20 / 3%);
+  border: 1px solid var(--ui-card-rim);
+  border-radius: var(--ui-radius-card);
+  box-shadow: var(--ui-card-shadow);
   font-size: 0.875rem;
   line-height: 1.45;
 }
@@ -43,11 +41,11 @@
   --ledger-selected: var(--theme-accent);
   --ledger-selected-end: var(--theme-accent-solid);
   --ledger-secondary: color-mix(in oklab, var(--ui-muted) 32%, var(--ui-surface));
-  --ledger-paid: #66b6a1;
-  --ledger-open: var(--theme-accent);
-  --ledger-late: #df9b78;
-  border-color: var(--ui-border);
-  box-shadow: var(--ui-shadow);
+  --ledger-paid: var(--data-green);
+  --ledger-open: var(--data-blue);
+  --ledger-late: var(--data-pink);
+  border-color: var(--ui-card-rim);
+  box-shadow: var(--ui-card-shadow);
 }
 
 .ledger-widget--metric {
@@ -72,10 +70,10 @@
 
 .ledger-widget h3 {
   color: var(--ledger-text);
-  font-size: 1.3125rem;
-  font-weight: 640;
-  letter-spacing: -0.044em;
-  line-height: 1.2;
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .ledger-widget .ledger-note {
@@ -88,9 +86,9 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 0.8125rem;
-  letter-spacing: normal;
-  font-weight: 565;
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+  font-weight: 500;
   color: var(--ledger-muted);
 }
 
@@ -105,18 +103,18 @@
   border-radius: 7px;
 }
 
-.ledger-mark--green { color: #287360; }
-.ledger-mark--orange { color: #984f2e; }
-:root[data-theme="dark"] .ledger-mark--green { color: #83cfb8; }
-:root[data-theme="dark"] .ledger-mark--orange { color: #efb090; }
+.ledger-mark--green { color: var(--data-green); }
+.ledger-mark--orange { color: var(--data-amber); }
+:root[data-theme="dark"] .ledger-mark--green { color: var(--data-green); }
+:root[data-theme="dark"] .ledger-mark--orange { color: var(--data-amber); }
 
 .ledger-value {
   display: block;
   margin-block-start: 8px;
   font-size: clamp(1.625rem, 11cqi, 2.35rem);
-  font-weight: 640;
-  line-height: 1.12;
-  letter-spacing: -0.073em;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }

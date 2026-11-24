@@ -827,34 +827,27 @@ export default function OutsourcingView() {
 
   return (
     <div className="workspace-page motion-page outsourcing-page-container">
-      {activeTab === "vendors" && (
-        <button
-          type="button"
-          className="ui-button ui-button--secondary mb-3"
-          onClick={() => setShowArchivedVendors(!showArchivedVendors)}
-        >
-          {showArchivedVendors
-            ? "Show active vendors"
-            : "Show archived vendors"}
-        </button>
-      )}
       {/* Toast Feedback Notification */}
       <MotionPresence>
         {toastNotification && (
           <MotionSurface
+            key={toastNotification.message}
             kind="toast"
-            className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-2.5 px-4 py-2.5 text-white rounded-xl shadow-xl text-[12px] font-medium ${
-              toastNotification.type === "error"
-                ? "bg-rose-900 border border-rose-700"
-                : "bg-toast border border-line-neutral-700"
-            }`}
+            role="status"
+            aria-live="polite"
+            className={`bf-toast-popup zentra-toast ${
+              toastNotification.type === "error" ? "zentra-toast--error" : ""
+            } fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]`}
           >
-            {toastNotification.type === "error" ? (
-              <AlertCircle className="text-content-rose-400 text-[14px] shrink-0" />
-            ) : (
-              <CheckCircle2 className="success-confirm-pulse rounded-full text-success-bright text-[14px] shrink-0" />
-            )}
-            <span>{toastNotification.message}</span>
+            <span className="zentra-toast-icon" aria-hidden="true">
+              {toastNotification.type === "error" ? (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              ) : (
+                <CheckCircle2 className="success-confirm-pulse rounded-full w-4 h-4 shrink-0" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1 leading-snug">{toastNotification.message}</span>
+            <span aria-hidden="true" className="zentra-toast-progress" />
           </MotionSurface>
         )}
       </MotionPresence>
@@ -1073,6 +1066,16 @@ export default function OutsourcingView() {
                 className="vendor-search-input"
               />
             </div>
+
+            {activeTab === "vendors" && (
+              <button
+                type="button"
+                className="zentra-control-pill"
+                onClick={() => setShowArchivedVendors(!showArchivedVendors)}
+              >
+                {showArchivedVendors ? "Active vendors" : "Archived vendors"}
+              </button>
+            )}
 
             <div className="vendor-status-filter">
               {(

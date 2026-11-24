@@ -116,30 +116,34 @@ export function DataDots({
   noun: string;
   tone?: "accent" | "green";
 }) {
-  const unit = Math.max(
-    1,
-    Math.ceil(Math.max(0, ...points.map((point) => point.value)) / 8),
-  );
+  const maxVal = Math.max(0, ...points.map((point) => point.value));
+  const unit = Math.max(1, Math.ceil(maxVal / 8));
   return (
     <figure className={`data-dots data-dots--${tone}`} aria-label={label}>
       <div className="data-dots-grid">
-        {points.map((point) => (
-          <div
-            key={point.key}
-            className="data-dots-column"
-            title={`${point.label}: ${point.value} ${noun}`}
-          >
-            <div>
-              {Array.from(
-                { length: Math.ceil(point.value / unit) },
-                (_, index) => (
-                  <span key={index} />
-                ),
-              )}
+        {points.map((point) => {
+          const isPeak = maxVal > 0 && point.value === maxVal;
+          return (
+            <div
+              key={point.key}
+              className="data-dots-column"
+              title={`${point.label}: ${point.value} ${noun}`}
+            >
+              <div>
+                {Array.from(
+                  { length: Math.ceil(point.value / unit) },
+                  (_, index) => (
+                    <span
+                      key={index}
+                      data-peak={isPeak ? "true" : "false"}
+                    />
+                  ),
+                )}
+              </div>
+              <small>{point.label}</small>
             </div>
-            <small>{point.label}</small>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <figcaption>
         {label} ·{" "}

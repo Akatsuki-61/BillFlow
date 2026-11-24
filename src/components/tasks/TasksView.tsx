@@ -937,49 +937,39 @@ export default function TasksView({
           <MotionSurface
             key={toastMessage}
             kind="toast"
-            className="bf-toast-popup fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 bg-surface-neutral-900 text-white text-sm font-medium rounded-xl shadow-[0_14px_30px_-6px_rgba(0,0,0,0.38)] border border-line-neutral-800 transition-all"
+            role="status"
+            aria-live="polite"
+            className="bf-toast-popup zentra-toast fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]"
           >
             {/\b(deleted|removed)\b/i.test(toastMessage) ? (
-              <span className="bf-toast-trash-badge w-6 h-6 rounded-lg bg-rose-500/20 border border-rose-500/35 text-rose-400 flex items-center justify-center shrink-0">
+              <span className="bf-toast-trash-badge w-7 h-7 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                 <i className="fa-solid fa-trash" aria-hidden="true" />
               </span>
             ) : /\b(created|added|scheduled)\b/i.test(toastMessage) ? (
-              <span className="bf-toast-add-badge w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/35 text-emerald-400 flex items-center justify-center shrink-0">
+              <span className="bf-toast-add-badge zentra-toast-icon">
                 <i className="fa-solid fa-circle-plus" aria-hidden="true" />
               </span>
             ) : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(
                 toastMessage,
               ) ? (
-              <span className="bf-toast-update-badge w-6 h-6 rounded-lg bg-blue-500/20 border border-blue-500/35 text-blue-400 flex items-center justify-center shrink-0">
+              <span className="bf-toast-update-badge zentra-toast-icon">
                 <i className="fa-solid fa-pen-to-square" aria-hidden="true" />
               </span>
             ) : (
-              <div className="w-2.5 h-2.5 rounded-full bg-accent-solid animate-ping shrink-0" />
+              <span className="zentra-toast-icon">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+              </span>
             )}
-            <span>{toastMessage}</span>
-            <Button
+            <span className="min-w-0 flex-1 leading-snug">{toastMessage}</span>
+            <button
+              type="button"
               aria-label="Close"
-              variant="ghost"
-              size="icon"
               onClick={() => setToastMessage(null)}
-              className="ml-2"
+              className="shrink-0 p-1 rounded-full text-content-neutral-500 hover:text-content-neutral-950 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" />
-            </Button>
-            <span
-              aria-hidden="true"
-              className={`bf-toast-progress-bar absolute bottom-0 left-0 right-0 h-[2.5px] ${
-                /\b(deleted|removed)\b/i.test(toastMessage)
-                  ? "bg-rose-500/80"
-                  : /\b(created|added|scheduled)\b/i.test(toastMessage)
-                    ? "bg-emerald-500/85"
-                    : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(
-                          toastMessage,
-                        )
-                      ? "bg-blue-500/85"
-                      : "bg-accent"
-              }`}
-            />
+              <X className="w-3.5 h-3.5" />
+            </button>
+            <span aria-hidden="true" className="zentra-toast-progress" />
           </MotionSurface>
         )}
       </MotionPresence>
@@ -1203,7 +1193,7 @@ export default function TasksView({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search sprint deliverables by name..."
-            className="ui-field ui-search-input w-full !pl-10 pl-10 pr-9 !rounded-full border border-line-neutral-200/90 text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-xs"
+            className="ui-field ui-search-input w-full !pl-10 pl-10 pr-9 !rounded-[12px] border border-[var(--ui-card-rim)] text-content-neutral-800 placeholder-content-neutral-400 focus:outline-none focus:border-accent transition-all text-xs"
             style={{ paddingLeft: "40px" }}
           />
           {searchQuery && (
@@ -1228,7 +1218,7 @@ export default function TasksView({
             renderValue={(opt) =>
               opt?.value === "all" ? "Priority: All" : `Priority: ${opt?.label}`
             }
-            buttonClassName="ui-field h-[38px] px-3.5 flex items-center justify-between gap-2 !rounded-full border border-line-neutral-200/90 font-medium text-content-neutral-700 text-xs hover:border-line-neutral-300 focus:outline-none focus:border-accent cursor-pointer transition-colors w-36"
+            buttonClassName="zentra-control-pill--white w-36"
             menuClassName="w-40"
           />
 
@@ -1239,7 +1229,7 @@ export default function TasksView({
             renderValue={(opt) =>
               opt?.value === "all" ? "Category: All" : `Category: ${opt?.label}`
             }
-            buttonClassName="ui-field h-[38px] px-3.5 flex items-center justify-between gap-2 !rounded-full border border-line-neutral-200/90 font-medium text-content-neutral-700 text-xs hover:border-line-neutral-300 focus:outline-none focus:border-accent cursor-pointer transition-colors w-40"
+            buttonClassName="zentra-control-pill--white w-40"
             menuClassName="w-44"
           />
 
@@ -1290,7 +1280,7 @@ export default function TasksView({
                 onDragOver={(e) => handleDragOver(e, col.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => void handleDrop(e, col.id)}
-                className={`ui-card p-4 transition-all duration-200 min-h-[420px] flex flex-col ${
+                className={`rounded-[24px] p-4 bg-[#e8e8ec]/75 dark:bg-[#121319] border border-[var(--ui-border-hairline)] transition-all duration-200 min-h-[420px] flex flex-col ${
                   isDropTarget ? "!border-accent ring-2 ring-accent/20" : ""
                 }`}
               >
@@ -1572,11 +1562,11 @@ export default function TasksView({
                           data-invoice-highlighted={
                             isInvoiceHoverLinked ? "true" : undefined
                           }
-                          className={`motion-card group relative bg-surface-neutral-50/75 dark:bg-surface-secondary rounded-[18px] p-4 border transition-[border-color,box-shadow,background-color,opacity,translate] duration-150 ease-out cursor-grab active:cursor-grabbing ${
+                          className={`motion-card group relative bg-[var(--ui-surface-pure)] rounded-[18px] p-4 border transition-[border-color,box-shadow,background-color,opacity,translate] duration-150 ease-out cursor-grab active:cursor-grabbing ${
                             isDragging
                               ? "opacity-40 scale-98"
                               : isInvoiceHoverLinked && invoicePalette
-                                ? `${invoicePalette.ringClass} -translate-y-[1.5px] bg-surface z-10`
+                                ? `${invoicePalette.ringClass} -translate-y-[1.5px] z-10`
                                 : col.id === "done" &&
                                     isBatchInvoicingMode &&
                                     isBatchSelected
@@ -1585,7 +1575,7 @@ export default function TasksView({
                                     ? "ring-2 ring-accent border-accent opacity-100 z-10"
                                     : dimmed
                                       ? "opacity-35 dark:opacity-25 grayscale-[70%] border-line-neutral-200/50 shadow-none hover:opacity-75"
-                                      : "border-line-neutral-200/80 hover:border-line-neutral-300 hover:bg-surface shadow-2xs"
+                                      : "border-[var(--ui-card-rim)] shadow-[var(--ui-white-pill-shadow)] hover:border-border-accent/45"
                           }`}
                         >
                           {/* Subtle 2px Left Accent Bar for Invoice-Linked Cards */}

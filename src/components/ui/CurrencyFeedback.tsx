@@ -62,39 +62,42 @@ export function CurrencyFeedback() {
     return () => clearTimeout(timer);
   }, [notice]);
   return (
-    <MotionPresence>
-      {notice && (
-        <MotionSurface
-          key={notice.key}
-          kind="toast"
-          className="fixed bottom-6 right-6 z-[9999] flex max-w-[360px] items-start gap-3 rounded-xl border border-line-neutral-200 bg-surface p-3.5 text-content-neutral-950 shadow-xl app-no-drag"
-        >
-          {notice.warning ? (
-            <AlertCircle className="mt-0.5 size-4 shrink-0 text-content-amber-700" />
-          ) : (
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-content-emerald-700" />
-          )}
-          <div className="min-w-0 text-xs leading-relaxed">
-            <p>{notice.message}</p>
-            <Link
-              className="mt-1 inline-block font-medium underline"
-              href="/settings?tab=invoices"
+      <MotionPresence>
+        {notice && (
+          <MotionSurface
+            key={notice.key}
+            kind="toast"
+            className="bf-toast-popup zentra-toast fixed bottom-6 right-6 z-[9999] max-w-[360px] items-start app-no-drag"
+          >
+            <span className="zentra-toast-icon mt-0.5" aria-hidden="true">
+              {notice.warning ? (
+                <AlertCircle className="size-4 text-content-amber-700" />
+              ) : (
+                <CheckCircle2 className="size-4" />
+              )}
+            </span>
+            <div className="min-w-0 flex-1 text-xs leading-relaxed">
+              <p>{notice.message}</p>
+              <Link
+                className="mt-1 inline-block font-semibold text-accent underline underline-offset-2"
+                href="/settings?tab=invoices"
+                onClick={() => setNotice(null)}
+              >
+                Exchange rate settings
+              </Link>
+            </div>
+            <button
+              type="button"
+              aria-label="Dismiss currency notification"
+              className="flex size-7 shrink-0 items-center justify-center rounded-full text-content-neutral-500 hover:bg-black/5 dark:hover:bg-white/10"
               onClick={() => setNotice(null)}
             >
-              Exchange rate settings
-            </Link>
-          </div>
-          <button
-            type="button"
-            aria-label="Dismiss currency notification"
-            className="flex size-7 shrink-0 items-center justify-center rounded-md hover:bg-surface-neutral-100"
-            onClick={() => setNotice(null)}
-          >
-            <X className="size-3.5" />
-          </button>
-        </MotionSurface>
-      )}
-    </MotionPresence>
+              <X className="size-3.5" />
+            </button>
+            <span aria-hidden="true" className="zentra-toast-progress" />
+          </MotionSurface>
+        )}
+      </MotionPresence>
   );
 }
 

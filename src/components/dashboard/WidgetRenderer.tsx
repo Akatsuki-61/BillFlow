@@ -2,7 +2,7 @@
 import { ReportingGuard } from "@/context/ReportingContext";
 import dynamic from "next/dynamic";
 
-import React, { useState, useMemo, useId } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { MonthlyBars, DataDots } from "@/components/ui/DataGraphic";
 import {
@@ -19,7 +19,6 @@ import {
   Maximize2,
   Minimize2,
   X,
-  Lightbulb,
 } from "lucide-react";
 import {
   useClients,
@@ -39,7 +38,13 @@ import { computeCashflowRunwayCard } from "@/lib/widgets/chartData";
 import "../analytics/analytics.css";
 import { useDashboardMetrics } from "./DashboardMetricsContext";
 import { LedgerWidget } from "./LedgerWidget";
-import { DEFAULT_DASHBOARD_WIDGET_IDS } from "@/lib/widgets/widgetDefinitions";
+import {
+  CardMenuButton,
+  DotMatrixCard,
+  GrossVolumeCard,
+  PaymentsFunnelCard,
+  RetentionSteppedCard,
+} from "./ZentraCharts";
 
 function ChartLoadingSkeleton() {
   return (
@@ -267,9 +272,11 @@ function WidgetContent({
   onNavigateToInvoice,
 }: WidgetRendererProps) {
   const router = useRouter();
-  const pipelineId = useId();
   const {
     activeCurrency,
+    grossDeltaPct,
+    invoicesCountDelta,
+    clientsCountDelta,
     activeTasks,
     filteredInvoices,
     financials,
@@ -303,14 +310,19 @@ function WidgetContent({
     overdueTotalStr,
     currencyIssuedCount,
     monthlyStats,
+    steppedRetentionSeries,
+    steppedPeakIndex,
+    steppedPeakPct,
+    invoiceDotBuckets,
+    invoicePeakLabel,
+    clientDotBuckets,
+    clientPeakLabel,
     taskCounts,
     pipelineStages,
   } = useDashboardMetrics(period);
   const { draggedWidgetId, startWidgetDrag, endWidgetDrag } =
     useWidgetContext();
   const isBeingDragged = draggedWidgetId === widgetId;
-
-  const [hoveredFunnelIdx, setHoveredFunnelIdx] = useState<number | null>(null);
 
   const displayInvoices = useMemo(
     () => filteredInvoices.slice(0, displaySize === "compact" ? 2 : 4),
@@ -377,21 +389,32 @@ function WidgetContent({
       >
         <div>
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+            <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
               {title}
             </h3>
+            {isDashboard && (
+              <CardMenuButton
+                label={`${title} options`}
+                actions={[
+                  { label: actionLabel || `Open ${title}`, onClick: () => router.push(href) },
+                  ...(onRemove
+                    ? [{ label: "Hide widget", onClick: onRemove, tone: "danger" as const }]
+                    : []),
+                ]}
+              />
+            )}
           </div>
 
-          <div className="my-3 flex items-end justify-between gap-3">
+          <div className="my-3.5 flex items-end justify-between gap-3">
             <div className="min-w-0">
               <div
                 className={`${
-                  isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                  isCompact ? "text-[26px]" : "text-[34px] xl:text-[38px]"
+                } dashboard-widget-value font-normal tracking-[-0.035em] text-content-neutral-950 leading-none tabular-nums truncate`}
               >
                 {value}
               </div>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2.5 flex items-center gap-2">
                 <span className="zentra-pill-badge !py-0.5 !px-2.5 !text-[11.5px]">
                   <span
                     className={`w-1.5 h-1.5 rounded-full ${dotActiveColor}`}
@@ -402,216 +425,75 @@ function WidgetContent({
             </div>
           </div>
 
-          <div className="pt-2.5 border-t border-line-neutral-100 space-y-2">
-            <div className="flex items-center justify-between text-[12px] text-content-neutral-500 gap-2">
+          <div className="pt-3 border-t border-[var(--ui-border-hairline)] space-y-2">
+            <div className="flex items-center justify-between text-[12.5px] text-content-neutral-500 gap-2">
               <span className="truncate">{subtitle}</span>
-              <span className="font-semibold tabular-nums text-content-neutral-800 shrink-0">
+              <span className="font-medium tabular-nums text-content-neutral-950 shrink-0">
                 {clampedPct}%
               </span>
             </div>
-            <div className="w-full h-2 rounded-full bg-surface-neutral-100 p-[1.5px] overflow-hidden">
+            <div className="data-track">
               <div
-                className={`h-full rounded-full ${stripeClass} transition-[width] duration-500`}
-                style={{ width: `${clampedPct}%` }}
+                className={`data-fill ${stripeClass} transition-[width] duration-500`}
+                style={{ width: `${clampedPct > 0 ? Math.max(4, clampedPct) : 0}%` }}
               />
             </div>
           </div>
         </div>
 
-        <div className="dashboard-widget-footer mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-          <span className="truncate text-[12px]">
-            {footerLabel || badgeText}
-          </span>
-          <Link
-            href={href}
-            onClick={(e) => e.stopPropagation()}
-            className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
-          >
-            <span>{actionLabel || `Open ${title}`}</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
+        {!isDashboard && (
+          <div className="dashboard-widget-footer mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
+            <span className="truncate text-[12px]">
+              {footerLabel || badgeText}
+            </span>
+            <Link
+              href={href}
+              onClick={(e) => e.stopPropagation()}
+              className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
+            >
+              <span>{actionLabel || `Open ${title}`}</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
       </div>
     );
   };
 
-  const [activeInsightIndex, setActiveInsightIndex] = useState(0);
-
-  const insightSlides = useMemo(() => {
-    if (widgetId !== "workspace-insights") return [];
-
-    return [
-      {
-        metric: `${paidRatioPct}%`,
-        title:
-          "Advance payment collection keeps project cashflow positive from day one",
-        description:
-          "Recording the 50% advance deposit before generating sprint deliverables connects billing directly to execution.",
-        actionLabel: "Open Invoices",
-        actionHref: "/invoices",
-      },
-      {
-        metric: `${taskCounts.done}/${taskCounts.total}`,
-        title: `${taskCounts.done} of ${taskCounts.total} linked deliverables completed on the sprint board`,
-        description:
-          "Invoice line items convert into trackable Kanban deliverables with independent subcontractor outsourcing.",
-        actionLabel: "Open Sprint Board",
-        actionHref: "/tasks",
-      },
-      {
-        metric: `${activeClientsCount}`,
-        title: `${activeClientsCount} active client accounts with connected delivery repositories`,
-        description:
-          "Saved delivery links keep source repositories, staging URLs, and consulting docs attached to every job.",
-        actionLabel: "Open Clients",
-        actionHref: "/clients",
-      },
-      {
-        metric: netProfitStr,
-        title: "Billed profit after recorded payouts and operating expenses",
-        description:
-          "Issued invoice totals less actual contractor payouts and recorded operating expenses, in the selected currency and period.",
-        actionLabel: "Open Expenses",
-        actionHref: "/expenses",
-      },
-    ];
-  }, [
-    widgetId,
-    paidRatioPct,
-    taskCounts.done,
-    taskCounts.total,
-    activeClientsCount,
-    netProfitStr,
-  ]);
-
   // Render individual widget based on ID
   const renderContent = () => {
     switch (widgetId) {
-      // 0. Workspace Insights — Atmospheric Spotlight Hero Card
-      case "workspace-insights": {
-        const currentInsight =
-          insightSlides[activeInsightIndex % insightSlides.length];
-        const isCompact = displaySize === "compact";
-
+      // 1. Total Revenue / Gross Volume — Zentra Pattern B (Massive Numeral + 3D Delta Pill + 3 Hatched Bars)
+      case "total-revenue":
         return (
-          <div
-            onClick={() =>
-              setActiveInsightIndex((prev) => (prev + 1) % insightSlides.length)
-            }
-            className={`dashboard-insight zentra-insights-card rounded-[24px] shadow-sm cursor-pointer select-none relative overflow-hidden transition-all h-full ${
-              isCompact
-                ? "p-5 flex flex-col justify-between gap-4 min-h-[170px]"
-                : "p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 min-h-[160px]"
-            }`}
-          >
-            {/* Decorative Glass Geometric Prism SVG (right) */}
-            <svg
-              className="absolute -top-6 -right-4 w-56 h-56 text-white/25 pointer-events-none"
-              viewBox="0 0 200 200"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M70 10 L190 50 L150 185 L35 130 Z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                fill="rgba(255,255,255,0.06)"
-              />
-              <path
-                d="M70 10 L125 95 L190 50"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
-              <path
-                d="M125 95 L150 185"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
-              <path
-                d="M35 130 L125 95"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
-            </svg>
-
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-5">
-              <div className="flex flex-col gap-2 shrink-0">
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/25 text-white text-[12.5px] font-medium w-fit">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-200" />
-                  <span>Workspace Insights</span>
-                </span>
-                <div
-                  className={`${
-                    isCompact ? "text-[30px]" : "text-[40px] xl:text-[46px]"
-                  } font-medium tracking-[-0.04em] leading-none tabular-nums text-white`}
-                >
-                  {currentInsight.metric}
-                </div>
-              </div>
-
-              <div className="sm:border-l sm:border-white/25 sm:pl-5 max-w-xl">
-                <h3
-                  className={`${
-                    isCompact ? "text-[14.5px]" : "text-[16.5px]"
-                  } font-semibold text-white leading-snug`}
-                >
-                  {currentInsight.title}
-                </h3>
-                <p
-                  className={`${
-                    isCompact ? "text-[12px] line-clamp-2" : "text-[13px]"
-                  } text-white/85 mt-1 leading-relaxed`}
-                >
-                  {currentInsight.description}
-                </p>
-              </div>
-            </div>
-
-            {/* Right: Quick Action Pill + 4-Segment Progress Indicator */}
-            <div
-              className="relative z-10 flex flex-col sm:items-end justify-between gap-4 shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => router.push(currentInsight.actionHref)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-[#111115] text-[12.5px] font-semibold shadow-sm hover:bg-white/90 transition-all cursor-pointer w-fit"
-              >
-                <span>{currentInsight.actionLabel}</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
-
-              <div className="flex items-center gap-2 w-40">
-                {insightSlides.map((_, idx) => {
-                  const isCurrent =
-                    idx === activeInsightIndex % insightSlides.length;
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      aria-label={`Insight ${idx + 1}`}
-                      onClick={() => setActiveInsightIndex(idx)}
-                      className={`h-1.5 flex-1 rounded-full transition-all cursor-pointer ${
-                        isCurrent ? "bg-white" : "bg-white/30 hover:bg-white/50"
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <GrossVolumeCard
+            totalRevenueCents={totalRevenueCents}
+            paidFullCents={paidFullCents}
+            advanceCentsCollected={advanceCentsCollected}
+            pendingCents={pendingCents}
+            grossDeltaPct={grossDeltaPct}
+            paidRatioPct={paidRatioPct}
+            currency={activeCurrency}
+            isCompact={isCompact}
+            onOpenInvoices={() => router.push("/invoices")}
+            onRemove={isDashboard ? onRemove : undefined}
+          />
         );
-      }
 
-      // 1. Total Revenue — Zentra Pattern B (Big Metric + Trend Pill + 3 Compact Diagonal-Striped Breakdown Bars)
-      case "total-revenue": {
-        const settledPct = sharePercent(paidFullCents, totalRevenueCents);
-        const advancePct = sharePercent(
-          advanceCentsCollected,
-          totalRevenueCents,
-        );
-        const pendingPct = sharePercent(pendingCents, totalRevenueCents);
-
+      // 2. Net Profit & Margin — Zentra Pattern C (Stepped Pink Pinstripe Chart + Peak Pill)
+      case "net-profit":
+        if (isDashboard) {
+          return (
+            <RetentionSteppedCard
+              title={isLoss ? "Net Loss" : "Net Margin"}
+              points={steppedRetentionSeries}
+              peakIndex={steppedPeakIndex}
+              peakPct={steppedPeakPct}
+              onOpenAnalytics={() => router.push("/analytics")}
+              onRemove={onRemove}
+            />
+          );
+        }
         return (
           <div
             className={`ui-card flex flex-col justify-between h-full ${
@@ -619,113 +501,13 @@ function WidgetContent({
             }`}
           >
             <div>
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
-                  Gross Volume & Revenue
-                </h3>
-              </div>
-
-              <div className="mt-3 flex items-center gap-2.5 flex-wrap">
-                <span
-                  className={`${
-                    isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                  } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
-                >
-                  {totalRevenueStr}
-                </span>
-                <span className="zentra-pill-badge !py-0.5 !px-2.5 !text-[11.5px]">
-                  <span>{paidRatioPct}% collected</span>
-                </span>
-              </div>
-
-              <div className="my-3 border-t border-line-neutral-200/70" />
-
-              <div className="space-y-2">
-                <div>
-                  <div className="flex items-center justify-between text-[11.5px] mb-1">
-                    <span className="text-content-neutral-500 font-medium">
-                      Settled ({paidCount})
-                    </span>
-                    <span className="font-semibold text-content-neutral-950 tabular-nums">
-                      {formatCents(paidFullCents, activeCurrency)}
-                    </span>
-                  </div>
-                  <div className="w-full h-[6px] rounded-full bg-surface-neutral-100 p-[1px] overflow-hidden">
-                    <div
-                      className="h-full rounded-full zentra-stripe-green transition-[width] duration-500"
-                      style={{ width: `${settledPct}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-[11.5px] mb-1">
-                    <span className="text-content-neutral-500 font-medium">
-                      Advance ({advancePaidCount})
-                    </span>
-                    <span className="font-semibold text-content-neutral-950 tabular-nums">
-                      {formatCents(advanceCentsCollected, activeCurrency)}
-                    </span>
-                  </div>
-                  <div className="w-full h-[6px] rounded-full bg-surface-neutral-100 p-[1px] overflow-hidden">
-                    <div
-                      className="h-full rounded-full zentra-stripe-blue transition-[width] duration-500"
-                      style={{ width: `${advancePct}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-[11.5px] mb-1">
-                    <span className="text-content-neutral-500 font-medium">
-                      Pending ({pendingCount})
-                    </span>
-                    <span className="font-semibold text-content-neutral-950 tabular-nums">
-                      {pendingReceivablesStr}
-                    </span>
-                  </div>
-                  <div className="w-full h-[6px] rounded-full bg-surface-neutral-100 p-[1px] overflow-hidden">
-                    <div
-                      className="h-full rounded-full zentra-stripe-pink transition-[width] duration-500"
-                      style={{ width: `${pendingPct}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="dashboard-widget-footer mt-3.5 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span className="dashboard-widget-footer-copy truncate text-[12px]">
-                {paidRatioPct}% collected
-              </span>
-              <Link
-                href="/invoices"
-                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
-              >
-                <span>Open Invoices</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
-        );
-      }
-
-      // 2. Net Profit & Margin — Zentra Pattern C (Stepped Pink Pinstripe Area Chart + Peak Pill)
-      case "net-profit": {
-        return (
-          <div
-            className={`ui-card flex flex-col justify-between h-full ${
-              isCompact ? "p-4 min-h-[195px]" : "p-6 min-h-[248px]"
-            }`}
-          >
-            <div>
-              <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+              <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
                 {isLoss ? "Net Loss & Margin" : "Net Profit & Margin"}
               </h3>
               <div
                 className={`mt-3 ${
                   isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                } dashboard-widget-value font-normal tracking-[-0.035em] text-content-neutral-950 leading-none tabular-nums truncate`}
               >
                 {netProfitStr}
               </div>
@@ -757,10 +539,28 @@ function WidgetContent({
             </div>
           </div>
         );
-      }
 
-      // 3. Pending Receivables — Zentra Pattern D (Big Metric + Green Dot-Matrix Histogram)
-      case "pending-receivables": {
+      // 3. Pending Receivables / Invoices — Zentra Pattern D (Green Circular Dot-Matrix Equalizer)
+      case "pending-receivables":
+        if (isDashboard) {
+          return (
+            <DotMatrixCard
+              title="Invoices"
+              value={filteredInvoices.length.toLocaleString()}
+              peakPrefix="Peak"
+              peakLabel={invoicePeakLabel}
+              deltaText={
+                invoicesCountDelta >= 0
+                  ? `+${invoicesCountDelta}`
+                  : `${invoicesCountDelta}`
+              }
+              buckets={invoiceDotBuckets}
+              tone="green"
+              onOpen={() => router.push("/invoices")}
+              onRemove={onRemove}
+            />
+          );
+        }
         return (
           <div
             className={`ui-card receivables-card flex flex-col justify-between h-full ${
@@ -769,7 +569,7 @@ function WidgetContent({
           >
             <div>
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+                <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
                   Pending Receivables
                 </h3>
               </div>
@@ -779,7 +579,7 @@ function WidgetContent({
                   <div
                     className={`${
                       isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                    } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                    } dashboard-widget-value font-normal tracking-[-0.035em] text-content-neutral-950 leading-none tabular-nums truncate`}
                   >
                     {pendingReceivablesStr}
                   </div>
@@ -833,15 +633,28 @@ function WidgetContent({
             </div>
           </div>
         );
-      }
 
-      // 4. Total Clients — Zentra Pattern D (Big Metric + Blue Dot-Matrix Histogram)
-      case "active-clients": {
-        const activeRatio =
-          totalClientsCount > 0
-            ? Math.round((activeClientsCount / totalClientsCount) * 100)
-            : 0;
-
+      // 4. Total Clients — Zentra Pattern D (Blue Circular Dot-Matrix Equalizer)
+      case "active-clients":
+        if (isDashboard) {
+          return (
+            <DotMatrixCard
+              title="Clients"
+              value={totalClientsCount.toLocaleString()}
+              peakPrefix="Highest"
+              peakLabel={clientPeakLabel}
+              deltaText={
+                clientsCountDelta >= 0
+                  ? `+${clientsCountDelta}`
+                  : `${clientsCountDelta}`
+              }
+              buckets={clientDotBuckets}
+              tone="blue"
+              onOpen={() => router.push("/clients")}
+              onRemove={onRemove}
+            />
+          );
+        }
         return (
           <div
             className={`ui-card flex flex-col justify-between h-full ${
@@ -850,7 +663,7 @@ function WidgetContent({
           >
             <div>
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
+                <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950 truncate">
                   Customers & Clients
                 </h3>
               </div>
@@ -860,7 +673,7 @@ function WidgetContent({
                   <div
                     className={`${
                       isCompact ? "text-[26px]" : "text-[34px] xl:text-[36px]"
-                    } dashboard-widget-value font-medium tracking-[-0.04em] text-content-neutral-950 leading-none tabular-nums truncate`}
+                    } dashboard-widget-value font-normal tracking-[-0.035em] text-content-neutral-950 leading-none tabular-nums truncate`}
                   >
                     {totalClientsCount.toLocaleString()}
                   </div>
@@ -874,7 +687,10 @@ function WidgetContent({
                     active share
                   </div>
                   <div className="text-[16px] font-medium tracking-tight text-content-neutral-950 tabular-nums mt-0.5">
-                    {activeRatio}%
+                    {totalClientsCount > 0
+                      ? Math.round((activeClientsCount / totalClientsCount) * 100)
+                      : 0}
+                    %
                   </div>
                 </div>
               </div>
@@ -896,7 +712,6 @@ function WidgetContent({
             </div>
           </div>
         );
-      }
 
       // 5. Outsourced Costs
       case "outsourced-costs":
@@ -1237,151 +1052,17 @@ function WidgetContent({
         );
       }
 
-      // 14. Billing pipeline follows the Overview period.
-      case "profit-trajectory-chart": {
+      // 14. Payments 5-Stage Sloped Hatched Funnel + Embedded AI Dock
+      case "profit-trajectory-chart":
         return (
-          <div className="ui-card p-6 flex flex-col justify-between h-full min-h-[330px]">
-            {/* Top Card Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-[18px] font-medium tracking-[-0.02em] text-content-neutral-950">
-                  Payments & Billing Pipeline
-                </h3>
-              </div>
-            </div>
-
-            {/* 5-Stage Zentra Striped Funnel Chart */}
-            <div className="relative mt-5 grid grid-cols-12 gap-0 min-h-[220px]">
-              {/* Left Y-Axis Scale */}
-              <div className="col-span-1 hidden sm:flex flex-col justify-between pt-14 pb-2 pr-2 text-[11px] font-medium text-content-neutral-400 select-none">
-                {[1, 2 / 3, 1 / 3, 0].map((factor) => (
-                  <span key={factor}>
-                    {getCurrencySymbol(activeCurrency)}
-                    {new Intl.NumberFormat("en", {
-                      notation: "compact",
-                      maximumFractionDigits: 1,
-                    }).format(
-                      (Math.max(
-                        ...pipelineStages.map((stage) => Math.abs(stage.value)),
-                      ) /
-                        100) *
-                        factor,
-                    )}
-                  </span>
-                ))}
-              </div>
-
-              {/* 5 Stage Columns */}
-              <div className="col-span-12 sm:col-span-11 grid grid-cols-5 relative">
-                {pipelineStages.map((stage, idx) => {
-                  const isSelected = hoveredFunnelIdx === idx;
-
-                  return (
-                    <div
-                      key={stage.label}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`${stage.label}: ${stage.valueStr}. ${stage.sub}`}
-                      aria-describedby={
-                        isSelected ? `${pipelineId}-${idx}` : undefined
-                      }
-                      onMouseEnter={() => setHoveredFunnelIdx(idx)}
-                      onMouseLeave={() => setHoveredFunnelIdx(null)}
-                      onFocus={() => setHoveredFunnelIdx(idx)}
-                      onBlur={() => setHoveredFunnelIdx(null)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          router.push(stage.href);
-                        }
-                        if (event.key === "Escape") setHoveredFunnelIdx(null);
-                      }}
-                      onClick={() => router.push(stage.href)}
-                      className={`relative flex flex-col justify-between border-l border-line-neutral-200/80 px-2.5 sm:px-3.5 pt-1 pb-0 cursor-pointer transition-colors ${
-                        isSelected
-                          ? "pipeline-stage-active"
-                          : "hover:bg-black/[0.01]"
-                      }`}
-                    >
-                      <div className="z-10">
-                        <div
-                          className={`text-[11.5px] font-medium truncate ${
-                            isSelected
-                              ? "text-content-neutral-950"
-                              : "text-content-neutral-400"
-                          }`}
-                        >
-                          {stage.label}
-                        </div>
-                        <div
-                          className={`mt-1 text-[17px] sm:text-[21px] font-medium tracking-[-0.03em] tabular-nums truncate ${
-                            isSelected
-                              ? "text-content-neutral-950"
-                              : "text-content-neutral-400"
-                          }`}
-                        >
-                          {stage.valueStr}
-                        </div>
-                      </div>
-
-                      {/* Floating Pill Tooltip on Active Stage */}
-                      {isSelected && (
-                        <div
-                          id={`${pipelineId}-${idx}`}
-                          role="tooltip"
-                          className={`pipeline-tooltip ${idx === 0 ? "pipeline-tooltip--first" : idx === pipelineStages.length - 1 ? "pipeline-tooltip--last" : ""}`}
-                        >
-                          <div className="zentra-pill-badge !py-1.5 !px-3.5 shadow-md">
-                            <strong className="font-semibold text-content-neutral-950">
-                              {stage.valueStr}
-                            </strong>
-                            <span className="text-content-neutral-400">|</span>
-                            <span className="text-content-neutral-500">
-                              {stage.sub}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Stage Bar + Connector */}
-                      <div className="relative w-full h-[145px] flex items-end mt-4">
-                        <div
-                          className="relative w-full transition-all duration-300"
-                          style={{ height: `${stage.heightPct}%` }}
-                        >
-                          <div
-                            className={`w-full h-full rounded-t-[4px] ${
-                              stage.value < 0
-                                ? "zentra-stripe-pink"
-                                : isSelected
-                                  ? "pipeline-bar-active"
-                                  : "zentra-stripe-blue opacity-90"
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-line-neutral-100 flex items-center justify-between text-[12.5px] text-content-neutral-500">
-              <span className="summary-caption">
-                Bar heights compare absolute amounts. Net profit uses billed
-                revenue.
-              </span>
-              <Link
-                href="/invoices"
-                className="text-content-neutral-950 font-medium hover:underline inline-flex items-center gap-1 shrink-0"
-              >
-                <span>Open Invoices</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
+          <PaymentsFunnelCard
+            stages={pipelineStages}
+            currency={activeCurrency}
+            isCompact={isCompact}
+            onOpenInvoices={() => router.push("/invoices")}
+            onRemove={isDashboard ? onRemove : undefined}
+          />
         );
-      }
 
       // 15. On-Time Collection Rate Gauge — Zentra Visual Gauge + Striped Breakdown
       case "collection-rate-gauge": {
@@ -2158,9 +1839,12 @@ function WidgetContent({
         </div>
       )}
 
-      {isDashboard && DEFAULT_DASHBOARD_WIDGET_IDS.includes(widgetId) ? (
+      {isDashboard &&
+      (widgetId === "cash-flow" || widgetId === "collected-revenue") ? (
         <LedgerWidget widgetId={widgetId} compact={isCompact} />
-      ) : renderContent()}
+      ) : (
+        renderContent()
+      )}
     </div>
   );
 }

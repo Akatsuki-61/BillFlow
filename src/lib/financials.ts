@@ -15,6 +15,28 @@ export function financialDateInPeriod(
   const date = new Date(`${day}T12:00:00`);
   if (["all", "all-time"].includes(period)) return true;
   if (/^\d{4}-\d{2}$/.test(period)) return day.slice(0, 7) === period;
+  if (period === "week") {
+    const dayOfWeek = (now.getDay() + 6) % 7;
+    const weekStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - dayOfWeek,
+      0,
+      0,
+      0,
+      0,
+    );
+    const weekEnd = new Date(
+      weekStart.getFullYear(),
+      weekStart.getMonth(),
+      weekStart.getDate() + 6,
+      23,
+      59,
+      59,
+      999,
+    );
+    return date >= weekStart && date <= weekEnd;
+  }
   if (date.getFullYear() !== now.getFullYear()) return false;
   if (period === "year") return true;
   if (period === "month") return date.getMonth() === now.getMonth();
