@@ -595,13 +595,13 @@ function ClientsContent() {
           ).length;
           const money = (value: number) => formatCents(value, activeCurrency);
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <section className="ui-card p-6 space-y-5">
+            <div className="kpi-strip grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <section className="ui-card kpi-strip-card">
                 <h2>Client Portfolio</h2>
                 <div>
                   <div className="summary-value">{money(billed)}</div>
                   <p className="summary-caption">
-                    Issued to saved clients, converted to {activeCurrency}
+                    Issued to saved clients · {activeCurrency}
                   </p>
                 </div>
                 <DataBreakdown
@@ -623,7 +623,7 @@ function ClientsContent() {
                   ]}
                 />
               </section>
-              <section className="ui-card p-6 space-y-5">
+              <section className="ui-card kpi-strip-card">
                 <h2>Client Relationships</h2>
                 <div>
                   <div className="summary-value">{clients.length}</div>
@@ -647,14 +647,14 @@ function ClientsContent() {
                   ]}
                 />
               </section>
-              <section className="ui-card p-6 space-y-5">
+              <section className="ui-card kpi-strip-card">
                 <h2>Delivery Locations</h2>
                 <div>
                   <div className="summary-value">
                     {linked}/{clients.length}
                   </div>
                   <p className="summary-caption">
-                    Client profiles with a saved delivery link
+                    Profiles with a saved delivery link
                   </p>
                 </div>
                 <DataBreakdown

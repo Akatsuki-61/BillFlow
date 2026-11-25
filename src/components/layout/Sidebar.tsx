@@ -1008,7 +1008,11 @@ export default function Sidebar() {
                       <div className="px-1.5 mb-1.5 text-[11px] font-medium text-content-neutral-400">
                         Appearance
                       </div>
-                      <div className="grid grid-cols-3 gap-1 p-1 rounded-[11px] bg-surface-neutral-100 relative">
+                      <div
+                        className="ui-segmented ui-segmented--compact !grid grid-cols-3 w-full"
+                        role="group"
+                        aria-label="Appearance theme"
+                      >
                         {(
                           [
                             { id: "light", label: "Light", icon: Sun },
@@ -1022,22 +1026,20 @@ export default function Sidebar() {
                             <button
                               key={mode.id}
                               type="button"
+                              aria-pressed={active}
+                              data-has-pill="true"
                               onClick={(e) =>
                                 setPreference(mode.id, {
                                   trigger: e.currentTarget,
                                 })
                               }
-                              className={`relative isolate flex items-center justify-center gap-1.5 py-1.5 rounded-[8px] text-[11.5px] font-medium cursor-pointer transition-colors ${
-                                active
-                                  ? "text-content-neutral-950"
-                                  : "text-content-neutral-500 hover:text-content-neutral-900"
-                              }`}
+                              className="!px-2 !py-1.5 !min-h-[28px] !text-[11.5px] w-full"
                             >
                               {active && (
                                 <m.span
                                   layoutId="profile-theme-pill"
                                   transition={SPRING_NAV_GLIDE}
-                                  className="absolute inset-0 -z-10 rounded-[8px] bg-surface shadow-xs border border-line-neutral-200/60"
+                                  className="ui-segmented-pill"
                                 />
                               )}
                               <ModeIcon className="w-3.5 h-3.5 relative z-10" />

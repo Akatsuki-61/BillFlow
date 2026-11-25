@@ -918,8 +918,8 @@ export default function OutsourcingView() {
           const done = orders.filter((order) => order.status === "done").length;
           const money = (value: number) => formatCents(value, activeCurrency);
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <section className="ui-card p-6 space-y-5">
+            <div className="kpi-strip grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <section className="ui-card kpi-strip-card">
                 <h2>Subcontractor Payables</h2>
                 <div>
                   <div className="summary-value">{money(committed)}</div>
@@ -947,14 +947,14 @@ export default function OutsourcingView() {
                   ]}
                 />
               </section>
-              <section className="ui-card p-6 space-y-5">
+              <section className="ui-card kpi-strip-card">
                 <h2>Contractor Delivery</h2>
                 <div>
                   <div className="summary-value">
                     {done}/{orders.length}
                   </div>
                   <p className="summary-caption">
-                    Completed work orders. Payouts are tracked separately.
+                    Completed work orders · payouts tracked separately
                   </p>
                 </div>
                 <DataBreakdown
@@ -975,11 +975,13 @@ export default function OutsourcingView() {
                   ]}
                 />
               </section>
-              <section className="ui-card p-6 space-y-5">
-                <h2>Scheduled Contractor Fees</h2>
-                <p className="summary-caption">
-                  Agreed fees by contractor delivery due month
-                </p>
+              <section className="ui-card kpi-strip-card">
+                <div>
+                  <h2>Scheduled Contractor Fees</h2>
+                  <p className="summary-caption">
+                    Agreed fees by contractor due month
+                  </p>
+                </div>
                 <MonthlyBars
                   label="Fees due · last six months"
                   formatValue={money}
@@ -1002,7 +1004,7 @@ export default function OutsourcingView() {
         <div className="vendor-directory-header">
           <div className="space-y-1">
             {/* View Switcher Tabs */}
-            <div className="inline-flex items-center gap-1 p-1 bg-surface-neutral-100 rounded-xl border border-line-neutral-200">
+            <div className="ui-segmented ui-segmented--compact" role="group" aria-label="Outsourcing section">
               {(
                 [
                   {
@@ -1022,17 +1024,13 @@ export default function OutsourcingView() {
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
                     aria-pressed={isActive}
-                    className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:scale-[0.97] ${
-                      isActive
-                        ? "text-content-neutral-900"
-                        : "text-content-neutral-600 hover:text-content-neutral-900"
-                    }`}
+                    data-has-pill="true"
                   >
                     {isActive && (
                       <m.span
                         layoutId="outsourcing-main-tab-pill"
                         transition={SPRING_NAV_GLIDE}
-                        className="absolute inset-0 rounded-lg bg-surface shadow-xs"
+                        className="ui-segmented-pill"
                       />
                     )}
                     <span className="relative z-10">{tab.label}</span>
@@ -1074,7 +1072,7 @@ export default function OutsourcingView() {
               </button>
             )}
 
-            <div className="vendor-status-filter">
+            <div className="ui-segmented ui-segmented--compact" role="group" aria-label="Payout status filter">
               {(
                 [
                   { id: "ALL", label: "All" },
@@ -1089,13 +1087,13 @@ export default function OutsourcingView() {
                     type="button"
                     onClick={() => setStatusFilter(item.id)}
                     aria-pressed={isActive}
-                    className={`vendor-filter-btn relative active:scale-[0.97] ${isActive ? "active !bg-transparent !shadow-none" : ""}`}
+                    data-has-pill="true"
                   >
                     {isActive && (
                       <m.span
                         layoutId="outsourcing-status-pill"
                         transition={SPRING_NAV_GLIDE}
-                        className="absolute inset-0 rounded-lg bg-surface dark:bg-[#252530] shadow-xs border border-line-neutral-200/80 dark:border-[#353545]"
+                        className="ui-segmented-pill"
                       />
                     )}
                     <span className="relative z-10">{item.label}</span>

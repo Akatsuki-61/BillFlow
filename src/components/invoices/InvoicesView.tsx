@@ -33,7 +33,6 @@ import {
 } from "@/components/ui/Workspace";
 
 import {
-  IconCrossfade,
   MotionPresence,
   MotionSurface,
 } from "@/components/ui/MotionSurface";
@@ -41,7 +40,6 @@ import { AnimatePresence, m } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
   EXIT_MENU_POPOVER,
-  SPRING_NAV_GLIDE,
   POPOVER_INITIAL_SCALE,
   listRowTransition,
 } from "@/lib/motion";
@@ -141,8 +139,6 @@ const ProjectMarginDrawer = dynamic(
 );
 
 const ACCENT_ICON_CLASS = "text-accent-deep-solid dark:text-accent";
-const ACCENT_EXPORT_BUTTON_CLASS =
-  "!border-border-accent !bg-accent-faint !text-accent-deep-solid enabled:hover:!bg-accent-soft enabled:hover:!border-accent/60 dark:!bg-accent-faint dark:!text-content-purple-950 dark:enabled:hover:!bg-accent-soft";
 
 type FilterTab =
   "All Invoices" | "Advance Paid" | "Drafts" | "Overdue" | "Paid";
@@ -390,9 +386,9 @@ export default function InvoicesView() {
     return () => clearTimeout(timer);
   }, [invoiceHighlightParam]);
 
-  // Overdue Summary Modal state & Export Format preference
+  // Overdue Summary Modal & Unified Export Dialog state
   const [showOverdueSummary, setShowOverdueSummary] = useState(false);
-  const [exportFormat, setExportFormat] = useState<ExportFileFormat>("csv");
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   // Check URL search parameters for overdue summary view
   const viewParam = searchParams.get("view");
@@ -411,10 +407,9 @@ export default function InvoicesView() {
   // Export Invoices CSV / Excel handler using Convert Engine
   const handleExportInvoicesCsv = (
     type: "current" | "selected" | "overdue" | "all",
-    formatOverride?: ExportFileFormat,
+    formatOverride: ExportFileFormat = "csv",
   ) => {
-    const activeFmt = formatOverride ?? exportFormat;
-    const isExcel = activeFmt === "excel";
+    const isExcel = formatOverride === "excel";
     try {
       const todayStr = localDateKey();
       if (type === "selected") {
@@ -2417,9 +2412,9 @@ export default function InvoicesView() {
           const pastDue = overdue.reduce((sum, inv) => sum + balance(inv), 0);
           const money = (value: number) => formatCents(value, primaryCurrency);
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <section className="lg:col-span-5 ui-card p-6 space-y-5">
-                <div className="flex items-center justify-between gap-3">
+            <div className="kpi-strip grid grid-cols-1 lg:grid-cols-12 gap-3">
+              <section className="lg:col-span-5 ui-card kpi-strip-card">
+                <div className="flex items-center justify-between gap-2">
                   <h2>Billed & Collected</h2>
                   <button
                     type="button"
@@ -2427,7 +2422,7 @@ export default function InvoicesView() {
                     className="zentra-circle-btn zentra-circle-btn--sm"
                     aria-label="Create new invoice"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <div>
@@ -2456,8 +2451,8 @@ export default function InvoicesView() {
                   ]}
                 />
               </section>
-              <section className="lg:col-span-4 ui-card p-6 space-y-5">
-                <div className="flex items-center justify-between gap-3">
+              <section className="lg:col-span-4 ui-card kpi-strip-card">
+                <div className="flex items-center justify-between gap-2">
                   <h2>Total Outstanding</h2>
                   <span className="zentra-pill-badge">{open.length} open</span>
                 </div>
@@ -2488,10 +2483,10 @@ export default function InvoicesView() {
                   ]}
                 />
               </section>
-              <section className="lg:col-span-3 ui-card p-6 space-y-5">
-                <div className="flex items-center justify-between gap-3">
+              <section className="lg:col-span-3 ui-card kpi-strip-card">
+                <div className="flex items-center justify-between gap-2">
                   <h2>Overdue</h2>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => handleExportInvoicesCsv("overdue", "csv")}
@@ -2519,28 +2514,28 @@ export default function InvoicesView() {
                       aria-label="View Overdue Summary and Aging"
                       title="View Overdue Summary and Aging Breakdown"
                     >
-                      <AlertCircle className="w-4 h-4" />
+                      <AlertCircle className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
                 <div>
                   <div className="summary-value">{money(pastDue)}</div>
-                  <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
                     <p className="summary-caption">
-                      {overdue.length} invoice{overdue.length === 1 ? "" : "s"}{" "}
-                      with a past-due balance
+                      {overdue.length} past-due invoice
+                      {overdue.length === 1 ? "" : "s"}
                     </p>
                     <button
                       type="button"
                       onClick={() => setShowOverdueSummary(true)}
-                      className="text-[11.5px] text-accent hover:underline font-medium cursor-pointer whitespace-nowrap shrink-0"
+                      className="text-[11px] text-accent hover:underline font-medium cursor-pointer whitespace-nowrap shrink-0"
                     >
                       Breakdown →
                     </button>
                   </div>
                 </div>
                 <MonthlyBars
-                  label={`Unpaid balance by due month · ${primaryCurrency}`}
+                  label={`Unpaid by due month · ${primaryCurrency}`}
                   formatValue={money}
                   points={recentMonths().map((month) => ({
                     ...month,
@@ -2626,86 +2621,19 @@ export default function InvoicesView() {
             )}
           </div>
 
-          <div
-            role="group"
-            aria-label="Export file format"
-            className="relative inline-flex items-center rounded-full border border-line-neutral-200 bg-surface-neutral-100/80 dark:bg-surface-neutral-900 p-0.5 shrink-0"
-          >
-            <button
-              type="button"
-              aria-pressed={exportFormat === "csv"}
-              onClick={() => setExportFormat("csv")}
-              className={`relative px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
-                exportFormat === "csv"
-                  ? "text-white"
-                  : "text-content-neutral-600 hover:text-content-neutral-950"
-              }`}
-              title="Set export format to RFC 4180 CSV (.csv)"
-            >
-              {exportFormat === "csv" && (
-                <m.span
-                  layoutId="invoices-export-format-pill"
-                  transition={SPRING_NAV_GLIDE}
-                  className="absolute inset-0 rounded-full bg-accent-solid shadow-xs"
-                />
-              )}
-              <span className="relative z-10">CSV</span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={exportFormat === "excel"}
-              onClick={() => setExportFormat("excel")}
-              className={`relative px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
-                exportFormat === "excel"
-                  ? "text-white"
-                  : "text-content-neutral-600 hover:text-content-neutral-950"
-              }`}
-              title="Set export format to Microsoft Excel Workbook (.xls) via Convert Engine"
-            >
-              {exportFormat === "excel" && (
-                <m.span
-                  layoutId="invoices-export-format-pill"
-                  transition={SPRING_NAV_GLIDE}
-                  className="absolute inset-0 rounded-full bg-accent-solid shadow-xs"
-                />
-              )}
-              <span className="relative z-10">Excel</span>
-            </button>
-          </div>
-
-          <Button
-            variant="secondary"
-            size="small"
+          <button
             type="button"
-            onClick={() =>
-              handleExportInvoicesCsv(
-                activeTab === "Overdue" ? "overdue" : "current",
-              )
-            }
+            onClick={() => setIsExportDialogOpen(true)}
+            className="zentra-control-pill hover:!border-accent/50 shrink-0"
             title={
               activeTab === "Overdue"
-                ? `Export overdue summary report to ${exportFormat === "excel" ? "Excel (.xls)" : "CSV (.csv)"}`
-                : `Export currently filtered invoices to ${exportFormat === "excel" ? "Excel (.xls)" : "CSV (.csv)"}`
+                ? "Export overdue summary report as CSV or Excel"
+                : "Export currently filtered invoices as CSV or Excel"
             }
-            className={`shrink-0 ${ACCENT_EXPORT_BUTTON_CLASS}`}
           >
-            <IconCrossfade iconKey={exportFormat} className="w-3.5 h-3.5">
-              {exportFormat === "excel" ? (
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-              ) : (
-                <Download className="w-3.5 h-3.5" />
-              )}
-            </IconCrossfade>
-            <span>
-              {activeTab === "Overdue"
-                ? exportFormat === "excel"
-                  ? "Export Overdue Excel"
-                  : "Export Overdue CSV"
-                : exportFormat === "excel"
-                  ? "Export Excel (.xls)"
-                  : "Export CSV (.csv)"}
-            </span>
-          </Button>
+            <Download className={`w-3.5 h-3.5 ${ACCENT_ICON_CLASS}`} />
+            <span>Export</span>
+          </button>
         </div>
       </div>
 
@@ -2768,10 +2696,9 @@ export default function InvoicesView() {
                   size="small"
                   type="button"
                   onClick={() => handleExportInvoicesCsv("selected", "csv")}
-                  className={`!text-xs !py-1 ${ACCENT_EXPORT_BUTTON_CLASS}`}
                   title="Export selected invoices to CSV (.csv)"
                 >
-                  <Download className="w-3 h-3" />
+                  <Download className="w-3.5 h-3.5 text-accent" />
                   <span>Export CSV</span>
                 </Button>
                 <Button
@@ -2779,10 +2706,9 @@ export default function InvoicesView() {
                   size="small"
                   type="button"
                   onClick={() => handleExportInvoicesCsv("selected", "excel")}
-                  className={`!text-xs !py-1 ${ACCENT_EXPORT_BUTTON_CLASS}`}
                   title="Convert & export selected invoices to Excel (.xls)"
                 >
-                  <FileSpreadsheet className="w-3 h-3" />
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
                   <span>Export Excel</span>
                 </Button>
               </div>
@@ -5118,6 +5044,92 @@ export default function InvoicesView() {
               }
             }}
           />
+        )}
+      </MotionPresence>
+      <MotionPresence>
+        {isExportDialogOpen && (
+          <Dialog
+            onClose={() => setIsExportDialogOpen(false)}
+            width={420}
+            compact
+          >
+            <div className="app-dialog-header">
+              <div>
+                <h2 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950">
+                  {activeTab === "Overdue"
+                    ? "Export Overdue Report"
+                    : "Export Invoices"}
+                </h2>
+                <p className="text-xs text-content-neutral-500 mt-0.5">
+                  {activeTab === "Overdue"
+                    ? "Choose a format for your overdue aging summary"
+                    : `${filteredInvoices.length} ${
+                        filteredInvoices.length === 1 ? "invoice" : "invoices"
+                      } in current view (${activeTab})`}
+                </p>
+              </div>
+            </div>
+
+            <div className="app-dialog-body space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  handleExportInvoicesCsv(
+                    activeTab === "Overdue" ? "overdue" : "current",
+                    "csv",
+                  );
+                  setIsExportDialogOpen(false);
+                }}
+                className="w-full flex items-center gap-3.5 p-3.5 rounded-[16px] bg-[var(--ui-surface-pure)] border border-[var(--ui-border)] hover:border-border-accent transition-all text-left cursor-pointer"
+              >
+                <span className="w-10 h-10 rounded-[12px] bg-accent/12 text-accent flex items-center justify-center shrink-0">
+                  <Download className="w-4.5 h-4.5" strokeWidth={1.9} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13.5px] font-medium text-content-neutral-950">
+                    Export as CSV (.csv)
+                  </div>
+                  <div className="text-[12px] text-content-neutral-500">
+                    Standard RFC 4180 spreadsheet format for bookkeeping
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleExportInvoicesCsv(
+                    activeTab === "Overdue" ? "overdue" : "current",
+                    "excel",
+                  );
+                  setIsExportDialogOpen(false);
+                }}
+                className="w-full flex items-center gap-3.5 p-3.5 rounded-[16px] bg-[var(--ui-surface-pure)] border border-[var(--ui-border)] hover:border-border-accent transition-all text-left cursor-pointer"
+              >
+                <span className="w-10 h-10 rounded-[12px] bg-surface-neutral-100 text-content-neutral-800 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-4.5 h-4.5" strokeWidth={1.9} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13.5px] font-medium text-content-neutral-950">
+                    Export as Excel (.xls)
+                  </div>
+                  <div className="text-[12px] text-content-neutral-500">
+                    Formatted Microsoft Excel workbook with summary totals
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setIsExportDialogOpen(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </Dialog>
         )}
       </MotionPresence>
       <MotionPresence>

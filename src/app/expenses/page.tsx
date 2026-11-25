@@ -1031,8 +1031,8 @@ function ExpensesContent() {
           const money = (value: number) =>
             formatCents(value, reporting.currency);
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <section className="ui-card p-6 space-y-5">
+            <div className="kpi-strip grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <section className="ui-card kpi-strip-card">
                 <h2>Operating Expenses</h2>
                 <div>
                   <div className="summary-value">{money(total)}</div>
@@ -1059,7 +1059,7 @@ function ExpensesContent() {
                   ]}
                 />
               </section>
-              <section className="ui-card p-6 space-y-5">
+              <section className="ui-card kpi-strip-card">
                 <h2>Supporting Records</h2>
                 <div>
                   <div className="summary-value">
@@ -1088,13 +1088,15 @@ function ExpensesContent() {
                   ]}
                 />
               </section>
-              <section className="ui-card p-6 space-y-5">
-                <h2>Monthly Spending</h2>
-                <p className="summary-caption">
-                  Recorded by expense date · {reporting.currency}
-                </p>
+              <section className="ui-card kpi-strip-card">
+                <div>
+                  <h2>Monthly Spending</h2>
+                  <p className="summary-caption">
+                    Recorded by expense date · {reporting.currency}
+                  </p>
+                </div>
                 <MonthlyBars
-                  label={`Expenses · last six months · ${reporting.currency}`}
+                  label={`Last six months · ${reporting.currency}`}
                   formatValue={money}
                   points={recentMonths().map((month) => ({
                     ...month,

@@ -1056,7 +1056,7 @@ export default function TaskCalendarView({
         {/* Filters and View Switcher */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Scope Filter Tabs */}
-          <div className="inline-flex rounded-xl bg-surface-neutral-100 p-1 border border-line-neutral-200/70 text-xs font-semibold">
+          <div className="ui-segmented ui-segmented--compact" role="group" aria-label="Calendar item scope">
             {(
               [
                 { id: "all", label: "All Items" },
@@ -1069,18 +1069,15 @@ export default function TaskCalendarView({
                 <button
                   key={tab.id}
                   type="button"
+                  aria-pressed={isActive}
+                  data-has-pill="true"
                   onClick={() => setScopeFilter(tab.id)}
-                  className={`relative px-3 py-1.5 rounded-lg transition-colors active:scale-[0.97] ${
-                    isActive
-                      ? "text-content-neutral-900 font-bold"
-                      : "text-content-neutral-600 hover:text-content-neutral-900"
-                  }`}
                 >
                   {isActive && (
                     <m.span
                       layoutId="calendar-scope-pill"
                       transition={SPRING_NAV_GLIDE}
-                      className="absolute inset-0 rounded-lg bg-surface shadow-xs"
+                      className="ui-segmented-pill"
                     />
                   )}
                   <span className="relative z-10">{tab.label}</span>
@@ -1122,7 +1119,7 @@ export default function TaskCalendarView({
           )}
 
           {/* View Mode Toggle: Grid vs Agenda */}
-          <div className="flex items-center gap-1 bg-surface-neutral-100 rounded-xl p-1 border border-line-neutral-200/70">
+          <div className="ui-segmented ui-segmented--compact" role="group" aria-label="Calendar layout">
             {(
               [
                 { id: "grid", title: "Month Grid", Icon: Grid3X3 },
@@ -1135,18 +1132,17 @@ export default function TaskCalendarView({
                   key={id}
                   type="button"
                   title={title}
+                  aria-label={title}
+                  aria-pressed={isActive}
+                  data-has-pill="true"
                   onClick={() => setViewType(id)}
-                  className={`relative p-1.5 rounded-lg transition-colors active:scale-[0.97] ${
-                    isActive
-                      ? "text-accent"
-                      : "text-content-neutral-500 hover:text-content-neutral-800"
-                  }`}
+                  className="!px-2"
                 >
                   {isActive && (
                     <m.span
                       layoutId="calendar-view-mode-pill"
                       transition={SPRING_NAV_GLIDE}
-                      className="absolute inset-0 rounded-lg bg-surface shadow-xs"
+                      className="ui-segmented-pill"
                     />
                   )}
                   <Icon className="relative z-10 w-4 h-4" />

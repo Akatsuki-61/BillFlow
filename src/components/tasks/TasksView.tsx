@@ -1081,8 +1081,8 @@ export default function TasksView({
 
       {/* ==============================================================          ZENTRA 3-CARD SPRINT BENTO HEADER ROW
          ===================================================================== */}
-      <div className="task-overview grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <section className="ui-card p-6 space-y-5">
+      <div className="task-overview kpi-strip grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <section className="ui-card kpi-strip-card">
           <h2>Work in Motion</h2>
           <div>
             <div className="summary-value">{stats.completionRate}%</div>
@@ -1093,40 +1093,41 @@ export default function TasksView({
           <DataBreakdown
             label="Tasks by current stage"
             total={stats.total}
+            columns={2}
             rows={[
               {
                 label: "To do",
                 value: tasks.filter((task) => task.status === "todo").length,
-                display: `${tasks.filter((task) => task.status === "todo").length} ${tasks.filter((task) => task.status === "todo").length === 1 ? "task" : "tasks"}`,
+                display: `${tasks.filter((task) => task.status === "todo").length}`,
               },
               {
                 label: "In progress",
                 value: stats.inProgress,
-                display: `${stats.inProgress} ${stats.inProgress === 1 ? "task" : "tasks"}`,
+                display: `${stats.inProgress}`,
               },
               {
                 label: "Review",
                 value: tasks.filter((task) => task.status === "review").length,
-                display: `${tasks.filter((task) => task.status === "review").length} ${tasks.filter((task) => task.status === "review").length === 1 ? "task" : "tasks"}`,
+                display: `${tasks.filter((task) => task.status === "review").length}`,
                 tone: "pink",
               },
               {
                 label: "Done",
                 value: stats.completed,
-                display: `${stats.completed} ${stats.completed === 1 ? "task" : "tasks"}`,
+                display: `${stats.completed}`,
                 tone: "green",
               },
             ]}
           />
         </section>
-        <section className="ui-card p-6 space-y-5">
+        <section className="ui-card kpi-strip-card">
           <h2>Completed Deliverables</h2>
           <div>
             <div className="summary-value">{stats.completed}</div>
             <p className="summary-caption">Tasks moved to Done</p>
           </div>
           <MonthlyBars
-            label="Completed tasks · last six months"
+            label="Completed · last six months"
             tone="green"
             formatValue={String}
             points={recentMonths().map((month) => ({
@@ -1139,7 +1140,7 @@ export default function TasksView({
             }))}
           />
         </section>
-        <section className="ui-card p-6 space-y-5">
+        <section className="ui-card kpi-strip-card">
           <div className="flex items-center justify-between">
             <h2>Outsourced</h2>
             <button
@@ -1148,7 +1149,7 @@ export default function TasksView({
               className="zentra-circle-btn zentra-circle-btn--sm"
               aria-label="Open Outsourcing"
             >
-              <GitFork className="w-4 h-4" />
+              <GitFork className="w-3.5 h-3.5" />
             </button>
           </div>
           <div>

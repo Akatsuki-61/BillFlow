@@ -570,23 +570,24 @@ export default function CatalogView() {
             ),
           );
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <section className="ui-card p-6 space-y-5">
+            <div className="kpi-strip grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <section className="ui-card kpi-strip-card">
                 <h2>Service Catalog</h2>
                 <div>
                   <div className="summary-value">{items.length}</div>
                   <p className="summary-caption">
-                    Reusable prices converted to {activeCurrency}
+                    Reusable prices · {activeCurrency}
                   </p>
                 </div>
                 <DataBreakdown
                   label="Services by category"
                   total={items.length}
+                  columns={categories.length > 2 ? 2 : 1}
                   rows={categories.map((category) => ({
                     label: category,
                     value: items.filter((item) => item.category === category)
                       .length,
-                    display: `${items.filter((item) => item.category === category).length} services`,
+                    display: `${items.filter((item) => item.category === category).length}`,
                   }))}
                 />
                 {!items.length && (
@@ -595,7 +596,7 @@ export default function CatalogView() {
                   </p>
                 )}
               </section>
-              <section className="ui-card p-6 space-y-5">
+              <section className="ui-card kpi-strip-card">
                 <h2>Average Listed Price</h2>
                 <div>
                   <div className="summary-value">
@@ -614,30 +615,32 @@ export default function CatalogView() {
                   </p>
                 </div>
                 <p className="summary-caption">
-                  You can customize a service’s price on each invoice.
+                  Customizable per invoice line item.
                 </p>
               </section>
-              <section className="ui-card p-6 space-y-5">
+              <section className="ui-card kpi-strip-card">
                 <h2>Price Range</h2>
-                <div>
-                  <div className="summary-value">
-                    {formatCents(
-                      rates.length ? Math.min(...rates) : 0,
-                      activeCurrency,
-                    )}
+                <div className="grid grid-cols-2 gap-3 items-end">
+                  <div>
+                    <div className="summary-value">
+                      {formatCents(
+                        rates.length ? Math.min(...rates) : 0,
+                        activeCurrency,
+                      )}
+                    </div>
+                    <p className="summary-caption">Lowest price</p>
                   </div>
-                  <p className="summary-caption">Lowest listed price</p>
-                </div>
-                <div>
-                  <div className="text-xl font-medium text-content-neutral-950">
-                    {formatCents(
-                      rates.length ? Math.max(...rates) : 0,
-                      activeCurrency,
-                    )}
+                  <div>
+                    <div className="summary-value">
+                      {formatCents(
+                        rates.length ? Math.max(...rates) : 0,
+                        activeCurrency,
+                      )}
+                    </div>
+                    <p className="summary-caption">
+                      Highest · {activeCurrency}
+                    </p>
                   </div>
-                  <p className="summary-caption">
-                    Highest listed price · {activeCurrency}
-                  </p>
                 </div>
               </section>
             </div>
@@ -683,7 +686,7 @@ export default function CatalogView() {
         </div>
 
         {/* Category Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 shrink-0">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 shrink-0">
           {categoryList.map((category) => {
             const isActive = selectedCategory === category;
             return (
@@ -692,22 +695,18 @@ export default function CatalogView() {
                 type="button"
                 onClick={() => setSelectedCategory(category)}
                 aria-pressed={isActive}
-                className={`relative px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer active:scale-[0.97] ${
-                  isActive
-                    ? "text-white dark:text-[#111115]"
-                    : "bg-surface-neutral-50 text-content-neutral-600 hover:bg-surface-neutral-100 hover:text-content-neutral-900 border border-line-neutral-200/80"
-                }`}
+                className="ui-filter-pill"
               >
                 {isActive && (
                   <m.span
                     layoutId="catalog-category-pill"
                     transition={SPRING_NAV_GLIDE}
-                    className="absolute inset-0 rounded-full bg-[#1c1c1f] dark:bg-white shadow-xs"
+                    className="ui-filter-pill-active"
                   />
                 )}
                 <span className="relative z-10">
                   {category}{" "}
-                  <span className="opacity-100 font-normal">
+                  <span className="opacity-80 font-normal">
                     ({categoryCounts[category]})
                   </span>
                 </span>

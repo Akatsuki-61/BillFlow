@@ -392,7 +392,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   max-width: none;
 }
 
-/* Zentra Circular Hairline Action & "..." Card Button */
+/* Zentra Circular Hairline Action & "..." Card Button (3D Tactile Keycap) */
 .zentra-circle-btn {
   display: inline-flex;
   align-items: center;
@@ -400,23 +400,56 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   width: 38px;
   height: 38px;
   border-radius: 9999px;
-  background: transparent;
-  border: 1px solid var(--ui-border);
+  background: linear-gradient(180deg, #ffffff 0%, #f1f1f5 100%);
+  border: 1px solid rgba(15, 17, 26, 0.11);
+  border-bottom-color: rgba(15, 17, 26, 0.18);
   color: var(--ui-text);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(15, 17, 26, 0.05),
+    0 2px 5px -1px rgba(15, 17, 26, 0.1),
+    0 1px 1px rgba(15, 17, 26, 0.05);
   cursor: pointer;
   flex-shrink: 0;
 }
 :root[data-theme="dark"] .zentra-circle-btn {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: var(--ui-border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, #2b2f3d 0%, #1e212c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(0, 0, 0, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 3px 8px -2px rgba(0, 0, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.38);
 }
-.zentra-circle-btn:hover {
-  background: var(--ui-surface-pure);
-  border-color: var(--ui-border-strong);
+.zentra-circle-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffffff 0%, #f5f5fa 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.16));
+  border-bottom-color: color-mix(in srgb, var(--theme-accent-solid) 38%, rgba(15, 17, 26, 0.22));
   color: var(--ui-text);
-  box-shadow: var(--ui-white-pill-shadow);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 4px 10px -2px rgba(15, 17, 26, 0.13),
+    0 1px 2px rgba(15, 17, 26, 0.06);
+}
+:root[data-theme="dark"] .zentra-circle-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #323747 0%, #242735 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 42%, rgba(255, 255, 255, 0.16));
+  border-bottom-color: rgba(0, 0, 0, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 5px 12px -2px rgba(0, 0, 0, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.zentra-circle-btn:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 4px rgba(15, 17, 26, 0.12),
+    0 0 0 rgba(0, 0, 0, 0);
+}
+:root[data-theme="dark"] .zentra-circle-btn:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.62),
+    0 0 0 rgba(0, 0, 0, 0);
 }
 .zentra-circle-btn--sm {
   width: 34px;
@@ -425,12 +458,8 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 .zentra-circle-btn--elevated {
   width: 34px;
   height: 34px;
-  background: var(--ui-surface-pure);
-  border: 1px solid var(--ui-card-rim);
-  box-shadow: var(--ui-pill-shadow);
 }
 .zentra-circle-btn--elevated:hover {
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, var(--ui-border));
   color: var(--theme-accent);
 }
 
@@ -451,7 +480,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   white-space: nowrap;
 }
 
-/* Zentra Soft Recessed Silver Control Pill (Daily, Add widget +, Secondary actions) */
+/* Zentra 3D Tactile Neutral Control Pill (Preview Template, Add widget +, Export, Secondary toolbar CTAs) */
 .zentra-control-pill {
   display: inline-flex;
   align-items: center;
@@ -460,27 +489,66 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   height: 40px;
   padding: 0 15px;
   border-radius: 12px;
-  background: var(--ui-control-muted);
-  border: 1px solid transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f1f5 100%);
+  border: 1px solid rgba(15, 17, 26, 0.11);
+  border-bottom-color: rgba(15, 17, 26, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 0 -1px 0 rgba(15, 17, 26, 0.05),
+    0 2px 5px -1px rgba(15, 17, 26, 0.09),
+    0 1px 1px rgba(15, 17, 26, 0.05);
   font-size: 13px;
-  font-weight: 480;
+  font-weight: 500;
   letter-spacing: -0.01em;
   color: var(--ui-text);
   white-space: nowrap;
   cursor: pointer;
 }
-.zentra-control-pill:hover {
-  background: var(--ui-control-muted-hover);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 20%, transparent);
+.zentra-control-pill:hover:not(:disabled) {
+  translate: 0 -1px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f5fa 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.14));
+  border-bottom-color: color-mix(in srgb, var(--theme-accent-solid) 38%, rgba(15, 17, 26, 0.22));
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    inset 0 -1px 0 rgba(15, 17, 26, 0.04),
+    0 4px 10px -2px rgba(15, 17, 26, 0.12),
+    0 1px 2px rgba(15, 17, 26, 0.06);
+}
+.zentra-control-pill:active:not(:disabled) {
+  translate: 0 1px;
+  scale: 0.98;
+  box-shadow:
+    inset 0 2px 4px rgba(15, 17, 26, 0.12),
+    0 0 0 rgba(0, 0, 0, 0);
 }
 :root[data-theme="dark"] .zentra-control-pill {
-  border-color: rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, #2b2f3d 0%, #1e212c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(0, 0, 0, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 3px 8px -2px rgba(0, 0, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.38);
 }
-:root[data-theme="dark"] .zentra-control-pill:hover {
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 35%, rgba(255, 255, 255, 0.08));
+:root[data-theme="dark"] .zentra-control-pill:hover:not(:disabled) {
+  background: linear-gradient(180deg, #323747 0%, #242735 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 42%, rgba(255, 255, 255, 0.16));
+  border-bottom-color: rgba(0, 0, 0, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.48),
+    0 5px 12px -2px rgba(0, 0, 0, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .zentra-control-pill:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.62),
+    0 0 0 rgba(0, 0, 0, 0);
 }
 
-/* Pure-White Elevated Control Pill (Date Pickers, Select Dropdowns — top right closeup) */
+/* 3D Elevated Dropdown Control Pill (Period Selectors, Category Filters) */
 .zentra-control-pill--white {
   display: inline-flex;
   align-items: center;
@@ -489,18 +557,61 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   height: 40px;
   padding: 0 14px;
   border-radius: 12px;
-  background: var(--ui-surface-pure);
-  border: 1px solid var(--ui-card-rim);
-  box-shadow: var(--ui-white-pill-shadow);
+  background: linear-gradient(180deg, #ffffff 0%, #f4f4f8 100%);
+  border: 1px solid rgba(15, 17, 26, 0.11);
+  border-bottom-color: rgba(15, 17, 26, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(15, 17, 26, 0.04),
+    0 2px 5px -1px rgba(15, 17, 26, 0.09),
+    0 1px 1px rgba(15, 17, 26, 0.05);
   font-size: 13px;
-  font-weight: 480;
+  font-weight: 500;
   letter-spacing: -0.01em;
   color: var(--ui-text);
   white-space: nowrap;
   cursor: pointer;
 }
-.zentra-control-pill--white:hover {
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, var(--ui-border));
+.zentra-control-pill--white:hover:not(:disabled) {
+  translate: 0 -1px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f7fb 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.14));
+  border-bottom-color: color-mix(in srgb, var(--theme-accent-solid) 38%, rgba(15, 17, 26, 0.22));
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 4px 10px -2px rgba(15, 17, 26, 0.12),
+    0 1px 2px rgba(15, 17, 26, 0.06);
+}
+.zentra-control-pill--white:active:not(:disabled) {
+  translate: 0 1px;
+  scale: 0.98;
+  box-shadow:
+    inset 0 2px 4px rgba(15, 17, 26, 0.12),
+    0 0 0 rgba(0, 0, 0, 0);
+}
+:root[data-theme="dark"] .zentra-control-pill--white {
+  background: linear-gradient(180deg, #2b2f3d 0%, #1e212c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(0, 0, 0, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 3px 8px -2px rgba(0, 0, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.38);
+}
+:root[data-theme="dark"] .zentra-control-pill--white:hover:not(:disabled) {
+  background: linear-gradient(180deg, #323747 0%, #242735 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 42%, rgba(255, 255, 255, 0.16));
+  border-bottom-color: rgba(0, 0, 0, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 5px 12px -2px rgba(0, 0, 0, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .zentra-control-pill--white:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.62),
+    0 0 0 rgba(0, 0, 0, 0);
 }
 
 /* Zentra 45-deg Up-Right Diagonal Hatched Bar Fills (High-Chroma Light & Dark) */
@@ -703,49 +814,114 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 .ui-button--primary svg {
   color: currentColor !important;
 }
-/* Secondary action buttons match the crisp recessed #EAEAEA pill in top right closeup */
+/* Secondary action buttons share the crisp 3D beveled keycap finish without accent fill */
 .ui-button--secondary {
-  background: var(--ui-control-muted);
-  border-color: transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f1f5 100%);
+  border: 1px solid rgba(15, 17, 26, 0.11);
+  border-bottom-color: rgba(15, 17, 26, 0.18);
   color: var(--ui-text);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 0 -1px 0 rgba(15, 17, 26, 0.05),
+    0 2px 5px -1px rgba(15, 17, 26, 0.09),
+    0 1px 1px rgba(15, 17, 26, 0.05);
 }
 .ui-button--secondary:hover:not(:disabled) {
-  background: var(--ui-control-muted-hover);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 24%, transparent);
+  background: linear-gradient(180deg, #ffffff 0%, #f5f5fa 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.14));
+  border-bottom-color: color-mix(in srgb, var(--theme-accent-solid) 38%, rgba(15, 17, 26, 0.22));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 2px 6px -2px rgba(0, 0, 0, 0.06);
+    inset 0 1px 0 #ffffff,
+    inset 0 -1px 0 rgba(15, 17, 26, 0.04),
+    0 4px 10px -2px rgba(15, 17, 26, 0.12),
+    0 1px 2px rgba(15, 17, 26, 0.06);
+}
+.ui-button--secondary:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 4px rgba(15, 17, 26, 0.12),
+    0 0 0 rgba(0, 0, 0, 0);
 }
 :root[data-theme="dark"] .ui-button--secondary {
-  background: var(--ui-control-muted);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, #2b2f3d 0%, #1e212c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(0, 0, 0, 0.58);
   color: var(--ui-text);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    0 3px 8px -2px rgba(0, 0, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.38);
 }
 :root[data-theme="dark"] .ui-button--secondary:hover:not(:disabled) {
-  background: var(--ui-control-muted-hover);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 38%, rgba(255, 255, 255, 0.08));
+  background: linear-gradient(180deg, #323747 0%, #242735 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 42%, rgba(255, 255, 255, 0.16));
+  border-bottom-color: rgba(0, 0, 0, 0.65);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 4px 10px -2px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.48),
+    0 5px 12px -2px rgba(0, 0, 0, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .ui-button--secondary:active:not(:disabled) {
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.62),
+    0 0 0 rgba(0, 0, 0, 0);
 }
 .ui-button--ghost {
   background: transparent;
+  border-color: transparent;
   color: var(--ui-secondary);
 }
-.ui-button--ghost:hover {
-  background: var(--ui-hover);
+.ui-button--ghost:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(236, 236, 241, 0.85) 100%);
+  border-color: rgba(15, 17, 26, 0.09);
+  border-bottom-color: rgba(15, 17, 26, 0.14);
   color: var(--ui-text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 4px -1px rgba(15, 17, 26, 0.08);
+}
+:root[data-theme="dark"] .ui-button--ghost:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(46, 51, 66, 0.9) 0%, rgba(33, 36, 48, 0.9) 100%);
+  border-color: rgba(255, 255, 255, 0.11);
+  border-bottom-color: rgba(0, 0, 0, 0.5);
+  color: var(--ui-text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 3px 7px -2px rgba(0, 0, 0, 0.5);
 }
 .ui-button--danger {
-  background: var(--ui-danger-soft);
-  border-color: var(--ui-danger-border);
+  background: linear-gradient(180deg, #fff5f6 0%, #ffe4e8 100%);
+  border: 1px solid var(--ui-danger-border);
+  border-bottom-color: color-mix(in srgb, var(--ui-danger) 42%, var(--ui-danger-border));
   color: var(--ui-danger);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(225, 29, 72, 0.08),
+    0 2px 5px -1px rgba(225, 29, 72, 0.14),
+    0 1px 1px rgba(225, 29, 72, 0.07);
 }
-.ui-button--danger:hover {
-  background: var(--ui-danger-hover);
-  border-color: var(--ui-danger-border);
+.ui-button--danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffeef1 0%, #ffd8df 100%);
+  border-color: color-mix(in srgb, var(--ui-danger) 48%, var(--ui-danger-border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 4px 10px -2px rgba(225, 29, 72, 0.2);
+}
+:root[data-theme="dark"] .ui-button--danger {
+  background: linear-gradient(180deg, rgba(225, 29, 72, 0.24) 0%, rgba(190, 18, 60, 0.16) 100%);
+  border-color: rgba(251, 113, 133, 0.34);
+  border-bottom-color: rgba(0, 0, 0, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 3px 8px -2px rgba(0, 0, 0, 0.52);
+}
+:root[data-theme="dark"] .ui-button--danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(225, 29, 72, 0.34) 0%, rgba(190, 18, 60, 0.22) 100%);
+  border-color: rgba(251, 113, 133, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 5px 12px -2px rgba(0, 0, 0, 0.62);
 }
 .ui-button--menu {
   width: 100%;
@@ -1027,6 +1203,93 @@ input[type="checkbox"] {
   height: 15px;
   scale: 1;
 }
+.ui-segmented--compact {
+  min-height: 34px;
+  padding: 2.5px;
+  border-radius: 11px;
+}
+.ui-segmented--compact button {
+  min-height: 27px;
+  padding: 4px 11px;
+  font-size: 12px;
+  line-height: 18px;
+  border-radius: 8px;
+}
+.ui-segmented--compact .ui-segmented-pill {
+  border-radius: 8px;
+}
+
+/* 3D Tactile Category Filter Pill Buttons (Catalog, Support) */
+.ui-filter-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--ui-secondary);
+  background: linear-gradient(180deg, #ffffff 0%, #f1f1f5 100%);
+  border: 1px solid rgba(15, 17, 26, 0.11);
+  border-bottom-color: rgba(15, 17, 26, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 4px -1px rgba(15, 17, 26, 0.08);
+}
+.ui-filter-pill:hover:not([aria-pressed="true"]) {
+  color: var(--ui-text);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.14));
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 3px 8px -2px rgba(15, 17, 26, 0.12);
+}
+:root[data-theme="dark"] .ui-filter-pill {
+  color: #b8bcc8;
+  background: linear-gradient(180deg, #2b2f3d 0%, #1e212c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(0, 0, 0, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 3px 7px -2px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme="dark"] .ui-filter-pill:hover:not([aria-pressed="true"]) {
+  color: #f4f5f8;
+  background: linear-gradient(180deg, #323747 0%, #242735 100%);
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 42%, rgba(255, 255, 255, 0.16));
+}
+.ui-filter-pill[aria-pressed="true"] {
+  color: #ffffff;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .ui-filter-pill[aria-pressed="true"] {
+  color: #101116;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.ui-filter-pill-active {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #323237 0%, #161619 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 4px 10px -2px rgba(0, 0, 0, 0.34),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+:root[data-theme="dark"] .ui-filter-pill-active {
+  background: linear-gradient(180deg, #ffffff 0%, #e7e8ee 100%);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 4px 12px -2px rgba(0, 0, 0, 0.55);
+}
 
 .ui-card {
   background: var(--ui-surface);
@@ -1178,23 +1441,46 @@ input[type="checkbox"] {
   height: 24px;
   padding: 3px;
   border-radius: 999px;
-  background: var(--ui-border-strong);
+  background: linear-gradient(180deg, #c9cbd6 0%, #dcdee6 100%);
+  border: 1px solid rgba(15, 17, 26, 0.1);
+  box-shadow:
+    inset 0 2px 4px rgba(15, 17, 26, 0.18),
+    inset 0 1px 1px rgba(15, 17, 26, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.85);
   flex-shrink: 0;
   cursor: pointer;
 }
+:root[data-theme="dark"] .ui-switch {
+  background: linear-gradient(180deg, #0f1016 0%, #1c1f2b 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.75),
+    0 1px 0 rgba(255, 255, 255, 0.08);
+}
 .ui-switch[aria-checked="true"] {
-  background: var(--theme-accent-solid);
+  background: var(--accent-btn-bg, var(--theme-accent-solid));
+  border-color: color-mix(in srgb, var(--theme-accent-deep-solid) 65%, transparent);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.24),
+    0 1px 0 rgba(255, 255, 255, 0.4);
 }
 :root[data-theme="dark"] .ui-switch[aria-checked="true"] {
-  background: var(--theme-accent-solid);
+  background: var(--accent-btn-bg, var(--theme-accent-solid));
+  border-color: color-mix(in srgb, var(--theme-accent-solid) 60%, rgba(255, 255, 255, 0.15));
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.36),
+    0 0 10px -2px color-mix(in srgb, var(--theme-accent-solid) 45%, transparent);
 }
 .ui-switch span {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: white;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+  background: linear-gradient(180deg, #ffffff 0%, #eaecf2 100%);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 2px 4px rgba(0, 0, 0, 0.24),
+    0 1px 1px rgba(0, 0, 0, 0.14);
 }
 .ui-switch:hover,
 .ui-switch:active {
@@ -1316,6 +1602,83 @@ input[type="checkbox"] {
 .data-breakdown {
   display: grid;
   gap: 16px;
+}
+.data-breakdown--2col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+
+/* Compact KPI Summary Strip (Invoices, Clients, Catalog, Expenses, Outsourcing, Tasks)
+   Keeps essential KPIs legible while giving primary lists/boards maximum above-the-fold space */
+.kpi-strip {
+  gap: 12px;
+}
+.kpi-strip-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+}
+.kpi-strip-card h2 {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+  color: var(--ui-muted);
+  letter-spacing: -0.01em !important;
+}
+.kpi-strip-card .summary-value {
+  font-size: clamp(1.2rem, 0.95rem + 1.1vw, 1.55rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+.kpi-strip-card .summary-caption {
+  font-size: 11.5px;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+.kpi-strip-card .data-breakdown {
+  gap: 7px;
+}
+.kpi-strip-card .data-breakdown--2col {
+  gap: 6px 12px;
+}
+.kpi-strip-card .data-breakdown-label {
+  font-size: 11px;
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+.kpi-strip-card .data-track {
+  height: 6px;
+  border-radius: 999px;
+}
+.kpi-strip-card .data-months figcaption {
+  font-size: 10.5px;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+.kpi-strip-card .data-months-grid {
+  gap: 6px;
+}
+.kpi-strip-card .data-month {
+  gap: 3px;
+  font-size: 9.5px;
+}
+.kpi-strip-card .data-month-value {
+  font-size: 8.5px;
+}
+.kpi-strip-card .data-month-column {
+  height: 34px;
+}
+.kpi-strip-card .zentra-circle-btn--sm {
+  width: 28px;
+  height: 28px;
+}
+.kpi-strip-card .zentra-pill-badge {
+  padding: 2.5px 9px;
+  font-size: 11px;
+  line-height: 15px;
 }
 .data-breakdown-label {
   display: flex;

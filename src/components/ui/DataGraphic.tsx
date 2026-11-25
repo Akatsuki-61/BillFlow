@@ -18,13 +18,19 @@ export function DataBreakdown({
   rows,
   total,
   label,
+  columns = 1,
 }: {
   rows: { label: string; value: number; display: string; tone?: string }[];
   total: number;
   label: string;
+  columns?: 1 | 2;
 }) {
   return (
-    <div className="data-breakdown" role="group" aria-label={label}>
+    <div
+      className={`data-breakdown${columns === 2 ? " data-breakdown--2col" : ""}`}
+      role="group"
+      aria-label={label}
+    >
       {rows.map((row) => (
         <div key={row.label}>
           <div className="data-breakdown-label">
