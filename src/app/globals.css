@@ -313,6 +313,24 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
     0px 4px 12px -2px rgba(0, 0, 0, 0.07),
     0px 16px 32px -8px rgba(0, 0, 0, 0.08);
   --ui-shadow-pill: var(--ui-pill-shadow);
+  /* Unified 3D Keycap Tokens — shared identically by toggle active pills & all non-primary buttons */
+  --ui-keycap-bg: linear-gradient(180deg, #ffffff 0%, #f5f5f8 100%);
+  --ui-keycap-bg-hover: linear-gradient(180deg, #ffffff 0%, #f8f8fc 100%);
+  --ui-keycap-border: rgba(255, 255, 255, 0.95);
+  --ui-keycap-border-hover: color-mix(in srgb, var(--theme-accent-solid) 30%, rgba(255, 255, 255, 0.92));
+  --ui-keycap-shadow:
+    0 2px 6px -1px rgba(0, 0, 0, 0.14),
+    0 1px 2px rgba(0, 0, 0, 0.07),
+    0 0 0 1px rgba(0, 0, 0, 0.045),
+    inset 0 1px 0 #ffffff;
+  --ui-keycap-shadow-hover:
+    0 4px 10px -2px rgba(0, 0, 0, 0.16),
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--theme-accent-solid) 24%, rgba(0, 0, 0, 0.06)),
+    inset 0 1px 0 #ffffff;
+  --ui-keycap-shadow-active:
+    inset 0 1px 3px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 :root[data-theme="dark"] {
@@ -321,6 +339,21 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
     0px 0px 0px 1px rgba(255, 255, 255, 0.08),
     0px 12px 32px -6px rgba(0, 0, 0, 0.6);
   --ui-shadow-pill: var(--ui-pill-shadow);
+  --ui-keycap-bg: linear-gradient(180deg, #2d3140 0%, #212430 100%);
+  --ui-keycap-bg-hover: linear-gradient(180deg, #34394b 0%, #262a38 100%);
+  --ui-keycap-border: rgba(255, 255, 255, 0.14);
+  --ui-keycap-border-hover: color-mix(in srgb, var(--theme-accent-solid) 42%, rgba(255, 255, 255, 0.2));
+  --ui-keycap-shadow:
+    0 2px 6px -1px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  --ui-keycap-shadow-hover:
+    0 4px 10px -2px rgba(0, 0, 0, 0.48),
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --ui-keycap-shadow-active:
+    inset 0 2px 4px rgba(0, 0, 0, 0.45),
+    0 0 0 rgba(0, 0, 0, 0);
 }
 
 .workspace-page {
@@ -392,7 +425,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   max-width: none;
 }
 
-/* Zentra Circular Hairline Action & "..." Card Button (3D Tactile Keycap) */
+/* Zentra Circular Hairline Action & "..." Card Button (Unified 3D Keycap) */
 .zentra-circle-btn {
   display: inline-flex;
   align-items: center;
@@ -400,50 +433,21 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   width: 38px;
   height: 38px;
   border-radius: 9999px;
-  background: linear-gradient(180deg, #ffffff 0%, #f2f2f6 100%);
-  border: 1px solid rgba(15, 17, 26, 0.12);
+  background: var(--ui-keycap-bg);
+  border: 1px solid var(--ui-keycap-border);
   color: var(--ui-text);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.96),
-    0 1px 3px rgba(15, 17, 26, 0.07),
-    0 1px 1px rgba(15, 17, 26, 0.04);
+  box-shadow: var(--ui-keycap-shadow);
   cursor: pointer;
   flex-shrink: 0;
 }
-:root[data-theme="dark"] .zentra-circle-btn {
-  background: linear-gradient(180deg, #2c303f 0%, #202330 100%);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 2px 6px -1px rgba(0, 0, 0, 0.32),
-    0 1px 2px rgba(0, 0, 0, 0.2);
-}
 .zentra-circle-btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, #ffffff 0%, #f6f6fa 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.15));
+  background: var(--ui-keycap-bg-hover);
+  border-color: var(--ui-keycap-border-hover);
   color: var(--ui-text);
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 3px 8px -2px rgba(15, 17, 26, 0.1),
-    0 1px 2px rgba(15, 17, 26, 0.05);
-}
-:root[data-theme="dark"] .zentra-circle-btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, #33384a 0%, #252938 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 44%, rgba(255, 255, 255, 0.18));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 4px 10px -2px rgba(0, 0, 0, 0.38),
-    0 1px 2px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--ui-keycap-shadow-hover);
 }
 .zentra-circle-btn:active:not(:disabled) {
-  box-shadow:
-    inset 0 2px 4px rgba(15, 17, 26, 0.12),
-    0 0 0 rgba(0, 0, 0, 0);
-}
-:root[data-theme="dark"] .zentra-circle-btn:active:not(:disabled) {
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.45),
-    0 0 0 rgba(0, 0, 0, 0);
+  box-shadow: var(--ui-keycap-shadow-active);
 }
 .zentra-circle-btn--sm {
   width: 34px;
@@ -474,7 +478,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   white-space: nowrap;
 }
 
-/* Zentra 3D Tactile Neutral Control Pill (Preview Template, Add widget +, Export, Secondary toolbar CTAs) */
+/* Zentra 3D Tactile Neutral Control Pill (Matches Active Toggle Highlight 1:1) */
 .zentra-control-pill {
   display: inline-flex;
   align-items: center;
@@ -483,12 +487,9 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   height: 40px;
   padding: 0 15px;
   border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #f2f2f6 100%);
-  border: 1px solid rgba(15, 17, 26, 0.12);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.96),
-    0 1px 3px rgba(15, 17, 26, 0.07),
-    0 1px 1px rgba(15, 17, 26, 0.04);
+  background: var(--ui-keycap-bg);
+  border: 1px solid var(--ui-keycap-border);
+  box-shadow: var(--ui-keycap-shadow);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -498,43 +499,17 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 }
 .zentra-control-pill:hover:not(:disabled) {
   translate: 0 -1px;
-  background: linear-gradient(180deg, #ffffff 0%, #f6f6fa 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.15));
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 3px 8px -2px rgba(15, 17, 26, 0.1),
-    0 1px 2px rgba(15, 17, 26, 0.05);
+  background: var(--ui-keycap-bg-hover);
+  border-color: var(--ui-keycap-border-hover);
+  box-shadow: var(--ui-keycap-shadow-hover);
 }
 .zentra-control-pill:active:not(:disabled) {
   translate: 0 1px;
   scale: 0.98;
-  box-shadow:
-    inset 0 2px 4px rgba(15, 17, 26, 0.12),
-    0 0 0 rgba(0, 0, 0, 0);
-}
-:root[data-theme="dark"] .zentra-control-pill {
-  background: linear-gradient(180deg, #2c303f 0%, #202330 100%);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 2px 6px -1px rgba(0, 0, 0, 0.32),
-    0 1px 2px rgba(0, 0, 0, 0.2);
-}
-:root[data-theme="dark"] .zentra-control-pill:hover:not(:disabled) {
-  background: linear-gradient(180deg, #33384a 0%, #252938 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 44%, rgba(255, 255, 255, 0.18));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 4px 10px -2px rgba(0, 0, 0, 0.38),
-    0 1px 2px rgba(0, 0, 0, 0.24);
-}
-:root[data-theme="dark"] .zentra-control-pill:active:not(:disabled) {
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.45),
-    0 0 0 rgba(0, 0, 0, 0);
+  box-shadow: var(--ui-keycap-shadow-active);
 }
 
-/* 3D Elevated Dropdown Control Pill (Period Selectors, Category Filters) */
+/* 3D Elevated Dropdown Control Pill (Period Selectors, Category Filters — Matches Active Toggle Highlight 1:1) */
 .zentra-control-pill--white {
   display: inline-flex;
   align-items: center;
@@ -543,12 +518,9 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   height: 40px;
   padding: 0 14px;
   border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #f4f4f8 100%);
-  border: 1px solid rgba(15, 17, 26, 0.12);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.98),
-    0 1px 3px rgba(15, 17, 26, 0.07),
-    0 1px 1px rgba(15, 17, 26, 0.04);
+  background: var(--ui-keycap-bg);
+  border: 1px solid var(--ui-keycap-border);
+  box-shadow: var(--ui-keycap-shadow);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -558,40 +530,14 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 }
 .zentra-control-pill--white:hover:not(:disabled) {
   translate: 0 -1px;
-  background: linear-gradient(180deg, #ffffff 0%, #f7f7fb 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.15));
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 3px 8px -2px rgba(15, 17, 26, 0.1),
-    0 1px 2px rgba(15, 17, 26, 0.05);
+  background: var(--ui-keycap-bg-hover);
+  border-color: var(--ui-keycap-border-hover);
+  box-shadow: var(--ui-keycap-shadow-hover);
 }
 .zentra-control-pill--white:active:not(:disabled) {
   translate: 0 1px;
   scale: 0.98;
-  box-shadow:
-    inset 0 2px 4px rgba(15, 17, 26, 0.12),
-    0 0 0 rgba(0, 0, 0, 0);
-}
-:root[data-theme="dark"] .zentra-control-pill--white {
-  background: linear-gradient(180deg, #2c303f 0%, #202330 100%);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 2px 6px -1px rgba(0, 0, 0, 0.32),
-    0 1px 2px rgba(0, 0, 0, 0.2);
-}
-:root[data-theme="dark"] .zentra-control-pill--white:hover:not(:disabled) {
-  background: linear-gradient(180deg, #33384a 0%, #252938 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 44%, rgba(255, 255, 255, 0.18));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 4px 10px -2px rgba(0, 0, 0, 0.38),
-    0 1px 2px rgba(0, 0, 0, 0.24);
-}
-:root[data-theme="dark"] .zentra-control-pill--white:active:not(:disabled) {
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.45),
-    0 0 0 rgba(0, 0, 0, 0);
+  box-shadow: var(--ui-keycap-shadow-active);
 }
 
 /* Zentra 45-deg Up-Right Diagonal Hatched Bar Fills (High-Chroma Light & Dark) */
@@ -794,50 +740,20 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 .ui-button--primary svg {
   color: currentColor !important;
 }
-/* Secondary action buttons share the crisp 3D beveled keycap finish without accent fill */
+/* Secondary action buttons match the active toggle highlight 3D keycap 1:1 */
 .ui-button--secondary {
-  background: linear-gradient(180deg, #ffffff 0%, #f2f2f6 100%);
-  border: 1px solid rgba(15, 17, 26, 0.12);
+  background: var(--ui-keycap-bg);
+  border: 1px solid var(--ui-keycap-border);
   color: var(--ui-text);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.96),
-    0 1px 3px rgba(15, 17, 26, 0.07),
-    0 1px 1px rgba(15, 17, 26, 0.04);
+  box-shadow: var(--ui-keycap-shadow);
 }
 .ui-button--secondary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #ffffff 0%, #f6f6fa 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.15));
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 3px 8px -2px rgba(15, 17, 26, 0.1),
-    0 1px 2px rgba(15, 17, 26, 0.05);
+  background: var(--ui-keycap-bg-hover);
+  border-color: var(--ui-keycap-border-hover);
+  box-shadow: var(--ui-keycap-shadow-hover);
 }
 .ui-button--secondary:active:not(:disabled) {
-  box-shadow:
-    inset 0 2px 4px rgba(15, 17, 26, 0.12),
-    0 0 0 rgba(0, 0, 0, 0);
-}
-:root[data-theme="dark"] .ui-button--secondary {
-  background: linear-gradient(180deg, #2c303f 0%, #202330 100%);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  color: var(--ui-text);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 2px 6px -1px rgba(0, 0, 0, 0.32),
-    0 1px 2px rgba(0, 0, 0, 0.2);
-}
-:root[data-theme="dark"] .ui-button--secondary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #33384a 0%, #252938 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 44%, rgba(255, 255, 255, 0.18));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 4px 10px -2px rgba(0, 0, 0, 0.38),
-    0 1px 2px rgba(0, 0, 0, 0.24);
-}
-:root[data-theme="dark"] .ui-button--secondary:active:not(:disabled) {
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.45),
-    0 0 0 rgba(0, 0, 0, 0);
+  box-shadow: var(--ui-keycap-shadow-active);
 }
 .ui-button--ghost {
   background: transparent;
@@ -1138,32 +1054,19 @@ input[type="checkbox"] {
   color: var(--ui-text);
 }
 .ui-segmented button[aria-pressed="true"]:not([data-has-pill="true"]) {
-  background: linear-gradient(180deg, #ffffff 0%, #f5f5f8 100%);
-  border-color: rgba(255, 255, 255, 0.95);
-  box-shadow:
-    0 2px 6px -1px rgba(0, 0, 0, 0.14),
-    inset 0 1px 0 #ffffff;
+  background: var(--ui-keycap-bg);
+  border-color: var(--ui-keycap-border);
+  box-shadow: var(--ui-keycap-shadow);
 }
 .ui-segmented-pill {
   position: absolute;
   inset: 0;
   z-index: -1;
   border-radius: 9px;
-  background: linear-gradient(180deg, #ffffff 0%, #f5f5f8 100%);
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow:
-    0 2px 6px -1px rgba(0, 0, 0, 0.14),
-    0 1px 2px rgba(0, 0, 0, 0.07),
-    inset 0 1px 0 #ffffff;
+  background: var(--ui-keycap-bg);
+  border: 1px solid var(--ui-keycap-border);
+  box-shadow: var(--ui-keycap-shadow);
   pointer-events: none;
-}
-:root[data-theme="dark"] .ui-segmented-pill {
-  background: linear-gradient(180deg, #2d3140 0%, #212430 100%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow:
-    0 2px 6px -1px rgba(0, 0, 0, 0.4),
-    0 1px 2px rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 .ui-segmented svg {
   width: 15px;
@@ -1186,7 +1089,7 @@ input[type="checkbox"] {
   border-radius: 8px;
 }
 
-/* 3D Tactile Category Filter Pill Buttons (Catalog, Support) */
+/* 3D Tactile Category Filter Pill Buttons (Catalog, Support — Matches Active Toggle Highlight 1:1) */
 .ui-filter-pill {
   position: relative;
   display: inline-flex;
@@ -1201,31 +1104,21 @@ input[type="checkbox"] {
   white-space: nowrap;
   cursor: pointer;
   color: var(--ui-secondary);
-  background: linear-gradient(180deg, #ffffff 0%, #f2f2f6 100%);
-  border: 1px solid rgba(15, 17, 26, 0.12);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.96),
-    0 1px 3px rgba(15, 17, 26, 0.07);
+  background: var(--ui-keycap-bg);
+  border: 1px solid var(--ui-keycap-border);
+  box-shadow: var(--ui-keycap-shadow);
 }
 .ui-filter-pill:hover:not([aria-pressed="true"]) {
   color: var(--ui-text);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 32%, rgba(15, 17, 26, 0.15));
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 3px 8px -2px rgba(15, 17, 26, 0.1);
+  background: var(--ui-keycap-bg-hover);
+  border-color: var(--ui-keycap-border-hover);
+  box-shadow: var(--ui-keycap-shadow-hover);
 }
 :root[data-theme="dark"] .ui-filter-pill {
   color: #b8bcc8;
-  background: linear-gradient(180deg, #2c303f 0%, #202330 100%);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    0 2px 6px -1px rgba(0, 0, 0, 0.32);
 }
 :root[data-theme="dark"] .ui-filter-pill:hover:not([aria-pressed="true"]) {
   color: #f4f5f8;
-  background: linear-gradient(180deg, #33384a 0%, #252938 100%);
-  border-color: color-mix(in srgb, var(--theme-accent-solid) 44%, rgba(255, 255, 255, 0.18));
 }
 .ui-filter-pill[aria-pressed="true"] {
   color: #ffffff;
