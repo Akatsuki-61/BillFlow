@@ -2,40 +2,58 @@
 
 Notable changes between BillFlow desktop releases.
 
-## Unreleased (`main`)
+## v0.3.0 (2026-11-25) — Build 4
 
-### Dashboard & Workspace Navigation
+Major release introducing a redesigned Light/Dark desktop interface with custom accent themes, an offline on-device AI suite, proposals and recurring retainers, project profit tracking, profile-currency reporting, encrypted rolling backups, and guided first-run setup.
 
-- Replaced overview widgets with Ledger designs (`LedgerWidget.tsx`, `ledger-widgets.css`) and refined workspace header navigation tabs.
+### What's New
 
-### Smart Capture & Local AI Suite (Two-Tier Local AI & Offline OCR)
+- **Offline Local AI & Smart Capture (`Cmd/Ctrl+Shift+I`):**
+  - Paste or drop a chat screenshot or message from WhatsApp, Slack, Signal, or email to automatically extract the client, deliverables, prices, due dates, and links, match your Service Catalog, and send them straight into a **New Invoice**, **Proposal / Quote**, or **Kanban Tasks**.
+  - Dark-mode chat screenshots are automatically inverted and sharpened before offline OCR reads them.
+  - **Bank Transfer Slip Auto-Reader:** Drop, select, or paste a payment slip in **Record Payment** to auto-fill the amount, date, and bank reference while flagging underpayments, overpayments, or currency mismatches.
+  - **Expense Receipt Scanner:** Drop, select, or paste a receipt (or click **Scan Receipt**) in **Expenses** to auto-fill the merchant, date, total, and currency and automatically pick the right expense category.
+  - **Two Local AI Tiers (`Settings → AI & Capture`):** Works completely offline out of the box with the built-in **Standard** tier (~25.6 MB bundled OCR + semantic model), plus an optional **Enhanced** local LLM (`Qwen2.5-0.5B-Instruct`) you can download, cancel, or delete anytime. Nothing leaves your computer.
+- **Proposals, Recurring Retainers & Project Profit:**
+  - **Proposals & Quotes:** Create numbered quotes (`QT-YYYY-NNN`), preview or export them using all five invoice templates, and convert approved proposals into invoices with one click.
+  - **Recurring Retainers:** Schedule repeating invoices (weekly, monthly, quarterly, or yearly) with automatic invoice creation and PDF export.
+  - **Project Margin (P&L) Drawer:** Check true net profit for any client or invoice (revenue minus subcontractor payouts, linked expenses, and tracked time) in both Accrual and Cash views.
+  - **Morning Financial Digest & App Badge:** Optional daily summary notifications for overdue invoices, due tasks, and upcoming contractor payouts.
+- **Profile Currency Reporting:**
+  - Choose a primary reporting currency per profile to view combined totals across Overview, Analytics, and summaries using cached daily exchange rates, while preserving every invoice and expense's original currency.
+- **Guided Setup, Encrypted Backups & Full Reset:**
+  - Step-by-step first-run onboarding with optional password setup, optional desktop notifications, and optional Apple Calendar sync that resumes cleanly after a restart.
+  - Password-protected AES-256-GCM encrypted backups (`.bfbackup`), automatic rolling backups, restore preflight checks, and startup SQLite integrity checks (`PRAGMA quick_check`).
+  - Separate **Reset active profile** and **Reset entire app** options in **Settings → Backup & data**.
+- **Desktop Workflow Upgrades:**
+  - Remembers your window size and position across launches.
+  - Added System Tray and macOS Dock quick actions (**New Invoice**, **Add Expense**, **Lock Workspace**), native OS drag-and-drop for receipts and logos, linked invoice selectors on Expenses, and 1-click WhatsApp handover in **Submit Work**.
+  - Added an interactive guided workspace tour, keyboard shortcuts cheat sheet, and **Local AI & OCR** FAQs in Help & Support.
 
-- Added the global intent-aware **Smart Capture** slide-over drawer (`Cmd/Ctrl+Shift+I`, top-bar Sparkles trigger, and Invoices header action) to paste screenshots or message text from WhatsApp, Slack, Signal, or email, detect whether the message belongs in **New Invoice**, **Proposal / Quote**, or **Kanban Tasks**, and hand off pre-filled records with one click.
-- Added **Bank Transfer Slip Auto-Reader** inside **Record Payment** (`InvoicesView.tsx`, `ai:scanPaymentSlip`) supporting file pick, drag-and-drop, and `Cmd/Ctrl+V` paste to auto-fill payment amount, date, and bank reference while flagging underpayment, overpayment, or currency mismatches.
-- Added **Expense Receipt Scanner** inside **Expenses** (`src/app/expenses/page.tsx`, `ai:scanExpenseReceipt`) with a **Scan Receipt** header action, paste/drop auto-scan, merchant/total/date extraction, and `all-MiniLM-L6-v2` neural OPEX category classification.
-- Added client-side screenshot preprocessing (`src/lib/image-preprocess.ts`) that detects dark-mode chat captures, auto-inverts them to dark-on-light text, upscales small screenshots, and enhances contrast before offline OCR.
-- Implemented a bundled **Standard** offline AI tier (~25.6 MB total via `scripts/prepare-ai-models.mjs` into `extraResources`) plus an optional **Enhanced** local LLM tier (`onnx-community/Qwen2.5-0.5B-Instruct` INT8 ONNX) managed in **Settings → AI & Capture** with download progress, cancel, delete, idle RAM disposal, and fallback to Standard.
-- Added **Local AI & OCR** FAQs to the in-app Help & Support screen (`src/app/support/page.tsx`).
-- Configured cross-platform macOS ARM64 and Windows x64 Electron packaging (`electron-builder.yml` ASAR unpacking and surgical platform binary trimming) plus updated runtime third-party notices.
+### Changed & Improved
 
-## v0.3.0 (2026-11-20)
+- **Fresh Light & Dark Mode Desktop Redesign:**
+  - Rebuilt the interface around a crisp card-and-bento layout with full Light Mode and Dark Mode parity, smooth circular theme-switch transitions, and **Profile Accent Presets** that theme primary buttons, active controls, focus rings, and toast notifications.
+  - Rebuilt the **Overview** screen with a focused 5-card bento layout (`Payments`, `Gross Volume`, `Net Margin`, `Invoices`, `Clients`), a streamlined period selector (`Weekly`, `Monthly`, `Quarterly`, `Yearly`, `All Time`), and a smooth height-animated **Add widget** customizer drawer (`Undo`, `Reset`, `Full Analytics Catalog`).
+  - Added **Elegant Sans** as a selectable workspace font alongside Inter.
+- **Cleaner Page Layouts & Unified 3D Controls:**
+  - Standardized page headers across every tab so titles and top-right buttons sit at the exact same height.
+  - Made top KPI summary tiles more compact on **Invoices**, **Clients**, **Catalog**, **Expenses**, **Outsourcing**, and **Tasks** so your lists and Kanban board stay front and center.
+  - Unified all non-primary buttons, dropdown pills, switches, and segmented toggles across the app with matching 3D keycap styling.
+  - Replaced separate export controls with a single **Export** pop-up dialog on **Invoices** (CSV or Excel) and a single **Export Report** dialog on **Expenses** (PDF, Print, or CSV).
+  - Updated top-bar hover animations with a natural ringing notification bell and magnifying-glass zoom on Search.
+- **Performance & Packaging:**
+  - Added 16 SQLite indexes, paginated large invoice registers, split large modals, and reduced Electron bundle size and memory usage.
+  - Configured cross-platform **macOS Apple Silicon (`.dmg`, build 4)** and **Windows 64-bit (`.exe`)** packaging with bundled offline OCR/ML models and deep ad-hoc macOS signing after Electron fuses.
 
-### Setup and Settings
+### Fixed
 
-- Added an empty profile picker and guided first-run setup with one question at a time, a profile review, and an empty starter catalog.
-- Made desktop notifications and Apple Calendar Automation optional during setup. BillFlow saves the profile first and resumes at permissions after reopening.
-- Consolidated profile identity, avatar, accent, currency, and invoice prefix in Business profile. Improved spacing in Workspace interface and standardized the Local activity history disclosure.
-- Added a full application reset that clears local profiles, records, managed files, and preferences before restarting at setup. Backup & data also retains a separate reset for the active profile.
-- Removed the automatic Keychain check when opening Backup & data. Packaged macOS tests now use a mock Keychain and keep native notifications quiet.
-- Simplified the macOS installer with larger native Finder icons and a clear drag-to-Applications layout.
-- Set the second macOS package to build 2 and display its build number in About BillFlow.
-
-### Billing and workspace operations
-
-- Added profile-currency reporting with cached exchange rates and original amounts preserved on financial records.
-- Added recurring retainers, proposals with one-click invoice conversion, a financial digest, and cash and accrual project-margin views.
-- Added encrypted rolling backups, restore preflight and recovery checkpoints, startup SQLite integrity checks, and a retryable PDF export history.
-- Improved offline PDF output, profile privacy, task-first outsourcing, window-state persistence, and dashboard performance.
+- Fixed 25+ Windows and macOS QA bugs covering window sizing, date/time pickers, scrollbars, profile avatars, accent consistency, and Analytics Cashflow Forecast table alignment.
+- Fixed the macOS Retina Light/Dark circular transition starting near the top notch instead of from the clicked theme button.
+- Fixed the Overview widget customizer close animation lag/snap and removed the duplicate `Done` button inside the customizer drawer.
+- Fixed dark-mode button underside borders appearing cut off by applying uniform full-perimeter rims and balanced elevation shadows.
+- Fixed multi-currency overdue totals, mixed-currency profit calculations, PDF page-break handling across all five templates, local calendar date-boundary sync, and unsolicited macOS Keychain prompts when opening Backup & data.
+- Hardened draft privacy (profile-isolated IPC storage), automatic workspace locking on sleep/screen lock, and expanded automated verification to **322 Vitest tests (44 files)** plus packaged Electron E2E coverage.
 
 ## v0.2.0 (2026-11-13)
 

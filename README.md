@@ -36,9 +36,9 @@ Recording a client deposit (`ADVANCE_PAID`) opens a 5-second prompt to turn invo
 
 Save permanent clients with default currencies (`USD`, `LKR`, `EUR`, `GBP`, `CAD`), contact details, and delivery destinations such as Google Drive folders or code repositories. For one-off work, enter temporary client details straight into the invoice editor without polluting the directory. Maintain fixed-fee or hourly rate cards in the service catalog and import or export rows via CSV or Excel workbooks.
 
-### Itemized invoicing and five offline PDF templates
+### Itemized invoicing, proposals, recurring retainers, and offline PDF templates
 
-Build multi-currency invoices with catalog items, custom discounts, taxes, and upfront deposit rules. Generate and save PDF files locally via Electron `printToPDF` and `pdf-lib` with bundled typography and an optional uploaded business logo. Five selectable invoice layouts are included offline:
+Build multi-currency invoices, **Proposals & Quotes** (`QT-YYYY-NNN` with 1-click conversion to invoices), and scheduled **Recurring Retainers** using catalog items, custom discounts, taxes, and upfront deposit rules. Generate and save PDF files locally via Electron `printToPDF` and `pdf-lib` with bundled typography and an optional uploaded business logo. Five selectable invoice layouts are included offline:
 
 - `Geometric Teal`: teal and slate angled header on a white sheet
 - `Executive Wave`: charcoal curved ribbon header with amber summary styling
@@ -46,7 +46,7 @@ Build multi-currency invoices with catalog items, custom discounts, taxes, and u
 - `Apex Orange`: orange diagonal header and bordered table grid
 - `Noir Crimson`: dark invoice sheet with crimson capsule rows
 
-Dispatch invoices or overdue reminders through prefilled `wa.me` WhatsApp links or email drafts, inspect past-due accounts receivable aging (`1-15`, `16-30`, `31-60`, `60+` days), and export active registers or aging reports to RFC 4180 CSV or Excel formats.
+Dispatch invoices or overdue reminders through prefilled `wa.me` WhatsApp links or email drafts, inspect past-due accounts receivable aging (`1-15`, `16-30`, `31-60`, `60+` days), and export active registers or aging reports to RFC 4180 CSV or Excel formats from a unified **Export** dialog.
 
 ### Smart Capture & Local AI Suite (two-tier local AI and offline OCR)
 
@@ -67,23 +67,23 @@ Switch between Kanban (`To Do`, `In Progress`, `Under Review`, `Done`), List, an
 
 Delegate any Kanban card to an external vendor with prefilled scope, client references, delivery URLs, payout fees, and deadlines. Export payable work orders (`VND-INV-xxxx`) offline via `pdf-lib` and send formatted briefs over WhatsApp. Deliverable approval and vendor settlement remain separate states; marking a voucher `Paid` records an operational payout entry in the expense ledger automatically.
 
-### Operational expenses, receipt vault, and net profit
+### Operational expenses, receipt vault, and project profit
 
-Log business expenses with custom merchant icons, recurring flags, and SHA-256 content-addressed receipt attachments (`PNG`, `JPG`, `PDF`) opened through the OS viewer. Financial summaries and Apache ECharts visualizations separate totals strictly by currency (`gross invoiced revenue - operational expenses - settled vendor payouts`). Losses and negative margins remain visible as entered, without zero-clamping or synthetic sample records.
+Log business expenses with custom merchant icons, linked invoices, recurring flags, and SHA-256 content-addressed receipt attachments (`PNG`, `JPG`, `PDF`) opened through the OS viewer, or export formatted **PDF**, **Print**, and **CSV** reports from a single **Export Report** dialog. Financial summaries, **Project Margin (P&L)** drawers, and Apache ECharts visualizations report totals in your chosen profile reporting currency (using cached daily exchange rates while preserving original amounts) and calculate true net profit (`gross invoiced revenue - operational expenses - settled vendor payouts`).
 
-### Multi-profile workspaces and backups
+### Multi-profile workspaces, themes, and encrypted backups
 
-Start with one profile through guided first-run setup and choose whether to enable desktop notifications and Apple Calendar sync. Create up to 5 isolated local workspaces and use role presets when adding profiles. Each profile keeps its own database, receipts directory, catalog defaults, appearance settings, and optional PIN or password enforced in Electron's main process.
+Start with one profile through guided first-run setup and choose whether to enable desktop notifications and Apple Calendar sync. Create up to 5 isolated local workspaces, switch seamlessly between **Light Mode** and **Dark Mode** with customizable **Profile Accent Presets** and selectable **Inter** or **Elegant Sans** typography, and protect each profile with an optional PIN or password enforced in Electron's main process.
 
-Export or restore workspace backups, including tasks, schedules, and managed receipts. Version 2 JSON backups support up to `150 MiB` per backup, including up to `100 MiB` of attachments, and `50,000` rows per table. **Settings → Backup & data** supports clearing the active profile's records or clearing the full application and returning to first-run setup.
+Export or restore standard JSON or password-protected AES-256-GCM **encrypted rolling backups** (`.bfbackup`), including tasks, schedules, and managed receipts, with startup SQLite integrity verification (`PRAGMA quick_check`). **Settings → Backup & data** supports clearing the active profile's records or clearing the full application and returning to first-run setup.
 
 ## System architecture
 
 | Layer | Stack | Role |
 | :--- | :--- | :--- |
-| Desktop shell | Electron 44 | Context-isolated `window.billflow` preload bridge, single-instance window management, local tray controls |
+| Desktop shell | Electron 44 | Context-isolated `window.billflow` preload bridge, persistent window bounds, Tray/Dock quick actions, native drag-and-drop |
 | Interface | Next.js 16 (App Router), React 19 | Static bundle (`output: 'export'`) loaded from loopback static protocol in packaged builds |
-| Styling and motion | Tailwind CSS v4, Motion | Custom surface tokens, Newsreader and Inter typography, reduced-motion support |
+| Styling and motion | Tailwind CSS v4, Motion | Light/Dark surface tokens, Profile Accent presets, unified 3D keycap controls, Inter & Elegant Sans typography, reduced-motion support |
 | Database and validation | SQLite (`better-sqlite3`), Drizzle ORM, Zod | WAL journal mode, foreign-key cascades, versioned schema migrations, schema-checked IPC payloads |
 | Documents and analytics | `pdf-lib`, Electron `printToPDF`, Apache ECharts 6 | Local PDF invoices and contractor vouchers, multi-currency financial and turnaround charts |
 | Local AI and OCR | `tesseract.js`, `@huggingface/transformers`, `onnxruntime-node` | Offline LSTM screenshot OCR, bundled `all-MiniLM-L6-v2` semantic catalog matching, optional on-demand `Qwen2.5-0.5B-Instruct` local LLM |
