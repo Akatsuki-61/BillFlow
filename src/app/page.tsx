@@ -284,161 +284,176 @@ export default function DashboardPage() {
         items={contextMenuItems}
       />
 
-      {/* Uniform Zentra Top Header */}
-      <PageHeader title="Overview">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <SelectDropdown<DashboardPeriod>
-            value={period}
-            onChange={setPeriod}
-            options={PERIOD_OPTIONS}
-            icon={<Calendar className="w-4 h-4 text-content-neutral-600" strokeWidth={1.65} />}
-            ariaLabel="Reporting period"
-            buttonClassName="zentra-control-pill--white"
-            menuClassName="w-40"
-          />
+      {/* Uniform Zentra Top Header + Smooth Height-Animated Widget Customizer */}
+      <div className="flex flex-col">
+        <PageHeader title="Overview">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <SelectDropdown<DashboardPeriod>
+              value={period}
+              onChange={setPeriod}
+              options={PERIOD_OPTIONS}
+              icon={<Calendar className="w-4 h-4 text-content-neutral-600" strokeWidth={1.65} />}
+              ariaLabel="Reporting period"
+              buttonClassName="zentra-control-pill--white"
+              menuClassName="w-40"
+            />
 
-          <button
-            type="button"
-            onClick={() => setIsDashboardEditing(!isDashboardEditing)}
-            className={
-              isDashboardEditing
-                ? "ui-button ui-button--primary !min-h-[40px] !h-[40px] !px-4 !rounded-[12px] !text-[13px]"
-                : "zentra-control-pill"
-            }
-          >
-            <span>{isDashboardEditing ? "Done" : "Add widget"}</span>
-            <IconCrossfade
-              iconKey={isDashboardEditing ? "done" : "add"}
-              className="w-3.5 h-3.5"
+            <button
+              type="button"
+              onClick={() => setIsDashboardEditing(!isDashboardEditing)}
+              className={
+                isDashboardEditing
+                  ? "ui-button ui-button--primary !min-h-[40px] !h-[40px] !px-4 !rounded-[12px] !text-[13px]"
+                  : "zentra-control-pill"
+              }
             >
-              {isDashboardEditing ? (
-                <Check className="w-3.5 h-3.5" strokeWidth={2.2} />
-              ) : (
-                <Plus className="w-3.5 h-3.5" strokeWidth={2} />
-              )}
-            </IconCrossfade>
-          </button>
-        </div>
-      </PageHeader>
+              <span>{isDashboardEditing ? "Done" : "Add widget"}</span>
+              <IconCrossfade
+                iconKey={isDashboardEditing ? "done" : "add"}
+                className="w-3.5 h-3.5"
+              >
+                {isDashboardEditing ? (
+                  <Check className="w-3.5 h-3.5" strokeWidth={2.2} />
+                ) : (
+                  <Plus className="w-3.5 h-3.5" strokeWidth={2} />
+                )}
+              </IconCrossfade>
+            </button>
+          </div>
+        </PageHeader>
 
-      {/* Interactive Zentra Widget Drawer & Layout Customizer — smooth top-down ease reveal */}
-      <MotionPresence>
-        {isDashboardEditing && (
-          <m.div
-            key="overview-widget-customizer"
-            initial={
-              reducedMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: -10, scale: 0.985 }
-            }
-            animate={
-              reducedMotion
-                ? { opacity: 1, transition: { duration: 0 } }
-                : {
-                    opacity: 1,
-                    y: 0,
-                    scale: 1,
-                    transition: { duration: 0.24, ease: EASE_ENTER },
+        {/* Interactive Zentra Widget Drawer & Layout Customizer — smooth accordion open & close */}
+        <MotionPresence>
+          {isDashboardEditing && (
+            <m.div
+              key="overview-widget-customizer"
+              initial={
+                reducedMotion
+                  ? { opacity: 0 }
+                  : { height: 0, opacity: 0 }
+              }
+              animate={
+                reducedMotion
+                  ? { opacity: 1, transition: { duration: 0 } }
+                  : {
+                      height: "auto",
+                      opacity: 1,
+                      transition: {
+                        height: { duration: 0.28, ease: EASE_ENTER },
+                        opacity: { duration: 0.22, ease: EASE_ENTER },
+                      },
+                    }
+              }
+              exit={
+                reducedMotion
+                  ? { opacity: 0, transition: { duration: 0 } }
+                  : {
+                      height: 0,
+                      opacity: 0,
+                      transition: {
+                        height: { duration: 0.24, ease: EASE_ENTER },
+                        opacity: { duration: 0.16, ease: EASE_EXIT },
+                      },
+                    }
+              }
+              className="overflow-hidden -mx-1 px-1"
+            >
+              <div className="pt-[18px] pb-1">
+                <m.div
+                  initial={reducedMotion ? false : { y: -8 }}
+                  animate={
+                    reducedMotion
+                      ? undefined
+                      : { y: 0, transition: { duration: 0.26, ease: EASE_ENTER } }
                   }
-            }
-            exit={
-              reducedMotion
-                ? { opacity: 0, transition: { duration: 0 } }
-                : {
-                    opacity: 0,
-                    y: -8,
-                    scale: 0.985,
-                    transition: { duration: 0.18, ease: EASE_EXIT },
+                  exit={
+                    reducedMotion
+                      ? undefined
+                      : { y: -8, transition: { duration: 0.2, ease: EASE_EXIT } }
                   }
-            }
-            style={{ transformOrigin: "top center" }}
-            className="flex flex-col gap-4 p-5 rounded-[26px] bg-[var(--ui-surface)] border border-[var(--ui-card-rim)] shadow-[var(--ui-card-shadow)]"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-accent-solid text-white flex items-center justify-center shrink-0">
-                  <SlidersHorizontal className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-medium text-content-neutral-950 leading-tight">
-                    Customize BillFlow Overview Bento Grid
-                  </h3>
-                  <p className="text-[12.5px] text-content-neutral-500 mt-0.5">
-                    Toggle widgets below to pin or unpin them, drag tiles to
-                    reorder, or right-click any card to resize.
-                  </p>
-                </div>
-              </div>
+                  className="flex flex-col gap-4 p-5 rounded-[26px] bg-[var(--ui-surface)] border border-[var(--ui-card-rim)] shadow-[var(--ui-card-shadow)]"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-accent-solid text-white flex items-center justify-center shrink-0">
+                        <SlidersHorizontal className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-[15px] font-medium text-content-neutral-950 leading-tight">
+                          Customize BillFlow Overview Bento Grid
+                        </h3>
+                        <p className="text-[12.5px] text-content-neutral-500 mt-0.5">
+                          Toggle widgets below to pin or unpin them, drag tiles to
+                          reorder, or right-click any card to resize.
+                        </p>
+                      </div>
+                    </div>
 
-              <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                <Button
-                  variant="ghost"
-                  size="small"
-                  onClick={undoDashboard}
-                  disabled={!canUndo}
-                  title={`Undo last change (${formatShortcut("Cmd+Z", isMac)})`}
-                  className="gap-1.5"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Undo</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="small"
-                  onClick={() => router.push("/analytics")}
-                  className="gap-1.5"
-                >
-                  <ArrowUpRight className="w-3 h-3" />
-                  <span>Full Analytics Catalog</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="small"
-                  onClick={resetToDefaults}
-                  title="Reset to default arrangement"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Reset</span>
-                </Button>
-                <Button
-                  variant="primary"
-                  size="small"
-                  onClick={() => setIsDashboardEditing(false)}
-                >
-                  <Check className="w-3 h-3" />
-                  <span>Done</span>
-                </Button>
-              </div>
-            </div>
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={undoDashboard}
+                        disabled={!canUndo}
+                        title={`Undo last change (${formatShortcut("Cmd+Z", isMac)})`}
+                        className="gap-1.5"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Undo</span>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={resetToDefaults}
+                        title="Reset to default arrangement"
+                        className="gap-1.5"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset</span>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() => router.push("/analytics")}
+                        className="gap-1.5"
+                      >
+                        <ArrowUpRight className="w-3 h-3" />
+                        <span>Full Analytics Catalog</span>
+                      </Button>
+                    </div>
+                  </div>
 
-            {/* Quick Pill Selector for all BillFlow Widgets */}
-            <div className="flex flex-wrap gap-2 pt-3 border-t border-[var(--ui-border-hairline)]">
-              {DASHBOARD_WIDGET_CATALOG.map((w) => {
-                const pinned = isPinnedToDashboard(w.id);
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => toggleDashboard(w.id)}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium transition-all cursor-pointer border ${
-                      pinned
-                        ? "bg-accent-solid text-white border-accent-solid shadow-xs"
-                        : "bg-[var(--ui-surface-pure)] text-content-neutral-600 border-[var(--ui-border)] hover:border-border-accent hover:text-content-neutral-950"
-                    }`}
-                  >
-                    {pinned ? (
-                      <Check className="w-3 h-3 text-white" strokeWidth={2.4} />
-                    ) : (
-                      <Plus className="w-3 h-3 text-content-neutral-400" />
-                    )}
-                    <span>{w.title}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </m.div>
-        )}
-      </MotionPresence>
+                  {/* Quick Pill Selector for all BillFlow Widgets */}
+                  <div className="flex flex-wrap gap-2 pt-3 border-t border-[var(--ui-border-hairline)]">
+                    {DASHBOARD_WIDGET_CATALOG.map((w) => {
+                      const pinned = isPinnedToDashboard(w.id);
+                      return (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => toggleDashboard(w.id)}
+                          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium transition-all cursor-pointer border ${
+                            pinned
+                              ? "bg-accent-solid text-white border-accent-solid shadow-xs"
+                              : "bg-[var(--ui-surface-pure)] text-content-neutral-600 border-[var(--ui-border)] hover:border-border-accent hover:text-content-neutral-950"
+                          }`}
+                        >
+                          {pinned ? (
+                            <Check className="w-3 h-3 text-white" strokeWidth={2.4} />
+                          ) : (
+                            <Plus className="w-3 h-3 text-content-neutral-400" />
+                          )}
+                          <span>{w.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </m.div>
+              </div>
+            </m.div>
+          )}
+        </MotionPresence>
+      </div>
 
       {/* =====================================================================
           UNIFIED BILLFLOW ZENTRA BENTO GRID
