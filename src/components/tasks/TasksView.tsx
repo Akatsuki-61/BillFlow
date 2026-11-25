@@ -975,10 +975,7 @@ export default function TasksView({
       </MotionPresence>
 
       {/* Header Section matching Clients & Expenses page alignment */}
-      <PageHeader
-        title="Tasks"
-        description="The work ahead, in progress and ready to deliver."
-      >
+      <PageHeader title="Tasks">
         {/* View Switcher & Primary Actions in the right corner */}
         <div className="flex items-center gap-2.5 flex-wrap">
           <SegmentedControl

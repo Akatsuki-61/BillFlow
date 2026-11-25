@@ -208,12 +208,17 @@ export function ensureViewTransitionOrigin(
   explicitTrigger?: EventTarget | null,
 ) {
   if (typeof document === "undefined" || typeof window === "undefined") return;
+  const vw = Math.max(1, window.innerWidth);
+  const vh = Math.max(1, window.innerHeight);
   const writeFromLast = () => {
     if (!lastTriggerRect) return false;
-    writeViewTransitionOrigin(
-      `${Math.round(lastTriggerRect.left + lastTriggerRect.width / 2)}px`,
-      `${Math.round(lastTriggerRect.top + lastTriggerRect.height / 2)}px`,
-    );
+    // Use viewport percentages (%) rather than px so Chromium/Electron Retina
+    // (devicePixelRatio >= 2) view-transition snapshots keep the exact button origin.
+    const cx = lastTriggerRect.left + lastTriggerRect.width / 2;
+    const cy = lastTriggerRect.top + lastTriggerRect.height / 2;
+    const xPct = Math.max(0, Math.min(100, (cx / vw) * 100));
+    const yPct = Math.max(0, Math.min(100, (cy / vh) * 100));
+    writeViewTransitionOrigin(`${xPct.toFixed(2)}%`, `${yPct.toFixed(2)}%`);
     return true;
   };
   if (explicitTrigger && recordElementTrigger(explicitTrigger) && writeFromLast()) {

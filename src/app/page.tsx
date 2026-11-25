@@ -16,14 +16,10 @@ import {
   Plus,
   SlidersHorizontal,
 } from "lucide-react";
-import { Button } from "@/components/ui/Workspace";
-import { m } from "motion/react";
-import { SPRING_NAV_GLIDE } from "@/lib/motion";
-import {
-  IconCrossfade,
-  MotionPresence,
-  MotionSurface,
-} from "@/components/ui/MotionSurface";
+import { Button, PageHeader } from "@/components/ui/Workspace";
+import { m, useReducedMotion } from "motion/react";
+import { EASE_ENTER, EASE_EXIT, SPRING_NAV_GLIDE } from "@/lib/motion";
+import { IconCrossfade, MotionPresence } from "@/components/ui/MotionSurface";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { ToastBanner } from "@/components/ui/ToastBanner";
 import { WidgetRenderer } from "@/components/dashboard/WidgetRenderer";
@@ -69,6 +65,7 @@ export default function DashboardPage() {
 
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
   const isMac = useIsMac();
+  const reducedMotion = useReducedMotion();
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const lastSwapRef = useRef<{ pair: string; time: number }>({
     pair: "",
@@ -287,15 +284,8 @@ export default function DashboardPage() {
         items={contextMenuItems}
       />
 
-      {/* Zentra Overview Top Sub-Header */}
-      <header className="flex flex-wrap items-center justify-between gap-4 pt-1 pb-2">
-        <div className="flex items-center gap-3.5">
-          <h1 className="text-[40px] sm:text-[44px] font-normal tracking-[-0.035em] text-content-neutral-950 leading-none">
-            Overview
-          </h1>
-        </div>
-
-        {/* Right: Single Period Selector (Weekly/Monthly/Quarterly/Yearly/All Time) + Add widget + */}
+      {/* Uniform Zentra Top Header */}
+      <PageHeader title="Overview">
         <div className="flex items-center gap-2.5 flex-wrap">
           <SelectDropdown<DashboardPeriod>
             value={period}
@@ -329,13 +319,39 @@ export default function DashboardPage() {
             </IconCrossfade>
           </button>
         </div>
-      </header>
+      </PageHeader>
 
-      {/* Interactive Zentra Widget Drawer & Layout Customizer */}
+      {/* Interactive Zentra Widget Drawer & Layout Customizer — smooth top-down ease reveal */}
       <MotionPresence>
         {isDashboardEditing && (
-          <MotionSurface
-            kind="panel"
+          <m.div
+            key="overview-widget-customizer"
+            initial={
+              reducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: -10, scale: 0.985 }
+            }
+            animate={
+              reducedMotion
+                ? { opacity: 1, transition: { duration: 0 } }
+                : {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    transition: { duration: 0.24, ease: EASE_ENTER },
+                  }
+            }
+            exit={
+              reducedMotion
+                ? { opacity: 0, transition: { duration: 0 } }
+                : {
+                    opacity: 0,
+                    y: -8,
+                    scale: 0.985,
+                    transition: { duration: 0.18, ease: EASE_EXIT },
+                  }
+            }
+            style={{ transformOrigin: "top center" }}
             className="flex flex-col gap-4 p-5 rounded-[26px] bg-[var(--ui-surface)] border border-[var(--ui-card-rim)] shadow-[var(--ui-card-shadow)]"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -420,7 +436,7 @@ export default function DashboardPage() {
                 );
               })}
             </div>
-          </MotionSurface>
+          </m.div>
         )}
       </MotionPresence>
 

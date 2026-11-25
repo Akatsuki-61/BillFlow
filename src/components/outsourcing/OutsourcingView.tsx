@@ -853,10 +853,7 @@ export default function OutsourcingView() {
       </MotionPresence>
 
       {/* Top Header */}
-      <PageHeader
-        title="Outsourcing"
-        description="Your contractors, deliverables and payouts, connected to each client job."
-      >
+      <PageHeader title="Outsourcing">
         <div className="outsourcing-header-actions">
           <Button
             variant="secondary"

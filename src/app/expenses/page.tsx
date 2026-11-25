@@ -27,6 +27,8 @@ import { useToast } from "@/context/ToastContext";
 import React, { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import {
   Download,
+  FileSpreadsheet,
+  FileText,
   Printer,
   Plus,
   Plane,
@@ -727,7 +729,10 @@ function ExpensesContent() {
     });
   }, [expenses, searchQuery, openedExpenseId, allExpenses, invoiceMap]);
 
-  const handleExportReport = () => {
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleExportCsvReport = () => {
     try {
       const todayStr = localDateKey();
       const csv = generateExpensesCsv(searchedExpenses, invoiceMap);
@@ -740,6 +745,7 @@ function ExpensesContent() {
         : `expenses-report-${todayStr}.csv`;
       downloadCsvFile(filename, csv);
       const count = searchedExpenses.length;
+      setIsExportDialogOpen(false);
       showToast(
         `Exported ${count} ${count === 1 ? "expense" : "expenses"} to ${filename}.`,
       );
@@ -749,9 +755,165 @@ function ExpensesContent() {
     }
   };
 
+  const handleExportPdfReport = async () => {
+    setIsExportingPdf(true);
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+      const pdfDoc = await PDFDocument.create();
+      const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const pageWidth = 595.28;
+      const pageHeight = 841.89;
+      const marginX = 44;
+      const rowHeight = 20;
+      const todayStr = localDateKey();
+
+      const sanitizePdfText = (value: string, maxLen = 42) => {
+        const clean = value.replace(/[^\x20-\x7E]/g, " ").trim();
+        return clean.length > maxLen ? `${clean.slice(0, maxLen - 1)}...` : clean;
+      };
+
+      let page = pdfDoc.addPage([pageWidth, pageHeight]);
+      let y = pageHeight - 52;
+
+      const drawHeader = (currentPage: typeof page) => {
+        currentPage.drawText("BillFlow — Expenses Report", {
+          x: marginX,
+          y,
+          size: 18,
+          font: fontBold,
+          color: rgb(0.08, 0.09, 0.12),
+        });
+        y -= 18;
+        currentPage.drawText(
+          `Generated ${todayStr}  |  Category: ${sanitizePdfText(selectedCategory, 28)}  |  Records: ${searchedExpenses.length}`,
+          {
+            x: marginX,
+            y,
+            size: 9.5,
+            font: fontRegular,
+            color: rgb(0.42, 0.44, 0.49),
+          },
+        );
+        y -= 24;
+
+        // Table header
+        currentPage.drawRectangle({
+          x: marginX,
+          y: y - 4,
+          width: pageWidth - marginX * 2,
+          height: 20,
+          color: rgb(0.95, 0.95, 0.97),
+        });
+        currentPage.drawText("Date", { x: marginX + 6, y: y + 2, size: 9, font: fontBold, color: rgb(0.25, 0.27, 0.32) });
+        currentPage.drawText("Merchant / Description", { x: marginX + 76, y: y + 2, size: 9, font: fontBold, color: rgb(0.25, 0.27, 0.32) });
+        currentPage.drawText("Category", { x: marginX + 290, y: y + 2, size: 9, font: fontBold, color: rgb(0.25, 0.27, 0.32) });
+        currentPage.drawText("Deductible", { x: marginX + 382, y: y + 2, size: 9, font: fontBold, color: rgb(0.25, 0.27, 0.32) });
+        currentPage.drawText("Amount", { x: marginX + 448, y: y + 2, size: 9, font: fontBold, color: rgb(0.25, 0.27, 0.32) });
+        y -= 22;
+      };
+
+      drawHeader(page);
+
+      if (searchedExpenses.length === 0) {
+        page.drawText("No expenses recorded in this selection.", {
+          x: marginX + 6,
+          y,
+          size: 10,
+          font: fontRegular,
+          color: rgb(0.45, 0.47, 0.52),
+        });
+      } else {
+        for (const item of searchedExpenses) {
+          if (y < 64) {
+            page = pdfDoc.addPage([pageWidth, pageHeight]);
+            y = pageHeight - 52;
+            drawHeader(page);
+          }
+          const desc = item.description
+            ? `${item.merchant} - ${item.description}`
+            : item.merchant;
+          page.drawText(sanitizePdfText(item.incurredAt.slice(0, 10), 12), {
+            x: marginX + 6,
+            y,
+            size: 8.8,
+            font: fontRegular,
+            color: rgb(0.18, 0.2, 0.25),
+          });
+          page.drawText(sanitizePdfText(desc, 36), {
+            x: marginX + 76,
+            y,
+            size: 8.8,
+            font: fontRegular,
+            color: rgb(0.1, 0.11, 0.14),
+          });
+          page.drawText(sanitizePdfText(item.category, 16), {
+            x: marginX + 290,
+            y,
+            size: 8.5,
+            font: fontRegular,
+            color: rgb(0.32, 0.34, 0.4),
+          });
+          page.drawText(item.deductible ? "Yes" : "No", {
+            x: marginX + 394,
+            y,
+            size: 8.8,
+            font: fontRegular,
+            color: rgb(0.25, 0.27, 0.32),
+          });
+          page.drawText(
+            sanitizePdfText(formatCents(item.amountCents, item.currency), 16),
+            {
+              x: marginX + 448,
+              y,
+              size: 8.8,
+              font: fontBold,
+              color: rgb(0.08, 0.09, 0.12),
+            },
+          );
+          page.drawLine({
+            start: { x: marginX, y: y - 5 },
+            end: { x: pageWidth - marginX, y: y - 5 },
+            thickness: 0.5,
+            color: rgb(0.9, 0.91, 0.93),
+          });
+          y -= rowHeight;
+        }
+      }
+
+      const bytes = await pdfDoc.save();
+      const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const isFiltered =
+        Boolean(openedExpenseId) ||
+        selectedCategory !== "All Categories" ||
+        Boolean(searchQuery.trim());
+      const filename = isFiltered
+        ? `expenses-report-filtered-${todayStr}.pdf`
+        : `expenses-report-${todayStr}.pdf`;
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      setIsExportDialogOpen(false);
+      showToast(`Exported PDF report to ${filename}.`);
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to generate expenses PDF report.", "error");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handlePrintReport = () => {
+    setIsExportDialogOpen(false);
     if (typeof window !== "undefined") {
-      window.print();
+      setTimeout(() => window.print(), 180);
     }
   };
 
@@ -771,11 +933,8 @@ function ExpensesContent() {
   return (
     <div className="workspace-page motion-page">
       {/* Page Header */}
-      <PageHeader
-        title="Expenses"
-        description="Keep track of software, hosting and day-to-day business costs."
-      >
-        <div className="flex items-center gap-2.5 flex-wrap">
+      <PageHeader title="Expenses">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Search Bar */}
           <div className="relative">
             <Search className="w-4 h-4 text-content-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -787,7 +946,7 @@ function ExpensesContent() {
                 setCurrentPage(1);
               }}
               placeholder="Search expenses..."
-              className="ui-field ui-search-input pl-9 pr-8 text-xs font-medium w-44 sm:w-52 border border-line-neutral-200"
+              className="ui-field ui-search-input pl-9 pr-8 text-xs font-medium w-40 sm:w-44 border border-line-neutral-200"
               style={{ paddingLeft: "38px" }}
             />
             {searchQuery && (
@@ -809,35 +968,21 @@ function ExpensesContent() {
               setCurrentPage(1);
             }}
             options={EXPENSE_CATEGORY_OPTIONS}
-            buttonClassName="zentra-control-pill--white w-44"
+            buttonClassName="zentra-control-pill--white w-40"
             menuClassName="w-48"
           />
 
           <Button
             variant="secondary"
             type="button"
-            onClick={handleExportReport}
-            title="Export expenses report to CSV (.csv)"
+            onClick={() => setIsExportDialogOpen(true)}
+            title="Export as PDF, print, or download CSV"
             className="group"
           >
-            <div className="w-4 h-4 flex items-center justify-center">
-              <Download
-                className="w-4 h-4 transition-transform duration-200 ease-out group-hover:scale-105 group-hover:translate-y-0.5"
-                strokeWidth={2.2}
-              />
-            </div>
+            <Download className="w-4 h-4" strokeWidth={2} />
             <span>Export Report</span>
           </Button>
 
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={handlePrintReport}
-            title="Print expenses report"
-          >
-            <Printer className="w-4 h-4" strokeWidth={2.2} />
-            <span>Print Report</span>
-          </Button>
           <Button
             variant="secondary"
             type="button"
@@ -847,11 +992,12 @@ function ExpensesContent() {
             <Sparkles className="w-4 h-4 text-accent" />
             <span>Scan Receipt</span>
           </Button>
+
+          <Button variant="primary" onClick={openLogExpenseModal}>
+            <Plus />
+            Log Expense
+          </Button>
         </div>
-        <Button variant="primary" onClick={openLogExpenseModal}>
-          <Plus />
-          Log Expense
-        </Button>
       </PageHeader>
       {openedExpenseId && (
         <div className="flex items-center gap-3 text-sm text-content-neutral-800">
@@ -1716,6 +1862,101 @@ function ExpensesContent() {
                 </Button>
               </div>
             </form>
+          </Dialog>
+        )}
+      </MotionPresence>
+
+      {/* Unified Export Expenses Report Dialog (Export as PDF / Print / CSV) */}
+      <MotionPresence>
+        {isExportDialogOpen && (
+          <Dialog
+            onClose={() => setIsExportDialogOpen(false)}
+            width={440}
+            compact
+          >
+            <div className="app-dialog-header">
+              <div>
+                <h2 className="text-[17px] font-medium tracking-[-0.02em] text-content-neutral-950">
+                  Export Expenses Report
+                </h2>
+                <p className="text-xs text-content-neutral-500 mt-0.5">
+                  {searchedExpenses.length}{" "}
+                  {searchedExpenses.length === 1 ? "expense" : "expenses"} in
+                  current selection ({selectedCategory})
+                </p>
+              </div>
+            </div>
+
+            <div className="app-dialog-body space-y-2.5">
+              <button
+                type="button"
+                disabled={isExportingPdf}
+                onClick={() => void handleExportPdfReport()}
+                className="w-full flex items-center gap-3.5 p-3.5 rounded-[16px] bg-[var(--ui-surface-pure)] border border-[var(--ui-border)] hover:border-border-accent transition-all text-left cursor-pointer disabled:opacity-60"
+              >
+                <span className="w-10 h-10 rounded-[12px] bg-accent/12 text-accent flex items-center justify-center shrink-0">
+                  {isExportingPdf ? (
+                    <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                  ) : (
+                    <FileText className="w-4.5 h-4.5" strokeWidth={1.9} />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13.5px] font-medium text-content-neutral-950">
+                    Export as PDF
+                  </div>
+                  <div className="text-[12px] text-content-neutral-500">
+                    Save a formatted vector PDF report to disk
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrintReport}
+                className="w-full flex items-center gap-3.5 p-3.5 rounded-[16px] bg-[var(--ui-surface-pure)] border border-[var(--ui-border)] hover:border-border-accent transition-all text-left cursor-pointer"
+              >
+                <span className="w-10 h-10 rounded-[12px] bg-surface-neutral-100 text-content-neutral-800 flex items-center justify-center shrink-0">
+                  <Printer className="w-4.5 h-4.5" strokeWidth={1.9} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13.5px] font-medium text-content-neutral-950">
+                    Print
+                  </div>
+                  <div className="text-[12px] text-content-neutral-500">
+                    Send the current expenses ledger to your printer
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportCsvReport}
+                className="w-full flex items-center gap-3.5 p-3.5 rounded-[16px] bg-[var(--ui-surface-pure)] border border-[var(--ui-border)] hover:border-border-accent transition-all text-left cursor-pointer"
+              >
+                <span className="w-10 h-10 rounded-[12px] bg-surface-neutral-100 text-content-neutral-800 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-4.5 h-4.5" strokeWidth={1.9} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13.5px] font-medium text-content-neutral-950">
+                    Export as CSV
+                  </div>
+                  <div className="text-[12px] text-content-neutral-500">
+                    Download spreadsheet data (.csv) for bookkeeping
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <div className="app-dialog-footer">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setIsExportDialogOpen(false)}
+              >
+                Close
+              </Button>
+            </div>
           </Dialog>
         )}
       </MotionPresence>

@@ -2,15 +2,7 @@
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowUp,
-  ArrowUpRight,
-  ChevronDown,
-  ChevronUp,
-  MoreHorizontal,
-  Sparkles,
-} from "lucide-react";
-import { useAiCapture } from "@/context/AiCaptureContext";
+import { ArrowUpRight, MoreHorizontal } from "lucide-react";
 import { formatCents, getCurrencySymbol } from "@/lib/format";
 import { sharePercent } from "@/lib/visual-metrics";
 import type { Currency } from "@/types/billing";
@@ -122,16 +114,9 @@ export function CardMenuButton({
 }
 
 /* ==========================================================================
-   Widget 1: Payments 5-Stage Sloped Hatched Funnel + Frosted AI Capture Dock
+   Widget 1: Payments 5-Stage Sloped Hatched Funnel
    Reference: payment timeline widget.png & top left closeup
    ========================================================================== */
-const AI_SLASH_COMMANDS = [
-  { tag: "/smart-capture", prompt: "Extract client message into invoice or tasks", action: "capture" },
-  { tag: "/overdue", prompt: "Inspect overdue balances and aging breakdown", action: "/invoices?view=overdue-summary" },
-  { tag: "/new-invoice", prompt: "Create a new itemized client invoice", action: "/invoices?new=1" },
-  { tag: "/tasks", prompt: "Review active sprint deliverables on Kanban", action: "/tasks" },
-] as const;
-
 export function PaymentsFunnelCard({
   stages,
   currency,
@@ -146,13 +131,9 @@ export function PaymentsFunnelCard({
   onRemove?: () => void;
 }) {
   const router = useRouter();
-  const { openDrawer } = useAiCapture();
   const uid = useId().replaceAll(":", "");
 
   const [activeIdx, setActiveIdx] = useState<number>(Math.min(2, Math.max(0, stages.length - 1)));
-  const [dockExpanded, setDockExpanded] = useState(true);
-  const [selectedCmdIdx, setSelectedCmdIdx] = useState(0);
-  const [queryText, setQueryText] = useState("Turn a WhatsApp brief or screenshot into");
 
   const safeActiveIdx = Math.min(activeIdx, Math.max(0, stages.length - 1));
   const activeStage = stages[safeActiveIdx];
@@ -167,12 +148,12 @@ export function PaymentsFunnelCard({
 
   // SVG coordinate system for 5 equal-width stages with sloped trapezoid connectors
   const svgW = 800;
-  const svgH = 200;
+  const svgH = 210;
   const colW = svgW / Math.max(1, stages.length);
   const barGap = 24;
   const barW = colW - barGap;
   const barBaseY = svgH;
-  const maxBarH = 166;
+  const maxBarH = 176;
 
   const barRects = stages.map((stage, i) => {
     const h = Math.max(24, (stage.heightPct / 100) * maxBarH);
@@ -180,30 +161,6 @@ export function PaymentsFunnelCard({
     const y = barBaseY - h;
     return { x, y, w: barW, h };
   });
-
-  const activeCmd = AI_SLASH_COMMANDS[selectedCmdIdx];
-
-  const handleDockSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const lower = queryText.trim().toLowerCase();
-    if (lower.includes("overdue") || activeCmd.action === "/invoices?view=overdue-summary") {
-      router.push("/invoices?view=overdue-summary");
-      return;
-    }
-    if (lower.includes("task") || lower.includes("kanban") || activeCmd.action === "/tasks") {
-      router.push("/tasks");
-      return;
-    }
-    if (lower.includes("expense") || lower.includes("cost")) {
-      router.push("/expenses");
-      return;
-    }
-    if (activeCmd.action === "/invoices?new=1") {
-      router.push("/invoices?new=1");
-      return;
-    }
-    openDrawer();
-  };
 
   return (
     <div className="ui-card relative flex flex-col justify-between h-full overflow-hidden">
@@ -214,7 +171,6 @@ export function PaymentsFunnelCard({
           label="Payments options"
           actions={[
             { label: "Open Invoices", onClick: onOpenInvoices },
-            { label: "Open Smart Capture", onClick: openDrawer },
             { label: "View Analytics", onClick: () => router.push("/analytics") },
             ...(onRemove ? [{ label: "Hide widget", onClick: onRemove, tone: "danger" as const }] : []),
           ]}
@@ -222,10 +178,10 @@ export function PaymentsFunnelCard({
       </div>
 
       {/* 5-Stage Interactive Funnel Area */}
-      <div className="relative flex-1 min-h-[214px] flex flex-col justify-end">
+      <div className={`relative flex-1 flex flex-col justify-end ${isCompact ? "min-h-[180px]" : "min-h-[224px]"}`}>
         <div className="relative grid grid-cols-12 flex-1">
           {/* Left Y-Axis Scale */}
-          <div className="col-span-1 hidden sm:flex flex-col justify-between pt-14 pb-9 pr-2 text-right text-[11px] font-normal text-content-neutral-400 tabular-nums select-none">
+          <div className="col-span-1 hidden sm:flex flex-col justify-between pt-14 pb-2 pr-2 text-right text-[11px] font-normal text-content-neutral-400 tabular-nums select-none">
             {yTicks.map((tick, idx) => (
               <span key={idx}>{tick || "\u00A0"}</span>
             ))}
@@ -272,7 +228,7 @@ export function PaymentsFunnelCard({
             </div>
 
             {/* Sloped Hatched Bars + Translucent Connectors SVG */}
-            <div className="relative w-full h-[156px] -mt-[100px] pointer-events-none select-none">
+            <div className={`relative w-full pointer-events-none select-none ${isCompact ? "h-[140px] -mt-[84px]" : "h-[186px] -mt-[106px]"}`}>
               <svg
                 viewBox={`0 0 ${svgW} ${svgH}`}
                 preserveAspectRatio="none"
@@ -424,60 +380,6 @@ export function PaymentsFunnelCard({
             </div>
           </div>
         </div>
-
-        {/* Embedded Frosted-Glass AI & Smart Capture Dock (overlapping bottom of bars) */}
-        {!isCompact && (
-          <div className="zentra-ai-dock relative z-20 -mt-6">
-            <div className="flex items-center justify-between gap-2 px-1 pb-1.5">
-              <div className="flex items-center gap-2 text-[12.5px] font-medium text-content-neutral-700 dark:text-content-neutral-200">
-                <Sparkles className="w-3.5 h-3.5 text-accent" strokeWidth={2} />
-                <span>What would you like to explore next?</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDockExpanded((v) => !v)}
-                aria-label={dockExpanded ? "Collapse AI bar" : "Expand AI bar"}
-                className="p-1 rounded-full text-content-neutral-600 hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer"
-              >
-                {dockExpanded ? (
-                  <ChevronUp className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-
-            {dockExpanded && (
-              <form onSubmit={handleDockSubmit} className="zentra-ai-dock-input-wrap">
-                <input
-                  type="text"
-                  aria-label="Explore finances or trigger Smart Capture"
-                  value={queryText}
-                  onChange={(e) => setQueryText(e.target.value)}
-                  placeholder="Ask or capture a client brief…"
-                  className="min-w-0 flex-1 bg-transparent border-0 outline-none text-[13px] text-content-neutral-900 placeholder:text-content-neutral-400"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedCmdIdx((prev) => (prev + 1) % AI_SLASH_COMMANDS.length)
-                  }
-                  title="Click to cycle quick workspace command"
-                  className="zentra-ai-command-chip shrink-0"
-                >
-                  {activeCmd.tag}
-                </button>
-                <button
-                  type="submit"
-                  aria-label="Run command or open Smart Capture"
-                  className="ui-button ui-button--primary !min-h-[32px] !h-[32px] !w-[32px] !p-0 !rounded-[9px] shrink-0"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" strokeWidth={2.2} />
-                </button>
-              </form>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

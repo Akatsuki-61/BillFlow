@@ -2326,10 +2326,7 @@ export default function InvoicesView() {
       </MotionPresence>
 
       {/* Zentra Top Header */}
-      <PageHeader
-        title="Invoices"
-        description="Create invoices, record deposits and keep every payment in view."
-      >
+      <PageHeader title="Invoices">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"

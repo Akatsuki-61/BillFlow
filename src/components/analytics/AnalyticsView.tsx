@@ -196,10 +196,7 @@ export default function AnalyticsView() {
       />
 
       {/* Top Header */}
-      <PageHeader
-        title="Analytics & Financial Performance"
-        description="Recorded revenue, costs, collections and delivery progress. Historical charts show their own labeled windows."
-      >
+      <PageHeader title="Analytics">
         <div className="analytics-header-controls">
           <SegmentedControl
             value={timeframe}

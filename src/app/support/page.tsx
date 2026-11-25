@@ -315,10 +315,7 @@ export default function SupportPage() {
   return (
     <div className="workspace-page motion-page space-y-8 pb-16">
       {/* Page Header */}
-      <PageHeader
-        title="Help & Support"
-        description="Workflow references, operating guides, troubleshooting, and local workspace diagnostics."
-      >
+      <PageHeader title="Help & Support">
         <div className="flex items-center gap-2.5">
           <Button
             variant="secondary"

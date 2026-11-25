@@ -544,10 +544,7 @@ function ClientsContent() {
       </MotionPresence>
 
       {/* Zentra Header Section */}
-      <PageHeader
-        title="Clients"
-        description="Manage permanent client profiles, delivery repositories, and account ledgers."
-      >
+      <PageHeader title="Clients">
         <div className="flex items-center gap-2.5">
           <button
             type="button"

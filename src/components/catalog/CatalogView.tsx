@@ -532,10 +532,7 @@ export default function CatalogView() {
   return (
     <div className="workspace-page motion-page">
       {/* Top Header */}
-      <PageHeader
-        title="Catalog"
-        description="Your services and default prices, ready for the next invoice."
-      >
+      <PageHeader title="Catalog">
         <div className="flex items-center gap-3">
           <Button
             variant="secondary"
