@@ -29,8 +29,6 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertCircle,
-  CheckCircle2,
   Code2,
   Download,
   ExternalLink,
@@ -50,7 +48,8 @@ import { formatWorkOrderPaymentSummary } from "@/lib/payment-summary";
 
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { MotionPresence } from "@/components/ui/MotionSurface";
+import { useToast } from "@/context/ToastContext";
 import { m } from "motion/react";
 import { SPRING_NAV_GLIDE, SPRING_MENU_POPOVER } from "@/lib/motion";
 import {
@@ -291,19 +290,15 @@ export default function OutsourcingView() {
     setIsWorkOrderModalOpen(true);
   };
 
-  // Toast notification state
-  const [toastNotification, setToastNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  // Shared stacked toast notifications
+  const { showToast: pushToast } = useToast();
 
   // Show auto-dismissing toast feedback
   const showToast = (
     message: string,
     type: "success" | "error" = "success",
   ) => {
-    setToastNotification({ message, type });
-    setTimeout(() => setToastNotification(null), 3500);
+    pushToast(message, { type, durationMs: 3500 });
   };
 
   // Handle task redirection deep link / query params from Sprint Board (/tasks)
@@ -827,31 +822,6 @@ export default function OutsourcingView() {
 
   return (
     <div className="workspace-page motion-page outsourcing-page-container">
-      {/* Toast Feedback Notification */}
-      <MotionPresence>
-        {toastNotification && (
-          <MotionSurface
-            key={toastNotification.message}
-            kind="toast"
-            role="status"
-            aria-live="polite"
-            className={`bf-toast-popup zentra-toast ${
-              toastNotification.type === "error" ? "zentra-toast--error" : ""
-            } fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]`}
-          >
-            <span className="zentra-toast-icon" aria-hidden="true">
-              {toastNotification.type === "error" ? (
-                <AlertCircle className="w-4 h-4 shrink-0" />
-              ) : (
-                <CheckCircle2 className="success-confirm-pulse rounded-full w-4 h-4 shrink-0" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1 leading-snug">{toastNotification.message}</span>
-            <span aria-hidden="true" className="zentra-toast-progress" />
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
       {/* Top Header */}
       <PageHeader title="Outsourcing">
         <div className="outsourcing-header-actions">

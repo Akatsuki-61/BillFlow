@@ -16,7 +16,8 @@ import { DataBreakdown } from "@/components/ui/DataGraphic";
 
 import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { MotionPresence } from "@/components/ui/MotionSurface";
+import { useToast } from "@/context/ToastContext";
 import { AnimatePresence, m } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
@@ -35,8 +36,6 @@ import {
   FolderClosed,
   ExternalLink,
   X,
-  CheckCircle2,
-  AlertCircle,
   Trash2,
   Building,
   Plus,
@@ -153,11 +152,7 @@ function ClientsContent() {
     };
   }, [activeMenuId]);
 
-  // Notifications / Toasts
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  const { showToast: pushToast } = useToast();
 
   // Add Client Form State
   const [formData, setFormData] = useState({
@@ -301,8 +296,7 @@ function ClientsContent() {
     message: string,
     type: "success" | "error" = "success",
   ) => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3600);
+    pushToast(message, type);
   };
 
   const handleAddClient = async (e: React.FormEvent) => {
@@ -518,31 +512,6 @@ function ClientsContent() {
 
   return (
     <div className="workspace-page motion-page">
-      {/* Toast Notification */}
-      <MotionPresence>
-        {notification && (
-          <MotionSurface
-            key={notification.message}
-            kind="toast"
-            role="status"
-            aria-live="polite"
-            className={`bf-toast-popup zentra-toast ${
-              notification.type === "error" ? "zentra-toast--error" : ""
-            } fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]`}
-          >
-            <span className="zentra-toast-icon" aria-hidden="true">
-              {notification.type === "error" ? (
-                <AlertCircle className="w-4 h-4 shrink-0" />
-              ) : (
-                <CheckCircle2 className="success-confirm-pulse rounded-full w-4 h-4 shrink-0" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1 leading-snug">{notification.message}</span>
-            <span aria-hidden="true" className="zentra-toast-progress" />
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
       {/* Zentra Header Section */}
       <PageHeader title="Clients">
         <div className="flex items-center gap-2.5">

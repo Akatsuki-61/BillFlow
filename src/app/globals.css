@@ -667,7 +667,7 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   background: var(--theme-accent-solid);
   opacity: 0.85;
   transform-origin: left center;
-  animation: bf-toast-progress 3.6s linear forwards;
+  animation: bf-toast-progress var(--toast-duration, 3.6s) linear forwards;
 }
 .zentra-toast--error .zentra-toast-progress {
   background: #e11d48;
@@ -3499,7 +3499,30 @@ button:active:not(:disabled) i.fa-solid.fa-rotate {
   min-height: var(--workspace-field-height);
 }
 
-:root[data-notification-placement] [data-motion-surface="toast"] {
+.bf-toast-stack {
+  position: fixed;
+  inset: var(--toast-top, auto) var(--toast-right, 24px)
+    var(--toast-bottom, 24px) var(--toast-left, auto);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+  max-width: min(440px, calc(100vw - 32px));
+}
+.bf-toast-stack > * {
+  pointer-events: auto;
+}
+:root:is(
+  [data-notification-placement="top-left"],
+  [data-notification-placement="bottom-left"]
+)
+  .bf-toast-stack {
+  align-items: flex-start;
+}
+:root[data-notification-placement]
+  [data-motion-surface="toast"]:not(.bf-toast-stack [data-motion-surface="toast"]) {
   position: fixed !important;
   inset: var(--toast-top, auto) var(--toast-right, 24px)
     var(--toast-bottom, 24px) var(--toast-left, auto) !important;

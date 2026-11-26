@@ -17,6 +17,8 @@ export interface ToastBannerProps {
   onDismiss?: () => void;
   icon?: React.ReactNode;
   showProgress?: boolean;
+  durationMs?: number;
+  stacked?: boolean;
   className?: string;
 }
 
@@ -32,6 +34,8 @@ export function ToastBanner({
   onDismiss,
   icon,
   showProgress = true,
+  durationMs = 3600,
+  stacked = false,
   className = "",
 }: ToastBannerProps) {
   const isError = variant === "error";
@@ -43,7 +47,9 @@ export function ToastBanner({
       aria-live="polite"
       className={`bf-toast-popup zentra-toast ${
         isError ? "zentra-toast--error" : ""
-      } fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px] app-no-drag ${className}`}
+      } ${
+        stacked ? "relative" : "fixed bottom-6 right-6 z-[9999]"
+      } text-[13px] font-medium max-w-md min-w-[260px] app-no-drag ${className}`}
     >
       <span className="zentra-toast-icon" aria-hidden="true">
         {icon ??
@@ -81,7 +87,13 @@ export function ToastBanner({
         </button>
       )}
 
-      {showProgress && <span aria-hidden="true" className="zentra-toast-progress" />}
+      {showProgress && durationMs > 0 && (
+        <span
+          aria-hidden="true"
+          className="zentra-toast-progress"
+          style={{ "--toast-duration": `${durationMs}ms` } as React.CSSProperties}
+        />
+      )}
     </MotionSurface>
   );
 }

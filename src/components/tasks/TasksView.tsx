@@ -18,7 +18,8 @@ import {
   EmptyState,
 } from "@/components/ui/Workspace";
 
-import { MotionPresence, MotionSurface } from "@/components/ui/MotionSurface";
+import { MotionPresence } from "@/components/ui/MotionSurface";
+import { useToast } from "@/context/ToastContext";
 
 import React, { useState, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -319,7 +320,7 @@ export default function TasksView({
     setSubtaskTitle("");
     setSelectedTaskId(task?.id || null);
   };
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { showToast: pushToast } = useToast();
 
   const leadFreelancerName =
     settings?.businessName?.trim() || "Lead Freelancer";
@@ -345,7 +346,6 @@ export default function TasksView({
   const [newOutsourceBudget, setNewOutsourceBudget] = useState("");
   const [hasTaskDraft, setHasTaskDraft] = useState(false);
   const [timeSlotVersion, setTimeSlotVersion] = useState(0);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isTaskFormDirty = () => {
     return Boolean(
@@ -439,16 +439,25 @@ export default function TasksView({
     return true;
   });
 
-  const showToast = React.useCallback((message: string) => {
-    setToastMessage(message);
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    toastTimerRef.current = setTimeout(() => {
-      toastTimerRef.current = null;
-      setToastMessage(null);
-    }, 3500);
-  }, []);
+  const showToast = React.useCallback(
+    (message: string) => {
+      const icon = /\b(deleted|removed)\b/i.test(message) ? (
+        <i className="fa-solid fa-trash" aria-hidden="true" />
+      ) : /\b(created|added|scheduled)\b/i.test(message) ? (
+        <i className="fa-solid fa-circle-plus" aria-hidden="true" />
+      ) : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(
+          message,
+        ) ? (
+        <i className="fa-solid fa-pen-to-square" aria-hidden="true" />
+      ) : undefined;
+      pushToast(message, {
+        type: "success",
+        durationMs: 3500,
+        ...(icon ? { icon } : {}),
+      });
+    },
+    [pushToast],
+  );
 
   const saveTask = async (id: string, patch: TaskPatchInput) => {
     if (saving) return false;
@@ -931,49 +940,6 @@ export default function TasksView({
           Open the desktop app to save tasks and linked work.
         </p>
       )}
-      {/* Toast Alert */}
-      <MotionPresence>
-        {toastMessage && (
-          <MotionSurface
-            key={toastMessage}
-            kind="toast"
-            role="status"
-            aria-live="polite"
-            className="bf-toast-popup zentra-toast fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]"
-          >
-            {/\b(deleted|removed)\b/i.test(toastMessage) ? (
-              <span className="bf-toast-trash-badge w-7 h-7 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-trash" aria-hidden="true" />
-              </span>
-            ) : /\b(created|added|scheduled)\b/i.test(toastMessage) ? (
-              <span className="bf-toast-add-badge zentra-toast-icon">
-                <i className="fa-solid fa-circle-plus" aria-hidden="true" />
-              </span>
-            ) : /\b(updated|edited|rescheduled|saved|modified|moved)\b/i.test(
-                toastMessage,
-              ) ? (
-              <span className="bf-toast-update-badge zentra-toast-icon">
-                <i className="fa-solid fa-pen-to-square" aria-hidden="true" />
-              </span>
-            ) : (
-              <span className="zentra-toast-icon">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-              </span>
-            )}
-            <span className="min-w-0 flex-1 leading-snug">{toastMessage}</span>
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={() => setToastMessage(null)}
-              className="shrink-0 p-1 rounded-full text-content-neutral-500 hover:text-content-neutral-950 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-            <span aria-hidden="true" className="zentra-toast-progress" />
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
       {/* Header Section matching Clients & Expenses page alignment */}
       <PageHeader title="Tasks">
         {/* View Switcher & Primary Actions in the right corner */}

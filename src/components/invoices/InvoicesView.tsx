@@ -32,10 +32,8 @@ import {
   EmptyState,
 } from "@/components/ui/Workspace";
 
-import {
-  MotionPresence,
-  MotionSurface,
-} from "@/components/ui/MotionSurface";
+import { MotionPresence } from "@/components/ui/MotionSurface";
+import { useToast } from "@/context/ToastContext";
 import { AnimatePresence, m } from "motion/react";
 import {
   SPRING_MENU_POPOVER,
@@ -344,19 +342,15 @@ export default function InvoicesView() {
   >({});
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
 
-  // Toast feedback state
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  // Shared stacked toast notifications
+  const { showToast: pushToast } = useToast();
 
-  const showToast = (
-    message: string,
-    type: "success" | "error" = "success",
-  ) => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3800);
-  };
+  const showToast = React.useCallback(
+    (message: string, type: "success" | "error" = "success") => {
+      pushToast(message, { type, durationMs: 3800 });
+    },
+    [pushToast],
+  );
 
   // URL search parameters
   const clientFilterParam = searchParams.get("client");
@@ -1019,6 +1013,7 @@ export default function InvoicesView() {
     settings?.defaultCurrency,
     activeCurrency,
     getNextInvoiceCode,
+    showToast,
   ]);
 
   const handleDuplicateInvoice = async (inv: InvoiceWithClient) => {
@@ -2295,31 +2290,6 @@ export default function InvoicesView() {
 
   return (
     <div className="workspace-page motion-page">
-      {/* Toast Notification */}
-      <MotionPresence>
-        {notification && (
-          <MotionSurface
-            key={notification.message}
-            kind="toast"
-            role="status"
-            aria-live="polite"
-            className={`bf-toast-popup zentra-toast ${
-              notification.type === "error" ? "zentra-toast--error" : ""
-            } fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]`}
-          >
-            <span className="zentra-toast-icon" aria-hidden="true">
-              {notification.type === "error" ? (
-                <AlertCircle className="w-4 h-4 shrink-0" />
-              ) : (
-                <CheckCircle2 className="success-confirm-pulse rounded-full w-4 h-4 shrink-0" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1 leading-snug">{notification.message}</span>
-            <span aria-hidden="true" className="zentra-toast-progress" />
-          </MotionSurface>
-        )}
-      </MotionPresence>
-
       {/* Zentra Top Header */}
       <PageHeader title="Invoices">
         <div className="flex flex-wrap items-center gap-2">

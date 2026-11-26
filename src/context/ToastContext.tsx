@@ -23,44 +23,67 @@ export interface ToastOptions {
   type?: ToastVariant;
   durationMs?: number;
   action?: ToastAction;
+  icon?: React.ReactNode;
+  dedupeKey?: string;
+  className?: string;
 }
 
 interface ToastState {
   id: number;
-  message: string;
+  message: React.ReactNode;
   type: ToastVariant;
+  durationMs: number;
   action?: ToastAction;
+  icon?: React.ReactNode;
+  dedupeKey?: string;
+  className?: string;
 }
 
 interface ToastContextValue {
   showToast: (
-    message: string,
+    message: React.ReactNode,
     variantOrOptions?: ToastVariant | ToastOptions,
-  ) => void;
-  dismissToast: () => void;
+  ) => number;
+  dismissToast: (id?: number) => void;
 }
 
+const MAX_VISIBLE_TOASTS = 5;
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toasts, setToasts] = useState<ToastState[]>([]);
+  const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const seqRef = useRef(0);
 
-  const dismissToast = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+  const clearTimer = useCallback((id: number) => {
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
     }
-    setToast(null);
   }, []);
 
-  const showToast = useCallback(
-    (message: string, variantOrOptions?: ToastVariant | ToastOptions) => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
+  const dismissToast = useCallback(
+    (id?: number) => {
+      if (typeof id === "number") {
+        clearTimer(id);
+        setToasts((prev) => prev.filter((item) => item.id !== id));
+        return;
       }
+      for (const timer of timersRef.current.values()) {
+        clearTimeout(timer);
+      }
+      timersRef.current.clear();
+      setToasts([]);
+    },
+    [clearTimer],
+  );
+
+  const showToast = useCallback(
+    (
+      message: React.ReactNode,
+      variantOrOptions?: ToastVariant | ToastOptions,
+    ): number => {
       const opts: ToastOptions =
         typeof variantOrOptions === "string"
           ? { type: variantOrOptions }
@@ -68,22 +91,59 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       const type: ToastVariant = opts.type || "success";
       const durationMs = opts.durationMs ?? 3600;
       const id = ++seqRef.current;
-      setToast({ id, message, type, action: opts.action });
+
+      const nextToast: ToastState = {
+        id,
+        message,
+        type,
+        durationMs,
+        action: opts.action,
+        icon: opts.icon,
+        dedupeKey: opts.dedupeKey,
+        className: opts.className,
+      };
+
+      // Stack newest toast at the top (index 0) and oldest toast at the bottom
+      setToasts((prev) => {
+        const filtered = opts.dedupeKey
+          ? prev.filter((item) => {
+              if (item.dedupeKey === opts.dedupeKey) {
+                clearTimer(item.id);
+                return false;
+              }
+              return true;
+            })
+          : prev;
+        const next = [nextToast, ...filtered];
+        if (next.length > MAX_VISIBLE_TOASTS) {
+          for (const dropped of next.slice(MAX_VISIBLE_TOASTS)) {
+            clearTimer(dropped.id);
+          }
+          return next.slice(0, MAX_VISIBLE_TOASTS);
+        }
+        return next;
+      });
+
       if (durationMs > 0) {
-        timerRef.current = setTimeout(() => {
-          timerRef.current = null;
-          setToast((current) => (current?.id === id ? null : current));
+        const timer = setTimeout(() => {
+          timersRef.current.delete(id);
+          setToasts((prev) => prev.filter((item) => item.id !== id));
         }, durationMs);
+        timersRef.current.set(id, timer);
       }
+
+      return id;
     },
-    [],
+    [clearTimer],
   );
 
   useEffect(() => {
+    const timers = timersRef.current;
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
+      for (const timer of timers.values()) {
+        clearTimeout(timer);
       }
+      timers.clear();
     };
   }, []);
 
@@ -95,27 +155,37 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <MotionPresence>
-        {toast && (
-          <ToastBanner
-            key={toast.id}
-            message={toast.message}
-            variant={toast.type}
-            action={
-              toast.action
-                ? {
-                    label: toast.action.label,
-                    onClick: () => {
-                      toast.action?.onClick();
-                      dismissToast();
-                    },
-                  }
-                : undefined
-            }
-            onDismiss={dismissToast}
-          />
-        )}
-      </MotionPresence>
+      <div
+        className="bf-toast-stack"
+        aria-live="polite"
+        aria-relevant="additions removals"
+      >
+        <MotionPresence>
+          {toasts.map((toast) => (
+            <ToastBanner
+              key={toast.id}
+              stacked
+              message={toast.message}
+              variant={toast.type}
+              durationMs={toast.durationMs}
+              icon={toast.icon}
+              className={toast.className}
+              action={
+                toast.action
+                  ? {
+                      label: toast.action.label,
+                      onClick: () => {
+                        toast.action?.onClick();
+                        dismissToast(toast.id);
+                      },
+                    }
+                  : undefined
+              }
+              onDismiss={() => dismissToast(toast.id)}
+            />
+          ))}
+        </MotionPresence>
+      </div>
     </ToastContext.Provider>
   );
 }

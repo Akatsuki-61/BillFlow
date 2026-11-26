@@ -60,6 +60,7 @@ import {
 } from "lucide-react";
 import { AiSettingsPanel } from "@/components/settings/AiSettingsPanel";
 import { useAppUpdates } from "@/context/UpdateContext";
+import { useToast } from "@/context/ToastContext";
 import { useSettings, useData } from "@/lib/data/DataProvider";
 import {
   APPLICATION_RESET_CONFIRMATION,
@@ -226,10 +227,7 @@ function SettingsContent() {
   const [dbPath, setDbPath] = useState<string>("");
   const [copiedPath, setCopiedPath] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  const { showToast: pushToast } = useToast();
 
   const formRef = useRef<HTMLFormElement>(null);
   const [formState, setFormState] = useState(() => settingsDraft(settings));
@@ -289,24 +287,11 @@ function SettingsContent() {
   const isDirty =
     Object.keys(settingsPatch).length > 0 || Object.keys(profilePatch).length > 0;
 
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
-
   const showToast = (
     message: string,
     type: "success" | "error" = "success",
   ) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setNotification({ message, type });
-    toastTimerRef.current = setTimeout(() => {
-      setNotification(null);
-      toastTimerRef.current = null;
-    }, 3200);
+    pushToast(message, { type, durationMs: 3200 });
   };
 
   const handleCopyPath = () => {
@@ -768,30 +753,6 @@ function SettingsContent() {
           {dataError}
         </p>
       )}
-      {/* Toast Notification */}
-      <MotionPresence>
-        {notification && (
-          <MotionSurface
-            key={notification.message}
-            kind="toast"
-            role="status"
-            aria-live="polite"
-            className={`bf-toast-popup zentra-toast ${
-              notification.type === "error" ? "zentra-toast--error" : ""
-            } fixed bottom-6 right-6 z-[9999] text-[13px] font-medium max-w-md min-w-[260px]`}
-          >
-            <span className="zentra-toast-icon" aria-hidden="true">
-              {notification.type === "error" ? (
-                <AlertCircle className="w-4 h-4 shrink-0" />
-              ) : (
-                <CheckCircle2 className="success-confirm-pulse rounded-full w-4 h-4 shrink-0" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1 leading-snug">{notification.message}</span>
-            <span aria-hidden="true" className="zentra-toast-progress" />
-          </MotionSurface>
-        )}
-      </MotionPresence>
 
       <PageHeader title="Settings" />
 
