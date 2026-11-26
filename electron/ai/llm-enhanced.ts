@@ -411,11 +411,11 @@ export async function classifyCaptureIntentWithEnhancedModel(
   if (intent && topScore >= 0.45 && topScore - secondScore >= 0.12) {
     const reasonMap: Record<AiCaptureIntent, string> = {
       quote:
-        "Enhanced AI detected a pricing or proposal inquiry — recommended as a Proposal / Quote.",
+        "Enhanced AI detected a pricing or proposal inquiry. Recommended as a Proposal / Quote.",
       tasks:
-        "Enhanced AI detected a quick fix or sprint item — ready to add to Kanban Tasks.",
+        "Enhanced AI detected a quick fix or sprint item. Ready to add to Kanban Tasks.",
       invoice:
-        "Enhanced AI detected confirmed deliverables — recommended as a New Invoice.",
+        "Enhanced AI detected confirmed deliverables. Recommended as a New Invoice.",
     };
     return {
       intent,

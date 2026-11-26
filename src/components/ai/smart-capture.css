@@ -422,6 +422,116 @@ dialog.smart-capture-sheet::backdrop {
     border-color 150ms ease;
 }
 
+.smart-capture-item-card--interactive {
+  overflow: visible;
+}
+
+.smart-capture-item-card--interactive .smart-capture-item-bottom {
+  border-bottom-left-radius: 13px;
+  border-bottom-right-radius: 13px;
+}
+
+.smart-capture-picker-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-subtle);
+  color: var(--ui-secondary);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.smart-capture-picker-btn:hover {
+  background: var(--ui-hover);
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+}
+
+.smart-capture-picker-btn[data-active="true"] {
+  color: var(--ui-accent);
+  border-color: color-mix(in oklab, var(--ui-accent) 32%, var(--ui-border));
+  background: color-mix(in oklab, var(--ui-accent) 10%, transparent);
+}
+
+.smart-capture-inline-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 8px;
+  right: 8px;
+  z-index: 35;
+  max-height: 224px;
+  overflow-y: auto;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--ui-surface-pure);
+  border: 1px solid var(--ui-border-strong);
+  box-shadow:
+    0 18px 40px -12px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(20, 20, 20, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+:root[data-theme="dark"] .smart-capture-inline-dropdown {
+  background: var(--ui-surface);
+  border-color: var(--ui-card-rim);
+  box-shadow:
+    0 20px 44px -10px rgba(0, 0, 0, 0.78),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.smart-capture-inline-dropdown-title {
+  padding: 4px 8px 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-muted);
+}
+
+.smart-capture-inline-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.smart-capture-inline-option:hover {
+  background: var(--ui-hover);
+}
+
+.smart-capture-inline-option[aria-selected="true"] {
+  background: color-mix(in oklab, var(--ui-accent) 12%, transparent);
+}
+
+.smart-capture-metric-box--date {
+  flex: 1 1 176px;
+  min-width: 170px;
+}
+
+.smart-capture-metric-input--date {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] .smart-capture-metric-input--date {
+  color-scheme: dark;
+}
+
 .smart-capture-item-card:focus-within {
   border-color: color-mix(in oklab, var(--ui-accent) 45%, var(--ui-border-strong));
 }

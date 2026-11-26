@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   Link2,
   Loader2,
+  Package,
   Plus,
   Receipt,
   Server,
@@ -26,6 +27,7 @@ import {
   User,
   UserCheck,
   UserPlus,
+  Users,
   X,
   Zap,
 } from "lucide-react";
@@ -42,11 +44,8 @@ import type {
   AiExtractedInvoiceDraft,
   AiModelTier,
 } from "@/types/ai";
+import type { CatalogItem, ClientWithStats } from "@/types/billing";
 import "./smart-capture.css";
-
-interface EditableDeliverable extends AiExtractedDeliverable {
-  selected: boolean;
-}
 
 export function SmartCaptureDrawer() {
   const router = useRouter();
@@ -55,6 +54,8 @@ export function SmartCaptureDrawer() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const engineMenuRef = useRef<HTMLDivElement>(null);
+  const clientPickerRef = useRef<HTMLDivElement>(null);
+  const catalogPickerRef = useRef<HTMLDivElement>(null);
 
   const {
     isOpen,
@@ -66,7 +67,14 @@ export function SmartCaptureDrawer() {
     handoffToInvoice,
     handoffToQuote,
   } = useAiCapture();
-  const { isElectron, workflow, activeCurrency, settings } = useData();
+  const {
+    isElectron,
+    workflow,
+    activeCurrency,
+    settings,
+    clients,
+    catalogItems,
+  } = useData();
   const { activeProfile } = useProfiles();
   const { showToast } = useToast();
   const isMac = useIsMac();
@@ -87,10 +95,19 @@ export function SmartCaptureDrawer() {
   const [error, setError] = useState<string | null>(null);
 
   const [result, setResult] = useState<AiExtractedInvoiceDraft | null>(null);
-  const [editableItems, setEditableItems] = useState<EditableDeliverable[]>([]);
+  const [editableItems, setEditableItems] = useState<AiExtractedDeliverable[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [clientInput, setClientInput] = useState("");
+  const [dueDateInput, setDueDateInput] = useState("");
+  const [clientMenuOpen, setClientMenuOpen] = useState(false);
+  const [catalogPickerItemId, setCatalogPickerItemId] = useState<string | null>(
+    null,
+  );
   const [targetDestination, setTargetDestination] =
     useState<AiCaptureIntent>("invoice");
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
+
+  const activeClients = clients.filter((c) => !c.archivedAt);
 
   // Sync native <dialog> showModal() / close() with React state
   useEffect(() => {
@@ -207,6 +224,11 @@ export function SmartCaptureDrawer() {
     setWasDarkInverted(false);
     setResult(null);
     setEditableItems([]);
+    setSelectedClientId(null);
+    setClientInput("");
+    setDueDateInput("");
+    setClientMenuOpen(false);
+    setCatalogPickerItemId(null);
     setError(null);
     textareaRef.current?.focus();
   };
@@ -218,20 +240,38 @@ export function SmartCaptureDrawer() {
     setWasDarkInverted(false);
   };
 
-  // Close the footer engine switcher popover when clicking outside it
+  // Close inline popovers (engine switcher, client picker, catalog picker) on outside click
   useEffect(() => {
-    if (!isOpen || !engineMenuOpen) return;
+    if (!isOpen || (!engineMenuOpen && !clientMenuOpen && !catalogPickerItemId)) {
+      return;
+    }
     const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
       if (
+        engineMenuOpen &&
         engineMenuRef.current &&
-        !engineMenuRef.current.contains(event.target as Node)
+        !engineMenuRef.current.contains(target)
       ) {
         setEngineMenuOpen(false);
+      }
+      if (
+        clientMenuOpen &&
+        clientPickerRef.current &&
+        !clientPickerRef.current.contains(target)
+      ) {
+        setClientMenuOpen(false);
+      }
+      if (
+        catalogPickerItemId &&
+        catalogPickerRef.current &&
+        !catalogPickerRef.current.contains(target)
+      ) {
+        setCatalogPickerItemId(null);
       }
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, [isOpen, engineMenuOpen]);
+  }, [isOpen, engineMenuOpen, clientMenuOpen, catalogPickerItemId]);
 
   const handleSelectEngine = async (tier: AiModelTier) => {
     if (!isElectron) {
@@ -331,12 +371,14 @@ export function SmartCaptureDrawer() {
       });
       setResult(extracted);
       setTargetDestination(extracted.detectedIntent || "invoice");
-      setEditableItems(
-        extracted.items.map((item) => ({
-          ...item,
-          selected: true,
-        })),
+      setEditableItems(extracted.items.map((item) => ({ ...item })));
+      setSelectedClientId(extracted.matchedClientId ?? null);
+      setClientInput(
+        extracted.matchedClientName || extracted.suggestedClient?.name || "",
       );
+      setDueDateInput(extracted.dueDate || "");
+      setClientMenuOpen(false);
+      setCatalogPickerItemId(null);
     } catch (err) {
       setError(
         err instanceof Error
@@ -351,7 +393,7 @@ export function SmartCaptureDrawer() {
 
   const buildCuratedItems = (): AiExtractedDeliverable[] =>
     editableItems
-      .filter((item) => item.selected && item.description.trim().length > 0)
+      .filter((item) => item.description.trim().length > 0)
       .map((item) => ({
         id: item.id,
         description: item.description.trim(),
@@ -364,11 +406,74 @@ export function SmartCaptureDrawer() {
         confidence: item.confidence,
       }));
 
+  const handleSelectSavedClient = (client: ClientWithStats) => {
+    setSelectedClientId(client.id);
+    setClientInput(client.name);
+    setClientMenuOpen(false);
+  };
+
+  const handleClientInputChange = (value: string) => {
+    setClientInput(value);
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) {
+      setSelectedClientId(null);
+      return;
+    }
+    const exactMatch = activeClients.find(
+      (c) => c.name.trim().toLowerCase() === trimmed,
+    );
+    setSelectedClientId(exactMatch ? exactMatch.id : null);
+  };
+
+  const handlePickCatalogItemForRow = (rowId: string, cat: CatalogItem) => {
+    const formattedPrice =
+      cat.priceCents > 0 ? (cat.priceCents / 100).toFixed(2) : cat.price || null;
+    handleUpdateItem(rowId, {
+      description: cat.title,
+      unitPrice: formattedPrice,
+      priceSource: "catalog",
+      catalogId: cat.id,
+      catalogTitle: cat.title,
+      catalogMatchScore: 1,
+    });
+    setCatalogPickerItemId(null);
+  };
+
   const handleDispatchAction = async () => {
     if (!result) return;
     const chosenItems = buildCuratedItems();
+    const trimmedClient = clientInput.trim();
+    const matchedClientRecord =
+      (selectedClientId
+        ? activeClients.find((c) => c.id === selectedClientId)
+        : undefined) ??
+      (trimmedClient
+        ? activeClients.find(
+            (c) => c.name.trim().toLowerCase() === trimmedClient.toLowerCase(),
+          )
+        : undefined);
+
+    const resolvedDueDate = dueDateInput.trim() || null;
     const curatedDraft: AiExtractedInvoiceDraft = {
       ...result,
+      matchedClientId: matchedClientRecord?.id ?? null,
+      matchedClientName: matchedClientRecord?.name ?? null,
+      suggestedClient: matchedClientRecord
+        ? null
+        : trimmedClient
+          ? {
+              ...(result.suggestedClient ?? {}),
+              name: trimmedClient,
+            }
+          : null,
+      currency:
+        result.currency ??
+        matchedClientRecord?.currency ??
+        settings?.defaultCurrency ??
+        activeCurrency ??
+        null,
+      dueDate: resolvedDueDate,
+      deliveryUrl: result.deliveryUrl ?? matchedClientRecord?.driveUrl ?? null,
       items: chosenItems,
     };
 
@@ -383,7 +488,7 @@ export function SmartCaptureDrawer() {
     }
 
     if (chosenItems.length === 0) {
-      setError("Select at least one deliverable to add to the Kanban board.");
+      setError("Add at least one deliverable to send to the Kanban board.");
       return;
     }
     setIsCreatingTasks(true);
@@ -391,9 +496,12 @@ export function SmartCaptureDrawer() {
     try {
       const due = new Date();
       due.setDate(due.getDate() + (settings?.defaultDueDays ?? 7));
-      const dueDate = result.dueDate || localDateKey(due);
+      const dueDate = curatedDraft.dueDate || localDateKey(due);
       const currency =
-        result.currency || settings?.defaultCurrency || activeCurrency || "USD";
+        curatedDraft.currency ||
+        settings?.defaultCurrency ||
+        activeCurrency ||
+        "USD";
       const ownerName = activeProfile?.name || "You";
       const assignee = {
         name: ownerName,
@@ -413,16 +521,20 @@ export function SmartCaptureDrawer() {
           assignee,
           dueDate,
           currency,
-          ...(result.matchedClientId
-            ? { clientId: result.matchedClientId }
+          ...(curatedDraft.matchedClientId
+            ? { clientId: curatedDraft.matchedClientId }
             : {}),
-          ...(result.matchedClientName || result.suggestedClient?.name
+          ...(curatedDraft.matchedClientName ||
+          curatedDraft.suggestedClient?.name
             ? {
                 clientName:
-                  result.matchedClientName || result.suggestedClient?.name,
+                  curatedDraft.matchedClientName ||
+                  curatedDraft.suggestedClient?.name,
               }
             : {}),
-          ...(result.deliveryUrl ? { deliveryUrl: result.deliveryUrl } : {}),
+          ...(curatedDraft.deliveryUrl
+            ? { deliveryUrl: curatedDraft.deliveryUrl }
+            : {}),
           subtasks: [],
         });
       }
@@ -445,7 +557,7 @@ export function SmartCaptureDrawer() {
 
   const handleUpdateItem = (
     id: string,
-    patch: Partial<EditableDeliverable>,
+    patch: Partial<AiExtractedDeliverable>,
   ) => {
     setEditableItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
@@ -465,23 +577,35 @@ export function SmartCaptureDrawer() {
         catalogTitle: null,
         catalogMatchScore: null,
         confidence: 1,
-        selected: true,
       },
     ]);
   };
 
   const handleRemoveItem = (id: string) => {
     setEditableItems((prev) => prev.filter((item) => item.id !== id));
+    if (catalogPickerItemId === id) {
+      setCatalogPickerItemId(null);
+    }
   };
 
   const hasContent = Boolean(rawText.trim() || imageOcrDataUrl);
-  const selectedItems = editableItems.filter(
-    (item) => item.selected && item.description.trim().length > 0,
+  const activeDeliverables = editableItems.filter(
+    (item) => item.description.trim().length > 0,
   );
-  const selectedCount = selectedItems.length;
+  const selectedCount = activeDeliverables.length;
+  const hasCatalogMatch = editableItems.some(
+    (item) => Boolean(item.catalogId || item.priceSource === "catalog"),
+  );
+  const selectedSavedClient = selectedClientId
+    ? activeClients.find((c) => c.id === selectedClientId) ?? null
+    : null;
   const effectiveCurrency =
-    result?.currency || settings?.defaultCurrency || activeCurrency || "USD";
-  const estimatedSubtotal = selectedItems.reduce((sum, item) => {
+    result?.currency ||
+    selectedSavedClient?.currency ||
+    settings?.defaultCurrency ||
+    activeCurrency ||
+    "USD";
+  const estimatedSubtotal = activeDeliverables.reduce((sum, item) => {
     const price = item.unitPrice ? Number.parseFloat(item.unitPrice) : Number.NaN;
     if (!Number.isFinite(price) || price <= 0) return sum;
     return sum + price * Math.max(1, item.quantity || 1);
@@ -523,13 +647,17 @@ export function SmartCaptureDrawer() {
       aria-labelledby={titleId}
       className="smart-capture-sheet app-no-drag"
       onCancel={(e) => {
-        if (engineMenuOpen) {
+        if (engineMenuOpen || clientMenuOpen || catalogPickerItemId) {
           e.preventDefault();
           setEngineMenuOpen(false);
+          setClientMenuOpen(false);
+          setCatalogPickerItemId(null);
         }
       }}
       onClose={() => {
         setEngineMenuOpen(false);
+        setClientMenuOpen(false);
+        setCatalogPickerItemId(null);
         if (dialogRef.current) dialogRef.current.returnValue = "";
         if (isOpen) closeDrawer();
       }}
@@ -751,20 +879,27 @@ export function SmartCaptureDrawer() {
           {/* Extracted Result Workspace */}
           {result && (
             <div className="space-y-4">
-              {/* Destination Selector & Intent Summary */}
+              {/* Destination Selector & Status Chips */}
               <section className="space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-content-neutral-950">
                     Destination
                   </h2>
-                  <span className="smart-capture-engine-chip tabular-nums">
-                    {result.engineUsed === "ollama"
-                      ? "Local Ollama"
-                      : result.engineUsed === "enhanced"
-                        ? "Enhanced AI"
-                        : "Standard AI"}{" "}
-                    · {(result.durationMs / 1000).toFixed(1)}s
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {hasCatalogMatch && (
+                      <span className="smart-capture-source-pill smart-capture-source-pill--catalog">
+                        Matched from catalog
+                      </span>
+                    )}
+                    <span className="smart-capture-engine-chip tabular-nums">
+                      {result.engineUsed === "ollama"
+                        ? "Local Ollama"
+                        : result.engineUsed === "enhanced"
+                          ? "Enhanced AI"
+                          : "Standard AI"}{" "}
+                      · {(result.durationMs / 1000).toFixed(1)}s
+                    </span>
+                  </div>
                 </div>
 
                 <div
@@ -816,54 +951,120 @@ export function SmartCaptureDrawer() {
                 </div>
               )}
 
-              {/* Detected Client & Metadata Card */}
-              <section className="smart-capture-meta-card">
-                <div className="flex items-center justify-between gap-3">
-                  {result.matchedClientId ? (
-                    <span className="inline-flex items-center gap-2 text-[13px] text-content-neutral-900 font-medium min-w-0">
+              {/* Editable Client & Due Date Card */}
+              <section className="smart-capture-item-card smart-capture-item-card--interactive">
+                <div ref={clientPickerRef} className="relative">
+                  <div className="smart-capture-item-top">
+                    {selectedSavedClient ? (
                       <UserCheck className="w-4 h-4 text-content-emerald-600 shrink-0" />
-                      <span className="truncate">{result.matchedClientName}</span>
-                    </span>
-                  ) : result.suggestedClient ? (
-                    <span className="inline-flex items-center gap-2 text-[13px] text-content-neutral-900 font-medium min-w-0">
+                    ) : clientInput.trim() ? (
                       <UserPlus className="w-4 h-4 text-accent shrink-0" />
-                      <span className="truncate">
-                        {result.suggestedClient.name}
-                        {result.suggestedClient.email
-                          ? ` · ${result.suggestedClient.email}`
-                          : ""}
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-2 text-[12.5px] text-content-neutral-500 min-w-0">
-                      <User className="w-3.5 h-3.5 shrink-0 opacity-75" />
-                      <span className="truncate">
-                        Select client on the next step
-                      </span>
-                    </span>
+                    ) : (
+                      <User className="w-4 h-4 text-content-neutral-400 shrink-0" />
+                    )}
+
+                    <input
+                      type="text"
+                      aria-label="Client name"
+                      value={clientInput}
+                      onChange={(e) => handleClientInputChange(e.target.value)}
+                      placeholder="Add or select a client"
+                      className="smart-capture-item-title"
+                    />
+
+                    {activeClients.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCatalogPickerItemId(null);
+                          setClientMenuOpen((prev) => !prev);
+                        }}
+                        aria-expanded={clientMenuOpen}
+                        aria-label="Choose from saved clients"
+                        title="Choose from saved clients"
+                        className="smart-capture-picker-btn"
+                        data-active={Boolean(selectedSavedClient)}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <ChevronDown
+                          className={`w-3 h-3 transition-transform duration-150 ${
+                            clientMenuOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                    )}
+                  </div>
+
+                  {clientMenuOpen && activeClients.length > 0 && (
+                    <div
+                      role="listbox"
+                      aria-label="Saved clients"
+                      className="smart-capture-inline-dropdown"
+                    >
+                      <div className="smart-capture-inline-dropdown-title">
+                        Saved Clients
+                      </div>
+                      {activeClients.map((client) => {
+                        const isPicked = selectedClientId === client.id;
+                        return (
+                          <button
+                            key={client.id}
+                            type="button"
+                            role="option"
+                            aria-selected={isPicked}
+                            onClick={() => handleSelectSavedClient(client)}
+                            className="smart-capture-inline-option"
+                          >
+                            <div className="min-w-0 flex-1 text-left">
+                              <div className="text-[12.5px] font-medium text-content-neutral-900 truncate">
+                                {client.name}
+                              </div>
+                              {(client.contactPerson || client.email) && (
+                                <div className="text-[11px] text-content-neutral-500 truncate">
+                                  {client.contactPerson || client.email}
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-semibold text-content-neutral-500 tabular-nums shrink-0">
+                              {client.currency}
+                            </span>
+                            {isPicked && (
+                              <Check className="w-3.5 h-3.5 text-accent shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
+                </div>
+
+                <div className="smart-capture-item-bottom">
+                  <label className="smart-capture-metric-box smart-capture-metric-box--date">
+                    <Calendar className="w-3.5 h-3.5 text-content-neutral-400 shrink-0" />
+                    <span className="smart-capture-metric-label">Due</span>
+                    <input
+                      type="date"
+                      aria-label="Due date"
+                      value={dueDateInput}
+                      onChange={(e) => setDueDateInput(e.target.value)}
+                      className="smart-capture-metric-input smart-capture-metric-input--date"
+                    />
+                  </label>
 
                   <span className="smart-capture-currency-chip tabular-nums">
                     {effectiveCurrency}
                   </span>
-                </div>
 
-                {(result.dueDate || result.deliveryUrl) && (
-                  <div className="smart-capture-meta-chips">
-                    {result.dueDate && (
-                      <span className="smart-capture-meta-chip tabular-nums">
-                        <Calendar className="w-3 h-3 shrink-0" />
-                        <span>Due {result.dueDate}</span>
-                      </span>
-                    )}
-                    {result.deliveryUrl && (
-                      <span className="smart-capture-meta-chip max-w-full">
-                        <Link2 className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{result.deliveryUrl}</span>
-                      </span>
-                    )}
-                  </div>
-                )}
+                  {result.deliveryUrl && (
+                    <span
+                      title={result.deliveryUrl}
+                      className="smart-capture-meta-chip max-w-full"
+                    >
+                      <Link2 className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{result.deliveryUrl}</span>
+                    </span>
+                  )}
+                </div>
               </section>
 
               {/* Deliverables Cards */}
@@ -883,117 +1084,179 @@ export function SmartCaptureDrawer() {
                 </div>
 
                 <div className="space-y-2.5">
-                  {editableItems.map((item) => (
-                    <div
-                      key={item.id}
-                      data-selected={item.selected}
-                      className="smart-capture-item-card"
-                    >
-                      <div className="smart-capture-item-top">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateItem(item.id, {
-                              selected: !item.selected,
-                            })
-                          }
-                          aria-label={
-                            item.selected
-                              ? "Unselect deliverable"
-                              : "Select deliverable"
-                          }
-                          className={`w-[18px] h-[18px] rounded-[6px] border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-                            item.selected
-                              ? "bg-accent-solid border-accent-solid text-white shadow-2xs"
-                              : "border-line-neutral-300 bg-transparent"
-                          }`}
+                  {editableItems.map((item) => {
+                    const isCatalogOpen = catalogPickerItemId === item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        className="smart-capture-item-card smart-capture-item-card--interactive"
+                      >
+                        <div
+                          ref={isCatalogOpen ? catalogPickerRef : undefined}
+                          className="relative"
                         >
-                          {item.selected && (
-                            <Check className="w-3 h-3" strokeWidth={2.75} />
+                          <div className="smart-capture-item-top">
+                            <input
+                              type="text"
+                              aria-label="Deliverable name"
+                              value={item.description}
+                              onChange={(e) =>
+                                handleUpdateItem(item.id, {
+                                  description: e.target.value,
+                                  catalogId: null,
+                                  catalogTitle: null,
+                                  catalogMatchScore: null,
+                                  priceSource:
+                                    item.priceSource === "catalog"
+                                      ? null
+                                      : item.priceSource,
+                                })
+                              }
+                              placeholder="Deliverable name"
+                              className="smart-capture-item-title"
+                            />
+
+                            {catalogItems.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setClientMenuOpen(false);
+                                  setCatalogPickerItemId(
+                                    isCatalogOpen ? null : item.id,
+                                  );
+                                }}
+                                aria-expanded={isCatalogOpen}
+                                aria-label="Choose from Service Catalog"
+                                title={
+                                  item.catalogTitle
+                                    ? `Catalog item: ${item.catalogTitle} (click to switch)`
+                                    : "Choose from Service Catalog"
+                                }
+                                className="smart-capture-picker-btn"
+                                data-active={Boolean(item.catalogId)}
+                              >
+                                <Package className="w-3.5 h-3.5" />
+                                <ChevronDown
+                                  className={`w-3 h-3 transition-transform duration-150 ${
+                                    isCatalogOpen ? "rotate-180" : ""
+                                  }`}
+                                />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(item.id)}
+                              aria-label="Remove item"
+                              className="smart-capture-item-remove"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {isCatalogOpen && catalogItems.length > 0 && (
+                            <div
+                              role="listbox"
+                              aria-label="Service Catalog items"
+                              className="smart-capture-inline-dropdown"
+                            >
+                              <div className="smart-capture-inline-dropdown-title">
+                                Service Catalog
+                              </div>
+                              {catalogItems.map((cat) => {
+                                const isPicked = item.catalogId === cat.id;
+                                const priceLabel =
+                                  cat.priceCents > 0
+                                    ? `${cat.currency} ${(cat.priceCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : cat.price || "";
+                                return (
+                                  <button
+                                    key={cat.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={isPicked}
+                                    onClick={() =>
+                                      handlePickCatalogItemForRow(item.id, cat)
+                                    }
+                                    className="smart-capture-inline-option"
+                                  >
+                                    <div className="min-w-0 flex-1 text-left">
+                                      <div className="text-[12.5px] font-medium text-content-neutral-900 truncate">
+                                        {cat.title}
+                                      </div>
+                                      <div className="text-[11px] text-content-neutral-500 truncate">
+                                        {cat.category}
+                                      </div>
+                                    </div>
+                                    {priceLabel && (
+                                      <span className="text-[11.5px] font-medium text-content-neutral-600 tabular-nums shrink-0">
+                                        {priceLabel}
+                                      </span>
+                                    )}
+                                    {isPicked && (
+                                      <Check className="w-3.5 h-3.5 text-accent shrink-0" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           )}
-                        </button>
+                        </div>
 
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) =>
-                            handleUpdateItem(item.id, {
-                              description: e.target.value,
-                            })
-                          }
-                          placeholder="Deliverable description"
-                          className="smart-capture-item-title"
-                        />
+                        <div className="smart-capture-item-bottom">
+                          <label className="smart-capture-metric-box smart-capture-metric-box--qty">
+                            <span className="smart-capture-metric-label">Qty</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleUpdateItem(item.id, {
+                                  quantity: Math.max(
+                                    1,
+                                    Number.parseInt(e.target.value, 10) || 1,
+                                  ),
+                                })
+                              }
+                              className="smart-capture-metric-input smart-capture-metric-input--qty"
+                            />
+                          </label>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(item.id)}
-                          aria-label="Remove item"
-                          className="smart-capture-item-remove"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                          <label className="smart-capture-metric-box smart-capture-metric-box--price">
+                            <span className="smart-capture-metric-label">
+                              {effectiveCurrency}
+                            </span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="any"
+                              min={0}
+                              value={item.unitPrice ?? ""}
+                              placeholder="0.00"
+                              onChange={(e) =>
+                                handleUpdateItem(item.id, {
+                                  unitPrice: e.target.value || null,
+                                })
+                              }
+                              className="smart-capture-metric-input smart-capture-metric-input--price"
+                            />
+                          </label>
+
+                          {item.priceSource === "catalog" && item.catalogTitle && (
+                            <span className="text-[11.5px] font-medium text-accent shrink-0">
+                              From catalog
+                            </span>
+                          )}
+                          {item.priceSource === "message" && (
+                            <span className="text-[11.5px] font-medium text-content-emerald-600 shrink-0">
+                              From message
+                            </span>
+                          )}
+                        </div>
                       </div>
-
-                      <div className="smart-capture-item-bottom">
-                        <label className="smart-capture-metric-box smart-capture-metric-box--qty">
-                          <span className="smart-capture-metric-label">Qty</span>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            value={item.quantity}
-                            onChange={(e) =>
-                              handleUpdateItem(item.id, {
-                                quantity: Math.max(
-                                  1,
-                                  Number.parseInt(e.target.value, 10) || 1,
-                                ),
-                              })
-                            }
-                            className="smart-capture-metric-input smart-capture-metric-input--qty"
-                          />
-                        </label>
-
-                        <label className="smart-capture-metric-box smart-capture-metric-box--price">
-                          <span className="smart-capture-metric-label">
-                            {effectiveCurrency}
-                          </span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="any"
-                            min={0}
-                            value={item.unitPrice ?? ""}
-                            placeholder="0.00"
-                            onChange={(e) =>
-                              handleUpdateItem(item.id, {
-                                unitPrice: e.target.value || null,
-                              })
-                            }
-                            className="smart-capture-metric-input smart-capture-metric-input--price"
-                          />
-                        </label>
-
-                        {item.priceSource === "catalog" && item.catalogTitle && (
-                          <span
-                            title={`Matched catalog service: ${item.catalogTitle}`}
-                            className="smart-capture-source-pill smart-capture-source-pill--catalog"
-                          >
-                            Catalog
-                            {item.catalogMatchScore
-                              ? ` ${Math.round(item.catalogMatchScore * 100)}%`
-                              : ""}
-                          </span>
-                        )}
-                        {item.priceSource === "message" && (
-                          <span className="smart-capture-source-pill smart-capture-source-pill--message">
-                            From message
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {formattedEstimatedSubtotal && (

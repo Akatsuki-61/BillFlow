@@ -147,7 +147,7 @@ export async function extractInvoiceFromMessage(
     }
     if (ocr.confidence > 0 && ocr.confidence < 0.55) {
       warnings.push(
-        "Low OCR confidence on this screenshot — double-check extracted wording before saving.",
+        "Low OCR confidence on this screenshot. Double-check extracted wording before saving.",
       );
     }
     combinedText = combinedText ? `${combinedText}\n\n${ocr.text}` : ocr.text;
@@ -274,9 +274,9 @@ export async function extractInvoiceFromMessage(
 
   if (ollamaIntentOverride && intent.confidence < 0.85) {
     const reasonMap: Record<AiCaptureIntent, string> = {
-      quote: "Local Ollama detected a pricing inquiry — recommended as a Proposal / Quote.",
-      tasks: "Local Ollama detected sprint tasks or fixes — ready to add to Kanban Tasks.",
-      invoice: "Local Ollama detected billable deliverables — recommended as a New Invoice.",
+      quote: "Local Ollama detected a pricing inquiry. Recommended as a Proposal / Quote.",
+      tasks: "Local Ollama detected sprint tasks or fixes. Ready to add to Kanban Tasks.",
+      invoice: "Local Ollama detected billable deliverables. Recommended as a New Invoice.",
     };
     intent = {
       intent: ollamaIntentOverride,
@@ -357,7 +357,7 @@ export async function scanPaymentSlip(
 
   if (ocr.confidence > 0 && ocr.confidence < 0.5) {
     parsed.warnings.push(
-      "Low OCR confidence on this slip — double-check the extracted amount and reference.",
+      "Low OCR confidence on this slip. Double-check the extracted amount and reference.",
     );
   }
 
@@ -400,7 +400,7 @@ export async function scanExpenseReceipt(
     }
     if (ocr.confidence > 0 && ocr.confidence < 0.5) {
       warnings.push(
-        "Low OCR confidence on this receipt — verify merchant and total before saving.",
+        "Low OCR confidence on this receipt. Verify merchant and total before saving.",
       );
     }
     ocrText = ocrText ? `${ocrText}\n${ocr.text}` : ocr.text;

@@ -438,9 +438,9 @@ export async function classifyCaptureIntentWithStandardModel(
     const second = scores[1];
     if (top && second && top.score - second.score >= 0.05 && top.score >= 0.24) {
       const reasonMap: Record<AiCaptureIntent, string> = {
-        quote: "Message reads like a pricing inquiry — recommended as a Proposal / Quote.",
-        tasks: "Message reads like sprint tasks or fixes — ready to add to Kanban Tasks.",
-        invoice: "Message describes billable deliverables — recommended as a New Invoice.",
+        quote: "Message reads like a pricing inquiry. Recommended as a Proposal / Quote.",
+        tasks: "Message reads like sprint tasks or fixes. Ready to add to Kanban Tasks.",
+        invoice: "Message describes billable deliverables. Recommended as a New Invoice.",
       };
       return {
         intent: top.intent,

@@ -1004,7 +1004,7 @@ export default function InvoicesView() {
       setNewNotes(draft.notes || "");
       setShowAddInvoiceModal(true);
       showToast(
-        `Auto-filled ${draft.items.length || 1} deliverable${draft.items.length === 1 ? "" : "s"} from Smart Capture — review pricing and save.`,
+        `Auto-filled ${draft.items.length || 1} deliverable${draft.items.length === 1 ? "" : "s"} from Smart Capture. Review pricing and save.`,
       );
     });
 

@@ -442,7 +442,7 @@ export function parseExpenseReceiptDeterministically(ocrText: string): {
   }
 
   if (!amount) {
-    warnings.push("Could not detect a clear receipt total — verify the amount before saving.");
+    warnings.push("Could not detect a clear receipt total. Verify the amount before saving.");
   }
 
   return {
@@ -489,27 +489,27 @@ export function detectCaptureIntentHeuristically(text: string): {
     return {
       intent: "quote",
       confidence: Math.min(0.95, 0.78 + quoteHits * 0.08),
-      reason: "Pricing or estimate inquiry detected — recommended as a Proposal / Quote.",
+      reason: "Pricing or estimate inquiry detected. Recommended as a Proposal / Quote.",
     };
   }
   if (taskHits > 0 && invoiceHits === 0 && quoteHits === 0) {
     return {
       intent: "tasks",
       confidence: Math.min(0.92, 0.75 + taskHits * 0.08),
-      reason: "Ad-hoc fix or sprint task detected — ready to add straight to Kanban Tasks.",
+      reason: "Ad-hoc fix or sprint task detected. Ready to add straight to Kanban Tasks.",
     };
   }
   if (invoiceHits > 0) {
     return {
       intent: "invoice",
       confidence: Math.min(0.96, 0.82 + invoiceHits * 0.06),
-      reason: "Approved scope or billing request detected — ready for New Invoice.",
+      reason: "Approved scope or billing request detected. Ready for a New Invoice.",
     };
   }
 
   return {
     intent: "invoice",
     confidence: 0.65,
-    reason: "Client deliverable request detected — ready to draft an Invoice.",
+    reason: "Client deliverable request detected. Ready to draft an Invoice.",
   };
 }
