@@ -6,7 +6,12 @@ import sharp from "sharp";
 import { closeDatabaseForTesting, getDb, initDatabase } from "../db";
 import { catalogItems, clients } from "../db/schema";
 import { extractInvoiceFromMessage, disposeAiResources } from "../ipc/ai";
-import { getAiStatus, setAiTier } from "../ai/config";
+import {
+  configureOllama,
+  getAiStatus,
+  setAiTier,
+  validateLocalOllamaUrl,
+} from "../ai/config";
 import { extractJsonObjectFromReply } from "../ai/llm-enhanced";
 
 vi.mock("electron", () => ({
@@ -60,6 +65,17 @@ beforeEach(() => {
         currency: "USD",
         unit: "project",
         iconType: "design",
+      },
+      {
+        id: "cat-3",
+        title: "Website Development",
+        category: "Development",
+        sku: "DEV-WEB",
+        description: "Custom responsive website build and launch",
+        priceCents: 65000,
+        currency: "USD",
+        unit: "project",
+        iconType: "code",
       },
     ])
     .run();
@@ -147,5 +163,49 @@ describe("Local AI Tiered Extraction Pipeline", () => {
       ],
       notes: null,
     });
+  });
+
+  it("maps conversational website client messages cleanly to the Website Development catalog item instead of raw message text", async () => {
+    const draft = await extractInvoiceFromMessage({
+      text: `
+        Hi Nipun, hope you're doing well!
+        My friend said you make great websites. We're opening a new cafe for Kandy Roasters and really need a website for our business by next Friday, please let me know the price!
+        Thanks,
+        Nimal Jayawardena
+      `,
+    });
+
+    expect(draft.engineUsed).toBe("standard");
+    expect(draft.matchedClientId).toBe("cli-1");
+    expect(draft.detectedIntent).toBe("quote");
+    expect(draft.items).toHaveLength(1);
+    expect(draft.items[0]).toMatchObject({
+      description: "Website Development",
+      catalogId: "cat-3",
+      catalogTitle: "Website Development",
+      unitPrice: "650.00",
+      priceSource: "catalog",
+    });
+  }, 30_000);
+
+  it("enforces localhost-only URLs and configuration guards for optional Local Ollama", () => {
+    expect(validateLocalOllamaUrl("http://127.0.0.1:11434/")).toBe(
+      "http://127.0.0.1:11434",
+    );
+    expect(validateLocalOllamaUrl("http://localhost:11434")).toBe(
+      "http://localhost:11434",
+    );
+    expect(() => validateLocalOllamaUrl("https://api.example.com")).toThrow(
+      /127\.0\.0\.1|localhost/i,
+    );
+
+    expect(() => setAiTier("ollama")).toThrow(/Ollama/i);
+    const configured = configureOllama({
+      baseUrl: "http://127.0.0.1:11434",
+      model: "qwen2.5:3b",
+    });
+    expect(configured.ollamaModel).toBe("qwen2.5:3b");
+    const enabled = setAiTier("ollama");
+    expect(enabled.activeTier).toBe("ollama");
   });
 });

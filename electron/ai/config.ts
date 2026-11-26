@@ -8,14 +8,25 @@ import type {
   AiDownloadProgressEvent,
   AiDownloadState,
   AiModelTier,
+  AiOllamaConfigInput,
   AiStatus,
 } from "../../src/types/ai";
 
 export const STANDARD_MODEL_ID = "Xenova/all-MiniLM-L6-v2";
-export const ENHANCED_MODEL_ID = "onnx-community/Qwen2.5-0.5B-Instruct";
-export const ENHANCED_MODEL_LABEL = "Qwen2.5 0.5B Instruct (INT8 ONNX)";
+
+export const ENHANCED_EMBEDDING_MODEL_ID = "Xenova/bge-base-en-v1.5";
+export const ENHANCED_NLI_MODEL_ID = "Xenova/nli-deberta-v3-small";
+export const ENHANCED_MODEL_ID = `${ENHANCED_EMBEDDING_MODEL_ID} + ${ENHANCED_NLI_MODEL_ID}`;
+export const ENHANCED_MODEL_LABEL =
+  "BGE-Base v1.5 + DeBERTa-v3 NLI (INT8 ONNX)";
+
+/** Legacy v0.3.0 Qwen2.5-0.5B folder automatically cleaned up when upgrading/removing. */
+export const LEGACY_ENHANCED_MODEL_ID = "onnx-community/Qwen2.5-0.5B-Instruct";
+
+export const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
 
 export interface PinnedModelAsset {
+  modelId: string;
   relativePath: string;
   url: string;
   expectedBytes: number;
@@ -23,47 +34,98 @@ export interface PinnedModelAsset {
 }
 
 export const ENHANCED_MODEL_ASSETS: readonly PinnedModelAsset[] = [
+  // 1. Xenova/bge-base-en-v1.5 (768-dim semantic embeddings, ~105 MB INT8)
   {
+    modelId: ENHANCED_EMBEDDING_MODEL_ID,
     relativePath: "config.json",
-    url: `https://huggingface.co/${ENHANCED_MODEL_ID}/resolve/main/config.json`,
-    expectedBytes: 1_200,
+    url: `https://huggingface.co/${ENHANCED_EMBEDDING_MODEL_ID}/resolve/main/config.json`,
+    expectedBytes: 717,
     minBytes: 100,
   },
   {
-    relativePath: "generation_config.json",
-    url: `https://huggingface.co/${ENHANCED_MODEL_ID}/resolve/main/generation_config.json`,
-    expectedBytes: 500,
+    modelId: ENHANCED_EMBEDDING_MODEL_ID,
+    relativePath: "tokenizer.json",
+    url: `https://huggingface.co/${ENHANCED_EMBEDDING_MODEL_ID}/resolve/main/tokenizer.json`,
+    expectedBytes: 711_396,
+    minBytes: 100_000,
+  },
+  {
+    modelId: ENHANCED_EMBEDDING_MODEL_ID,
+    relativePath: "tokenizer_config.json",
+    url: `https://huggingface.co/${ENHANCED_EMBEDDING_MODEL_ID}/resolve/main/tokenizer_config.json`,
+    expectedBytes: 366,
     minBytes: 40,
   },
   {
+    modelId: ENHANCED_EMBEDDING_MODEL_ID,
+    relativePath: "special_tokens_map.json",
+    url: `https://huggingface.co/${ENHANCED_EMBEDDING_MODEL_ID}/resolve/main/special_tokens_map.json`,
+    expectedBytes: 125,
+    minBytes: 20,
+  },
+  {
+    modelId: ENHANCED_EMBEDDING_MODEL_ID,
+    relativePath: "vocab.txt",
+    url: `https://huggingface.co/${ENHANCED_EMBEDDING_MODEL_ID}/resolve/main/vocab.txt`,
+    expectedBytes: 231_508,
+    minBytes: 50_000,
+  },
+  {
+    modelId: ENHANCED_EMBEDDING_MODEL_ID,
+    relativePath: "onnx/model_int8.onnx",
+    url: `https://huggingface.co/${ENHANCED_EMBEDDING_MODEL_ID}/resolve/main/onnx/model_int8.onnx`,
+    expectedBytes: 109_622_386,
+    minBytes: 90_000_000,
+  },
+  // 2. Xenova/nli-deberta-v3-small (Zero-shot NLI classifier & catalog verifier, ~154 MB INT8)
+  {
+    modelId: ENHANCED_NLI_MODEL_ID,
+    relativePath: "config.json",
+    url: `https://huggingface.co/${ENHANCED_NLI_MODEL_ID}/resolve/main/config.json`,
+    expectedBytes: 1_037,
+    minBytes: 100,
+  },
+  {
+    modelId: ENHANCED_NLI_MODEL_ID,
     relativePath: "tokenizer.json",
-    url: `https://huggingface.co/${ENHANCED_MODEL_ID}/resolve/main/tokenizer.json`,
-    expectedBytes: 7_030_000,
+    url: `https://huggingface.co/${ENHANCED_NLI_MODEL_ID}/resolve/main/tokenizer.json`,
+    expectedBytes: 8_656_551,
     minBytes: 1_000_000,
   },
   {
+    modelId: ENHANCED_NLI_MODEL_ID,
     relativePath: "tokenizer_config.json",
-    url: `https://huggingface.co/${ENHANCED_MODEL_ID}/resolve/main/tokenizer_config.json`,
-    expectedBytes: 8_000,
-    minBytes: 200,
+    url: `https://huggingface.co/${ENHANCED_NLI_MODEL_ID}/resolve/main/tokenizer_config.json`,
+    expectedBytes: 384,
+    minBytes: 40,
   },
   {
-    relativePath: "vocab.json",
-    url: `https://huggingface.co/${ENHANCED_MODEL_ID}/resolve/main/vocab.json`,
-    expectedBytes: 2_780_000,
+    modelId: ENHANCED_NLI_MODEL_ID,
+    relativePath: "special_tokens_map.json",
+    url: `https://huggingface.co/${ENHANCED_NLI_MODEL_ID}/resolve/main/special_tokens_map.json`,
+    expectedBytes: 173,
+    minBytes: 20,
+  },
+  {
+    modelId: ENHANCED_NLI_MODEL_ID,
+    relativePath: "added_tokens.json",
+    url: `https://huggingface.co/${ENHANCED_NLI_MODEL_ID}/resolve/main/added_tokens.json`,
+    expectedBytes: 23,
+    minBytes: 2,
+  },
+  {
+    modelId: ENHANCED_NLI_MODEL_ID,
+    relativePath: "spm.model",
+    url: `https://huggingface.co/${ENHANCED_NLI_MODEL_ID}/resolve/main/spm.model`,
+    expectedBytes: 2_464_616,
     minBytes: 500_000,
   },
   {
-    relativePath: "merges.txt",
-    url: `https://huggingface.co/${ENHANCED_MODEL_ID}/resolve/main/merges.txt`,
-    expectedBytes: 1_670_000,
-    minBytes: 300_000,
-  },
-  {
-    relativePath: "onnx/model_quantized.onnx",
-    url: `https://huggingface.co/${ENHANCED_MODEL_ID}/resolve/main/onnx/model_quantized.onnx`,
-    expectedBytes: 512_100_000,
-    minBytes: 350_000_000,
+    modelId: ENHANCED_NLI_MODEL_ID,
+    relativePath: "onnx/model_int8.onnx",
+    url: `https://huggingface.co/${ENHANCED_NLI_MODEL_ID}/resolve/main/onnx/model_int8.onnx`,
+    expectedBytes: 160_932_259,
+    minBytes: 130_000_000,
   },
 ];
 
@@ -74,6 +136,8 @@ export const ENHANCED_MODEL_EXPECTED_BYTES = ENHANCED_MODEL_ASSETS.reduce(
 
 interface PersistedAiConfig {
   activeTier: AiModelTier;
+  ollamaUrl: string;
+  ollamaModel: string | null;
 }
 
 let downloadState: AiDownloadState = "idle";
@@ -116,8 +180,12 @@ export function getUserModelsDir(): string {
   return path.join(getUserDataRoot(), "models");
 }
 
-export function getEnhancedModelDir(): string {
-  return path.join(getUserModelsDir(), ...ENHANCED_MODEL_ID.split("/"));
+export function getUserModelDir(modelId: string): string {
+  return path.join(getUserModelsDir(), ...modelId.split("/"));
+}
+
+export function getLegacyEnhancedModelDir(): string {
+  return getUserModelDir(LEGACY_ENHANCED_MODEL_ID);
 }
 
 export function getBundledTessdataDir(): string {
@@ -128,21 +196,91 @@ function getAiConfigPath(): string {
   return path.join(getUserDataRoot(), "ai-config.json");
 }
 
+/**
+ * Strictly validates that an Ollama endpoint is local loopback only
+ * (127.0.0.1 / localhost / [::1]) to uphold BillFlow's local-first privacy invariant.
+ */
+export function validateLocalOllamaUrl(rawUrl?: string | null): string {
+  const trimmed = (rawUrl || DEFAULT_OLLAMA_URL).trim().replace(/\/+$/, "");
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error(
+      "Enter a valid local Ollama URL (for example http://127.0.0.1:11434).",
+    );
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Local Ollama URL must use http:// or https://.");
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (host !== "127.0.0.1" && host !== "localhost" && host !== "::1" && host !== "[::1]") {
+    throw new Error(
+      "For privacy, BillFlow only connects to Ollama on this computer (127.0.0.1 or localhost).",
+    );
+  }
+  return parsed.origin;
+}
+
 export function readAiConfig(): PersistedAiConfig {
   try {
     const raw = fs.readFileSync(getAiConfigPath(), "utf8");
     const parsed = JSON.parse(raw) as Partial<PersistedAiConfig>;
-    if (parsed.activeTier === "enhanced" || parsed.activeTier === "standard") {
-      return { activeTier: parsed.activeTier };
+    const activeTier: AiModelTier =
+      parsed.activeTier === "enhanced" ||
+      parsed.activeTier === "ollama" ||
+      parsed.activeTier === "standard"
+        ? parsed.activeTier
+        : "standard";
+    let ollamaUrl = DEFAULT_OLLAMA_URL;
+    if (typeof parsed.ollamaUrl === "string" && parsed.ollamaUrl.trim()) {
+      try {
+        ollamaUrl = validateLocalOllamaUrl(parsed.ollamaUrl);
+      } catch {
+        ollamaUrl = DEFAULT_OLLAMA_URL;
+      }
     }
+    const ollamaModel =
+      typeof parsed.ollamaModel === "string" && parsed.ollamaModel.trim()
+        ? parsed.ollamaModel.trim()
+        : null;
+    return { activeTier, ollamaUrl, ollamaModel };
   } catch {
     // Default config
   }
-  return { activeTier: "standard" };
+  return {
+    activeTier: "standard",
+    ollamaUrl: DEFAULT_OLLAMA_URL,
+    ollamaModel: null,
+  };
 }
 
 export function writeAiConfig(config: PersistedAiConfig): void {
   atomicWrite(getAiConfigPath(), JSON.stringify(config, null, 2), 0o600);
+}
+
+export function configureOllama(input: AiOllamaConfigInput): AiStatus {
+  const current = readAiConfig();
+  const nextUrl =
+    input.baseUrl !== undefined
+      ? validateLocalOllamaUrl(input.baseUrl)
+      : current.ollamaUrl;
+  const nextModel =
+    input.model !== undefined
+      ? input.model && input.model.trim()
+        ? input.model.trim()
+        : null
+      : current.ollamaModel;
+
+  const nextTier: AiModelTier =
+    current.activeTier === "ollama" && !nextModel ? "standard" : current.activeTier;
+
+  writeAiConfig({
+    activeTier: nextTier,
+    ollamaUrl: nextUrl,
+    ollamaModel: nextModel,
+  });
+  return getAiStatus();
 }
 
 export function isOcrReady(): boolean {
@@ -173,9 +311,11 @@ export function isStandardModelReady(): boolean {
 }
 
 export function isEnhancedModelDownloaded(): boolean {
-  const dir = getEnhancedModelDir();
   return ENHANCED_MODEL_ASSETS.every((asset) => {
-    const filePath = path.join(dir, ...asset.relativePath.split("/"));
+    const filePath = path.join(
+      getUserModelDir(asset.modelId),
+      ...asset.relativePath.split("/"),
+    );
     try {
       return fs.existsSync(filePath) && fs.statSync(filePath).size >= asset.minBytes;
     } catch {
@@ -184,11 +324,31 @@ export function isEnhancedModelDownloaded(): boolean {
   });
 }
 
+function getDirectorySizeBytes(dir: string): number {
+  if (!fs.existsSync(dir)) return 0;
+  let total = 0;
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        total += getDirectorySizeBytes(full);
+      } else if (entry.isFile()) {
+        total += fs.statSync(full).size;
+      }
+    }
+  } catch {
+    // ignore unreadable path
+  }
+  return total;
+}
+
 export function getEnhancedModelDiskBytes(): number {
-  const dir = getEnhancedModelDir();
   let total = 0;
   for (const asset of ENHANCED_MODEL_ASSETS) {
-    const filePath = path.join(dir, ...asset.relativePath.split("/"));
+    const filePath = path.join(
+      getUserModelDir(asset.modelId),
+      ...asset.relativePath.split("/"),
+    );
     try {
       if (fs.existsSync(filePath)) {
         total += fs.statSync(filePath).size;
@@ -200,11 +360,30 @@ export function getEnhancedModelDiskBytes(): number {
   return total;
 }
 
+export function getLegacyEnhancedDiskBytes(): number {
+  return getDirectorySizeBytes(getLegacyEnhancedModelDir());
+}
+
+export function cleanupLegacyEnhancedModelFiles(): void {
+  const legacyDir = getLegacyEnhancedModelDir();
+  try {
+    if (fs.existsSync(legacyDir)) {
+      fs.rmSync(legacyDir, { recursive: true, force: true });
+    }
+  } catch {
+    // non-fatal cleanup
+  }
+}
+
 export function getAiStatus(): AiStatus {
   const cfg = readAiConfig();
   const enhancedReady = isEnhancedModelDownloaded();
-  const activeTier: AiModelTier =
-    cfg.activeTier === "enhanced" && enhancedReady ? "enhanced" : "standard";
+  let activeTier: AiModelTier = "standard";
+  if (cfg.activeTier === "enhanced" && enhancedReady) {
+    activeTier = "enhanced";
+  } else if (cfg.activeTier === "ollama" && cfg.ollamaModel) {
+    activeTier = "ollama";
+  }
 
   return {
     activeTier,
@@ -215,6 +394,9 @@ export function getAiStatus(): AiStatus {
     enhancedModelLabel: ENHANCED_MODEL_LABEL,
     enhancedModelExpectedBytes: ENHANCED_MODEL_EXPECTED_BYTES,
     enhancedModelDiskBytes: getEnhancedModelDiskBytes(),
+    legacyEnhancedDiskBytes: getLegacyEnhancedDiskBytes(),
+    ollamaUrl: cfg.ollamaUrl,
+    ollamaModel: cfg.ollamaModel,
     downloadState,
     downloadProgress,
     downloadMessage,
@@ -223,12 +405,18 @@ export function getAiStatus(): AiStatus {
 }
 
 export function setAiTier(tier: AiModelTier): AiStatus {
+  const current = readAiConfig();
   if (tier === "enhanced" && !isEnhancedModelDownloaded()) {
     throw new Error(
-      "Download the Enhanced Local LLM model in Settings before enabling Enhanced mode.",
+      "Download the Enhanced Offline AI pack in Settings before enabling Enhanced mode.",
     );
   }
-  writeAiConfig({ activeTier: tier });
+  if (tier === "ollama" && !current.ollamaModel) {
+    throw new Error(
+      "Select a local Ollama model in Settings → AI & Capture before enabling Ollama mode.",
+    );
+  }
+  writeAiConfig({ ...current, activeTier: tier });
   return getAiStatus();
 }
 
@@ -360,18 +548,15 @@ export async function downloadEnhancedModel(
   onProgress: (event: AiDownloadProgressEvent) => void,
 ): Promise<AiStatus> {
   if (downloadState === "downloading" && activeAbortController) {
-    throw new Error("Enhanced model download is already in progress.");
+    throw new Error("Enhanced AI pack download is already in progress.");
   }
 
   const controller = new AbortController();
   activeAbortController = controller;
   downloadState = "downloading";
   downloadProgress = 0;
-  downloadMessage = "Preparing Enhanced Local LLM download…";
+  downloadMessage = "Preparing Enhanced Offline AI pack download…";
   lastDownloadError = null;
-
-  const modelDir = getEnhancedModelDir();
-  fs.mkdirSync(modelDir, { recursive: true });
 
   const totalExpected = ENHANCED_MODEL_EXPECTED_BYTES;
   let completedBytes = 0;
@@ -396,20 +581,27 @@ export async function downloadEnhancedModel(
   };
 
   try {
+    // Reclaim disk space from any legacy Qwen2.5-0.5B files automatically
+    cleanupLegacyEnhancedModelFiles();
+
     for (const asset of ENHANCED_MODEL_ASSETS) {
+      const modelDir = getUserModelDir(asset.modelId);
+      fs.mkdirSync(modelDir, { recursive: true });
       const targetPath = path.join(modelDir, ...asset.relativePath.split("/"));
+      const displayLabel = `${asset.modelId.split("/")[1]}/${asset.relativePath}`;
+
       if (
         fs.existsSync(targetPath) &&
         fs.statSync(targetPath).size >= asset.minBytes
       ) {
         completedBytes += fs.statSync(targetPath).size;
-        emit(asset.relativePath, `Verified ${asset.relativePath}`, true);
+        emit(displayLabel, `Verified ${displayLabel}`, true);
         continue;
       }
 
       const fileStartBytes = completedBytes;
       let fileBytes = 0;
-      emit(asset.relativePath, `Downloading ${asset.relativePath}…`, true);
+      emit(displayLabel, `Downloading ${displayLabel}…`, true);
 
       await downloadPinnedFile(
         asset.url,
@@ -421,8 +613,8 @@ export async function downloadEnhancedModel(
           const mbDone = (completedBytes / (1024 * 1024)).toFixed(0);
           const mbTotal = (totalExpected / (1024 * 1024)).toFixed(0);
           emit(
-            asset.relativePath,
-            `Downloading Enhanced AI model (${mbDone} / ${mbTotal} MB)…`,
+            displayLabel,
+            `Downloading Enhanced AI pack (${mbDone} / ${mbTotal} MB)…`,
           );
         },
       );
@@ -431,7 +623,7 @@ export async function downloadEnhancedModel(
       if (finalSize < asset.minBytes) {
         fs.unlinkSync(targetPath);
         throw new Error(
-          `Downloaded file ${asset.relativePath} was incomplete. Please retry.`,
+          `Downloaded file ${displayLabel} was incomplete. Please retry.`,
         );
       }
       completedBytes = fileStartBytes + finalSize;
@@ -439,23 +631,24 @@ export async function downloadEnhancedModel(
 
     downloadState = "idle";
     downloadProgress = 100;
-    downloadMessage = "Enhanced Local LLM ready.";
+    downloadMessage = "Enhanced Offline AI ready.";
     lastDownloadError = null;
-    writeAiConfig({ activeTier: "enhanced" });
+    const current = readAiConfig();
+    writeAiConfig({ ...current, activeTier: "enhanced" });
 
     onProgress({
       state: "idle",
       progress: 100,
       downloadedBytes: totalExpected,
       totalBytes: totalExpected,
-      message: "Enhanced Local LLM ready and enabled.",
+      message: "Enhanced Offline AI pack ready and enabled.",
       error: null,
     });
 
     return getAiStatus();
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : "Failed to download Enhanced AI model.";
+      err instanceof Error ? err.message : "Failed to download Enhanced AI pack.";
     const canceled = message.toLowerCase().includes("canceled");
     downloadState = canceled ? "idle" : "error";
     downloadProgress = 0;
@@ -489,14 +682,21 @@ export function removeEnhancedModelFiles(): AiStatus {
   if (activeAbortController) {
     activeAbortController.abort();
   }
-  const dir = getEnhancedModelDir();
-  if (fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
+  for (const modelId of [ENHANCED_EMBEDDING_MODEL_ID, ENHANCED_NLI_MODEL_ID]) {
+    const dir = getUserModelDir(modelId);
+    if (fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   }
+  cleanupLegacyEnhancedModelFiles();
   downloadState = "idle";
   downloadProgress = 0;
   downloadMessage = "";
   lastDownloadError = null;
-  writeAiConfig({ activeTier: "standard" });
+  const current = readAiConfig();
+  writeAiConfig({
+    ...current,
+    activeTier: current.activeTier === "enhanced" ? "standard" : current.activeTier,
+  });
   return getAiStatus();
 }

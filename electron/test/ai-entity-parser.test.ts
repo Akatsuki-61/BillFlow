@@ -180,4 +180,60 @@ describe("AI entity-parser", () => {
     );
     expect(match?.item.id).toBe("cat-web");
   });
+
+  it("strips greetings/signoffs and matches 'website' requests to Website Development / Web Development", () => {
+    const webCatalog: CatalogMatchCandidate[] = [
+      {
+        id: "cat-website",
+        title: "Website Development",
+        category: "Development",
+        description: "Full-stack responsive business website build",
+        price: "500.00",
+        priceCents: 50000,
+        currency: "USD",
+        unit: "project",
+      },
+      {
+        id: "cat-mobile",
+        title: "Mobile App Development",
+        category: "Development",
+        description: "Native iOS and Android mobile application",
+        price: "1200.00",
+        priceCents: 120000,
+        currency: "USD",
+        unit: "project",
+      },
+    ];
+
+    const parsed = parseMessageDeterministically(
+      "Hi Nipun, hope you're doing well! I need a website for my bakery by next Friday. Please let me know. Thanks, Sarah",
+      CLIENTS,
+      new Date("2026-11-25T10:00:00Z"),
+      webCatalog,
+    );
+
+    expect(parsed.candidateItems).toHaveLength(1);
+    expect(parsed.candidateItems[0].description).toBe("Website for my bakery");
+    expect(parsed.candidateItems[0].description.toLowerCase()).not.toContain("hi nipun");
+    expect(parsed.candidateItems[0].description.toLowerCase()).not.toContain("thanks");
+
+    const matched = matchCatalogLexically(
+      parsed.candidateItems[0].description,
+      webCatalog,
+    );
+    expect(matched?.item.id).toBe("cat-website");
+
+    // Synonym check: "website" also matches "Web Development"
+    const webDevMatch = matchCatalogLexically("Website for our coffee shop", [
+      { ...webCatalog[0], id: "cat-webdev", title: "Web Development" },
+    ]);
+    expect(webDevMatch?.item.id).toBe("cat-webdev");
+
+    // Negative check: bugfix mentioning "mobile" must NOT falsely match "Mobile App Development"
+    const bugMatch = matchCatalogLexically(
+      "Fix mobile navigation drawer bug",
+      webCatalog,
+    );
+    expect(bugMatch).toBeNull();
+  });
 });

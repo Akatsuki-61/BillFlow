@@ -1,6 +1,6 @@
 import type { Currency } from "./billing";
 
-export type AiModelTier = "standard" | "enhanced";
+export type AiModelTier = "standard" | "enhanced" | "ollama";
 
 export type AiDownloadState = "idle" | "downloading" | "error";
 
@@ -15,6 +15,18 @@ export type AiExpenseCategory =
   | "OFFICE"
   | "HARDWARE";
 
+export interface AiOllamaCheckResult {
+  reachable: boolean;
+  baseUrl: string;
+  models: string[];
+  error?: string | null;
+}
+
+export interface AiOllamaConfigInput {
+  baseUrl?: string;
+  model?: string | null;
+}
+
 export interface AiStatus {
   activeTier: AiModelTier;
   ocrReady: boolean;
@@ -24,6 +36,9 @@ export interface AiStatus {
   enhancedModelLabel: string;
   enhancedModelExpectedBytes: number;
   enhancedModelDiskBytes: number;
+  legacyEnhancedDiskBytes?: number;
+  ollamaUrl: string;
+  ollamaModel: string | null;
   downloadState: AiDownloadState;
   downloadProgress: number;
   downloadMessage: string;
@@ -71,7 +86,7 @@ export interface AiExtractedInvoiceDraft {
   sourceKind: "image" | "text";
   ocrText?: string | null;
   cleanedText: string;
-  engineUsed: "standard" | "enhanced" | "standard-fallback";
+  engineUsed: "standard" | "enhanced" | "ollama" | "standard-fallback";
   durationMs: number;
   matchedClientId?: string | null;
   matchedClientName?: string | null;

@@ -60,6 +60,7 @@ export function buildMenuTemplate(
   includeDevTools: boolean = typeof app === "object" && app !== null
     ? !app.isPackaged
     : true,
+  onCheckForUpdates?: () => void,
 ): MenuItemConstructorOptions[] {
   const openAbout = () => {
     const currentVersion = app?.getVersion?.() ?? packageVersion;
@@ -85,6 +86,10 @@ export function buildMenuTemplate(
   };
 
   const openCheckForUpdates = () => {
+    if (onCheckForUpdates) {
+      onCheckForUpdates();
+      return;
+    }
     const win = getMainWindow ? getMainWindow() : null;
     const currentVersion = app?.getVersion?.() ?? packageVersion;
     const options = {
@@ -92,7 +97,7 @@ export function buildMenuTemplate(
       title: "Check for Updates",
       message: `Installed version: BillFlow v${currentVersion}`,
       detail:
-        "Automatic update checks are not enabled. Compare this version with downloads at github.com/Akatsuki-61/BillFlow/releases.",
+        "Compare this version with downloads at github.com/Akatsuki-61/BillFlow/releases.",
       buttons: ["OK"],
     };
     if (win && !win.isDestroyed()) {
@@ -309,6 +314,7 @@ export function buildQuickActionsMenuTemplate(options: {
 export function createApplicationMenu(
   getMainWindow: () => BrowserWindow | null,
   showWindow?: () => void,
+  onCheckForUpdates?: () => void,
 ): void {
   const navigate = (route: string) => {
     if (showWindow) {
@@ -338,6 +344,8 @@ export function createApplicationMenu(
     navigate,
     process.platform === "darwin",
     getMainWindow,
+    undefined,
+    onCheckForUpdates,
   );
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);

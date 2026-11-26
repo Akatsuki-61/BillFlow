@@ -470,6 +470,7 @@ export function detectCaptureIntentHeuristically(text: string): {
     /\b(?:quote|quotation|estimate|proposal|ballpark|pricing|rough\s+cost|what\s+would\s+(?:it|this)\s+cost|what\s+do\s+you\s+charge|rate\s+for)\b/,
     /\bcan\s+you\s+(?:quote|estimate|give\s+(?:me|us)\s+a\s+price)\b/,
     /\bwondering\s+(?:how\s+much|what\s+the\s+cost)\b/,
+    /\blet\s+(?:me|us)\s+know\s+(?:the\s+|your\s+)?(?:price|cost|rate|rates|fee|fees)\b/,
   ];
 
   const invoiceSignals = [

@@ -4,11 +4,14 @@ import { ipcMain } from "../security";
 import { getDb } from "../db";
 import { clients as clientsTable, catalogItems as catalogTable } from "../db/schema";
 import type {
+  AiCaptureIntent,
   AiDownloadProgressEvent,
   AiExpenseReceiptScanInput,
   AiExpenseReceiptScanResult,
   AiExtractedInvoiceDraft,
   AiExtractionInput,
+  AiOllamaCheckResult,
+  AiOllamaConfigInput,
   AiPaymentSlipScanInput,
   AiPaymentSlipScanResult,
   AiStatus,
@@ -16,9 +19,11 @@ import type {
 import type { Currency } from "../../src/types/billing";
 import {
   cancelEnhancedModelDownload,
+  configureOllama,
   downloadEnhancedModel,
   getAiStatus,
   isEnhancedModelDownloaded,
+  readAiConfig,
   removeEnhancedModelFiles,
   setAiTier,
 } from "../ai/config";
@@ -39,13 +44,21 @@ import {
   enrichDeliverablesWithStandardModel,
 } from "../ai/semantic-standard";
 import {
-  disposeEnhancedLlm,
-  runEnhancedLlmExtraction,
+  classifyCaptureIntentWithEnhancedModel,
+  classifyExpenseCategoryWithEnhancedModel,
+  disposeEnhancedEngine,
+  enrichDeliverablesWithEnhancedModel,
 } from "../ai/llm-enhanced";
+import { checkLocalOllama, runOllamaExtraction } from "../ai/ollama";
 import { peekStagedAttachmentBytes } from "./files";
 
-const tierSchema = z.enum(["standard", "enhanced"]);
+const tierSchema = z.enum(["standard", "enhanced", "ollama"]);
 const currencySchema = z.enum(["USD", "LKR", "EUR", "GBP", "CAD"]);
+
+const ollamaConfigSchema = z.object({
+  baseUrl: z.string().max(256).optional(),
+  model: z.string().max(128).nullable().optional(),
+});
 
 const extractInputSchema = z
   .object({
@@ -143,29 +156,40 @@ export async function extractInvoiceFromMessage(
   const clientCandidates = loadActiveClientsForMatching();
   const catalogCandidates = loadActiveCatalogForMatching();
 
-  // Step 1: Deterministic exact-fact extraction (client DB match, URLs, dates, currencies, fallback segments)
+  // Step 1: Deterministic exact-fact extraction (client DB match, URLs, dates, currencies, clean segments)
   const deterministic = parseMessageDeterministically(
     combinedText,
     clientCandidates,
+    new Date(),
+    catalogCandidates,
   );
 
   const status = getAiStatus();
+  const cfg = readAiConfig();
   const requestedTier = input.tierOverride ?? status.activeTier;
   let engineUsed: AiExtractedInvoiceDraft["engineUsed"] = "standard";
   let items = deterministic.candidateItems;
   let currency = deterministic.currency;
   let notes = deterministic.notes;
   let suggestedClient = deterministic.suggestedClient;
+  let ollamaIntentOverride: AiCaptureIntent | null = null;
 
-  // Step 2: Optional Enhanced Local LLM tier (Qwen2.5-0.5B-Instruct)
-  if (requestedTier === "enhanced" && isEnhancedModelDownloaded()) {
+  const analysisText = deterministic.cleanedText || combinedText;
+  const targetCurrency = currency ?? deterministic.matchedClient?.currency ?? null;
+
+  // Step 2: Optional Local Ollama LLM extraction (127.0.0.1 only)
+  if (requestedTier === "ollama" && cfg.ollamaModel) {
     try {
-      const llm = await runEnhancedLlmExtraction(
-        deterministic.cleanedText || combinedText,
+      const llm = await runOllamaExtraction(
+        analysisText,
+        catalogCandidates,
+        cfg.ollamaUrl,
+        cfg.ollamaModel,
       );
       if (llm && llm.items.length > 0) {
-        engineUsed = "enhanced";
+        engineUsed = "ollama";
         items = llm.items;
+        ollamaIntentOverride = llm.intent;
         if (!currency && llm.currency) {
           currency = llm.currency;
         }
@@ -181,30 +205,85 @@ export async function extractInvoiceFromMessage(
       } else {
         engineUsed = "standard-fallback";
         warnings.push(
-          "Enhanced LLM produced an incomplete response; used the Standard local engine instead.",
+          `Local Ollama (${cfg.ollamaModel}) returned an empty response; used the local offline engine instead.`,
         );
       }
     } catch (err) {
-      console.warn("[ai:enhanced] Inference failed, falling back to Standard:", err);
+      console.warn("[ai:ollama] Inference failed, falling back to offline engine:", err);
       engineUsed = "standard-fallback";
       warnings.push(
-        "Enhanced Local LLM encountered an error; automatically fell back to the Standard engine.",
+        `Could not reach Local Ollama (${cfg.ollamaModel}); automatically fell back to the offline engine.`,
       );
     }
   }
 
-  // Step 3: Bundled Standard MiniLM semantic filtering + Service Catalog auto-pricing + Intent classification
-  const [enriched, intent] = await Promise.all([
-    enrichDeliverablesWithStandardModel(
-      items,
-      catalogCandidates,
-      currency ?? deterministic.matchedClient?.currency ?? null,
-    ),
-    classifyCaptureIntentWithStandardModel(
-      deterministic.cleanedText || combinedText,
-    ),
-  ]);
-  items = enriched.items;
+  // Step 3: Neural catalog matching, clause verification, and intent routing
+  // Uses Enhanced Pack (BGE-Base v1.5 + DeBERTa-v3 NLI) when active & downloaded, otherwise bundled Standard MiniLM.
+  let intent: { intent: AiCaptureIntent; confidence: number; reason: string };
+  const shouldUseEnhancedNeural =
+    isEnhancedModelDownloaded() &&
+    (requestedTier === "enhanced" ||
+      (requestedTier === "ollama" && engineUsed === "ollama"));
+
+  if (shouldUseEnhancedNeural) {
+    try {
+      const [enriched, enhancedIntent] = await Promise.all([
+        enrichDeliverablesWithEnhancedModel(
+          items,
+          catalogCandidates,
+          currency ?? targetCurrency,
+        ),
+        classifyCaptureIntentWithEnhancedModel(analysisText),
+      ]);
+      items = enriched.items;
+      intent = enhancedIntent;
+      if (engineUsed !== "ollama") {
+        engineUsed = "enhanced";
+      }
+    } catch (err) {
+      console.warn("[ai:enhanced] Falling back to Standard offline engine:", err);
+      if (engineUsed !== "ollama") {
+        engineUsed = "standard-fallback";
+        warnings.push(
+          "Enhanced Offline AI encountered an error; automatically fell back to Standard Offline AI.",
+        );
+      }
+      const [enriched, standardIntent] = await Promise.all([
+        enrichDeliverablesWithStandardModel(
+          items,
+          catalogCandidates,
+          currency ?? targetCurrency,
+        ),
+        classifyCaptureIntentWithStandardModel(analysisText),
+      ]);
+      items = enriched.items;
+      intent = standardIntent;
+    }
+  } else {
+    const [enriched, standardIntent] = await Promise.all([
+      enrichDeliverablesWithStandardModel(
+        items,
+        catalogCandidates,
+        currency ?? targetCurrency,
+      ),
+      classifyCaptureIntentWithStandardModel(analysisText),
+    ]);
+    items = enriched.items;
+    intent = standardIntent;
+  }
+
+  if (ollamaIntentOverride && intent.confidence < 0.85) {
+    const reasonMap: Record<AiCaptureIntent, string> = {
+      quote: "Local Ollama detected a pricing inquiry — recommended as a Proposal / Quote.",
+      tasks: "Local Ollama detected sprint tasks or fixes — ready to add to Kanban Tasks.",
+      invoice: "Local Ollama detected billable deliverables — recommended as a New Invoice.",
+    };
+    intent = {
+      intent: ollamaIntentOverride,
+      confidence: 0.9,
+      reason: reasonMap[ollamaIntentOverride],
+    };
+  }
 
   if (items.length === 0) {
     warnings.push(
@@ -215,7 +294,7 @@ export async function extractInvoiceFromMessage(
   return {
     sourceKind,
     ocrText,
-    cleanedText: deterministic.cleanedText || combinedText,
+    cleanedText: analysisText,
     engineUsed,
     durationMs: Date.now() - startedAt,
     matchedClientId: deterministic.matchedClient?.id ?? null,
@@ -328,13 +407,40 @@ export async function scanExpenseReceipt(
   }
 
   const parsed = parseExpenseReceiptDeterministically(ocrText);
-  const classified = await classifyExpenseCategoryWithStandardModel({
-    merchant: parsed.merchant,
-    description: parsed.description,
-    ocrText,
-    heuristicCategory: parsed.heuristicCategory,
-    matchedKnownMerchant: parsed.matchedKnownMerchant,
-  });
+  const status = getAiStatus();
+  let classified: {
+    category: AiExpenseReceiptScanResult["category"];
+    confidence: number;
+    source: "neural" | "heuristic";
+  };
+
+  if (status.activeTier === "enhanced" && isEnhancedModelDownloaded()) {
+    try {
+      classified = await classifyExpenseCategoryWithEnhancedModel({
+        merchant: parsed.merchant,
+        description: parsed.description,
+        ocrText,
+        heuristicCategory: parsed.heuristicCategory,
+        matchedKnownMerchant: parsed.matchedKnownMerchant,
+      });
+    } catch {
+      classified = await classifyExpenseCategoryWithStandardModel({
+        merchant: parsed.merchant,
+        description: parsed.description,
+        ocrText,
+        heuristicCategory: parsed.heuristicCategory,
+        matchedKnownMerchant: parsed.matchedKnownMerchant,
+      });
+    }
+  } else {
+    classified = await classifyExpenseCategoryWithStandardModel({
+      merchant: parsed.merchant,
+      description: parsed.description,
+      ocrText,
+      heuristicCategory: parsed.heuristicCategory,
+      matchedKnownMerchant: parsed.matchedKnownMerchant,
+    });
+  }
 
   return {
     ocrText,
@@ -356,7 +462,7 @@ export async function disposeAiResources(): Promise<void> {
   await Promise.all([
     disposeOcrWorker(),
     disposeStandardModel(),
-    disposeEnhancedLlm(),
+    disposeEnhancedEngine(),
   ]);
 }
 
@@ -374,11 +480,27 @@ export function registerAiHandlers(
 
   ipcMain.handle("ai:setTier", async (_event, tier: unknown): Promise<AiStatus> => {
     const parsed = tierSchema.parse(tier);
-    if (parsed === "standard") {
-      await disposeEnhancedLlm();
+    if (parsed !== "enhanced") {
+      await disposeEnhancedEngine();
     }
     return setAiTier(parsed);
   });
+
+  ipcMain.handle(
+    "ai:checkOllama",
+    async (_event, baseUrl?: unknown): Promise<AiOllamaCheckResult> => {
+      const parsedUrl = typeof baseUrl === "string" ? baseUrl : undefined;
+      return checkLocalOllama(parsedUrl);
+    },
+  );
+
+  ipcMain.handle(
+    "ai:configureOllama",
+    (_event, input: unknown): AiStatus => {
+      const parsed = ollamaConfigSchema.parse(input) as AiOllamaConfigInput;
+      return configureOllama(parsed);
+    },
+  );
 
   ipcMain.handle(
     "ai:extractInvoice",
@@ -413,7 +535,7 @@ export function registerAiHandlers(
   });
 
   ipcMain.handle("ai:removeEnhancedModel", async (): Promise<AiStatus> => {
-    await disposeEnhancedLlm();
+    await disposeEnhancedEngine();
     return removeEnhancedModelFiles();
   });
 }

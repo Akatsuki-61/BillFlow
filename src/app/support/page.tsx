@@ -101,7 +101,7 @@ const FAQ_DATABASE: FAQItem[] = [
     category: "ai",
     question: "What is the difference between Standard and Enhanced AI tiers, and does any data leave my PC?",
     answer:
-      "Nothing ever leaves your computer. The built-in Standard tier (~25.6 MB bundled) runs 100% offline using Tesseract LSTM OCR + all-MiniLM-L6-v2 embeddings for instant (<1s) extraction. Under Settings → AI & Capture, you can optionally download the Enhanced Local LLM (Qwen2.5-0.5B-Instruct, ~490 MB stored in local app data) for rewriting messy conversational chats; it unloads from RAM when idle and can be deleted anytime.",
+      "Nothing ever leaves your computer. The built-in Standard tier (~26 MB bundled) runs 100% offline using Tesseract LSTM OCR + all-MiniLM-L6-v2 embeddings for instant extraction and Service Catalog matching. Under Settings → AI & Capture (or directly from the Smart Capture footer), you can optionally download the Enhanced Offline AI pack (BGE-Base v1.5 + DeBERTa-v3 NLI, ~270 MB) for sharper catalog, intent, and receipt matching, or connect a local Ollama server on 127.0.0.1 if you already run models locally.",
     actionText: "AI & Capture Settings",
     actionHref: "/settings?tab=ai",
   },

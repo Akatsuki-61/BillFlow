@@ -12,15 +12,19 @@ import {
   isStandardModelReady,
   STANDARD_MODEL_ID,
 } from "./config";
-import { loadTransformers } from "./transformers-loader";
+import { loadTransformers, SAFE_ONNX_SESSION_OPTIONS } from "./transformers-loader";
 import {
+  applyMatchedCatalogToDeliverable,
+  deduplicateDeliverables,
+  fuseCatalogScores,
   matchCatalogLexically,
+  scoreCatalogCandidateLexically,
   type CatalogMatchCandidate,
 } from "./entity-parser";
 import { detectCaptureIntentHeuristically } from "./document-parsers";
 
 const IDLE_DISPOSE_MS = 5 * 60 * 1000;
-const CATALOG_MATCH_THRESHOLD = 0.52;
+const CATALOG_MATCH_THRESHOLD = 0.48;
 
 const DELIVERABLE_PROTOTYPE =
   "Build, design, develop, fix, integrate, update, or deliver a software feature, webpage, app, logo, or client service item";
@@ -101,6 +105,7 @@ async function getEmbeddingPipeline(): Promise<FeatureExtractionPipeline> {
       const extractor = await pipeline("feature-extraction", STANDARD_MODEL_ID, {
         local_files_only: true,
         dtype: "q8",
+        session_options: SAFE_ONNX_SESSION_OPTIONS,
       });
       return extractor;
     })().catch((err) => {
@@ -137,7 +142,7 @@ async function getPrototypes() {
   return prototypeEmbeddings;
 }
 
-function resolveCatalogPrice(
+export function resolveCatalogPrice(
   cat: CatalogMatchCandidate,
   targetCurrency: Currency | null,
 ): string | null {
@@ -151,10 +156,25 @@ function resolveCatalogPrice(
   return converted !== null ? (converted / 100).toFixed(2) : null;
 }
 
+function enrichLexicallyOnly(
+  items: AiExtractedDeliverable[],
+  catalogItems: readonly CatalogMatchCandidate[],
+  targetCurrency: Currency | null,
+): AiExtractedDeliverable[] {
+  const enriched = items.map((item) => {
+    const lexical = matchCatalogLexically(item.description, catalogItems);
+    if (!lexical) return item;
+    const suggested = resolveCatalogPrice(lexical.item, targetCurrency);
+    return applyMatchedCatalogToDeliverable(item, lexical, suggested);
+  });
+  return deduplicateDeliverables(enriched);
+}
+
 /**
  * Enriches extracted deliverables using the bundled all-MiniLM-L6-v2 sentence transformer:
  * 1. Zero-shot semantic filtering of chitchat vs. real deliverables.
- * 2. Semantic cosine-similarity matching against the user's Service Catalog to auto-suggest pricing.
+ * 2. Hybrid semantic + domain-lexical matching against the user's Service Catalog
+ *    (replacing conversational raw text with the crisp matched Catalog title and auto-filling pricing).
  * Falls back cleanly to lexical matching if model files are absent (e.g., isolated unit tests).
  */
 export async function enrichDeliverablesWithStandardModel(
@@ -170,33 +190,28 @@ export async function enrichDeliverablesWithStandardModel(
   }
 
   if (!isStandardModelReady()) {
-    const enriched = items.map((item) => {
-      if (item.unitPrice) return item;
-      const lexical = matchCatalogLexically(item.description, catalogItems);
-      if (!lexical) return item;
-      const suggested = resolveCatalogPrice(lexical.item, targetCurrency);
-      return {
-        ...item,
-        catalogId: lexical.item.id,
-        catalogTitle: lexical.item.title,
-        catalogMatchScore: lexical.score,
-        ...(suggested ? { unitPrice: suggested, priceSource: "catalog" as const } : {}),
-      };
-    });
-    return { items: enriched, usedNeuralModel: false };
+    return {
+      items: enrichLexicallyOnly(items, catalogItems, targetCurrency),
+      usedNeuralModel: false,
+    };
   }
 
   try {
     const prototypes = await getPrototypes();
 
-    // Embed catalog entries once for this extraction pass
+    // Embed both the crisp catalog title and the full catalog description once for this pass
     const catalogVectors = await Promise.all(
-      catalogItems.map(async (cat) => ({
-        item: cat,
-        vector: await embedText(
-          `${cat.title}. ${cat.category}. ${cat.description || ""}`.trim(),
-        ),
-      })),
+      catalogItems.map(async (cat) => {
+        const [titleVector, fullVector] = await Promise.all([
+          embedText(cat.title),
+          embedText(`${cat.title}. ${cat.category}. ${cat.description || ""}`.trim()),
+        ]);
+        return {
+          item: cat,
+          titleVector,
+          fullVector,
+        };
+      }),
     );
 
     const results: AiExtractedDeliverable[] = [];
@@ -205,10 +220,36 @@ export async function enrichDeliverablesWithStandardModel(
       const deliverableSim = dotProduct(vec, prototypes.deliverable);
       const chitchatSim = dotProduct(vec, prototypes.chitchat);
 
-      // Filter out obvious conversational filler if there are multiple items and no explicit price
+      // Compute best hybrid catalog score before chitchat pruning so a short catalog phrase is never dropped
+      let bestCatalog: { item: CatalogMatchCandidate; score: number } | null =
+        null;
+      for (const entry of catalogVectors) {
+        const neuralSim = Math.max(
+          dotProduct(vec, entry.titleVector),
+          dotProduct(vec, entry.fullVector),
+        );
+        const lexicalScore = scoreCatalogCandidateLexically(
+          item.description,
+          entry.item,
+        );
+        const fused = fuseCatalogScores(
+          neuralSim,
+          lexicalScore,
+          CATALOG_MATCH_THRESHOLD,
+        );
+        if (fused !== null && (!bestCatalog || fused > bestCatalog.score)) {
+          bestCatalog = {
+            item: entry.item,
+            score: fused,
+          };
+        }
+      }
+
+      // Filter out obvious conversational filler if there are multiple items, no price, and no catalog match
       if (
         items.length > 1 &&
         !item.unitPrice &&
+        !bestCatalog &&
         chitchatSim > deliverableSim + 0.08 &&
         deliverableSim < 0.22
       ) {
@@ -220,33 +261,19 @@ export async function enrichDeliverablesWithStandardModel(
         Math.min(0.98, Number((0.55 + (deliverableSim - chitchatSim) * 0.8).toFixed(2))),
       );
 
-      let bestCatalog: { item: CatalogMatchCandidate; score: number } | null =
-        null;
-      for (const entry of catalogVectors) {
-        const sim = dotProduct(vec, entry.vector);
-        if (sim >= CATALOG_MATCH_THRESHOLD && (!bestCatalog || sim > bestCatalog.score)) {
-          bestCatalog = {
-            item: entry.item,
-            score: Number(sim.toFixed(2)),
-          };
-        }
-      }
-
       if (bestCatalog) {
         const suggestedPrice =
           !item.unitPrice
             ? resolveCatalogPrice(bestCatalog.item, targetCurrency)
             : null;
-        results.push({
-          ...item,
-          confidence: Math.max(item.confidence, semanticConfidence),
-          catalogId: bestCatalog.item.id,
-          catalogTitle: bestCatalog.item.title,
-          catalogMatchScore: bestCatalog.score,
-          ...(suggestedPrice
-            ? { unitPrice: suggestedPrice, priceSource: "catalog" as const }
-            : {}),
-        });
+        results.push(
+          applyMatchedCatalogToDeliverable(
+            item,
+            bestCatalog,
+            suggestedPrice,
+            semanticConfidence,
+          ),
+        );
       } else {
         results.push({
           ...item,
@@ -256,13 +283,17 @@ export async function enrichDeliverablesWithStandardModel(
     }
 
     scheduleIdleDispose();
+    const deduped = deduplicateDeliverables(results.length > 0 ? results : items);
     return {
-      items: results.length > 0 ? results : items,
+      items: deduped,
       usedNeuralModel: true,
     };
   } catch (err) {
     console.warn("[ai:standard] Falling back to lexical matcher:", err);
-    return { items, usedNeuralModel: false };
+    return {
+      items: enrichLexicallyOnly(items, catalogItems, targetCurrency),
+      usedNeuralModel: false,
+    };
   }
 }
 

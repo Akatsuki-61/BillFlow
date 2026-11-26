@@ -64,6 +64,7 @@ import { registerFileHandlers } from "./ipc/files";
 import { registerExpenseHandlers } from "./ipc/expenses";
 import { registerCalendarHandlers } from "./ipc/calendar";
 import { registerAiHandlers, disposeAiResources } from "./ipc/ai";
+import { registerUpdateHandlers } from "./updater";
 import {
   registerEncryptedBackupHandlers,
   runRollingEncryptedBackup,
@@ -162,6 +163,32 @@ function navigateToRoute(route: string) {
     win.webContents.once("did-finish-load", dispatchRoute);
   } else {
     dispatchRoute();
+  }
+}
+
+function openUpdatesDialog() {
+  showMainWindow();
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return;
+  const dispatchOpen = () => {
+    if (win.isDestroyed()) return;
+    if (isWorkspaceUnlocked()) {
+      win.webContents.send("updates:open-dialog");
+    } else {
+      void dialog.showMessageBox(win, {
+        type: "info",
+        title: "Check for Updates",
+        message: "Unlock your profile to check for updates",
+        detail:
+          "Unlock your BillFlow workspace first, then choose Check for Updates again or click the version number in Settings.",
+        buttons: ["OK"],
+      });
+    }
+  };
+  if (win.webContents.isLoading()) {
+    win.webContents.once("did-finish-load", dispatchOpen);
+  } else {
+    dispatchOpen();
   }
 }
 
@@ -541,6 +568,7 @@ if (gotSingleInstanceLock) {
       registerExpenseHandlers(broadcastDataChanged);
       registerCalendarHandlers(broadcastDataChanged);
       registerAiHandlers(() => mainWindow);
+      registerUpdateHandlers(() => mainWindow);
 
       // Register production static file protocol
       const outDir = app.isPackaged
@@ -571,7 +599,7 @@ if (gotSingleInstanceLock) {
       createWindow();
       createTray();
       setupAboutPanel();
-      createApplicationMenu(() => mainWindow, showMainWindow);
+      createApplicationMenu(() => mainWindow, showMainWindow, openUpdatesDialog);
       syncAppBadgeCount({ tray });
       startupMaintenanceTimer = setTimeout(() => {
         startupMaintenanceTimer = null;

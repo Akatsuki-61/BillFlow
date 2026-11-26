@@ -50,10 +50,13 @@ const OCR_UI_NOISE_PATTERNS = [
 ];
 
 const GREETING_OR_CLOSING_RE =
-  /^(?:hi|hey|hello|dear|good\s+(?:morning|afternoon|evening)|hope\s+you(?:'re|\s+are)|how\s+are\s+you|thanks?(?:\s+a\s+lot|\s+so\s+much)?|thank\s+you|best(?:\s+regards)?|kind\s+regards|regards|cheers|warm\s+regards|let\s+me\s+know|please\s+let\s+me\s+know|looking\s+forward|talk\s+soon|take\s+care|ok(?:ay)?|sure|sounds\s+good|great|awesome|cool|got\s+it)[\s,!.:-]*$/i;
+  /^(?:(?:hi|hey|hello|dear|yo)(?:\s+[a-z][a-z'’.-]*){0,2}(?:[,!.:-]+\s*(?:hope\s+you(?:'re|\s+are)\s+doing\s+well|hope\s+(?:all\s+is|you(?:'re|\s+are))\s+well|how\s+are\s+you(?:\s+doing)?))?|good\s+(?:morning|afternoon|evening)(?:\s+[a-z][a-z'’.-]*){0,2}|hope\s+you(?:'re|\s+are)(?:\s+doing)?\s+well|hope\s+all\s+is\s+well|how\s+are\s+you(?:\s+doing)?|thanks?(?:\s+a\s+lot|\s+so\s+much|\s+again)?(?:[,\s]+[a-z][a-z'’.-]*){0,2}|thank\s+you(?:\s+so\s+much|\s+very\s+much)?(?:[,\s]+[a-z][a-z'’.-]*){0,2}|best(?:\s+regards)?(?:[,\s]+[a-z][a-z'’.-]*){0,2}|kind\s+regards(?:[,\s]+[a-z][a-z'’.-]*){0,2}|regards(?:[,\s]+[a-z][a-z'’.-]*){0,2}|cheers(?:[,\s]+[a-z][a-z'’.-]*){0,2}|warm\s+regards(?:[,\s]+[a-z][a-z'’.-]*){0,2}|(?:please\s+|pls\s+)?let\s+(?:me|us)\s+know(?:\s+(?:if|when|the\s+details|your\s+thoughts|asap|soon).*)?|looking\s+forward(?:\s+to\s+hearing\s+from\s+you)?|talk\s+soon|take\s+care|ok(?:ay)?|sure|sounds\s+good|great|awesome|cool|got\s+it)[\s,!.:?-]*$/i;
+
+const PURE_PREAMBLE_OR_FILLER_RE =
+  /^(?:about\s+the\s+[\w\s]{2,30}|(?:please|pls)\s+(?:send|share)\s+(?:me\s+|us\s+)?(?:the\s+|an?\s+)?(?:invoice|quote|quotation|estimate|details|pricing)|let\s+(?:me|us)\s+know\s+(?:how\s+much|what\s+it\s+(?:costs?|would\s+cost)|your\s+(?:rates?|pricing|availability)|when\s+you\s+can\s+start)|when\s+can\s+you\s+start|are\s+you\s+available(?:\s+this\s+week|\s+to\s+help)?|my\s+(?:friend|cousin|colleague)\s+.*(?:number|contact|recommended))[\s,!.:?-]*$/i;
 
 const ACTION_VERBS_RE =
-  /\b(?:build|create|develop|design|redesign|fix|update|upgrade|integrate|connect|add|implement|setup|set\s+up|configure|deploy|migrate|optimize|refactor|audit|review|write|draft|prepare|deliver|make|produce|edit|animate|install|launch|refresh|revamp|automate|sync|customize|customise|debug|resolve|patch|test|convert|export|import|host|maintain|support)\b/i;
+  /\b(?:build|create|develop|design|redesign|fix|update|upgrade|integrate|connect|add|implement|setup|set\s+up|configure|deploy|migrate|optimize|refactor|audit|review|write|draft|prepare|deliver|make|produce|edit|animate|install|launch|refresh|revamp|automate|sync|customize|customise|debug|resolve|patch|test|convert|export|import|host|maintain|support|book|shoot|record|consult)\b/i;
 
 const MONTH_INDEX: Record<string, number> = {
   jan: 0,
@@ -383,10 +386,20 @@ export function extractDueDate(text: string, now = new Date()): string | null {
 }
 
 function extractSignoffName(text: string): string | null {
-  const signoffMatch = text.match(
-    /(?:thanks(?:\s+again)?|thank\s+you|best(?:\s+regards)?|kind\s+regards|regards|cheers|sincerely)[,!.\s]*\n+\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/,
+  const multilineMatch = text.match(
+    /(?:thanks(?:\s+again|\s+so\s+much|\s+a\s+lot)?|thank\s+you(?:\s+so\s+much)?|best(?:\s+regards)?|kind\s+regards|regards|cheers|sincerely)[,!.\s]*\n+\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/,
   );
-  if (signoffMatch) return signoffMatch[1].trim();
+  if (multilineMatch) return multilineMatch[1].trim();
+
+  const inlineMatch = text.match(
+    /(?:thanks(?:\s+again|\s+so\s+much|\s+a\s+lot)?|thank\s+you|best\s+regards|kind\s+regards|regards|cheers)[,!]+\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*[.!?]*$/,
+  );
+  if (inlineMatch) {
+    const candidate = inlineMatch[1].trim();
+    if (!/^(?:again|much|lots|advance|all|everyone)$/i.test(candidate)) {
+      return candidate;
+    }
+  }
   return null;
 }
 
@@ -606,15 +619,57 @@ function parseLineItemDetails(rawItem: string): {
     }
   }
 
-  // Clean leading conversational scaffolding
+  // Clean leading greetings and conversational scaffolding (loop for chained intros like "Hi Nipun, hope you're well! We need...")
+  for (let pass = 0; pass < 3; pass += 1) {
+    const before = text;
+    text = text
+      .replace(
+        /^(?:hi|hey|hello|dear|yo)(?:\s+(?:there|bro|man|mate|team|[a-z][a-z'’.-]*))?[,!.:—–-]+\s*/i,
+        "",
+      )
+      .replace(
+        /^(?:hi|hey|hello)\s+[a-z][a-z'’.-]*\s+(?=(?:can|could|would|we|i|please|pls|need|want|looking|hope)\b)/i,
+        "",
+      )
+      .replace(
+        /^good\s+(?:morning|afternoon|evening)(?:\s+[a-z][a-z'’.-]*)?[,!.:—–-\s]+/i,
+        "",
+      )
+      .replace(
+        /^(?:hope\s+you(?:'re|\s+are)(?:\s+doing)?\s+well|hope\s+all\s+is\s+well|how\s+are\s+you(?:\s+doing)?)[,!.:—–-\s]+/i,
+        "",
+      )
+      .replace(
+        /^(?:just\s+(?:wanted\s+to|reaching\s+out\s+to)\s+(?:ask|check|see)\s+(?:if\s+)?)/i,
+        "",
+      )
+      .replace(
+        /^(?:please\s+|pls\s+|can\s+you\s+(?:please\s+|pls\s+)?(?:also\s+)?(?:help\s+(?:me|us)\s+(?:with\s+|to\s+)?)?|could\s+you\s+(?:please\s+|pls\s+)?(?:also\s+)?(?:help\s+(?:me|us)\s+(?:with\s+|to\s+)?)?|would\s+you\s+be\s+able\s+to\s+|we(?:'re|\s+are)\s+looking\s+(?:to\s+get\s+|to\s+have\s+|to\s+|for\s+)|i(?:'m|\s+am)\s+looking\s+(?:to\s+get\s+|to\s+have\s+|to\s+|for\s+)|we\s+(?:also\s+|really\s+)?(?:need|want)\s+(?:you\s+to\s+|to\s+get\s+|to\s+have\s+|to\s+)?|i\s+(?:also\s+|really\s+)?(?:need|want)\s+(?:you\s+to\s+|to\s+get\s+|to\s+have\s+|to\s+)?|i(?:'d|\s+would)\s+like\s+(?:you\s+to\s+|to\s+get\s+|to\s+have\s+|to\s+)?|also\s+|and\s+also\s+|oh\s+and\s+|don't\s+forget\s+(?:the\s+|to\s+)?|remember\s+to\s+|my\s+\w+\s+wants\s+(?:us\s+to\s+)?)/i,
+        "",
+      )
+      .trim();
+    if (text === before) break;
+  }
+
+  // Strip a bare leading indefinite article ("a website for my shop" -> "Website for my shop")
+  text = text.replace(/^(?:a|an)\s+(?=[a-z])/i, "");
+
+  // Strip trailing sign-offs, conversational wrap-ups, deadlines, and URLs
   text = text
     .replace(
-      /^(?:please\s+|pls\s+|can\s+you\s+(?:also\s+)?|could\s+you\s+(?:also\s+)?|we\s+(?:also\s+)?need\s+(?:you\s+to\s+)?|i\s+(?:also\s+)?need\s+(?:you\s+to\s+)?|also\s+|and\s+also\s+|oh\s+and\s+|don't\s+forget\s+(?:the\s+|to\s+)?|remember\s+to\s+|my\s+\w+\s+wants\s+(?:us\s+to\s+)?)/i,
+      /[,.!\s]+(?:thanks?(?:\s+so\s+much|\s+a\s+lot|\s+again)?|thank\s+you(?:\s+so\s+much)?|cheers|kind\s+regards|best\s+regards|regards)(?:[,\s]+[A-Za-z][A-Za-z'’.-]*){0,2}[.!?]*$/i,
       "",
     )
-    .replace(/\s+(?:by|before|until)\s+(?:next\s+|this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|\d{1,2}(?:st|nd|rd|th)?\s+\w+|\w+\s+\d{1,2}(?:st|nd|rd|th)?).*$/i, "")
+    .replace(
+      /,?\s+(?:please\s+|pls\s+)?(?:let\s+(?:me|us)\s+know\b.*|send\s+(?:me\s+|us\s+)?(?:the\s+|an?\s+)?(?:invoice|quote|quotation|estimate|details|pricing)\b.*)$/i,
+      "",
+    )
+    .replace(
+      /\s+(?:by|before|until)\s+(?:next\s+|this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|\d{1,2}(?:st|nd|rd|th)?\s+\w+|\w+\s+\d{1,2}(?:st|nd|rd|th)?).*$/i,
+      "",
+    )
     .replace(/https?:\/\/\S+/gi, "")
-    .replace(/\s*[-–—:,;]+\s*$/, "")
+    .replace(/\s*[-–—:,;?!.]+\s*$/, "")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -631,8 +686,9 @@ function parseLineItemDetails(rawItem: string): {
 
 function isLikelyDeliverableClause(segment: string): boolean {
   const trimmed = segment.trim();
-  if (trimmed.length < 4 || trimmed.length > 260) return false;
+  if (trimmed.length < 4 || trimmed.length > 320) return false;
   if (GREETING_OR_CLOSING_RE.test(trimmed)) return false;
+  if (PURE_PREAMBLE_OR_FILLER_RE.test(trimmed)) return false;
   if (/^https?:\/\/\S+$/i.test(trimmed)) return false;
   if (/^(?:budget|total|deadline|due\s+date|link|folder|drive|repo|email|phone|whatsapp)\b/i.test(trimmed)) {
     return false;
@@ -698,6 +754,7 @@ export function parseMessageDeterministically(
   rawText: string,
   clients: readonly ClientMatchCandidate[],
   now = new Date(),
+  catalogItems: readonly CatalogMatchCandidate[] = [],
 ): DeterministicParseResult {
   const { cleanedText, senderHints, subjectHint } = cleanMessageText(rawText);
   const deliveryUrl = extractDeliveryUrl(rawText);
@@ -716,20 +773,29 @@ export function parseMessageDeterministically(
     if (!isLikelyDeliverableClause(segment)) continue;
     const details = parseLineItemDetails(segment);
     if (details.description.length < 3) continue;
+    if (
+      GREETING_OR_CLOSING_RE.test(details.description) ||
+      PURE_PREAMBLE_OR_FILLER_RE.test(details.description)
+    ) {
+      continue;
+    }
 
-    // In freeform prose, require either an action verb, explicit price, or clear deliverable noun
+    // In freeform prose, require an action verb, explicit price, strong deliverable noun,
+    // or a direct match against the user's Service Catalog.
     if (
       !structuredListFound &&
       !ACTION_VERBS_RE.test(segment) &&
       !details.unitPrice &&
       segments.length > 1
     ) {
-      // Still keep if it contains strong project/deliverable nouns
-      if (
-        !/\b(?:page|site|website|app|api|logo|banner|dashboard|design|integration|feature|bug|fix|checkout|payment|login|auth|database|migration|report|bot|script|component|module|screen|form|customizer|ordering|seo|hosting|deployment|maintenance)\b/i.test(
+      const hasKnownDeliverableNoun =
+        /\b(?:page|site|website|webpage|web|app|api|logo|banner|dashboard|design|integration|feature|bug|fix|checkout|payment|login|auth|database|migration|report|bot|script|component|module|screen|form|customizer|ordering|seo|hosting|deployment|maintenance|store|ecommerce|shop|branding)\b/i.test(
           details.description,
-        )
-      ) {
+        );
+      const hasCatalogHit =
+        catalogItems.length > 0 &&
+        matchCatalogLexically(details.description, catalogItems) !== null;
+      if (!hasKnownDeliverableNoun && !hasCatalogHit) {
         continue;
       }
     }
@@ -758,10 +824,18 @@ export function parseMessageDeterministically(
       cleanedText
         .split("\n")
         .map((l) => l.trim())
-        .find((l) => l.length >= 6 && !GREETING_OR_CLOSING_RE.test(l));
+        .find(
+          (l) =>
+            l.length >= 6 &&
+            !GREETING_OR_CLOSING_RE.test(l) &&
+            !PURE_PREAMBLE_OR_FILLER_RE.test(l),
+        );
     if (fallbackTitle) {
       const details = parseLineItemDetails(fallbackTitle);
-      if (details.description.length >= 3) {
+      if (
+        details.description.length >= 3 &&
+        !GREETING_OR_CLOSING_RE.test(details.description)
+      ) {
         candidateItems.push({
           id: "ai-item-1",
           description: details.description,
@@ -796,33 +870,423 @@ export function parseMessageDeterministically(
   };
 }
 
-/** Lightweight lexical fallback matcher used when neural embeddings are unavailable. */
+const CATALOG_STOPWORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "our",
+  "your",
+  "their",
+  "this",
+  "that",
+  "these",
+  "those",
+  "into",
+  "onto",
+  "about",
+  "need",
+  "want",
+  "wants",
+  "needed",
+  "looking",
+  "please",
+  "pls",
+  "can",
+  "could",
+  "would",
+  "should",
+  "will",
+  "get",
+  "have",
+  "has",
+  "make",
+  "built",
+  "new",
+  "simple",
+  "small",
+  "basic",
+  "custom",
+  "company",
+  "business",
+  "client",
+  "project",
+  "asap",
+  "soon",
+  "very",
+  "really",
+  "just",
+  "also",
+  "some",
+  "all",
+  "well",
+  "doing",
+  "good",
+  "great",
+  "awesome",
+  "help",
+  "like",
+  "one",
+  "two",
+  "out",
+  "you",
+  "they",
+  "them",
+  "here",
+  "there",
+  "when",
+  "how",
+  "much",
+  "price",
+  "cost",
+  "quote",
+  "invoice",
+  "thanks",
+  "thank",
+  "hello",
+  "hey",
+]);
+
+const GENERIC_CATALOG_WORDS = new Set([
+  "development",
+  "develop",
+  "developer",
+  "dev",
+  "service",
+  "services",
+  "package",
+  "packages",
+  "solution",
+  "solutions",
+  "setup",
+  "work",
+  "consulting",
+  "consultancy",
+  "management",
+  "implementation",
+  "creation",
+  "build",
+  "building",
+  "design",
+  "designing",
+  "engineering",
+  "support",
+  "custom",
+  "full",
+  "stack",
+  "professional",
+  "standard",
+  "premium",
+]);
+
+const CANONICAL_TOKEN_MAP: Record<string, string> = {
+  web: "website",
+  website: "website",
+  websites: "website",
+  webpage: "website",
+  webpages: "website",
+  site: "website",
+  sites: "website",
+  homepage: "website",
+  webapp: "website",
+  webapps: "website",
+  ecommerce: "ecommerce",
+  webstore: "ecommerce",
+  shopify: "ecommerce",
+  woocommerce: "ecommerce",
+  checkout: "payment",
+  payment: "payment",
+  payments: "payment",
+  gateway: "payment",
+  stripe: "payment",
+  payhere: "payment",
+  paypal: "payment",
+  logo: "logo",
+  logos: "logo",
+  brand: "logo",
+  branding: "logo",
+  identity: "logo",
+  redesign: "redesign",
+  refresh: "redesign",
+  revamp: "redesign",
+  rebrand: "redesign",
+  overhaul: "redesign",
+  mobile: "mobile",
+  ios: "mobile",
+  android: "mobile",
+  flutter: "mobile",
+  app: "app",
+  apps: "app",
+  application: "app",
+  applications: "app",
+  seo: "seo",
+  ranking: "seo",
+  rankings: "seo",
+  hosting: "hosting",
+  deploy: "hosting",
+  deployment: "hosting",
+  server: "hosting",
+  servers: "hosting",
+  cloud: "hosting",
+  vercel: "hosting",
+  aws: "hosting",
+  netlify: "hosting",
+  domain: "hosting",
+  maintenance: "maintenance",
+  retainer: "maintenance",
+  upkeep: "maintenance",
+  api: "integration",
+  apis: "integration",
+  backend: "integration",
+  webhook: "integration",
+  webhooks: "integration",
+  integration: "integration",
+  integrations: "integration",
+  sync: "integration",
+  ui: "uiux",
+  ux: "uiux",
+  figma: "uiux",
+  wireframe: "uiux",
+  wireframes: "uiux",
+  prototype: "uiux",
+  interface: "uiux",
+  landing: "landing",
+  dashboard: "dashboard",
+  portal: "dashboard",
+  admin: "dashboard",
+  chatbot: "automation",
+  bot: "automation",
+  automation: "automation",
+  workflow: "automation",
+  copywriting: "content",
+  content: "content",
+  blog: "content",
+  article: "content",
+  articles: "content",
+  video: "video",
+  editing: "video",
+  animation: "video",
+  motion: "video",
+  photo: "photo",
+  photography: "photo",
+  shoot: "photo",
+};
+
+function canonicalizeToken(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (CANONICAL_TOKEN_MAP[lower]) return CANONICAL_TOKEN_MAP[lower];
+  if (lower.endsWith("ies") && lower.length > 4) {
+    const singular = `${lower.slice(0, -3)}y`;
+    return CANONICAL_TOKEN_MAP[singular] ?? singular;
+  }
+  if (lower.endsWith("s") && lower.length > 4 && !lower.endsWith("ss")) {
+    const singular = lower.slice(0, -1);
+    return CANONICAL_TOKEN_MAP[singular] ?? singular;
+  }
+  return lower;
+}
+
+function tokenizeForCatalog(text: string): {
+  canonical: Set<string>;
+  raw: Set<string>;
+} {
+  const normalized = normalizeToken(text);
+  const canonical = new Set<string>();
+  const raw = new Set<string>();
+  for (const part of normalized.split(" ")) {
+    if (!part) continue;
+    if (part.length < 2) continue;
+    if (part.length === 2 && !CANONICAL_TOKEN_MAP[part]) continue;
+    if (CATALOG_STOPWORDS.has(part)) continue;
+    raw.add(part);
+    canonical.add(canonicalizeToken(part));
+  }
+  return { canonical, raw };
+}
+
+/**
+ * Computes a domain-aware lexical similarity score [0..0.96] between an extracted
+ * deliverable description and a Service Catalog entry, emphasizing distinctive
+ * catalog-title topic recall (e.g. "website" -> "Website Development") while
+ * resisting false positives from unrelated multi-word titles.
+ */
+export function scoreCatalogCandidateLexically(
+  description: string,
+  cat: CatalogMatchCandidate,
+): number {
+  const normQuery = normalizeToken(description);
+  const normTitle = normalizeToken(cat.title);
+  if (!normQuery || !normTitle) return 0;
+
+  if (
+    normTitle.length >= 4 &&
+    (normQuery.includes(normTitle) || normTitle.includes(normQuery))
+  ) {
+    return normQuery === normTitle ? 0.96 : 0.92;
+  }
+
+  const queryToks = tokenizeForCatalog(description);
+  const titleToks = tokenizeForCatalog(cat.title);
+  const fullToks = tokenizeForCatalog(
+    `${cat.title} ${cat.description} ${cat.category}`,
+  );
+
+  if (queryToks.canonical.size === 0 || titleToks.canonical.size === 0) {
+    return 0;
+  }
+
+  const coreTitleTokens = new Set(
+    Array.from(titleToks.canonical).filter((t) => !GENERIC_CATALOG_WORDS.has(t)),
+  );
+  const effectiveCore =
+    coreTitleTokens.size > 0 ? coreTitleTokens : titleToks.canonical;
+
+  let coreHits = 0;
+  for (const token of effectiveCore) {
+    if (queryToks.canonical.has(token)) coreHits += 1;
+  }
+
+  let titleHits = 0;
+  for (const token of titleToks.canonical) {
+    if (queryToks.canonical.has(token)) titleHits += 1;
+  }
+
+  let fullHits = 0;
+  for (const token of queryToks.canonical) {
+    if (fullToks.canonical.has(token)) fullHits += 1;
+  }
+
+  let rawExtraHits = 0;
+  for (const token of queryToks.raw) {
+    if (fullToks.raw.has(token) && !GENERIC_CATALOG_WORDS.has(token)) {
+      rawExtraHits += 1;
+    }
+  }
+
+  const coreRecall = coreHits / effectiveCore.size;
+  const titleRecall = titleHits / titleToks.canonical.size;
+  const fullCosine =
+    fullHits /
+    Math.sqrt(queryToks.canonical.size * Math.max(1, fullToks.canonical.size));
+
+  // Avoid matching a full service package on a bug-fix sentence with only partial overlap
+  const isBugFixClause = /\b(?:bug|hotfix|crash|broken|overlap|typo|glitch)\b/i.test(
+    description,
+  );
+  if (isBugFixClause && coreRecall < 1) {
+    return Number((fullCosine * 0.45).toFixed(2));
+  }
+
+  if (coreHits === 0) {
+    // Allow description-only matches only when multiple non-generic words overlap
+    if (fullHits >= 2 && rawExtraHits >= 2) {
+      return Math.min(0.68, Number((fullCosine * 0.95).toFixed(2)));
+    }
+    return Number((fullCosine * 0.4).toFixed(2));
+  }
+
+  const titleFocused =
+    coreRecall * 0.68 +
+    titleRecall * 0.22 +
+    Math.min(0.1, Math.max(fullHits, rawExtraHits) * 0.03);
+
+  const combined = Math.max(titleFocused, fullCosine * 0.95);
+  return Math.min(0.95, Number(combined.toFixed(2)));
+}
+
+/**
+ * Combines neural embedding cosine similarity with domain-aware lexical recall.
+ * Returns null if the candidate does not clear the calibrated match gate.
+ */
+export function fuseCatalogScores(
+  neuralSim: number,
+  lexicalScore: number,
+  neuralThreshold = 0.46,
+): number | null {
+  const strongNeural = neuralSim >= neuralThreshold;
+  const strongLexical = lexicalScore >= 0.58;
+  const corroboratedHybrid = lexicalScore >= 0.42 && neuralSim >= 0.24;
+
+  if (!strongNeural && !strongLexical && !corroboratedHybrid) {
+    return null;
+  }
+
+  const blended = Math.max(
+    neuralSim,
+    lexicalScore,
+    neuralSim * 0.55 + lexicalScore * 0.55,
+  );
+  return Math.min(0.98, Number(blended.toFixed(2)));
+}
+
+/**
+ * Applies a matched Service Catalog entry to an extracted deliverable:
+ * replaces conversational raw wording with the clean Catalog title and fills
+ * the Catalog rate whenever the client message did not state an explicit price.
+ */
+export function applyMatchedCatalogToDeliverable(
+  item: AiExtractedDeliverable,
+  matched: { item: CatalogMatchCandidate; score: number },
+  suggestedPrice: string | null,
+  confidenceOverride?: number,
+): AiExtractedDeliverable {
+  return {
+    ...item,
+    description: matched.item.title,
+    confidence:
+      confidenceOverride !== undefined
+        ? Math.max(item.confidence, confidenceOverride)
+        : item.confidence,
+    catalogId: matched.item.id,
+    catalogTitle: matched.item.title,
+    catalogMatchScore: matched.score,
+    ...(!item.unitPrice && suggestedPrice
+      ? { unitPrice: suggestedPrice, priceSource: "catalog" as const }
+      : {}),
+  };
+}
+
+/**
+ * Collapses duplicate conversational clauses that resolve to the exact same
+ * Service Catalog item (e.g. a message mentioning "website" in two sentences)
+ * while preserving distinct priced or multi-quantity items.
+ */
+export function deduplicateDeliverables(
+  items: AiExtractedDeliverable[],
+): AiExtractedDeliverable[] {
+  const out: AiExtractedDeliverable[] = [];
+  const catalogIndex = new Map<string, number>();
+
+  for (const item of items) {
+    if (item.catalogId && item.priceSource !== "message" && item.quantity === 1) {
+      const existingIdx = catalogIndex.get(item.catalogId);
+      if (existingIdx !== undefined) {
+        const existing = out[existingIdx];
+        if ((item.catalogMatchScore ?? 0) > (existing.catalogMatchScore ?? 0)) {
+          out[existingIdx] = item;
+        }
+        continue;
+      }
+      catalogIndex.set(item.catalogId, out.length);
+    }
+    out.push(item);
+  }
+  return out;
+}
+
+/** Lightweight lexical matcher used both as hybrid boost and fallback when neural embeddings are unavailable. */
 export function matchCatalogLexically(
   description: string,
   catalogItems: readonly CatalogMatchCandidate[],
 ): { item: CatalogMatchCandidate; score: number } | null {
-  const descTokens = new Set(
-    normalizeToken(description)
-      .split(" ")
-      .filter((t) => t.length >= 3),
-  );
-  if (descTokens.size === 0 || catalogItems.length === 0) return null;
+  if (!description.trim() || catalogItems.length === 0) return null;
 
   let best: { item: CatalogMatchCandidate; score: number } | null = null;
   for (const cat of catalogItems) {
-    const catTokens = new Set(
-      normalizeToken(`${cat.title} ${cat.description} ${cat.category}`)
-        .split(" ")
-        .filter((t) => t.length >= 3),
-    );
-    if (catTokens.size === 0) continue;
-    let overlap = 0;
-    for (const token of descTokens) {
-      if (catTokens.has(token)) overlap += 1;
-    }
-    const score = overlap / Math.sqrt(descTokens.size * catTokens.size);
-    if (score >= 0.45 && (!best || score > best.score)) {
-      best = { item: cat, score: Math.min(0.95, Number(score.toFixed(2))) };
+    const score = scoreCatalogCandidateLexically(description, cat);
+    if (score >= 0.56 && (!best || score > best.score)) {
+      best = { item: cat, score };
     }
   }
   return best;

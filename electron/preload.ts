@@ -83,10 +83,13 @@ import type {
   AiExtractedInvoiceDraft,
   AiExtractionInput,
   AiModelTier,
+  AiOllamaCheckResult,
+  AiOllamaConfigInput,
   AiPaymentSlipScanInput,
   AiPaymentSlipScanResult,
   AiStatus,
 } from "../src/types/ai";
+import type { AppUpdateStatus } from "../src/types/updates";
 
 let operationEpoch = 0;
 let profileId: string | null = null;
@@ -549,6 +552,10 @@ if (process.isMainFrame && trustedDocument)
       status: (): Promise<AiStatus> => invoke("ai:status"),
       setTier: (tier: AiModelTier): Promise<AiStatus> =>
         invoke("ai:setTier", tier),
+      checkOllama: (baseUrl?: string): Promise<AiOllamaCheckResult> =>
+        invoke("ai:checkOllama", baseUrl),
+      configureOllama: (input: AiOllamaConfigInput): Promise<AiStatus> =>
+        invoke("ai:configureOllama", input),
       extractInvoice: (
         input: AiExtractionInput,
       ): Promise<AiExtractedInvoiceDraft> => invoke("ai:extractInvoice", input),
@@ -574,6 +581,35 @@ if (process.isMainFrame && trustedDocument)
         ipcRenderer.on("ai:download-progress", listener);
         return () => {
           ipcRenderer.removeListener("ai:download-progress", listener);
+        };
+      },
+    },
+    updates: {
+      status: (): Promise<AppUpdateStatus> => invoke("updates:status"),
+      check: (): Promise<AppUpdateStatus> => invoke("updates:check"),
+      download: (): Promise<AppUpdateStatus> => invoke("updates:download"),
+      cancel: (): Promise<AppUpdateStatus> => invoke("updates:cancel"),
+      install: (): Promise<{
+        started: boolean;
+        mode: "in-place" | "installer" | "opened-dmg";
+      }> => invoke("updates:install"),
+      openReleasePage: (): Promise<{ opened: boolean }> =>
+        invoke("updates:openReleasePage"),
+      onStatusChanged: (callback: (status: AppUpdateStatus) => void) => {
+        const listener = (
+          _e: Electron.IpcRendererEvent,
+          payload: AppUpdateStatus,
+        ) => callback(payload);
+        ipcRenderer.on("updates:status-changed", listener);
+        return () => {
+          ipcRenderer.removeListener("updates:status-changed", listener);
+        };
+      },
+      onOpenDialog: (callback: () => void) => {
+        const listener = () => callback();
+        ipcRenderer.on("updates:open-dialog", listener);
+        return () => {
+          ipcRenderer.removeListener("updates:open-dialog", listener);
         };
       },
     },

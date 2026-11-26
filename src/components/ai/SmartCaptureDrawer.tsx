@@ -9,19 +9,24 @@ import {
   Calendar,
   Check,
   ChevronDown,
+  ChevronUp,
   ClipboardList,
+  Cpu,
+  Download,
   FileText,
   Image as ImageIcon,
   Link2,
   Loader2,
   Plus,
   Receipt,
+  Server,
   Settings,
   Sparkles,
   Trash2,
   UserCheck,
   UserPlus,
   X,
+  Zap,
 } from "lucide-react";
 import { useAiCapture } from "@/context/AiCaptureContext";
 import { useProfiles } from "@/context/ProfileContext";
@@ -34,6 +39,7 @@ import type {
   AiCaptureIntent,
   AiExtractedDeliverable,
   AiExtractedInvoiceDraft,
+  AiModelTier,
 } from "@/types/ai";
 import "./smart-capture.css";
 
@@ -47,11 +53,15 @@ export function SmartCaptureDrawer() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const engineMenuRef = useRef<HTMLDivElement>(null);
 
   const {
     isOpen,
     closeDrawer,
     aiStatus,
+    downloadEvent,
+    setTier,
+    downloadEnhancedModel,
     handoffToInvoice,
     handoffToQuote,
   } = useAiCapture();
@@ -59,6 +69,9 @@ export function SmartCaptureDrawer() {
   const { activeProfile } = useProfiles();
   const { showToast } = useToast();
   const isMac = useIsMac();
+
+  const [engineMenuOpen, setEngineMenuOpen] = useState(false);
+  const [isSwitchingEngine, setIsSwitchingEngine] = useState(false);
 
   const [rawText, setRawText] = useState("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -204,6 +217,88 @@ export function SmartCaptureDrawer() {
     setWasDarkInverted(false);
   };
 
+  // Close the footer engine switcher popover when clicking outside it
+  useEffect(() => {
+    if (!isOpen || !engineMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        engineMenuRef.current &&
+        !engineMenuRef.current.contains(event.target as Node)
+      ) {
+        setEngineMenuOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, [isOpen, engineMenuOpen]);
+
+  const handleSelectEngine = async (tier: AiModelTier) => {
+    if (!isElectron) {
+      setError("Local AI engine selection requires the BillFlow desktop app.");
+      setEngineMenuOpen(false);
+      return;
+    }
+
+    if (tier === "enhanced" && !aiStatus?.enhancedModelDownloaded) {
+      if (
+        aiStatus?.downloadState === "downloading" ||
+        downloadEvent?.state === "downloading"
+      ) {
+        return;
+      }
+      setIsSwitchingEngine(true);
+      setError(null);
+      try {
+        const updated = await downloadEnhancedModel();
+        if (updated?.enhancedModelDownloaded) {
+          showToast("Enhanced Offline AI pack downloaded and enabled.");
+          setEngineMenuOpen(false);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not download the Enhanced Offline AI pack.",
+        );
+      } finally {
+        setIsSwitchingEngine(false);
+      }
+      return;
+    }
+
+    if (tier === "ollama" && !aiStatus?.ollamaModel) {
+      setEngineMenuOpen(false);
+      closeDrawer();
+      router.push("/settings?tab=ai");
+      return;
+    }
+
+    if (tier === (aiStatus?.activeTier ?? "standard")) {
+      setEngineMenuOpen(false);
+      return;
+    }
+
+    setIsSwitchingEngine(true);
+    setError(null);
+    try {
+      await setTier(tier);
+      setEngineMenuOpen(false);
+      const label =
+        tier === "enhanced"
+          ? "Enhanced Offline AI"
+          : tier === "ollama"
+            ? `Local Ollama (${aiStatus?.ollamaModel || "model"})`
+            : "Standard Offline AI";
+      showToast(`Switched Smart Capture to ${label}.`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not switch AI engine.",
+      );
+    } finally {
+      setIsSwitchingEngine(false);
+    }
+  };
+
   const handleAnalyze = async () => {
     if (!isElectron || !window.billflow?.ai) {
       setError("Local AI capture requires the BillFlow desktop application.");
@@ -219,9 +314,11 @@ export function SmartCaptureDrawer() {
     setAnalyzeStep(
       imageOcrDataUrl
         ? "Reading screenshot…"
-        : aiStatus?.activeTier === "enhanced"
-          ? "Analyzing with Local LLM…"
-          : "Extracting details…",
+        : aiStatus?.activeTier === "ollama"
+          ? "Analyzing with Local Ollama…"
+          : aiStatus?.activeTier === "enhanced"
+            ? "Analyzing with Enhanced AI…"
+            : "Extracting details…",
     );
 
     try {
@@ -380,10 +477,25 @@ export function SmartCaptureDrawer() {
   const selectedCount = editableItems.filter(
     (item) => item.selected && item.description.trim().length > 0,
   ).length;
+  const activeTier: AiModelTier = aiStatus?.activeTier ?? "standard";
+  const isDownloadingEnhanced =
+    aiStatus?.downloadState === "downloading" ||
+    downloadEvent?.state === "downloading";
+  const downloadProgress =
+    downloadEvent?.state === "downloading"
+      ? downloadEvent.progress
+      : (aiStatus?.downloadProgress ?? 0);
+  const expectedEnhancedMb = Math.round(
+    (aiStatus?.enhancedModelExpectedBytes ?? 282_621_541) / (1024 * 1024),
+  );
   const activeEngineLabel =
-    aiStatus?.activeTier === "enhanced"
-      ? "Enhanced Local LLM"
-      : "Standard Offline AI";
+    activeTier === "ollama"
+      ? aiStatus?.ollamaModel
+        ? `Ollama · ${aiStatus.ollamaModel}`
+        : "Local Ollama"
+      : activeTier === "enhanced"
+        ? "Enhanced Offline AI"
+        : "Standard Offline AI";
 
   const dialogProps = {
     closedby: "any",
@@ -394,7 +506,14 @@ export function SmartCaptureDrawer() {
       ref={dialogRef}
       aria-labelledby={titleId}
       className="smart-capture-sheet app-no-drag"
+      onCancel={(e) => {
+        if (engineMenuOpen) {
+          e.preventDefault();
+          setEngineMenuOpen(false);
+        }
+      }}
       onClose={() => {
+        setEngineMenuOpen(false);
         if (dialogRef.current) dialogRef.current.returnValue = "";
         if (isOpen) closeDrawer();
       }}
@@ -623,9 +742,11 @@ export function SmartCaptureDrawer() {
                     Destination
                   </h2>
                   <span className="text-xs text-content-neutral-500 tabular-nums">
-                    {result.engineUsed === "enhanced"
-                      ? "Enhanced LLM"
-                      : "Standard AI"}{" "}
+                    {result.engineUsed === "ollama"
+                      ? "Local Ollama"
+                      : result.engineUsed === "enhanced"
+                        ? "Enhanced AI"
+                        : "Standard AI"}{" "}
                     · {(result.durationMs / 1000).toFixed(1)}s
                   </span>
                 </div>
@@ -872,16 +993,148 @@ export function SmartCaptureDrawer() {
           )}
         </div>
 
-        {/* Minimal Footer */}
+        {/* Minimal Footer with In-Place AI Engine Switcher */}
         <footer className="smart-capture-footer">
-          <Link
-            href="/settings?tab=ai"
-            onClick={closeDrawer}
-            className="smart-capture-settings-link"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>{activeEngineLabel}</span>
-          </Link>
+          <div ref={engineMenuRef} className="smart-capture-engine-switcher">
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={engineMenuOpen}
+              aria-label="Switch Smart Capture AI engine"
+              disabled={isSwitchingEngine && !isDownloadingEnhanced}
+              onClick={() => setEngineMenuOpen((prev) => !prev)}
+              className="smart-capture-engine-trigger"
+            >
+              {isDownloadingEnhanced || isSwitchingEngine ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent shrink-0" />
+              ) : activeTier === "ollama" ? (
+                <Server className="w-3.5 h-3.5 text-accent shrink-0" />
+              ) : activeTier === "enhanced" ? (
+                <Cpu className="w-3.5 h-3.5 text-accent shrink-0" />
+              ) : (
+                <Zap className="w-3.5 h-3.5 text-accent shrink-0" />
+              )}
+              <span className="truncate max-w-[180px]">
+                {isDownloadingEnhanced
+                  ? `Downloading Enhanced (${downloadProgress}%)…`
+                  : activeEngineLabel}
+              </span>
+              <ChevronUp
+                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
+                  engineMenuOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {engineMenuOpen && (
+              <div
+                role="listbox"
+                aria-label="Select AI engine"
+                className="smart-capture-engine-popover"
+              >
+                <div className="px-2.5 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-content-neutral-400">
+                  Local AI Engine
+                </div>
+
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={activeTier === "standard"}
+                  onClick={() => void handleSelectEngine("standard")}
+                  className="smart-capture-engine-option"
+                >
+                  <Zap className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="text-[12.5px] font-medium text-content-neutral-900">
+                      Standard Offline AI
+                    </div>
+                    <div className="text-[11px] text-content-neutral-500">
+                      Built-in MiniLM · Instant
+                    </div>
+                  </div>
+                  {activeTier === "standard" && (
+                    <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={activeTier === "enhanced"}
+                  onClick={() => void handleSelectEngine("enhanced")}
+                  className="smart-capture-engine-option"
+                >
+                  {isDownloadingEnhanced ? (
+                    <Loader2 className="w-4 h-4 text-accent animate-spin shrink-0 mt-0.5" />
+                  ) : aiStatus?.enhancedModelDownloaded ? (
+                    <Cpu className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                  ) : (
+                    <Download className="w-4 h-4 text-content-neutral-500 shrink-0 mt-0.5" />
+                  )}
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="text-[12.5px] font-medium text-content-neutral-900">
+                      Enhanced Offline AI
+                    </div>
+                    <div className="text-[11px] text-content-neutral-500">
+                      {isDownloadingEnhanced
+                        ? `Downloading pack (${downloadProgress}%)…`
+                        : aiStatus?.enhancedModelDownloaded
+                          ? "BGE-Base + DeBERTa NLI · High precision"
+                          : `Click to download (~${expectedEnhancedMb} MB) & enable`}
+                    </div>
+                    {isDownloadingEnhanced && (
+                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-surface-neutral-200 overflow-hidden">
+                        <div
+                          className="h-full bg-accent rounded-full transition-[width] duration-200"
+                          style={{ width: `${Math.max(4, downloadProgress)}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {activeTier === "enhanced" && (
+                    <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={activeTier === "ollama"}
+                  onClick={() => void handleSelectEngine("ollama")}
+                  className="smart-capture-engine-option"
+                >
+                  <Server className="w-4 h-4 text-content-neutral-500 shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="text-[12.5px] font-medium text-content-neutral-900">
+                      Local Ollama
+                    </div>
+                    <div className="text-[11px] text-content-neutral-500 truncate">
+                      {aiStatus?.ollamaModel
+                        ? `${aiStatus.ollamaModel} · 127.0.0.1`
+                        : "Set up local Ollama in Settings"}
+                    </div>
+                  </div>
+                  {activeTier === "ollama" && (
+                    <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                  )}
+                </button>
+
+                <div className="mt-1 pt-1 border-t border-line-neutral-200">
+                  <Link
+                    href="/settings?tab=ai"
+                    onClick={() => {
+                      setEngineMenuOpen(false);
+                      closeDrawer();
+                    }}
+                    className="smart-capture-engine-settings"
+                  >
+                    <Settings className="w-3.5 h-3.5 shrink-0" />
+                    <span>Manage AI models in Settings…</span>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
 
           {result && (
             <button

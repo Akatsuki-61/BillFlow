@@ -68,10 +68,13 @@ import type {
   AiExtractedInvoiceDraft,
   AiExtractionInput,
   AiModelTier,
+  AiOllamaCheckResult,
+  AiOllamaConfigInput,
   AiPaymentSlipScanInput,
   AiPaymentSlipScanResult,
   AiStatus,
 } from "./ai";
+import type { AppUpdateStatus } from "./updates";
 
 import type { ThemePreference } from "../lib/theme";
 import type {
@@ -457,6 +460,8 @@ export interface BillFlowAPI extends WorkflowAPI {
   ai?: {
     status: () => Promise<AiStatus>;
     setTier: (tier: AiModelTier) => Promise<AiStatus>;
+    checkOllama?: (baseUrl?: string) => Promise<AiOllamaCheckResult>;
+    configureOllama?: (input: AiOllamaConfigInput) => Promise<AiStatus>;
     extractInvoice: (
       input: AiExtractionInput,
     ) => Promise<AiExtractedInvoiceDraft>;
@@ -472,6 +477,19 @@ export interface BillFlowAPI extends WorkflowAPI {
     onDownloadProgress: (
       callback: (event: AiDownloadProgressEvent) => void,
     ) => () => void;
+  };
+  updates?: {
+    status: () => Promise<AppUpdateStatus>;
+    check: () => Promise<AppUpdateStatus>;
+    download: () => Promise<AppUpdateStatus>;
+    cancel: () => Promise<AppUpdateStatus>;
+    install: () => Promise<{
+      started: boolean;
+      mode: "in-place" | "installer" | "opened-dmg";
+    }>;
+    openReleasePage: () => Promise<{ opened: boolean }>;
+    onStatusChanged: (callback: (status: AppUpdateStatus) => void) => () => void;
+    onOpenDialog: (callback: () => void) => () => void;
   };
   onWorkspaceLocked?: (callback: () => void) => () => void;
   onDataChanged: (callback: (change?: WorkspaceChange) => void) => () => void;

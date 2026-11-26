@@ -1944,6 +1944,52 @@ input[type="checkbox"] {
   margin-top: 2px;
   flex-shrink: 0;
 }
+.settings-version-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: calc(100% - 16px);
+  margin: 14px 8px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-subtle);
+  color: var(--ui-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-on-screen),
+    border-color var(--motion-fast) var(--ease-on-screen),
+    color var(--motion-fast) var(--ease-on-screen),
+    scale var(--motion-fast) var(--ease-on-screen);
+}
+.settings-version-btn:hover {
+  background: var(--ui-surface);
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+}
+.settings-version-btn:active {
+  scale: 0.98;
+}
+.settings-version-btn:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+.settings-version-meta {
+  min-width: 0;
+}
+.settings-version-meta strong {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.settings-version-meta small {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--ui-muted);
+}
 .settings-content {
   width: 100%;
   max-width: none;

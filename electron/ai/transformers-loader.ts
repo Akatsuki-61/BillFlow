@@ -2,6 +2,18 @@ import path from "node:path";
 
 type TransformersModule = typeof import("@huggingface/transformers");
 
+/**
+ * Shared ONNX Runtime session options for Electron's Chromium PartitionAlloc.
+ * Disabling the CPU memory arena prevents ONNX Runtime's BFCArena from issuing
+ * large power-of-two reallocations that can exceed Chromium PartitionAlloc's
+ * 2 GiB single-allocation fatal trap on macOS ARM64, and lowers RAM usage on
+ * both macOS and Windows.
+ */
+export const SAFE_ONNX_SESSION_OPTIONS = {
+  enableCpuMemArena: false,
+  enableMemPattern: false,
+} as const;
+
 let cachedModule: Promise<TransformersModule> | null = null;
 
 /**

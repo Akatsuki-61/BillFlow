@@ -55,8 +55,11 @@ import {
   Monitor,
   Eye,
   Sparkles,
+  RefreshCw,
+  ArrowUpCircle,
 } from "lucide-react";
 import { AiSettingsPanel } from "@/components/settings/AiSettingsPanel";
+import { useAppUpdates } from "@/context/UpdateContext";
 import { useSettings, useData } from "@/lib/data/DataProvider";
 import {
   APPLICATION_RESET_CONFIRMATION,
@@ -191,6 +194,7 @@ function SettingsContent() {
     ? (requestedTab as SettingsTab)
     : "profile";
   const { workflow, isElectron, error: dataError } = useData();
+  const { status: updateStatus, openUpdateDialog } = useAppUpdates();
   const isMac = useIsMac();
   const { preference, setPreference, accent, setAccent, ready } = useTheme();
   const { activeProfile, updateProfile, refreshProfiles } = useProfiles();
@@ -876,6 +880,45 @@ function SettingsContent() {
               </small>
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => openUpdateDialog(true)}
+            className="settings-version-btn"
+            title="Check for BillFlow updates"
+          >
+            <span className="settings-version-meta">
+              <strong>BillFlow v{updateStatus.currentVersion}</strong>
+              <small
+                className={
+                  updateStatus.state === "update-available" ||
+                  updateStatus.state === "downloaded"
+                    ? "!text-accent font-medium"
+                    : undefined
+                }
+              >
+                {updateStatus.state === "checking"
+                  ? "Checking for updates…"
+                  : updateStatus.state === "downloading"
+                    ? `Downloading (${updateStatus.downloadProgress}%)…`
+                    : updateStatus.state === "downloaded"
+                      ? `v${updateStatus.latestVersion} ready to install`
+                      : updateStatus.state === "update-available"
+                        ? `Update v${updateStatus.latestVersion} available`
+                        : "Check for updates"}
+              </small>
+            </span>
+            {updateStatus.state === "update-available" ||
+            updateStatus.state === "downloaded" ? (
+              <ArrowUpCircle className="w-4 h-4 text-accent shrink-0" />
+            ) : (
+              <RefreshCw
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  updateStatus.state === "checking" ? "animate-spin text-accent" : ""
+                }`}
+              />
+            )}
+          </button>
         </aside>
         {/* Main Content Area */}
         <div className="workspace-form settings-content w-full max-w-none">
@@ -897,7 +940,7 @@ function SettingsContent() {
                 : activeTab === "invoices"
                   ? "Set up the starting point for your next invoice."
                   : activeTab === "ai"
-                    ? "Choose between built-in offline AI and the optional downloadable local LLM."
+                    ? "Choose between built-in offline AI, the fast Enhanced neural pack, or optional local Ollama."
                     : activeTab === "appearance"
                       ? "Customize how BillFlow looks and feels."
                       : "Manage your local storage, backups, and reset options."}

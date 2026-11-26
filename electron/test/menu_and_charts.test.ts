@@ -152,4 +152,40 @@ describe("macOS Menu & About Panel Configuration", () => {
     expect(helpLabels).toContain("Check for Updates...");
     expect(helpLabels).toContain("About BillFlow");
   });
+
+  it("invokes the in-app update dialog callback from both macOS BillFlow menu and Windows Help menu", () => {
+    let macCalls = 0;
+    const macTemplate = buildMenuTemplate(
+      () => {},
+      true,
+      undefined,
+      false,
+      () => {
+        macCalls += 1;
+      },
+    );
+    const macAppMenu = macTemplate.find((m) => m.label === "BillFlow");
+    const macUpdateItem = (
+      macAppMenu!.submenu as MenuItemConstructorOptions[]
+    ).find((i) => i.label === "Check for Updates...");
+    macUpdateItem?.click?.({} as MenuItem, undefined, {} as KeyboardEvent);
+    expect(macCalls).toBe(1);
+
+    let winCalls = 0;
+    const winTemplate = buildMenuTemplate(
+      () => {},
+      false,
+      undefined,
+      false,
+      () => {
+        winCalls += 1;
+      },
+    );
+    const winHelpMenu = winTemplate.find((m) => m.label === "Help");
+    const winUpdateItem = (
+      winHelpMenu!.submenu as MenuItemConstructorOptions[]
+    ).find((i) => i.label === "Check for Updates...");
+    winUpdateItem?.click?.({} as MenuItem, undefined, {} as KeyboardEvent);
+    expect(winCalls).toBe(1);
+  });
 });

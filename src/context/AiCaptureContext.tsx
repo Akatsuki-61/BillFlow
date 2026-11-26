@@ -13,6 +13,8 @@ import type {
   AiDownloadProgressEvent,
   AiExtractedInvoiceDraft,
   AiModelTier,
+  AiOllamaCheckResult,
+  AiOllamaConfigInput,
   AiStatus,
 } from "@/types/ai";
 
@@ -25,6 +27,8 @@ interface AiCaptureContextValue {
   downloadEvent: AiDownloadProgressEvent | null;
   refreshStatus: () => Promise<void>;
   setTier: (tier: AiModelTier) => Promise<AiStatus | null>;
+  checkOllama: (baseUrl?: string) => Promise<AiOllamaCheckResult | null>;
+  configureOllama: (input: AiOllamaConfigInput) => Promise<AiStatus | null>;
   downloadEnhancedModel: () => Promise<AiStatus | null>;
   cancelDownload: () => Promise<AiStatus | null>;
   removeEnhancedModel: () => Promise<AiStatus | null>;
@@ -157,6 +161,20 @@ export function AiCaptureProvider({
     return updated;
   }, []);
 
+  const checkOllama = useCallback(async (baseUrl?: string) => {
+    const api = window.billflow?.ai;
+    if (!api?.checkOllama) return null;
+    return api.checkOllama(baseUrl);
+  }, []);
+
+  const configureOllama = useCallback(async (input: AiOllamaConfigInput) => {
+    const api = window.billflow?.ai;
+    if (!api?.configureOllama) return null;
+    const updated = await api.configureOllama(input);
+    setAiStatus(updated);
+    return updated;
+  }, []);
+
   const downloadEnhancedModel = useCallback(async () => {
     const api = window.billflow?.ai;
     if (!api) return null;
@@ -227,6 +245,8 @@ export function AiCaptureProvider({
         downloadEvent,
         refreshStatus,
         setTier,
+        checkOllama,
+        configureOllama,
         downloadEnhancedModel,
         cancelDownload,
         removeEnhancedModel,
