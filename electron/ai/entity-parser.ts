@@ -343,10 +343,20 @@ export function extractDueDate(text: string, now = new Date()): string | null {
     return formatIsoDate(target);
   }
 
-  // 5. Tomorrow
+  // 5. Tomorrow / Next week / Next month
   if (/\btomorrow\b/i.test(text)) {
     const target = new Date(base);
     target.setDate(target.getDate() + 1);
+    return formatIsoDate(target);
+  }
+  if (/\b(?:by|before|until|in)?\s*next\s+week\b/i.test(text)) {
+    const target = new Date(base);
+    target.setDate(target.getDate() + 7);
+    return formatIsoDate(target);
+  }
+  if (/\b(?:by|before|until|in)?\s*next\s+month\b/i.test(text)) {
+    const target = new Date(base);
+    target.setDate(target.getDate() + 30);
     return formatIsoDate(target);
   }
 

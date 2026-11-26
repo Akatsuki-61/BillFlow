@@ -265,15 +265,28 @@ dialog.smart-capture-sheet::backdrop {
   cursor: not-allowed;
 }
 
-/* Segmented destination bar inside extracted results */
+/* Segmented destination bar inside extracted results (matches BillFlow 3D .ui-segmented) */
 .smart-capture-segments {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 13px;
-  background: var(--ui-control-muted);
-  border: 1px solid var(--ui-border-hairline);
+  gap: 3px;
+  padding: 3px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #dedee4 0%, #e9e9ee 100%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.08),
+    inset 0 1px 1px rgba(0, 0, 0, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+:root[data-theme="dark"] .smart-capture-segments {
+  background: linear-gradient(180deg, #0f1016 0%, #171923 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.72),
+    inset 0 1px 2px rgba(0, 0, 0, 0.52),
+    0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .smart-capture-segment {
@@ -288,33 +301,303 @@ dialog.smart-capture-sheet::backdrop {
   font-weight: 500;
   color: var(--ui-muted);
   background: transparent;
-  border: 0;
+  border: 1px solid transparent;
   cursor: pointer;
   transition:
     background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
     color 150ms ease;
 }
 
 .smart-capture-segment:hover:not([aria-checked="true"]) {
   color: var(--ui-text);
-  background: color-mix(in oklab, var(--ui-text) 7%, transparent);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+:root[data-theme="dark"] .smart-capture-segment:not([aria-checked="true"]) {
+  color: #9ba0b2;
+}
+
+:root[data-theme="dark"] .smart-capture-segment:hover:not([aria-checked="true"]) {
+  color: #f4f5f8;
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .smart-capture-segment[aria-checked="true"] {
-  color: #ffffff;
-  background: linear-gradient(180deg, #2c2c30 0%, #151518 100%);
-  box-shadow:
-    0 3px 10px -2px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: var(--ui-text);
+  background: var(--ui-keycap-bg);
+  border-color: var(--ui-keycap-border);
+  box-shadow: var(--ui-keycap-shadow);
   font-weight: 550;
 }
 
-:root[data-theme="dark"] .smart-capture-segment[aria-checked="true"] {
-  color: #0d0e12;
-  background: linear-gradient(180deg, #ffffff 0%, #e7e8ee 100%);
-  box-shadow:
-    0 4px 12px -2px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+/* Reworked AI Results Section (Metadata + Deliverable Cards + Unclipped Metric Inputs) */
+.smart-capture-engine-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ui-muted);
+  background: var(--ui-subtle);
+  border: 1px solid var(--ui-border);
+}
+
+.smart-capture-meta-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  background: var(--ui-surface-pure);
+  border: 1px solid var(--ui-border);
+}
+
+.smart-capture-currency-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ui-secondary);
+  background: var(--ui-subtle);
+  border: 1px solid var(--ui-border);
+  flex-shrink: 0;
+}
+
+.smart-capture-meta-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.smart-capture-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  color: var(--ui-secondary);
+  background: var(--ui-subtle);
+  min-width: 0;
+}
+
+.smart-capture-add-item-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-accent);
+  background: color-mix(in oklab, var(--ui-accent) 10%, transparent);
+  border: 0;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.smart-capture-add-item-btn:hover {
+  background: color-mix(in oklab, var(--ui-accent) 16%, transparent);
+}
+
+.smart-capture-item-card {
+  border-radius: 14px;
+  background: var(--ui-surface-pure);
+  border: 1px solid var(--ui-border);
+  overflow: hidden;
+  transition:
+    opacity 150ms ease,
+    border-color 150ms ease;
+}
+
+.smart-capture-item-card:focus-within {
+  border-color: color-mix(in oklab, var(--ui-accent) 45%, var(--ui-border-strong));
+}
+
+.smart-capture-item-card[data-selected="false"] {
+  opacity: 0.52;
+}
+
+.smart-capture-item-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+}
+
+.smart-capture-item-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 13.5px;
+  font-weight: 500;
+  outline: none;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.smart-capture-item-title:hover {
+  background: var(--ui-hover);
+}
+
+.smart-capture-item-title:focus {
+  background: var(--ui-surface);
+  border-color: color-mix(in oklab, var(--ui-accent) 50%, var(--ui-border-strong));
+}
+
+.smart-capture-item-remove {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.smart-capture-item-remove:hover {
+  background: color-mix(in oklab, #e11d48 12%, transparent);
+  color: #e11d48;
+}
+
+.smart-capture-item-bottom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--ui-border);
+  background: color-mix(in oklab, var(--ui-surface) 55%, transparent);
+}
+
+.smart-capture-metric-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: var(--ui-surface-pure);
+  border: 1px solid var(--ui-border);
+  transition: border-color 140ms ease;
+}
+
+.smart-capture-metric-box:focus-within {
+  border-color: color-mix(in oklab, var(--ui-accent) 55%, var(--ui-border-strong));
+}
+
+.smart-capture-metric-box--qty {
+  width: 78px;
+  flex: none;
+}
+
+.smart-capture-metric-box--price {
+  flex: 1 1 148px;
+  min-width: 148px;
+}
+
+.smart-capture-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ui-muted);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.smart-capture-metric-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.smart-capture-metric-input::-webkit-outer-spin-button,
+.smart-capture-metric-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.smart-capture-metric-input--qty {
+  text-align: right;
+}
+
+.smart-capture-metric-input--price {
+  text-align: right;
+}
+
+.smart-capture-source-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.smart-capture-source-pill--catalog {
+  color: var(--ui-accent);
+  background: color-mix(in oklab, var(--ui-accent) 12%, transparent);
+}
+
+.smart-capture-source-pill--message {
+  color: #10b981;
+  background: color-mix(in oklab, #10b981 12%, transparent);
+}
+
+.smart-capture-total-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 13px;
+  border-radius: 12px;
+  background: var(--ui-subtle);
+  border: 1px solid var(--ui-border);
+  font-size: 12.5px;
+  color: var(--ui-muted);
+}
+
+.smart-capture-total-bar strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ui-text);
 }
 
 /* Quiet typographic guide rows in empty state */

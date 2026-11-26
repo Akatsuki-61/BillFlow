@@ -23,6 +23,7 @@ import {
   Settings,
   Sparkles,
   Trash2,
+  User,
   UserCheck,
   UserPlus,
   X,
@@ -474,9 +475,24 @@ export function SmartCaptureDrawer() {
   };
 
   const hasContent = Boolean(rawText.trim() || imageOcrDataUrl);
-  const selectedCount = editableItems.filter(
+  const selectedItems = editableItems.filter(
     (item) => item.selected && item.description.trim().length > 0,
-  ).length;
+  );
+  const selectedCount = selectedItems.length;
+  const effectiveCurrency =
+    result?.currency || settings?.defaultCurrency || activeCurrency || "USD";
+  const estimatedSubtotal = selectedItems.reduce((sum, item) => {
+    const price = item.unitPrice ? Number.parseFloat(item.unitPrice) : Number.NaN;
+    if (!Number.isFinite(price) || price <= 0) return sum;
+    return sum + price * Math.max(1, item.quantity || 1);
+  }, 0);
+  const formattedEstimatedSubtotal =
+    estimatedSubtotal > 0
+      ? new Intl.NumberFormat(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(estimatedSubtotal)
+      : null;
   const activeTier: AiModelTier = aiStatus?.activeTier ?? "standard";
   const isDownloadingEnhanced =
     aiStatus?.downloadState === "downloading" ||
@@ -734,14 +750,14 @@ export function SmartCaptureDrawer() {
 
           {/* Extracted Result Workspace */}
           {result && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               {/* Destination Selector & Intent Summary */}
               <section className="space-y-2.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-content-neutral-950">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-content-neutral-950">
                     Destination
                   </h2>
-                  <span className="text-xs text-content-neutral-500 tabular-nums">
+                  <span className="smart-capture-engine-chip tabular-nums">
                     {result.engineUsed === "ollama"
                       ? "Local Ollama"
                       : result.engineUsed === "enhanced"
@@ -781,18 +797,18 @@ export function SmartCaptureDrawer() {
                   })}
                 </div>
 
-                <p className="text-[12.5px] text-content-neutral-500">
+                <p className="text-[12px] text-content-neutral-500 leading-relaxed">
                   {result.intentReason}
                 </p>
               </section>
 
               {/* Soft Warnings */}
               {result.warnings.length > 0 && (
-                <div className="space-y-1.5 border-l-2 border-amber-500/70 pl-3 py-0.5">
+                <div className="rounded-xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-2.5 space-y-1">
                   {result.warnings.map((warning, idx) => (
                     <p
                       key={idx}
-                      className="text-[12.5px] text-content-amber-700"
+                      className="text-[12px] text-content-amber-700 leading-relaxed"
                     >
                       {warning}
                     </p>
@@ -800,16 +816,16 @@ export function SmartCaptureDrawer() {
                 </div>
               )}
 
-              {/* Detected Client & Details */}
-              <section className="border-t border-line-neutral-200 pt-4 space-y-2.5 text-[13px]">
+              {/* Detected Client & Metadata Card */}
+              <section className="smart-capture-meta-card">
                 <div className="flex items-center justify-between gap-3">
                   {result.matchedClientId ? (
-                    <span className="inline-flex items-center gap-2 text-content-neutral-900 font-medium min-w-0">
+                    <span className="inline-flex items-center gap-2 text-[13px] text-content-neutral-900 font-medium min-w-0">
                       <UserCheck className="w-4 h-4 text-content-emerald-600 shrink-0" />
                       <span className="truncate">{result.matchedClientName}</span>
                     </span>
                   ) : result.suggestedClient ? (
-                    <span className="inline-flex items-center gap-2 text-content-neutral-900 font-medium min-w-0">
+                    <span className="inline-flex items-center gap-2 text-[13px] text-content-neutral-900 font-medium min-w-0">
                       <UserPlus className="w-4 h-4 text-accent shrink-0" />
                       <span className="truncate">
                         {result.suggestedClient.name}
@@ -819,28 +835,30 @@ export function SmartCaptureDrawer() {
                       </span>
                     </span>
                   ) : (
-                    <span className="text-content-neutral-500">
-                      Client will be selected in the form
+                    <span className="inline-flex items-center gap-2 text-[12.5px] text-content-neutral-500 min-w-0">
+                      <User className="w-3.5 h-3.5 shrink-0 opacity-75" />
+                      <span className="truncate">
+                        Select client on the next step
+                      </span>
                     </span>
                   )}
-                  {result.currency && (
-                    <span className="text-xs font-semibold text-content-neutral-600 tabular-nums shrink-0">
-                      {result.currency}
-                    </span>
-                  )}
+
+                  <span className="smart-capture-currency-chip tabular-nums">
+                    {effectiveCurrency}
+                  </span>
                 </div>
 
                 {(result.dueDate || result.deliveryUrl) && (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-content-neutral-500">
+                  <div className="smart-capture-meta-chips">
                     {result.dueDate && (
-                      <span className="inline-flex items-center gap-1.5 tabular-nums">
-                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                      <span className="smart-capture-meta-chip tabular-nums">
+                        <Calendar className="w-3 h-3 shrink-0" />
                         <span>Due {result.dueDate}</span>
                       </span>
                     )}
                     {result.deliveryUrl && (
-                      <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
-                        <Link2 className="w-3.5 h-3.5 shrink-0" />
+                      <span className="smart-capture-meta-chip max-w-full">
+                        <Link2 className="w-3 h-3 shrink-0" />
                         <span className="truncate">{result.deliveryUrl}</span>
                       </span>
                     )}
@@ -848,31 +866,30 @@ export function SmartCaptureDrawer() {
                 )}
               </section>
 
-              {/* Deliverables List */}
-              <section className="border-t border-line-neutral-200 pt-4 space-y-2.5">
+              {/* Deliverables Cards */}
+              <section className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-content-neutral-950">
+                  <h2 className="text-[14px] font-semibold tracking-[-0.02em] text-content-neutral-950">
                     Deliverables ({selectedCount})
                   </h2>
                   <button
                     type="button"
                     onClick={handleAddBlankItem}
-                    className="inline-flex items-center gap-1 text-[12.5px] font-medium text-accent hover:underline cursor-pointer"
+                    className="smart-capture-add-item-btn"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add item</span>
                   </button>
                 </div>
 
-                <div className="divide-y divide-line-neutral-200">
+                <div className="space-y-2.5">
                   {editableItems.map((item) => (
                     <div
                       key={item.id}
-                      className={`py-3 space-y-2 transition-opacity ${
-                        item.selected ? "opacity-100" : "opacity-50"
-                      }`}
+                      data-selected={item.selected}
+                      className="smart-capture-item-card"
                     >
-                      <div className="flex items-center gap-2.5">
+                      <div className="smart-capture-item-top">
                         <button
                           type="button"
                           onClick={() =>
@@ -905,69 +922,72 @@ export function SmartCaptureDrawer() {
                             })
                           }
                           placeholder="Deliverable description"
-                          className="ui-field flex-1 h-9 !min-h-[36px] px-3 text-[13px]"
+                          className="smart-capture-item-title"
                         />
 
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(item.id)}
                           aria-label="Remove item"
-                          className="p-1.5 text-content-neutral-400 hover:text-content-rose-600 cursor-pointer"
+                          className="smart-capture-item-remove"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between gap-2 pl-[28px]">
-                        <div className="flex items-center gap-2">
-                          <label className="inline-flex items-center gap-1.5 text-xs text-content-neutral-500">
-                            <span>Qty</span>
-                            <input
-                              type="number"
-                              min={1}
-                              value={item.quantity}
-                              onChange={(e) =>
-                                handleUpdateItem(item.id, {
-                                  quantity: Math.max(
-                                    1,
-                                    Number.parseInt(e.target.value, 10) || 1,
-                                  ),
-                                })
-                              }
-                              className="ui-field w-14 h-8 !min-h-[32px] px-2 text-center text-xs tabular-nums"
-                            />
-                          </label>
-                          <label className="inline-flex items-center gap-1.5 text-xs text-content-neutral-500">
-                            <span>Price</span>
-                            <input
-                              type="number"
-                              step="any"
-                              min={0}
-                              value={item.unitPrice ?? ""}
-                              placeholder="Optional"
-                              onChange={(e) =>
-                                handleUpdateItem(item.id, {
-                                  unitPrice: e.target.value || null,
-                                })
-                              }
-                              className="ui-field w-28 h-8 !min-h-[32px] px-2.5 text-xs tabular-nums"
-                            />
-                          </label>
-                        </div>
+                      <div className="smart-capture-item-bottom">
+                        <label className="smart-capture-metric-box smart-capture-metric-box--qty">
+                          <span className="smart-capture-metric-label">Qty</span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) =>
+                              handleUpdateItem(item.id, {
+                                quantity: Math.max(
+                                  1,
+                                  Number.parseInt(e.target.value, 10) || 1,
+                                ),
+                              })
+                            }
+                            className="smart-capture-metric-input smart-capture-metric-input--qty"
+                          />
+                        </label>
+
+                        <label className="smart-capture-metric-box smart-capture-metric-box--price">
+                          <span className="smart-capture-metric-label">
+                            {effectiveCurrency}
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="any"
+                            min={0}
+                            value={item.unitPrice ?? ""}
+                            placeholder="0.00"
+                            onChange={(e) =>
+                              handleUpdateItem(item.id, {
+                                unitPrice: e.target.value || null,
+                              })
+                            }
+                            className="smart-capture-metric-input smart-capture-metric-input--price"
+                          />
+                        </label>
 
                         {item.priceSource === "catalog" && item.catalogTitle && (
                           <span
                             title={`Matched catalog service: ${item.catalogTitle}`}
-                            className="text-[12px] font-medium text-accent truncate max-w-[140px] tabular-nums"
+                            className="smart-capture-source-pill smart-capture-source-pill--catalog"
                           >
-                            Catalog{" "}
+                            Catalog
                             {item.catalogMatchScore
-                              ? `${Math.round(item.catalogMatchScore * 100)}%`
+                              ? ` ${Math.round(item.catalogMatchScore * 100)}%`
                               : ""}
                           </span>
                         )}
                         {item.priceSource === "message" && (
-                          <span className="text-[12px] font-medium text-content-emerald-600">
+                          <span className="smart-capture-source-pill smart-capture-source-pill--message">
                             From message
                           </span>
                         )}
@@ -975,6 +995,15 @@ export function SmartCaptureDrawer() {
                     </div>
                   ))}
                 </div>
+
+                {formattedEstimatedSubtotal && (
+                  <div className="smart-capture-total-bar">
+                    <span>Estimated total</span>
+                    <strong className="tabular-nums">
+                      {effectiveCurrency} {formattedEstimatedSubtotal}
+                    </strong>
+                  </div>
+                )}
               </section>
 
               {/* Native <details> Raw OCR Viewer */}

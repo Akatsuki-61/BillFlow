@@ -171,6 +171,12 @@ describe("AI entity-parser", () => {
       "2026-11-26",
     );
     expect(
+      extractDueDate(
+        "I want website created by next week for my t-shirt business",
+        new Date("2026-11-25"),
+      ),
+    ).toBe("2026-12-02");
+    expect(
       cleanMessageText("Online\nHello\nType a message\n10:42 AM ✓✓").cleanedText,
     ).toBe("Hello");
 
