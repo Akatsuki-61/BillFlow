@@ -39,6 +39,7 @@ import {
   Receipt,
   ListChecks,
   ArrowRight,
+  Flag,
 } from "lucide-react";
 import { nextTaskStage } from "@/lib/payment-summary";
 import {
@@ -95,6 +96,7 @@ const CATEGORY_OPTIONS: SelectOption[] = [
 export interface InvoiceLinkPalette {
   name: "emerald" | "indigo" | "amber" | "teal" | "violet";
   barColor: string;
+  rgb: string;
   ringClass: string;
   glowShadow: string;
   activeChipClass: string;
@@ -104,44 +106,66 @@ const INVOICE_LINK_PALETTES: InvoiceLinkPalette[] = [
   {
     name: "emerald",
     barColor: "#10b981",
-    ringClass: "ring-2 ring-emerald-500/70 !border-emerald-500/60",
-    glowShadow: "0 0 12px rgba(16, 185, 129, 0.25)",
+    rgb: "16, 185, 129",
+    ringClass: "ring-1 ring-emerald-500/45 !border-emerald-500/55",
+    glowShadow: "0 6px 20px -6px rgba(16, 185, 129, 0.32)",
     activeChipClass:
       "text-emerald-700 dark:text-emerald-300 bg-emerald-500/12 border-emerald-500/35",
   },
   {
     name: "indigo",
     barColor: "#6366f1",
-    ringClass: "ring-2 ring-indigo-500/70 !border-indigo-500/60",
-    glowShadow: "0 0 12px rgba(99, 102, 241, 0.25)",
+    rgb: "99, 102, 241",
+    ringClass: "ring-1 ring-indigo-500/45 !border-indigo-500/55",
+    glowShadow: "0 6px 20px -6px rgba(99, 102, 241, 0.32)",
     activeChipClass:
       "text-indigo-700 dark:text-indigo-300 bg-indigo-500/12 border-indigo-500/35",
   },
   {
     name: "amber",
     barColor: "#f59e0b",
-    ringClass: "ring-2 ring-amber-500/70 !border-amber-500/60",
-    glowShadow: "0 0 12px rgba(245, 158, 11, 0.25)",
+    rgb: "245, 158, 11",
+    ringClass: "ring-1 ring-amber-500/45 !border-amber-500/55",
+    glowShadow: "0 6px 20px -6px rgba(245, 158, 11, 0.32)",
     activeChipClass:
       "text-amber-700 dark:text-amber-300 bg-amber-500/12 border-amber-500/35",
   },
   {
     name: "teal",
     barColor: "#14b8a6",
-    ringClass: "ring-2 ring-teal-500/70 !border-teal-500/60",
-    glowShadow: "0 0 12px rgba(20, 184, 166, 0.25)",
+    rgb: "20, 184, 166",
+    ringClass: "ring-1 ring-teal-500/45 !border-teal-500/55",
+    glowShadow: "0 6px 20px -6px rgba(20, 184, 166, 0.32)",
     activeChipClass:
       "text-teal-700 dark:text-teal-300 bg-teal-500/12 border-teal-500/35",
   },
   {
     name: "violet",
     barColor: "#8b5cf6",
-    ringClass: "ring-2 ring-violet-500/70 !border-violet-500/60",
-    glowShadow: "0 0 12px rgba(139, 92, 246, 0.25)",
+    rgb: "139, 92, 246",
+    ringClass: "ring-1 ring-violet-500/45 !border-violet-500/55",
+    glowShadow: "0 6px 20px -6px rgba(139, 92, 246, 0.32)",
     activeChipClass:
       "text-violet-700 dark:text-violet-300 bg-violet-500/12 border-violet-500/35",
   },
 ];
+
+function getPriorityVisual(priority: TaskPriority): {
+  tone: "high" | "medium" | "low";
+  label: string;
+  title: string;
+} {
+  if (priority === "urgent") {
+    return { tone: "high", label: "Urgent", title: "Urgent priority" };
+  }
+  if (priority === "high") {
+    return { tone: "high", label: "High", title: "High priority" };
+  }
+  if (priority === "medium") {
+    return { tone: "medium", label: "Medium", title: "Medium priority" };
+  }
+  return { tone: "low", label: "Low", title: "Low priority" };
+}
 
 export function getInvoiceLinkPalette(
   invoiceKey?: string | null,
@@ -1542,21 +1566,23 @@ export default function TasksView({
                                       : "border-[var(--ui-card-rim)] shadow-[var(--ui-white-pill-shadow)] hover:border-border-accent/45"
                           }`}
                         >
-                          {/* Subtle 2px Left Accent Bar for Invoice-Linked Cards */}
+                          {/* Top Hue Tint Wash for Invoice-Linked Cards (hardens smoothly on shared hover) */}
                           {hasLinkedInvoice && invoicePalette && (
                             <span
                               aria-hidden="true"
-                              style={{
-                                backgroundColor: invoicePalette.barColor,
-                              }}
-                              className={`absolute left-0 top-3.5 bottom-3.5 w-[2.5px] rounded-r-full transition-opacity duration-150 ${
-                                isInvoiceHoverLinked
-                                  ? "opacity-100"
-                                  : "opacity-65 group-hover:opacity-95"
-                              }`}
+                              className="task-invoice-tint"
+                              data-active={
+                                isInvoiceHoverLinked ? "true" : "false"
+                              }
+                              style={
+                                {
+                                  "--invoice-tint-rgb": invoicePalette.rgb,
+                                } as React.CSSProperties
+                              }
                             />
                           )}
 
+                          <div className="relative z-[1]">
                           {/* Top Tag Strip */}
                           <div className="flex items-center justify-between gap-1.5 mb-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -1574,23 +1600,30 @@ export default function TasksView({
                                     className="w-3.5 h-3.5 rounded text-accent focus:ring-accent cursor-pointer"
                                   />
                                 )}
-                              <span className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-surface border border-line-neutral-200 text-content-neutral-600">
+                              <span className="task-category-tag">
                                 {task.category}
                               </span>
 
-                              <span
-                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                  task.priority === "urgent"
-                                    ? "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300"
-                                    : task.priority === "high"
-                                      ? "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300"
-                                      : task.priority === "medium"
-                                        ? "bg-accent-faint text-accent border border-border-accent dark:bg-accent-soft dark:text-accent"
-                                        : "bg-surface text-content-neutral-600 border border-line-neutral-200"
-                                }`}
-                              >
-                                {task.priority}
-                              </span>
+                              {(() => {
+                                const priorityVisual = getPriorityVisual(
+                                  task.priority,
+                                );
+                                return (
+                                  <span
+                                    title={priorityVisual.title}
+                                    aria-label={priorityVisual.title}
+                                    className={`task-priority-badge task-priority-badge--${priorityVisual.tone}`}
+                                  >
+                                    <Flag
+                                      className="w-3 h-3"
+                                      strokeWidth={2.2}
+                                      fill="currentColor"
+                                      fillOpacity={0.28}
+                                      aria-hidden="true"
+                                    />
+                                  </span>
+                                );
+                              })()}
 
                               {matched && (
                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent-soft text-accent uppercase tracking-wider">
@@ -1811,6 +1844,7 @@ export default function TasksView({
                               </button>
                             </div>
                           </div>
+                          </div>
                         </div>
                       );
                     })
@@ -1945,7 +1979,7 @@ export default function TasksView({
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-surface-neutral-100 text-content-neutral-600 font-medium">
+                        <span className="task-category-tag">
                           {task.category}
                         </span>
                       </td>
@@ -1965,19 +1999,26 @@ export default function TasksView({
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span
-                          className={`text-[11px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider ${
-                            task.priority === "urgent"
-                              ? "bg-surface-rose-100 text-content-rose-800"
-                              : task.priority === "high"
-                                ? "bg-surface-orange-100 text-content-orange-800"
-                                : task.priority === "medium"
-                                  ? "bg-surface-amber-100 text-content-amber-800"
-                                  : "bg-surface-blue-100 text-content-blue-800"
-                          }`}
-                        >
-                          {task.priority}
-                        </span>
+                        {(() => {
+                          const priorityVisual = getPriorityVisual(
+                            task.priority,
+                          );
+                          return (
+                            <span
+                              title={priorityVisual.title}
+                              className={`task-priority-pill task-priority-badge--${priorityVisual.tone}`}
+                            >
+                              <Flag
+                                className="w-3 h-3"
+                                strokeWidth={2.2}
+                                fill="currentColor"
+                                fillOpacity={0.28}
+                                aria-hidden="true"
+                              />
+                              <span>{priorityVisual.label}</span>
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-3.5 px-4 text-xs text-content-neutral-500">
                         {task.dueDate || "No due date"}
@@ -2605,20 +2646,29 @@ export default function TasksView({
             <div className="app-dialog-header">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md bg-surface-neutral-100 text-content-neutral-600">
+                  <span className="task-category-tag">
                     {selectedTaskForDetail.category}
                   </span>
-                  <span
-                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                      selectedTaskForDetail.priority === "urgent"
-                        ? "bg-surface-rose-100 text-content-rose-800"
-                        : selectedTaskForDetail.priority === "high"
-                          ? "bg-surface-orange-100 text-content-orange-800"
-                          : "bg-surface-amber-100 text-content-amber-800"
-                    }`}
-                  >
-                    {selectedTaskForDetail.priority}
-                  </span>
+                  {(() => {
+                    const priorityVisual = getPriorityVisual(
+                      selectedTaskForDetail.priority,
+                    );
+                    return (
+                      <span
+                        title={priorityVisual.title}
+                        className={`task-priority-pill task-priority-badge--${priorityVisual.tone}`}
+                      >
+                        <Flag
+                          className="w-3 h-3"
+                          strokeWidth={2.2}
+                          fill="currentColor"
+                          fillOpacity={0.28}
+                          aria-hidden="true"
+                        />
+                        <span>{priorityVisual.label}</span>
+                      </span>
+                    );
+                  })()}
                   {selectedTaskForDetail.clientName && (
                     <span className="text-xs text-content-neutral-400">
                       Client: {selectedTaskForDetail.clientName}
