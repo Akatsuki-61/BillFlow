@@ -2,6 +2,38 @@
 
 Notable changes between BillFlow desktop releases.
 
+## Unreleased (Post-v0.3.0 Build 4 — 2026-11-26)
+
+Follow-up reliability, local AI, desktop update, and UI polish merged from `Nipun` into `main` (`7c3fc2c`..`7f88f3c`).
+
+### What's New
+
+- **In-App GitHub Releases Updater:**
+  - Added a clickable version badge in the bottom-left corner of **Settings** and a native **BillFlow → Check for Updates...** entry in the macOS menu bar.
+  - Built a dedicated update dialog (`UpdateDialog.tsx`) showing version status ("Your application is up to date" or available release notes), live download progress, and 1-click installer download and launch from GitHub Releases (`electron/updater.ts`, `UpdateContext.tsx`).
+- **Upgraded Local AI Engine & Optional Loopback Ollama:**
+  - Replaced the heavy `Qwen2.5-0.5B-Instruct` LLM with the fast, memory-safe **Enhanced Offline AI Pack** (`Xenova/bge-base-en-v1.5` + `Xenova/nli-deberta-v3-small`, ~270 MB) running in ~140ms with zero crashes on macOS Electron 44.
+  - Added optional **Local Ollama** (`127.0.0.1` loopback only) support in **Settings → AI & Capture** and an inline AI engine switcher right in the **Smart Capture** drawer footer.
+
+### Changed & Improved
+
+- **Smart Capture Results & Workflow Rework:**
+  - Reworked the entire extracted-results panel under **Destination** with BillFlow's 3D segmented controls, unclipped currency/price fields, and clean copy without em dashes.
+  - Added an editable **Client** field (`"Add or select a client"`) with an inline Saved Clients picker, an editable **Due** date picker with automatic `"next week"` and `"next month"` phrase parsing, and per-deliverable **Service Catalog** pickers (`"Matched from catalog"` / `"From catalog"`).
+  - Removed deliverable checkboxes and applied matched catalog item titles automatically instead of keeping raw extracted phrases.
+- **Unified Vertical Notification Toast Stack:**
+  - Upgraded the global toast system (`ToastContext.tsx`, `ToastBanner.tsx`) and migrated view-local fixed toast popups across Clients, Settings, Invoices, Outsourcing, Tasks, and Currency Feedback so simultaneous notifications stack vertically (newest on top, oldest on bottom) with independent auto-dismiss timers instead of overlapping.
+- **Tasks Page Card Polish:**
+  - Replaced the left vertical bar on invoice-linked Kanban cards with a subtle top hue tint wash that smoothly deepens across all tiles sharing the same invoice on hover.
+  - Reworked task category tags into tactile 3D keycap badges matching BillFlow's button/toggle aesthetic across Kanban cards, List view, and the Task Detail modal.
+  - Replaced text priority badges on Kanban cards with matching-height (`24px`) 3D **Flag** icon badges using a clear 3-color priority system (**Red** High/Urgent, **Blue** Medium, **Green** Low).
+
+### Fixed
+
+- Fixed a fatal macOS Electron 44 `EXC_BREAKPOINT (SIGTRAP)` crash during ONNX Runtime `BFCArena::Extend` allocation by applying `SAFE_ONNX_SESSION_OPTIONS` (`enableCpuMemArena: false`, `enableMemPattern: false`) across local AI sessions.
+- Fixed Standard AI semantic catalog matching so close service descriptions resolve to the matching catalog item name and default rate.
+- Expanded automated verification to **332 Vitest tests across 45 test files** (adding `electron/test/updater.test.ts` and expanded AI entity-parser, AI IPC, and menu tests).
+
 ## v0.3.0 (2026-11-25) — Build 4
 
 Major release introducing a redesigned Light/Dark desktop interface with custom accent themes, an offline on-device AI suite, proposals and recurring retainers, project profit tracking, profile-currency reporting, encrypted rolling backups, and guided first-run setup.

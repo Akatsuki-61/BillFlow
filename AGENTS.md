@@ -16,7 +16,8 @@ BillFlow is a local-first desktop workspace designed for software freelancers an
 - **Service Catalog & Rate Cards**: Reusable service offerings (fixed-fee and hourly rates).
 - **Client Directory**: Contact metadata, WhatsApp numbers, currency preferences, and delivery repository/folder links.
 - **Itemized Invoicing & PDF Compilation**: Multi-currency invoices (USD, LKR, EUR), upfront deposit math, discount/tax calculations, and local vector PDF generation via `pdf-lib`.
-- **Local AI Suite & Offline OCR**: Two-tier on-device AI powered by bundled offline `tesseract.js` LSTM OCR + quantized `all-MiniLM-L6-v2` ONNX embeddings plus an optional on-demand `Qwen2.5-0.5B-Instruct` local LLM configurable in **Settings → AI & Capture** (`electron/ai/`, `electron/ipc/ai.ts`). Includes intent-aware **Smart Capture** (`Cmd/Ctrl+Shift+I`, routing to New Invoice, Proposal/Quote, or Kanban Tasks), **Bank Transfer Slip Auto-Reader** with mismatch warnings in Record Payment, and **Expense Receipt Scanner** with neural OPEX category classification in Expenses.
+- **Local AI Suite & Offline OCR**: On-device AI powered by bundled offline `tesseract.js` LSTM OCR + quantized `all-MiniLM-L6-v2` ONNX embeddings, an optional on-demand **Enhanced Offline AI Pack** (`Xenova/bge-base-en-v1.5` + `Xenova/nli-deberta-v3-small`, ~270 MB), and optional loopback-only **Local Ollama** (`127.0.0.1`), configurable in **Settings → AI & Capture** and the Smart Capture footer (`electron/ai/`, `electron/ipc/ai.ts`). Includes intent-aware **Smart Capture** (`Cmd/Ctrl+Shift+I`, routing to New Invoice, Proposal/Quote, or Kanban Tasks with inline Client, Service Catalog, and Due Date pickers), **Bank Transfer Slip Auto-Reader** with mismatch warnings in Record Payment, and **Expense Receipt Scanner** with neural OPEX category classification in Expenses.
+- **In-App GitHub Releases Updater**: Checks GitHub Releases for newer versions from the Settings bottom-left version button or macOS menu bar (**BillFlow → Check for Updates...**), displaying release notes, download progress, and 1-click installer launch (`electron/updater.ts`, `src/context/UpdateContext.tsx`, `src/components/ui/UpdateDialog.tsx`).
 - **Multi-Channel Dispatch**: 1-click WhatsApp URI links (`https://wa.me/`) with pre-filled payment summaries and native email dispatch.
 - **Task Management & Synchronized Kanban**: 4-stage visual execution board (`To Do`, `In Progress`, `Under Review`, `Done`) with two-way task-to-invoice conversion and synchronized hover highlighting for cards sharing an invoice.
 - **Task Outsourcing & Vendor Ledger**: 1-click task delegation, payable invoice vouchers (`VND-INV-xxxx`), WhatsApp contractor dispatch, and automated ledger expense logging on payout settlement.
@@ -51,7 +52,7 @@ BillFlow is built around interconnected workflows rather than isolated screens. 
    - In `InvoicesView.tsx`, click **"Import Completed Tasks"** to review unbilled completed tasks filtered by client, configure unit rates, and populate invoice line items with one click.
    - On the Kanban board (`TasksView.tsx`), select completed cards in the "Done" column and trigger **"Batch Invoice Completed"** to jump into invoicing.
 4. **Task Linking**: Saving the invoice updates all imported tasks with `invoiceId` and `invoiceCode`, linking the deliverables permanently.
-5. **Synchronized Card Highlighting**: Cards linked to an invoice show a subtle invoice reference indicator. Hovering over any card illuminates all other cards sharing that same invoice with a synchronized glow ring.
+5. **Synchronized Card Highlighting**: Cards linked to an invoice share a subtle top hue tint wash and invoice reference chip. Hovering over any card illuminates all other cards sharing that same invoice by deepening the top tint wash and border highlight together.
 
 ### Workflow C: Subcontractor Outsourcing Loop
 1. **Outsource Trigger**: Click **Outsource Task** on any Kanban card to open the delegation modal with scope, client, and deliverable specifications pre-filled.
@@ -90,7 +91,9 @@ BillFlow is built around interconnected workflows rather than isolated screens. 
 │  │  • IPC Controllers: invoices, tasks, clients,         │  │
 │  │    expenses, vendors, profiles, backup, calendar, ai  │  │
 │  │  • Local AI Engine: tesseract.js LSTM OCR +           │  │
-│  │    @huggingface/transformers (MiniLM & Qwen2.5 ONNX)  │  │
+│  │    @huggingface/transformers (MiniLM/BGE/DeBERTa)     │  │
+│  │    + optional loopback Ollama (127.0.0.1)             │  │
+│  │  • Updater: GitHub Releases check/download/install    │  │
 │  │  • Persistence: SQLite 3 via better-sqlite3 + Drizzle │  │
 │  │  • PDF Engine: pdf-lib (vector PDF generation)        │  │
 │  │  • File Storage: userData/receipts and backups        │  │
@@ -99,7 +102,7 @@ BillFlow is built around interconnected workflows rather than isolated screens. 
 ```
 
 - **Runtime**: Node.js LTS (v20/v22), Electron 44, Next.js 16 (App Router), React 19, TypeScript 5.
-- **Local AI & OCR**: `tesseract.js` (bundled offline `eng.traineddata.gz`), `@huggingface/transformers` + `onnxruntime-node` (bundled `Xenova/all-MiniLM-L6-v2` quantized ONNX + optional on-demand `onnx-community/Qwen2.5-0.5B-Instruct` INT8 ONNX in `userData/models/`).
+- **Local AI & OCR**: `tesseract.js` (bundled offline `eng.traineddata.gz`), `@huggingface/transformers` + `onnxruntime-node` (bundled `Xenova/all-MiniLM-L6-v2` quantized ONNX + optional on-demand Enhanced Offline AI Pack `Xenova/bge-base-en-v1.5` & `Xenova/nli-deberta-v3-small` in `userData/models/` with `SAFE_ONNX_SESSION_OPTIONS`), plus optional loopback Ollama (`127.0.0.1`).
 - **Embedded Database**: Local SQLite 3 (`billflow.db`) inside Electron `app.getPath("userData")`. Managed with Drizzle ORM schemas (`electron/db/schema.ts`) and versioned migrations in `drizzle/`.
 - **IPC Interface**: Typed bridge exposed via `electron/preload.ts` and declared in `src/types/billflow-api.d.ts`. All handlers validate payloads using Zod schemas (`electron/validation.ts`, `electron/workflow-validation.ts`).
 - **Data Integrity**: Financial figures are stored as integer minor units (cents) with an explicit currency token. Foreign keys maintain referential integrity with cascade rules.

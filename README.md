@@ -48,20 +48,21 @@ Build multi-currency invoices, **Proposals & Quotes** (`QT-YYYY-NNN` with 1-clic
 
 Dispatch invoices or overdue reminders through prefilled `wa.me` WhatsApp links or email drafts, inspect past-due accounts receivable aging (`1-15`, `16-30`, `31-60`, `60+` days), and export active registers or aging reports to RFC 4180 CSV or Excel formats from a unified **Export** dialog.
 
-### Smart Capture & Local AI Suite (two-tier local AI and offline OCR)
+### Smart Capture & Local AI Suite (on-device AI and offline OCR)
 
-BillFlow ships a unified two-tier on-device AI suite built on one shared local runtime so client messages, bank transfer slips, and expense receipts never leave your computer:
+BillFlow ships a unified on-device AI suite built on one shared local runtime so client messages, bank transfer slips, and expense receipts never leave your computer:
 
-- **Intent-Aware Smart Capture (`Cmd/Ctrl+Shift+I`):** Paste a screenshot (`Cmd/Ctrl+V` or drag-and-drop) or copied text from WhatsApp, Slack, Signal, or email. Dark-mode chat screenshots are automatically inverted and upscaled before OCR. Zero-shot neural intent detection classifies whether the message is best routed to **New Invoice**, **Proposal / Quote**, or directly to **Kanban Tasks** (with 1-click override), pre-filling clients, deliverables, due dates, currencies, delivery URLs, and semantically matched **Service Catalog** unit prices.
+- **Intent-Aware Smart Capture (`Cmd/Ctrl+Shift+I`):** Paste a screenshot (`Cmd/Ctrl+V` or drag-and-drop) or copied text from WhatsApp, Slack, Signal, or email. Dark-mode chat screenshots are automatically inverted and upscaled before OCR. Zero-shot neural intent detection classifies whether the message is best routed to **New Invoice**, **Proposal / Quote**, or directly to **Kanban Tasks** (with 1-click override), pre-filling clients, deliverables, relative or absolute due dates (`"next week"`, `"next month"`, etc.), currencies, delivery URLs, and semantically matched **Service Catalog** names and unit prices—with inline Client, Service Catalog, and Due Date pickers plus an inline AI engine switcher right inside the drawer.
 - **Bank Transfer Slip Auto-Reader (Record Payment):** Dropping, selecting, or pasting a client's bank transfer slip screenshot automatically extracts the transferred amount, payment date, bank name, and reference/transaction ID, and flags underpayment, overpayment, or currency mismatches against the invoice's expected advance or remaining balance.
 - **Expense Receipt Scanner (Expenses):** Dropping, selecting, or pasting a receipt screenshot (or clicking **Scan Receipt**) extracts the merchant, date, amount, currency, and description while classifying the expense into BillFlow's OPEX categories (`SOFTWARE`, `AI INFRASTRUCTURE`, `HOSTING`, `TRAVEL`, `MEALS`, `OFFICE`, `HARDWARE`) using bundled `all-MiniLM-L6-v2` neural embeddings.
-- **Two Configurable Tiers in Settings → AI & Capture:**
+- **Configurable Local AI Engines in Settings → AI & Capture (and the Smart Capture footer):**
   - **Standard (Built-in Offline Default, ~25.6 MB bundled):** `tesseract.js` LSTM OCR (`eng.traineddata.gz`) + quantized `Xenova/all-MiniLM-L6-v2` sentence embeddings + deterministic document/entity parsers.
-  - **Enhanced (Optional Local LLM):** Downloads quantized `onnx-community/Qwen2.5-0.5B-Instruct` (INT8 ONNX, ~490 MB) once into `userData/models/` with live progress, cancel, delete, automatic idle RAM disposal, and automatic fallback to Standard.
+  - **Enhanced Offline AI Pack (~270 MB on-demand):** Downloads quantized `Xenova/bge-base-en-v1.5` (semantic matching) + `Xenova/nli-deberta-v3-small` (zero-shot intent/deliverable classification) once into `userData/models/` with live progress, cancel, delete, automatic idle RAM disposal, and safe ONNX memory options (`enableCpuMemArena: false`).
+  - **Local Ollama (Optional, `127.0.0.1` only):** Connects exclusively to a loopback Ollama daemon if you prefer to run your own local model for structured extraction, with automatic fallback to offline tiers.
 
 ### Task board, local calendar, and deliverable handoff
 
-Switch between Kanban (`To Do`, `In Progress`, `Under Review`, `Done`), List, and Calendar views. Active work time accumulates in the background on cards, and Calendar view supports drag-and-drop rescheduling alongside two-way local macOS Calendar `.ics` synchronization on desktop. Dragging a deliverable card to `Done` opens the Submit Work modal with direct links to that client's repository, staging URL, or Drive folder.
+Switch between Kanban (`To Do`, `In Progress`, `Under Review`, `Done`), List, and Calendar views. Invoice-linked Kanban cards share a soft top hue wash that deepens across sibling tiles on hover, paired with 3D keycap category tags and compact 3-color priority flag badges (**Red** High/Urgent, **Blue** Medium, **Green** Low). Active work time accumulates in the background on cards, and Calendar view supports drag-and-drop rescheduling alongside two-way local macOS Calendar `.ics` synchronization on desktop. Dragging a deliverable card to `Done` opens the Submit Work modal with direct links to that client's repository, staging URL, or Drive folder.
 
 ### Subcontractor outsourcing and automated payout ledger
 
@@ -75,19 +76,19 @@ Log business expenses with custom merchant icons, linked invoices, recurring fla
 
 Start with one profile through guided first-run setup and choose whether to enable desktop notifications and Apple Calendar sync. Create up to 5 isolated local workspaces, switch seamlessly between **Light Mode** and **Dark Mode** with customizable **Profile Accent Presets** and selectable **Inter** or **Elegant Sans** typography, and protect each profile with an optional PIN or password enforced in Electron's main process.
 
-Export or restore standard JSON or password-protected AES-256-GCM **encrypted rolling backups** (`.bfbackup`), including tasks, schedules, and managed receipts, with startup SQLite integrity verification (`PRAGMA quick_check`). **Settings → Backup & data** supports clearing the active profile's records or clearing the full application and returning to first-run setup.
+Export or restore standard JSON or password-protected AES-256-GCM **encrypted rolling backups** (`.bfbackup`), including tasks, schedules, and managed receipts, with startup SQLite integrity verification (`PRAGMA quick_check`). **Settings → Backup & data** supports clearing the active profile's records or clearing the full application and returning to first-run setup. Check for new GitHub Releases directly from the version button in the bottom-left of **Settings** or from the macOS menu bar (**BillFlow → Check for Updates...**), with built-in release notes, download progress, and installer launch.
 
 ## System architecture
 
 | Layer | Stack | Role |
 | :--- | :--- | :--- |
-| Desktop shell | Electron 44 | Context-isolated `window.billflow` preload bridge, persistent window bounds, Tray/Dock quick actions, native drag-and-drop |
+| Desktop shell | Electron 44 | Context-isolated `window.billflow` preload bridge, persistent window bounds, Tray/Dock quick actions, native drag-and-drop, in-app GitHub Releases updater |
 | Interface | Next.js 16 (App Router), React 19 | Static bundle (`output: 'export'`) loaded from loopback static protocol in packaged builds |
-| Styling and motion | Tailwind CSS v4, Motion | Light/Dark surface tokens, Profile Accent presets, unified 3D keycap controls, Inter & Elegant Sans typography, reduced-motion support |
+| Styling and motion | Tailwind CSS v4, Motion | Light/Dark surface tokens, Profile Accent presets, unified 3D keycap controls, vertical notification toast stack, Inter & Elegant Sans typography, reduced-motion support |
 | Database and validation | SQLite (`better-sqlite3`), Drizzle ORM, Zod | WAL journal mode, foreign-key cascades, versioned schema migrations, schema-checked IPC payloads |
 | Documents and analytics | `pdf-lib`, Electron `printToPDF`, Apache ECharts 6 | Local PDF invoices and contractor vouchers, multi-currency financial and turnaround charts |
-| Local AI and OCR | `tesseract.js`, `@huggingface/transformers`, `onnxruntime-node` | Offline LSTM screenshot OCR, bundled `all-MiniLM-L6-v2` semantic catalog matching, optional on-demand `Qwen2.5-0.5B-Instruct` local LLM |
-| Testing | Vitest, Playwright | Database integrity, security, offline PDF generation, local OCR/AI pipeline, and packaged Electron end-to-end tests |
+| Local AI and OCR | `tesseract.js`, `@huggingface/transformers`, `onnxruntime-node` | Offline LSTM screenshot OCR, bundled `all-MiniLM-L6-v2` semantic catalog matching, optional Enhanced Offline AI Pack (`bge-base-en-v1.5` + `nli-deberta-v3-small`) and optional loopback Ollama (`127.0.0.1`) |
+| Testing | Vitest, Playwright | Database integrity, security, offline PDF generation, updater, local OCR/AI pipeline, and packaged Electron end-to-end tests |
 
 ## Running from source
 
@@ -163,7 +164,7 @@ npm run dist:win         # Windows x64 NSIS setup (.exe)
 | Windows packaged app | `%APPDATA%\BillFlow\billflow.db` |
 | Development (`npm run dev:electron`) | `./.billflow-dev/billflow.db` |
 
-Additional local files stay in the same `userData` directory: SHA-256 receipt attachments under `attachments/`, isolated secondary workspaces under `profiles/<profile-id>/`, theme state in `appearance.json`, local AI tier preference in `ai-config.json`, optional Enhanced LLM weights under `models/` (shared across profiles and excluded from profile backups), and automatic `billflow.db.before-upgrade-*.bak` recovery copies created ahead of pending Drizzle migrations. Generated PDFs export to the folder configured in Settings (defaulting to Downloads).
+Additional local files stay in the same `userData` directory: SHA-256 receipt attachments under `attachments/`, isolated secondary workspaces under `profiles/<profile-id>/`, theme state in `appearance.json`, local AI tier preference in `ai-config.json`, optional Enhanced Offline AI Pack weights under `models/` (shared across profiles and excluded from profile backups), and automatic `billflow.db.before-upgrade-*.bak` recovery copies created ahead of pending Drizzle migrations. Generated PDFs export to the folder configured in Settings (defaulting to Downloads).
 
 ## Project background and credits
 
@@ -171,7 +172,7 @@ BillFlow was originally developed for **EER4189 Software Design in Group** (Grou
 
 | Contributor | GitHub | Area |
 | :--- | :--- | :--- |
-| Nipun Yatawara | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron shell, SQLite/Drizzle schema, multi-profile workspaces, task-to-invoice flow, local AI/OCR Smart Capture, motion tokens |
+| Nipun Yatawara | [@nipunyatawara-dev](https://github.com/nipunyatawara-dev) | Architecture, Electron shell, SQLite/Drizzle schema, multi-profile workspaces, task-to-invoice flow, local AI/OCR Smart Capture, in-app GitHub Releases updater, motion tokens |
 | GVSL-Lahiru | [@GVSL-Lahiru](https://github.com/GVSL-Lahiru) | Lead QA, deliverable handoff workflow, overdue aging summaries, CSV exports, navigation polish |
 | Binuka Reshan | [@Binukareshane](https://github.com/Binukareshane) | Subcontractor outsourcing engine, payable vouchers (`VND-INV-xxxx`), WhatsApp dispatch, ledger expense posting, Excel exports |
 | Sandika | [@Sandika-2003](https://github.com/Sandika-2003) | Service catalog, bulk CSV/Excel imports, UI integration, invoice sheet preview, macOS Calendar `.ics` sync |
