@@ -366,17 +366,41 @@ function createWindow() {
   mainWindow.on("move", scheduleSaveWindowState);
   mainWindow.on("maximize", scheduleSaveWindowState);
   mainWindow.on("unmaximize", scheduleSaveWindowState);
-  mainWindow.on("close", () => {
-    captureNormalBounds();
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-    }
-    try {
-      saveWindowState(statePath, currentWindowState());
-    } catch {
-      // Ignore non-fatal disk write error during window close
-    }
+  mainWindow.on("close", (event) => {
+    event.preventDefault();
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    dialog
+      .showMessageBox(win, {
+        type: "question",
+        buttons: ["Yes, Exit", "No, Stay"],
+        defaultId: 1,
+        cancelId: 1,
+        title: "Exit BillFlow",
+        message: "Are you sure you want to exit?",
+        detail: "Any unsaved changes will be lost.",
+        noLink: true,
+      })
+      .then(({ response }) => {
+        if (response === 0) {
+          // User confirmed — save state then quit
+          captureNormalBounds();
+          if (saveTimer) {
+            clearTimeout(saveTimer);
+            saveTimer = null;
+          }
+          try {
+            saveWindowState(statePath, currentWindowState());
+          } catch {
+            // Ignore non-fatal disk write error during window close
+          }
+          app.exit(0);
+        }
+        // response === 1 → user cancelled, do nothing
+      })
+      .catch(() => {
+        app.exit(0);
+      });
   });
 
   mainWindow.once("ready-to-show", () => {
