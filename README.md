@@ -3,7 +3,7 @@
   <h1>BillFlow</h1>
   <p>Local-first desktop workspace for client billing, task execution, subcontractor payouts, and profit tracking.</p>
   <p>
-    <a href="package.json"><img src="https://img.shields.io/badge/Version-0.3.0-111827.svg" alt="Version 0.3.0" /></a>
+    <a href="package.json"><img src="https://img.shields.io/badge/Version-0.3.1-111827.svg" alt="Version 0.3.1" /></a>
     <a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/Electron-44.11-47848F.svg" alt="Electron 44.11" /></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16.4-000000.svg" alt="Next.js 16.4" /></a>
     <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-WAL-003B57.svg" alt="SQLite WAL" /></a>

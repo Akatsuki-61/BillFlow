@@ -234,12 +234,13 @@ The earlier test counts above describe their original milestone; the current ver
 | **Nov 25** | Nipun | `Nipun` / `main` | Completed the Zentra-inspired Light/Dark/Accent redesign, compact KPI strips across 6 tabs, unified Invoices & Expenses export modals, unified 3D keycap buttons & toggles, macOS Retina theme-wipe fix, smooth Overview widget customizer collapse, and `v0.3.0` (Build 4) release preparation (`6293b6c`..`d19eb85`); synced `main`, `Nipun`, `Binuka`, `Lahiru`, and `Sandika` while keeping `UI-Rework` frozen at `3db5ae9`. |
 | **Nov 26** | Nipun | `Nipun` | Fixed macOS Electron 44 ONNX `SIGTRAP` crash, upgraded local AI to the Enhanced Offline AI Pack (`bge-base-en-v1.5` + `nli-deberta-v3-small`) + optional loopback Ollama, added the in-app GitHub Releases updater (Settings version button & macOS menu bar), reworked Smart Capture results with inline Client/Catalog/Due Date pickers, unified concurrent notification toasts into a vertical stack, and reworked Tasks card invoice top tint, 3D category tags, and 3-color priority flag icons (`7c3fc2c`..`7f88f3c`). |
 | **Nov 27** | Nipun | `main` / Members | Merged `Nipun` into `main` via fast-forward (`7f88f3c`), updated `README.md`, `CHANGELOG.md`, `CONTRIBUTIONS.md`, and `AGENTS.md`, and fast-forwarded `Nipun`, `Binuka`, `Lahiru`, and `Sandika` to `main` while keeping `UI-Rework` frozen at `3db5ae9`. |
+| **Nov 28** | Nipun | `main` | Prepared `v0.3.1` bug-fix release (`package.json`, `package-lock.json`, `electron-builder.yml` `bundleVersion` `5`, `README.md`, `CHANGELOG.md`, `CONTRIBUTIONS.md`), drafted the GitHub release, and built the signed macOS Apple Silicon `.dmg`. |
 
 ---
 
 ## Test & Build Verification
 
-The November 27 integrated state on `main` passed the following verification checks:
+The November 28 `v0.3.1` release preparation on `main` passed the following verification checks:
 
 - **Vitest:** **332 passing tests across 45 test files**, including SQLite integrity/security (`54` tests), task-to-invoice workflows, Section 6 workflows (quotes, recurring retainers, project margin, encrypted backups), GitHub Releases updater & macOS menu bar tests (`electron/test/updater.test.ts`, `electron/test/menu_and_charts.test.ts`), and real offline `tesseract.js` PNG OCR + ONNX semantic extraction (`electron/test/ai-entity-parser.test.ts`, `electron/test/ai-ipc.test.ts`, `electron/test/ai-document-scanners.test.ts`).
 - **TypeScript & Lint:** `npx tsc --noEmit` (0 errors) and `npx eslint src/ electron/` (0 errors, 0 warnings).

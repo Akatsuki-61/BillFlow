@@ -2,9 +2,9 @@
 
 Notable changes between BillFlow desktop releases.
 
-## Unreleased (Post-v0.3.0 Build 4 — 2026-11-26)
+## v0.3.1 (2026-11-28)
 
-Follow-up reliability, local AI, desktop update, and UI polish merged from `Nipun` into `main` (`7c3fc2c`..`7f88f3c`).
+Bug-fix and stability release fixing macOS local AI crashes, upgrading the offline AI engine with optional loopback Ollama, adding an in-app GitHub Releases updater, reworking Smart Capture results and inline pickers, stacking concurrent notification toasts vertically, and polishing the Tasks board cards.
 
 ### What's New
 
