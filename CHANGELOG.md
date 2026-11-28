@@ -34,6 +34,7 @@ Bug-fix and stability release fixing macOS local AI crashes, upgrading the offli
 ### Fixed
 
 - Fixed a fatal macOS Electron 44 `EXC_BREAKPOINT (SIGTRAP)` crash during ONNX Runtime `BFCArena::Extend` allocation by applying `SAFE_ONNX_SESSION_OPTIONS` (`enableCpuMemArena: false`, `enableMemPattern: false`) across local AI sessions.
+- Fixed an infinite React effect and Electron IPC loop in `UpdateProvider` (`UpdateContext.tsx`) that caused excessive idle CPU usage and continuous root re-renders.
 - Fixed Standard AI semantic catalog matching so close service descriptions resolve to the matching catalog item name and default rate.
 - Expanded automated verification to **332 Vitest tests across 45 test files** (adding `electron/test/updater.test.ts` and expanded AI entity-parser, AI IPC, and menu tests).
 
