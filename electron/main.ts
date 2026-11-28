@@ -576,13 +576,18 @@ if (gotSingleInstanceLock) {
         : path.join(__dirname, "../out");
 
       protocol.handle("app", async (req) => {
-        const filePath = resolveStaticFile(outDir, req.url);
+        const isRsc =
+          req.headers.get("rsc") === "1" || req.url.includes("_rsc=");
+        const filePath = resolveStaticFile(outDir, req.url, isRsc);
         if (!filePath) return new Response("Not found", { status: 404 });
         const response = await net.fetch(pathToFileURL(filePath).toString());
         const headers = new Headers(response.headers);
         headers.set("X-Content-Type-Options", "nosniff");
         if (req.url.includes("/_next/static/")) {
           headers.set("Cache-Control", "public, max-age=31536000, immutable");
+        }
+        if (isRsc && filePath.endsWith(".txt")) {
+          headers.set("Content-Type", "text/x-component; charset=utf-8");
         }
         if (filePath.endsWith(".html"))
           headers.set("Content-Security-Policy", cachedDocumentCsp(filePath));

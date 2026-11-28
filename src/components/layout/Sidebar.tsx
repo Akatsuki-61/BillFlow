@@ -196,35 +196,6 @@ export default function Sidebar() {
   const sheenId = useId();
   const isMac = useIsMac();
 
-  // Pre-warm all top-level routes on idle so switching tabs never stalls on first-visit chunk fetches.
-  useEffect(() => {
-    const routesToWarm = [
-      ...mainNavItems.map((item) => item.href),
-      "/settings",
-      "/support",
-    ];
-    const warmRoutes = () => {
-      for (const href of routesToWarm) {
-        router.prefetch(href);
-      }
-    };
-    const win = window as Window & {
-      requestIdleCallback?: (
-        cb: () => void,
-        opts?: { timeout: number },
-      ) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    if (typeof win.requestIdleCallback === "function") {
-      const idleId = win.requestIdleCallback(warmRoutes, { timeout: 800 });
-      return () => {
-        win.cancelIdleCallback?.(idleId);
-      };
-    }
-    const timer = window.setTimeout(warmRoutes, 150);
-    return () => window.clearTimeout(timer);
-  }, [router]);
-
   const openSearch = useCallback(() => {
     setSearchFocused(true);
     setSearchQuery("");
@@ -583,7 +554,6 @@ export default function Sidebar() {
                 <Link
                   key={item.id}
                   href={item.href}
-                  prefetch={true}
                   data-tour={`nav-${item.id}`}
                   aria-current={isActive ? "page" : undefined}
                   data-drop-state={dropState}

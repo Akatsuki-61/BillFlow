@@ -274,10 +274,23 @@ it("rejects protocol authority, encoded sibling traversal and escaping symlinks"
   fs.mkdirSync(root);
   fs.mkdirSync(sibling);
   fs.writeFileSync(path.join(root, "index.html"), "local");
+  fs.writeFileSync(path.join(root, "index.txt"), "rsc-root");
+  fs.mkdirSync(path.join(root, "invoices"));
+  fs.writeFileSync(path.join(root, "invoices", "index.html"), "inv-html");
+  fs.writeFileSync(path.join(root, "invoices", "index.txt"), "inv-rsc");
   fs.writeFileSync(path.join(sibling, "secret.txt"), "synthetic");
   fs.symlinkSync(sibling, path.join(root, "escape"));
   expect(resolveStaticFile(root, "app://billflow/index.html")).toBe(
     fs.realpathSync(path.join(root, "index.html")),
+  );
+  expect(resolveStaticFile(root, "app://billflow/invoices/")).toBe(
+    fs.realpathSync(path.join(root, "invoices", "index.html")),
+  );
+  expect(resolveStaticFile(root, "app://billflow/invoices/?_rsc=abc")).toBe(
+    fs.realpathSync(path.join(root, "invoices", "index.txt")),
+  );
+  expect(resolveStaticFile(root, "app://billflow/invoices/", true)).toBe(
+    fs.realpathSync(path.join(root, "invoices", "index.txt")),
   );
   for (const url of [
     "app://other/index.html",

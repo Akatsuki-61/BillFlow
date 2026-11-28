@@ -28,7 +28,7 @@ Bug-fix and stability release fixing macOS local AI crashes, upgrading the offli
   - Reworked task category tags into tactile 3D keycap badges matching BillFlow's button/toggle aesthetic across Kanban cards, List view, and the Task Detail modal.
   - Replaced text priority badges on Kanban cards with matching-height (`24px`) 3D **Flag** icon badges using a clear 3-color priority system (**Red** High/Urgent, **Blue** Medium, **Green** Low).
 - **Smoother Page Transitions & Outsourcing List Animations:**
-  - Eliminated the brief blank/dark background flash when switching routes by replacing `.motion-page`'s `opacity: 0` fade-in with a subtle `0.94 → 1` settle, pre-warming all top-level nav routes on idle, caching immutable `/_next/static/` bundles in Electron's `app://` protocol handler, and replacing jarring `<Suspense>` fallbacks on Catalog and Outsourcing.
+  - Eliminated the brief blank/dark background flash when switching routes by replacing `.motion-page`'s `opacity: 0` fade-in with a subtle `0.94 → 1` settle, serving proper `text/x-component` static RSC payloads (`index.txt`) for `?_rsc=` / `RSC: 1` requests in Electron's `app://` protocol handler, caching immutable `/_next/static/` bundles, and replacing jarring `<Suspense>` fallbacks on Catalog and Outsourcing.
   - Added one-by-one staggered row entrance animations (`listRowTransition`) to Outsourcing **Work Orders** and **Vendors** lists to match Expenses and Invoices while honoring `prefers-reduced-motion`.
 
 ### Fixed

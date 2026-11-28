@@ -5,6 +5,7 @@ import { createHash } from "crypto";
 export function resolveStaticFile(
   root: string,
   requestedUrl: string,
+  isRsc = false,
 ): string | null {
   try {
     const url = new URL(requestedUrl);
@@ -29,14 +30,24 @@ export function resolveStaticFile(
     };
     let file = path.resolve(canonicalRoot, `.${decoded}`);
     if (!contained(file)) return null;
-    const candidates = [
-      file,
-      path.join(file, "index.html"),
-      `${file}.html`,
-      ...(file.endsWith(".txt")
-        ? [path.join(file.slice(0, -4), "index.txt")]
-        : []),
-    ];
+    const wantsRsc = isRsc || url.searchParams.has("_rsc");
+    const candidates = wantsRsc
+      ? [
+          file,
+          path.join(file, "index.txt"),
+          `${file}.txt`,
+          ...(file.endsWith(".txt")
+            ? [path.join(file.slice(0, -4), "index.txt")]
+            : []),
+        ]
+      : [
+          file,
+          path.join(file, "index.html"),
+          `${file}.html`,
+          ...(file.endsWith(".txt")
+            ? [path.join(file.slice(0, -4), "index.txt")]
+            : []),
+        ];
     const match = candidates.find(
       (candidate) =>
         fs.existsSync(candidate) && fs.statSync(candidate).isFile(),
