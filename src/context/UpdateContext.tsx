@@ -5,6 +5,8 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState,
 } from "react";
 import packageJson from "../../package.json";
@@ -46,6 +48,11 @@ const UpdateContext = createContext<UpdateContextValue | null>(null);
 export function UpdateProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [status, setStatus] = useState<AppUpdateStatus>(FALLBACK_STATUS);
+  const statusRef = useRef<AppUpdateStatus>(FALLBACK_STATUS);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const checkForUpdates = useCallback(async (): Promise<AppUpdateStatus> => {
     const api = window.billflow?.updates;
@@ -72,7 +79,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       return next;
     } catch (err) {
       const failed: AppUpdateStatus = {
-        ...status,
+        ...statusRef.current,
         state: "error",
         error:
           err instanceof Error
@@ -83,7 +90,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       setStatus(failed);
       return failed;
     }
-  }, [status]);
+  }, []);
 
   const openUpdateDialog = useCallback(
     (autoCheck = true) => {
@@ -120,14 +127,14 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
 
   const downloadUpdate = useCallback(async (): Promise<AppUpdateStatus> => {
     const api = window.billflow?.updates;
-    if (!api) return status;
+    if (!api) return statusRef.current;
     try {
       const next = await api.download();
       setStatus(next);
       return next;
     } catch (err) {
       const failed: AppUpdateStatus = {
-        ...status,
+        ...statusRef.current,
         state: "error",
         error:
           err instanceof Error ? err.message : "Failed to download update.",
@@ -136,15 +143,15 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       setStatus(failed);
       return failed;
     }
-  }, [status]);
+  }, []);
 
   const cancelDownload = useCallback(async (): Promise<AppUpdateStatus> => {
     const api = window.billflow?.updates;
-    if (!api) return status;
+    if (!api) return statusRef.current;
     const next = await api.cancel();
     setStatus(next);
     return next;
-  }, [status]);
+  }, []);
 
   const installUpdate = useCallback(async (): Promise<void> => {
     const api = window.billflow?.updates;
@@ -168,8 +175,8 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       await api.openReleasePage();
       return;
     }
-    window.open(status.releaseUrl, "_blank", "noopener,noreferrer");
-  }, [status.releaseUrl]);
+    window.open(statusRef.current.releaseUrl, "_blank", "noopener,noreferrer");
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -202,22 +209,33 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     };
   }, [openUpdateDialog]);
 
+  const value = useMemo<UpdateContextValue>(
+    () => ({
+      isOpen,
+      status,
+      openUpdateDialog,
+      closeUpdateDialog,
+      checkForUpdates,
+      downloadUpdate,
+      cancelDownload,
+      installUpdate,
+      openReleasePage,
+    }),
+    [
+      isOpen,
+      status,
+      openUpdateDialog,
+      closeUpdateDialog,
+      checkForUpdates,
+      downloadUpdate,
+      cancelDownload,
+      installUpdate,
+      openReleasePage,
+    ],
+  );
+
   return (
-    <UpdateContext.Provider
-      value={{
-        isOpen,
-        status,
-        openUpdateDialog,
-        closeUpdateDialog,
-        checkForUpdates,
-        downloadUpdate,
-        cancelDownload,
-        installUpdate,
-        openReleasePage,
-      }}
-    >
-      {children}
-    </UpdateContext.Provider>
+    <UpdateContext.Provider value={value}>{children}</UpdateContext.Provider>
   );
 }
 
