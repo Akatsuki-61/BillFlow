@@ -4,7 +4,7 @@ import "@/components/catalog/catalog.css";
 
 export default function CatalogPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="workspace-page" />}>
       <CatalogView />
     </Suspense>
   );

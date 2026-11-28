@@ -50,8 +50,12 @@ import { Button, PageHeader, EmptyState } from "@/components/ui/Workspace";
 
 import { MotionPresence } from "@/components/ui/MotionSurface";
 import { useToast } from "@/context/ToastContext";
-import { m } from "motion/react";
-import { SPRING_NAV_GLIDE, SPRING_MENU_POPOVER } from "@/lib/motion";
+import { m, useReducedMotion } from "motion/react";
+import {
+  SPRING_NAV_GLIDE,
+  SPRING_MENU_POPOVER,
+  listRowTransition,
+} from "@/lib/motion";
 import {
   useClients,
   useInvoices,
@@ -95,6 +99,7 @@ export default function OutsourcingView() {
   const [activeTab, setActiveTab] = useState<"work-orders" | "vendors">(
     "work-orders",
   );
+  const reducedMotion = Boolean(useReducedMotion());
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -1127,14 +1132,19 @@ export default function OutsourcingView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredWorkOrders.map((wo) => {
+                    {filteredWorkOrders.map((wo, idx) => {
                       const resolved = resolveDeliveryUrl(wo, {
                         tasks,
                         invoices,
                         clients,
                       });
                       return (
-                        <tr key={wo.id}>
+                        <m.tr
+                          key={wo.id}
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={listRowTransition(idx, reducedMotion)}
+                        >
                           <td className="work-order-scope">
                             <div className="record-identity">
                               <div className="record-avatar">
@@ -1250,7 +1260,7 @@ export default function OutsourcingView() {
                               </Button>
                             </div>
                           </td>
-                        </tr>
+                        </m.tr>
                       );
                     })}
                   </tbody>
@@ -1287,12 +1297,18 @@ export default function OutsourcingView() {
               )}
             </EmptyState>
           ) : (
-            filteredVendors.map((vendor) => {
+            filteredVendors.map((vendor, idx) => {
               const linkedOrders = workOrders.filter(
                 (w) => w.vendorId === vendor.id,
               );
               return (
-                <div key={vendor.id} className="vendor-list-row">
+                <m.div
+                  key={vendor.id}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={listRowTransition(idx, reducedMotion)}
+                  className="vendor-list-row"
+                >
                   <div className="vendor-info-group">
                     <div className="vendor-avatar-icon">
                       {vendor.photoData ? (
@@ -1388,7 +1404,7 @@ export default function OutsourcingView() {
                       <Download className="text-[11px]" />
                     </Button>
                   </div>
-                </div>
+                </m.div>
               );
             })
           )}

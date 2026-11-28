@@ -202,9 +202,10 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
   }
 }
 
-/* Opacity only on page containers keeps fixed dialogs anchored to the viewport. */
+/* Opacity only on page containers keeps fixed dialogs anchored to the viewport.
+   Never start at opacity: 0 so switching routes never flashes a blank canvas frame. */
 .motion-page {
-  animation: page-arrive 240ms var(--motion-ease);
+  animation: page-settle 130ms var(--motion-ease);
 }
 
 [data-motion-surface="panel"] {
@@ -221,6 +222,15 @@ button[aria-expanded="true"] > :is(.lucide-chevron-down, .motion-chevron) {
 /* Toast feedback notifications always appear on the topmost layer above all modals, overlays, and drawers. */
 [data-motion-surface="toast"] {
   z-index: 9999 !important;
+}
+
+@keyframes page-settle {
+  from {
+    opacity: 0.94;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes page-arrive {

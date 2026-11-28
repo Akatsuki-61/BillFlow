@@ -581,6 +581,9 @@ if (gotSingleInstanceLock) {
         const response = await net.fetch(pathToFileURL(filePath).toString());
         const headers = new Headers(response.headers);
         headers.set("X-Content-Type-Options", "nosniff");
+        if (req.url.includes("/_next/static/")) {
+          headers.set("Cache-Control", "public, max-age=31536000, immutable");
+        }
         if (filePath.endsWith(".html"))
           headers.set("Content-Security-Policy", cachedDocumentCsp(filePath));
         return new Response(response.body, { status: response.status, headers });

@@ -11,13 +11,7 @@ export const metadata: Metadata = {
 // Dedicated /outsourcing route page
 export default function OutsourcingPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="workspace-page flex items-center justify-center min-h-[60vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-800" />
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="workspace-page" />}>
       <OutsourcingView />
     </Suspense>
   );
