@@ -366,42 +366,40 @@ function createWindow() {
   mainWindow.on("move", scheduleSaveWindowState);
   mainWindow.on("maximize", scheduleSaveWindowState);
   mainWindow.on("unmaximize", scheduleSaveWindowState);
+  let closeConfirmPending = false;
   mainWindow.on("close", (event) => {
     event.preventDefault();
     const win = mainWindow;
     if (!win || win.isDestroyed()) return;
-    dialog
-      .showMessageBox(win, {
-        type: "question",
-        buttons: ["Yes, Exit", "No, Stay"],
-        defaultId: 1,
-        cancelId: 1,
-        title: "Exit BillFlow",
-        message: "Are you sure you want to exit?",
-        detail: "Any unsaved changes will be lost.",
-        noLink: true,
-      })
-      .then(({ response }) => {
-        if (response === 0) {
-          // User confirmed — save state then quit
-          captureNormalBounds();
-          if (saveTimer) {
-            clearTimeout(saveTimer);
-            saveTimer = null;
-          }
-          try {
-            saveWindowState(statePath, currentWindowState());
-          } catch {
-            // Ignore non-fatal disk write error during window close
-          }
-          app.exit(0);
+    // If the dialog is already open, ignore additional close attempts
+    if (closeConfirmPending) return;
+    closeConfirmPending = true;
+
+    // Ask the renderer to show the in-app themed exit confirmation dialog.
+    // The renderer will send 'window:close-response' back with the user's choice.
+    win.webContents.send("window:confirm-close");
+
+    ipcMain.once("window:close-response", (_e, confirmed: boolean) => {
+      closeConfirmPending = false;
+      if (confirmed) {
+        // User confirmed — save state then exit cleanly
+        captureNormalBounds();
+        if (saveTimer) {
+          clearTimeout(saveTimer);
+          saveTimer = null;
         }
-        // response === 1 → user cancelled, do nothing
-      })
-      .catch(() => {
+        try {
+          saveWindowState(statePath, currentWindowState());
+        } catch {
+          // Ignore non-fatal disk write error during window close
+        }
         app.exit(0);
-      });
+      }
+      // confirmed === false → user cancelled, dialog closes, nothing happens
+    });
   });
+
+
 
   mainWindow.once("ready-to-show", () => {
     if (

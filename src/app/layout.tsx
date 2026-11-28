@@ -23,6 +23,8 @@ import { AiCaptureProvider } from "@/context/AiCaptureContext";
 import { UpdateProvider } from "@/context/UpdateContext";
 import { SmartCaptureDrawer } from "@/components/ai/SmartCaptureDrawer";
 import { UpdateDialog } from "@/components/ui/UpdateDialog";
+import { ExitConfirmDialog } from "@/components/ui/ExitConfirmDialog";
+
 import { WorkspaceTour } from "@/components/onboarding/WorkspaceTour";
 import { KeyboardShortcutsModal } from "@/components/onboarding/KeyboardShortcutsModal";
 import "./globals.css";
@@ -75,6 +77,8 @@ export default function RootLayout({
                         <Sidebar />
                         <SmartCaptureDrawer />
                         <UpdateDialog />
+                        <ExitConfirmDialog />
+
                         <WorkspaceTour />
                         <KeyboardShortcutsModal />
                         <main className="workspace-scroll min-w-0 flex-1 bg-canvas min-h-0 overflow-y-auto">

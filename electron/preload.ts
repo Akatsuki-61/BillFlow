@@ -641,4 +641,16 @@ if (process.isMainFrame && trustedDocument)
         ipcRenderer.removeListener("navigate-to", handler);
       };
     },
+    window: {
+      onConfirmClose: (callback: () => void) => {
+        const listener = () => callback();
+        ipcRenderer.on("window:confirm-close", listener);
+        return () => {
+          ipcRenderer.removeListener("window:confirm-close", listener);
+        };
+      },
+      closeResponse: (confirmed: boolean): void => {
+        ipcRenderer.send("window:close-response", confirmed);
+      },
+    },
   });

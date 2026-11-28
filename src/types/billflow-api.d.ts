@@ -494,7 +494,12 @@ export interface BillFlowAPI extends WorkflowAPI {
   onWorkspaceLocked?: (callback: () => void) => () => void;
   onDataChanged: (callback: (change?: WorkspaceChange) => void) => () => void;
   onNavigate?: (callback: (route: string) => void) => () => void;
+  window?: {
+    onConfirmClose: (callback: () => void) => () => void;
+    closeResponse: (confirmed: boolean) => void;
+  };
 }
+
 
 declare global {
   interface Window {
