@@ -17,6 +17,7 @@ const bootstrapChannels = new Set([
   "profiles:completeOnboarding",
   "theme:initial",
   "theme:set",
+  "window:close-response",
 ]);
 
 const allowedMailtoParams = new Set(["subject", "body", "cc", "bcc"]);
@@ -121,5 +122,18 @@ export const ipcMain = {
         event.returnValue = null;
       }
     });
+  },
+  once(channel: string, listener: Parameters<typeof nativeIpcMain.once>[1]) {
+    nativeIpcMain.once(channel, (event, ...args) => {
+      try {
+        assertTrustedSender(event, channel);
+        listener(event, ...args);
+      } catch {
+        event.returnValue = null;
+      }
+    });
+  },
+  removeAllListeners(channel: string) {
+    nativeIpcMain.removeAllListeners(channel);
   },
 };

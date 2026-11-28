@@ -367,6 +367,8 @@ function createWindow() {
   mainWindow.on("maximize", scheduleSaveWindowState);
   mainWindow.on("unmaximize", scheduleSaveWindowState);
   let closeConfirmPending = false;
+  const CLOSE_RESPONSE = "window:close-response";
+
   mainWindow.on("close", (event) => {
     event.preventDefault();
     const win = mainWindow;
@@ -379,7 +381,7 @@ function createWindow() {
     // The renderer will send 'window:close-response' back with the user's choice.
     win.webContents.send("window:confirm-close");
 
-    ipcMain.once("window:close-response", (_e, confirmed: boolean) => {
+    ipcMain.once(CLOSE_RESPONSE, (_e, confirmed: boolean) => {
       closeConfirmPending = false;
       if (confirmed) {
         // User confirmed — save state then exit cleanly
@@ -395,7 +397,7 @@ function createWindow() {
         }
         app.exit(0);
       }
-      // confirmed === false → user cancelled, dialog closes, nothing happens
+      // confirmed === false → user cancelled, dialog stays closed, nothing happens
     });
   });
 
